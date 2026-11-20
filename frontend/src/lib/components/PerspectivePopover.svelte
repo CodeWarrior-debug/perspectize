@@ -17,24 +17,24 @@
 		Button,
 		Label,
 		Switch,
-	} from '$lib/components/shadcn';
-	import RatingInput from '$lib/components/RatingInput.svelte';
-	import Thumbs from '$lib/components/Thumbs.svelte';
-	import CommentsEditor from '$lib/components/CommentsEditor.svelte';
-	import AddFieldSearch from '$lib/components/AddFieldSearch.svelte';
-	import { sanitizeHtml } from '$lib/utils/sanitize';
-	import { hasReviewContent, reviewPreviewText } from '$lib/utils/reviewContent';
-	import { draftKey, saveDraft, loadDraft, clearDraft } from '$lib/utils/perspectiveDraft';
-	import type { FieldDef } from '$lib/components/AddFieldSearch.svelte';
-	import { useCreatePerspective } from '$lib/queries/perspectives/useCreatePerspective';
-	import { useUpdatePerspective } from '$lib/queries/perspectives/useUpdatePerspective';
-	import { useDeletePerspective } from '$lib/queries/perspectives/useDeletePerspective';
-	import { useFetchUserTodos } from '$lib/queries/userTodos/useFetchUserTodos';
-	import { useUpdateUserTodo } from '$lib/queries/userTodos/useUpdateUserTodo';
-	import { completedTodoInput, openConsumeOrReviewTodos } from '$lib/utils/plan-todo-helpers';
-	import { toastWithAction } from '$lib/utils/toast';
-	import { isOptimisticId, type PerspectiveItem } from '$lib/queries/perspectives';
-	import FeelWheel, { type Feeling } from '$lib/components/FeelWheel.svelte';
+	} from '#lib/components/shadcn/index.js';
+	import RatingInput from '#lib/components/RatingInput.svelte';
+	import Thumbs from '#lib/components/Thumbs.svelte';
+	import CommentsEditor from '#lib/components/CommentsEditor.svelte';
+	import AddFieldSearch from '#lib/components/AddFieldSearch.svelte';
+	import { sanitizeHtml } from '#lib/utils/sanitize.js';
+	import { hasReviewContent, reviewPreviewText } from '#lib/utils/reviewContent.js';
+	import { draftKey, saveDraft, loadDraft, clearDraft } from '#lib/utils/perspectiveDraft.js';
+	import type { FieldDef } from '#lib/components/AddFieldSearch.svelte';
+	import { useCreatePerspective } from '#lib/queries/perspectives/useCreatePerspective.js';
+	import { useUpdatePerspective } from '#lib/queries/perspectives/useUpdatePerspective.js';
+	import { useDeletePerspective } from '#lib/queries/perspectives/useDeletePerspective.js';
+	import { useFetchUserTodos } from '#lib/queries/userTodos/useFetchUserTodos.js';
+	import { useUpdateUserTodo } from '#lib/queries/userTodos/useUpdateUserTodo.js';
+	import { completedTodoInput, openConsumeOrReviewTodos } from '#lib/utils/plan-todo-helpers.js';
+	import { toastWithAction } from '#lib/utils/toast.js';
+	import { isOptimisticId, type PerspectiveItem } from '#lib/queries/perspectives/index.js';
+	import FeelWheel, { type Feeling } from '#lib/components/FeelWheel.svelte';
 
 	/**
 	 * PerspectivePopover — centered modal for creating or editing a perspective.
@@ -147,7 +147,7 @@
 		}
 	}
 
-	import { getFieldLabel, STANDARD_DIMENSIONS } from '$lib/utils/comparePerspectives';
+	import { getFieldLabel, STANDARD_DIMENSIONS } from '#lib/utils/comparePerspectives.js';
 
 	// Tracks the most recently added field so its newly-rendered row can be
 	// scrolled into view — the ratings grid grows downward inside a scroll

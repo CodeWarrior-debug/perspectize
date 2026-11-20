@@ -16,8 +16,8 @@ import {
 	statusPrompt,
 	todayIso,
 	type TodoFormValues,
-} from '$lib/utils/plan-todo-helpers';
-import type { TodoActionItem, UserTodoItem } from '$lib/queries/userTodos';
+} from '#lib/utils/plan-todo-helpers.js';
+import type { TodoActionItem, UserTodoItem } from '#lib/queries/userTodos/index.js';
 
 function action(id: string, label: string, typicalSequence: number | null, description = ''): TodoActionItem {
 	return { id, key: label.toLowerCase(), label, description, typicalSequence, isPreset: typicalSequence !== null };

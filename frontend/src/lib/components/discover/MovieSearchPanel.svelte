@@ -1,7 +1,7 @@
 <script lang="ts">
 	import type { LibraryItem } from './libraryItem';
 	import { createQuery, useQueryClient } from '@tanstack/svelte-query';
-	import { Button, Input } from '$lib/components/shadcn';
+	import { Button, Input } from '#lib/components/shadcn/index.js';
 	import MovieCard from './MovieCard.svelte';
 	import MovieTrendingFeed from './MovieTrendingFeed.svelte';
 	import {
@@ -13,8 +13,8 @@
 		tmdbKeys,
 		type MovieSearchPage,
 		type TrendingWindow,
-	} from '$lib/services/tmdbApi';
-	import { validateMovieInput } from '$lib/utils/movie';
+	} from '#lib/services/tmdbApi.js';
+	import { validateMovieInput } from '#lib/utils/movie.js';
 	import GlassesIcon from '@lucide/svelte/icons/glasses';
 	import SearchIcon from '@lucide/svelte/icons/search';
 	import XIcon from '@lucide/svelte/icons/x';

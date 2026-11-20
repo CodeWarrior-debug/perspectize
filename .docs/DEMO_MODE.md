@@ -87,7 +87,7 @@ Host the files as release assets (same flow as [PR_SCREENSHOTS.md](PR_SCREENSHOT
 - Demo tokens are unsigned by design. The only protection is that production never runs with `DEMO_MODE=true` — enforced at startup. Never deploy the demo stack publicly with real user data.
 - A production (Clerk-only) backend treats `demo.*` tokens as anonymous (covered by `TestMiddleware_DemoTokenIgnoredWithoutDemoVerifier`).
 - Compose publishes ports on `127.0.0.1` only.
-- New frontend code must use the auth facade (`$lib/auth`, `components/auth/*`), not `svelte-clerk` directly, or it will break in demo mode (there is no `ClerkProvider` in the tree).
+- New frontend code must use the auth facade (`#lib/auth`, `components/auth/*`), not `svelte-clerk` directly, or it will break in demo mode (there is no `ClerkProvider` in the tree).
 
 ## Not covered yet / next steps
 

@@ -1,8 +1,8 @@
 <script lang="ts">
 	import { page } from '$app/state';
-	import ThreadView from '$lib/components/messaging/ThreadView.svelte';
-	import { useEditMessage } from '$lib/queries/messaging/useEditMessage';
-	import { useDeleteMessage } from '$lib/queries/messaging/useDeleteMessage';
+	import ThreadView from '#lib/components/messaging/ThreadView.svelte';
+	import { useEditMessage } from '#lib/queries/messaging/useEditMessage.js';
+	import { useDeleteMessage } from '#lib/queries/messaging/useDeleteMessage.js';
 
 	const editMutation = useEditMessage();
 	const deleteMutation = useDeleteMessage();

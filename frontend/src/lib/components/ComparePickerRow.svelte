@@ -1,6 +1,6 @@
 <script lang="ts">
 	import ArrowLeftRightIcon from '@lucide/svelte/icons/arrow-left-right';
-	import { identityColor, nameInitials } from '$lib/utils/compareIdentity';
+	import { identityColor, nameInitials } from '#lib/utils/compareIdentity.js';
 
 	let {
 		options,

@@ -2,7 +2,7 @@ import { createQuery, useQueryClient } from '@tanstack/svelte-query';
 import { graphqlRequest } from '../client';
 import { LIST_THREAD_MESSAGES, type ListThreadMessagesResponse } from './index';
 import { queryKeys } from '../keys';
-import { seedFromApiPage, prependOlderPage, type ThreadMessagesCache } from '$lib/messaging/threadCache';
+import { seedFromApiPage, prependOlderPage, type ThreadMessagesCache } from '#lib/messaging/threadCache.js';
 
 const PAGE_SIZE = 40;
 

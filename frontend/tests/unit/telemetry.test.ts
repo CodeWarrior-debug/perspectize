@@ -14,7 +14,7 @@ const GRAPHQL_URL = 'https://api.perspectize.com/graphql';
 
 async function loadTelemetry() {
 	vi.resetModules();
-	return import('$lib/telemetry');
+	return import('#lib/telemetry.js');
 }
 
 type FaroConfig = {
@@ -63,7 +63,7 @@ describe('initTelemetry', () => {
 		vi.stubEnv('VITE_FARO_URL', FARO_URL);
 		vi.stubEnv('VITE_APP_ENV', 'production');
 		const { initTelemetry } = await loadTelemetry();
-		const { APP_VERSION } = await import('$lib/buildInfo');
+		const { APP_VERSION } = await import('#lib/buildInfo.js');
 		await initTelemetry();
 		const cfg = faroConfig();
 		expect(cfg.url).toBe(FARO_URL);
@@ -91,7 +91,7 @@ describe('initTelemetry', () => {
 	it('tags the session with platform and git sha', async () => {
 		vi.stubEnv('VITE_FARO_URL', FARO_URL);
 		const { initTelemetry } = await loadTelemetry();
-		const { GIT_SHA } = await import('$lib/buildInfo');
+		const { GIT_SHA } = await import('#lib/buildInfo.js');
 		await initTelemetry();
 		expect(faroConfig().sessionTracking.session.attributes).toEqual({ platform: 'web', git_sha: GIT_SHA });
 	});

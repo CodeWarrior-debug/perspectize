@@ -1,6 +1,6 @@
 <script lang="ts">
-	import { Input } from '$lib/components/shadcn';
-	import { NO_AUTOFILL } from '$lib/utils/noAutofill';
+	import { Input } from '#lib/components/shadcn/index.js';
+	import { NO_AUTOFILL } from '#lib/utils/noAutofill.js';
 	import SearchIcon from '@lucide/svelte/icons/search';
 	import XIcon from '@lucide/svelte/icons/x';
 

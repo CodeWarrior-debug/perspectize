@@ -1,8 +1,8 @@
 <script lang="ts">
-	import { NO_AUTOFILL } from '$lib/utils/noAutofill';
-	import type { Message, MessagingUser } from '$lib/queries/messaging';
-	import { isOptimistic } from '$lib/messaging/optimistic';
-	import { messageClockTime } from '$lib/messaging/format';
+	import { NO_AUTOFILL } from '#lib/utils/noAutofill.js';
+	import type { Message, MessagingUser } from '#lib/queries/messaging/index.js';
+	import { isOptimistic } from '#lib/messaging/optimistic.js';
+	import { messageClockTime } from '#lib/messaging/format.js';
 	import Avatar from './Avatar.svelte';
 	import MessageLink from './MessageLink.svelte';
 	import { linkify } from './linkify';

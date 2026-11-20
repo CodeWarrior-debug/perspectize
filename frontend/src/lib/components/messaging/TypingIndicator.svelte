@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { typingLabel } from '$lib/messaging/format';
+	import { typingLabel } from '#lib/messaging/format.js';
 
 	let { usernames }: { usernames: string[] } = $props();
 </script>

@@ -3,26 +3,26 @@
 	 * Signed-in shell: coach eligibility, quiet graduate, and OnboardingCoach mount.
 	 */
 	import { createQuery } from '@tanstack/svelte-query';
-	import { useMe } from '$lib/queries/users/useMe.svelte';
-	import { isCoachEligible } from '$lib/onboarding/eligibility';
+	import { useMe } from '#lib/queries/users/useMe.svelte.js';
+	import { isCoachEligible } from '#lib/onboarding/eligibility.js';
 	import {
 		resolveShowCoach,
 		resolveQuietGraduate,
 		markQuietGraduateAttempted,
 		getCoachForceOpen,
 		getCoachReplayNonce,
-	} from '$lib/onboarding/coachGate.svelte';
-	import { CURRENT_INTRO_VERSION } from '$lib/onboarding/config';
-	import { useMarkOnboardingSeen } from '$lib/queries/users/useMarkOnboardingSeen';
-	import { graphqlRequest } from '$lib/queries/client';
-	import { LIST_CONTENT, type ContentResponse } from '$lib/queries/content';
+	} from '#lib/onboarding/coachGate.svelte.js';
+	import { CURRENT_INTRO_VERSION } from '#lib/onboarding/config.js';
+	import { useMarkOnboardingSeen } from '#lib/queries/users/useMarkOnboardingSeen.js';
+	import { graphqlRequest } from '#lib/queries/client.js';
+	import { LIST_CONTENT, type ContentResponse } from '#lib/queries/content/index.js';
 	import {
 		LIST_PERSPECTIVES_BY_USER,
 		MAX_PERSPECTIVES_PER_LIST,
 		type ListPerspectivesByUserResponse,
-	} from '$lib/queries/perspectives';
-	import { queryKeys } from '$lib/queries/keys';
-	import OnboardingCoach from '$lib/components/onboarding/OnboardingCoach.svelte';
+	} from '#lib/queries/perspectives/index.js';
+	import { queryKeys } from '#lib/queries/keys.js';
+	import OnboardingCoach from '#lib/components/onboarding/OnboardingCoach.svelte';
 
 	const meState = useMe();
 	const markSeen = useMarkOnboardingSeen();

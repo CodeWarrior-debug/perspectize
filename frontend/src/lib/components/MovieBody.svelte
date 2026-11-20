@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { moviePeople, movieResponse, type MovieRow } from '$lib/utils/formatting';
+	import { moviePeople, movieResponse, type MovieRow } from '#lib/utils/formatting.js';
 
 	// Synopsis, top cast (directors first, linked to TMDB person pages) and keywords.
 	let { row }: { row: MovieRow } = $props();

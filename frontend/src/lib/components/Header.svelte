@@ -1,14 +1,14 @@
 <script lang="ts">
-	import AuthShow from '$lib/components/auth/AuthShow.svelte';
-	import SignInTrigger from '$lib/components/auth/SignInTrigger.svelte';
-	import UserMenu from '$lib/components/auth/UserMenu.svelte';
-	import AddContentPopover from '$lib/components/AddContentPopover.svelte';
-	import SettingsDialog from '$lib/components/SettingsDialog.svelte';
+	import AuthShow from '#lib/components/auth/AuthShow.svelte';
+	import SignInTrigger from '#lib/components/auth/SignInTrigger.svelte';
+	import UserMenu from '#lib/components/auth/UserMenu.svelte';
+	import AddContentPopover from '#lib/components/AddContentPopover.svelte';
+	import SettingsDialog from '#lib/components/SettingsDialog.svelte';
 	import SettingsIcon from '@lucide/svelte/icons/settings';
 	import { page } from '$app/state';
-	import { createThemeStore } from '$lib/theme/store.svelte';
-	import { createFontStore } from '$lib/fonts/store.svelte';
-	import { LIBRARY_PATH } from '$lib/utils/contentLinks';
+	import { createThemeStore } from '#lib/theme/store.svelte.js';
+	import { createFontStore } from '#lib/fonts/store.svelte.js';
+	import { LIBRARY_PATH } from '#lib/utils/contentLinks.js';
 
 	const themeStore = createThemeStore();
 	const fontStore = createFontStore();

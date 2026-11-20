@@ -8,8 +8,8 @@ import {
 	clearLayout,
 	defaultLayout,
 	planColumnSwitch,
-} from '$lib/utils/columnLayouts';
-import { togglableColIds } from '$lib/utils/grid-config';
+} from '#lib/utils/columnLayouts.js';
+import { togglableColIds } from '#lib/utils/grid-config.js';
 
 describe('columnViewFor', () => {
 	it('is movie only when the type filter is exactly MOVIE', () => {

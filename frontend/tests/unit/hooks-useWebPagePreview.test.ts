@@ -17,13 +17,13 @@ vi.mock('@tanstack/svelte-query', async (importOriginal) => {
 	};
 });
 
-vi.mock('$lib/queries/client', () => ({ graphqlRequest: mockGraphqlRequest }));
+vi.mock('#lib/queries/client.js', () => ({ graphqlRequest: mockGraphqlRequest }));
 
 const URL_A = 'https://arxiv.org/abs/1706.03762';
 const URL_B = 'https://example.com/post';
 
 async function mountPreview(url: string | null) {
-	const { useWebPagePreview } = await import('$lib/queries/content/useWebPagePreview');
+	const { useWebPagePreview } = await import('#lib/queries/content/useWebPagePreview.js');
 	useWebPagePreview(() => url);
 	return capturedQueryOptions;
 }
@@ -31,9 +31,9 @@ async function mountPreview(url: string | null) {
 // The tests import these inside their bodies; load them once up front so the first
 // test doesn't pay the module transform, which balloons under full-suite load (#728).
 preloadLazy(
-	() => import('$lib/queries/content'),
-	() => import('$lib/queries/content/useWebPagePreview'),
-	() => import('$lib/queries/keys'),
+	() => import('#lib/queries/content/index.js'),
+	() => import('#lib/queries/content/useWebPagePreview.js'),
+	() => import('#lib/queries/keys.js'),
 );
 
 describe('useWebPagePreview', () => {
@@ -61,14 +61,14 @@ describe('useWebPagePreview', () => {
 	});
 
 	it('stays out of the content list keys, so a list invalidation does not refetch it', async () => {
-		const { queryKeys } = await import('$lib/queries/keys');
+		const { queryKeys } = await import('#lib/queries/keys.js');
 		const options = await mountPreview(URL_A);
 		const listKey = queryKeys.content.lists();
 		expect(options.queryKey.slice(0, listKey.length)).not.toEqual(listKey);
 	});
 
 	it('is cached for a deliberate window (the page is read once; the preview does not change minute to minute)', async () => {
-		const { WEB_PAGE_PREVIEW_STALE_TIME_MS } = await import('$lib/queries/content/useWebPagePreview');
+		const { WEB_PAGE_PREVIEW_STALE_TIME_MS } = await import('#lib/queries/content/useWebPagePreview.js');
 		const options = await mountPreview(URL_A);
 		expect(options.staleTime).toBe(WEB_PAGE_PREVIEW_STALE_TIME_MS);
 		expect(WEB_PAGE_PREVIEW_STALE_TIME_MS).toBeGreaterThan(0);
@@ -76,7 +76,7 @@ describe('useWebPagePreview', () => {
 
 	it('sends the url through the authenticated graphqlRequest wrapper and unwraps previewWebPage', async () => {
 		mockGraphqlRequest.mockResolvedValue({ previewWebPage: { title: 'Attention', alreadyExistsContentId: null } });
-		const { PREVIEW_WEB_PAGE } = await import('$lib/queries/content');
+		const { PREVIEW_WEB_PAGE } = await import('#lib/queries/content/index.js');
 		const options = await mountPreview(URL_A);
 		const result = await options.queryFn();
 		expect(mockGraphqlRequest).toHaveBeenCalledWith(PREVIEW_WEB_PAGE, { url: URL_A });

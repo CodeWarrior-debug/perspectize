@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { render, screen } from '@testing-library/svelte';
-import InterlinearCredit from '$lib/components/interlinear/InterlinearCredit.svelte';
+import InterlinearCredit from '#lib/components/interlinear/InterlinearCredit.svelte';
 
 describe('InterlinearCredit', () => {
 	it('links "STEP Bible" to stepbible.org and states the license', () => {

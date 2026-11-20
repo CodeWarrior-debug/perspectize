@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/svelte';
-import CompareRatingTable from '$lib/components/CompareRatingTable.svelte';
-import type { RatingRow, FilledInDifferentlyRow, FeelingComparison } from '$lib/utils/comparePerspectives';
+import CompareRatingTable from '#lib/components/CompareRatingTable.svelte';
+import type { RatingRow, FilledInDifferentlyRow, FeelingComparison } from '#lib/utils/comparePerspectives.js';
 
 const rows: RatingRow[] = [
 	{ key: 'quality', label: 'Quality', leftDisplay: 8, rightDisplay: 7, delta: 1, pctDiff: 10, status: 'similar' },

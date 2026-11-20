@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { hasReviewContent, reviewPreviewText } from '$lib/utils/reviewContent';
+import { hasReviewContent, reviewPreviewText } from '#lib/utils/reviewContent.js';
 
 describe('hasReviewContent', () => {
 	it('is false for empty and whitespace-only editor output', () => {

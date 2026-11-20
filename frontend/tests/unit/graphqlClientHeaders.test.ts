@@ -6,8 +6,8 @@ vi.mock('@capacitor/core', () => ({
 	Capacitor: { getPlatform: mockGetPlatform },
 }));
 
-import { graphqlClient, graphqlRequest } from '$lib/queries/client';
-import { APP_VERSION } from '$lib/buildInfo';
+import { graphqlClient, graphqlRequest } from '#lib/queries/client.js';
+import { APP_VERSION } from '#lib/buildInfo.js';
 
 beforeEach(() => {
 	mockGetPlatform.mockReturnValue('android');

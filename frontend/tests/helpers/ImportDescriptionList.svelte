@@ -1,6 +1,6 @@
 <script lang="ts">
-	import ImportDescription from '$lib/components/imports/ImportDescription.svelte';
-	import { useImportJobs } from '$lib/queries/imports/useImportJobs';
+	import ImportDescription from '#lib/components/imports/ImportDescription.svelte';
+	import { useImportJobs } from '#lib/queries/imports/useImportJobs.js';
 
 	/**
 	 * The Imports list's description rows, read through the real list hook, so a

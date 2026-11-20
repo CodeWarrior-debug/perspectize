@@ -1,9 +1,9 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, within } from '@testing-library/svelte';
 import { tick } from 'svelte';
-import PlanTable from '$lib/components/plan/PlanTable.svelte';
-import { PLAN_COL_IDS, planColumnsForTier } from '$lib/utils/plan-grid-config';
-import type { UserTodoItem } from '$lib/queries/userTodos';
+import PlanTable from '#lib/components/plan/PlanTable.svelte';
+import { PLAN_COL_IDS, planColumnsForTier } from '#lib/utils/plan-grid-config.js';
+import type { UserTodoItem } from '#lib/queries/userTodos/index.js';
 
 /**
  * AG Grid does not render in jsdom, so the grid component is replaced by one that records

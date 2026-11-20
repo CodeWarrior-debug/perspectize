@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import type { CellClassParams } from '@ag-grid-community/core';
-import { EMPTY_CLASS, emptyCellClassRules, isEmptyMarker } from '$lib/utils/grid-empty';
-import { EMPTY_VALUE, formatTags } from '$lib/utils/formatting';
+import { EMPTY_CLASS, emptyCellClassRules, isEmptyMarker } from '#lib/utils/grid-empty.js';
+import { EMPTY_VALUE, formatTags } from '#lib/utils/formatting.js';
 
 describe('isEmptyMarker', () => {
 	it('is true only for the exact empty marker', () => {

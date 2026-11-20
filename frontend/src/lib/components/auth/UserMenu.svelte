@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { UserButton } from 'svelte-clerk';
-	import { DEMO_MODE, demoSession } from '$lib/auth';
+	import { DEMO_MODE, demoSession } from '#lib/auth/index.js';
 
 	/** Signed-in account control: Clerk's UserButton, or the demo persona chip. */
 	const initial = $derived(demoSession.current?.name.charAt(0).toUpperCase() ?? '?');

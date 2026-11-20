@@ -9,7 +9,7 @@
  * (useAddMovie) using the result's canonical `url`, so dedupe is unchanged.
  */
 import { gql } from 'graphql-request';
-import { graphqlRequest } from '$lib/queries/client';
+import { graphqlRequest } from '#lib/queries/client.js';
 
 /** One movie from TMDB search, as the backend maps it (schema.graphql MovieSearchResult). */
 export interface MovieSearchResult {

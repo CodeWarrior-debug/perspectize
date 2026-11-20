@@ -1,5 +1,5 @@
 import { describe, it, expect, afterEach, vi } from 'vitest';
-import { CURRENT_INTRO_VERSION, ONBOARDING_VIDEOS } from '$lib/onboarding/config';
+import { CURRENT_INTRO_VERSION, ONBOARDING_VIDEOS } from '#lib/onboarding/config.js';
 
 describe('onboarding config', () => {
 	it('exports CURRENT_INTRO_VERSION as 1', () => {
@@ -43,7 +43,7 @@ describe('onboarding config ONBOARDING_VIDEOS env var handling', () => {
 		(import.meta.env as Record<string, string | undefined>).VITE_ONBOARDING_VIDEO_GUEST_PRODUCT = '   ';
 		delete (import.meta.env as Record<string, string | undefined>).VITE_ONBOARDING_VIDEO_HOW_ADD_VIDEO;
 		vi.resetModules();
-		const { ONBOARDING_VIDEOS } = await import('$lib/onboarding/config');
+		const { ONBOARDING_VIDEOS } = await import('#lib/onboarding/config.js');
 		expect(ONBOARDING_VIDEOS.guestProduct).toBeUndefined();
 		expect(ONBOARDING_VIDEOS.howAddVideo).toBeUndefined();
 	});
@@ -52,7 +52,7 @@ describe('onboarding config ONBOARDING_VIDEOS env var handling', () => {
 		(import.meta.env as Record<string, string | undefined>).VITE_ONBOARDING_VIDEO_HOW_PERSPECTIVE =
 			'  /onboarding/perspective.mp4  ';
 		vi.resetModules();
-		const { ONBOARDING_VIDEOS } = await import('$lib/onboarding/config');
+		const { ONBOARDING_VIDEOS } = await import('#lib/onboarding/config.js');
 		expect(ONBOARDING_VIDEOS.howPerspective).toBe('/onboarding/perspective.mp4');
 	});
 });

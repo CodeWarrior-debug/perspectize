@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { dateValueFormatter, formatDate, formatPublishDate } from '$lib/utils/formatting';
-import { webPublishedFilterValueGetter, formatWebPublished } from '$lib/utils/webPageFormatting';
+import { dateValueFormatter, formatDate, formatPublishDate } from '#lib/utils/formatting.js';
+import { webPublishedFilterValueGetter, formatWebPublished } from '#lib/utils/webPageFormatting.js';
 
 // A date-only string is a calendar date, not a UTC instant. '2017-06-12' is Jun 12 in every timezone;
 // parsed as UTC midnight it reads Jun 11 in US timezones. Full ISO timestamps keep their instant.

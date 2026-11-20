@@ -7,7 +7,7 @@ SvelteKit SPA (`ssr = false`, `prerender = false`), Svelte 5 runes only.
 Small interface, lots of work hidden behind it (Ousterhout). The frontend isn't hexagonal; deep modules is about boundary quality, not dependency direction.
 
 - **One folder per domain** — `lib/queries/{content,perspectives,users,categories,…}/` holds the `gql` defs (`index.ts`) _and_ that domain's hooks (`useCreatePerspective.ts`). Only `client.ts`/`keys.ts` are top-level.
-- **Import the domain, not its guts** — `import { LIST_CONTENT } from '$lib/queries/content'`; components call a hook, never `graphqlClient.request` + cache invalidation inline.
+- **Import the domain, not its guts** — `import { LIST_CONTENT } from '#lib/queries/content'`; components call a hook, never `graphqlClient.request` + cache invalidation inline.
 - **Hide cache wiring in the hook** — query keys, `invalidateQueries`, optimistic updates live inside `useX`; callers get `{ mutate, isPending }` and nothing else.
 - **No pass-through components** — a wrapper that only forwards props/snippets to one child: inline it or give it state/logic.
 
@@ -50,7 +50,7 @@ Runes only: `$state`, `$derived`, `$props` (`let { data, children } = $props()`)
 
 ## Auth (Clerk + demo mode)
 
-**Use the auth facade, not `svelte-clerk`, in components:** `useAuthState()` (`$lib/auth/useAuthState`), `getAuthToken()` (`$lib/auth`), and `components/auth/{AuthShow,SignInTrigger,UserMenu}.svelte`. With `VITE_DEMO_MODE=true` there is no `ClerkProvider`, so a direct `useClerkContext()`/`<Show>` crashes demo mode (and the `demo-e2e` CI job). Keep `$lib/auth` free of `svelte-clerk` imports: under Vitest `$env/dynamic/public` is undefined and unit tests that load it break. See [../.docs/DEMO_MODE.md](../.docs/DEMO_MODE.md).
+**Use the auth facade, not `svelte-clerk`, in components:** `useAuthState()` (`#lib/auth/useAuthState`), `getAuthToken()` (`#lib/auth`), and `components/auth/{AuthShow,SignInTrigger,UserMenu}.svelte`. With `VITE_DEMO_MODE=true` there is no `ClerkProvider`, so a direct `useClerkContext()`/`<Show>` crashes demo mode (and the `demo-e2e` CI job). Keep `#lib/auth` free of `svelte-clerk` imports: under Vitest `$env/dynamic/public` is undefined and unit tests that load it break. See [../.docs/DEMO_MODE.md](../.docs/DEMO_MODE.md).
 
 ## First-load performance (Clerk gate)
 
@@ -153,11 +153,11 @@ Uses `ag-grid-svelte5` (bundles AG Grid v32.x). **Do NOT install `ag-grid-commun
 
 **Date formatting timezone:** `formatDate`/`formatDateCompact` use local time (`toLocaleDateString`). Test with midday UTC (`T12:00:00Z`), not midnight, or dates shift a day in US timezones.
 
-**AG Grid doesn't render in jsdom** (no lifecycle, Grid API or cells). Extract grid logic into pure functions in `$lib/utils/grid-config.ts` (sort mapping, pagination bounds, responsive tiers, comparators, column metadata) and renderers/formatters into `$lib/utils/formatting.ts`, and unit-test those. Test grid integration (filter UI, sort clicks, responsive `$effect`s) with Playwright E2E or Vitest Browser Mode. See [ADDING_AG_GRID_COLUMN.md](../.claude/docs/ADDING_AG_GRID_COLUMN.md) testing section.
+**AG Grid doesn't render in jsdom** (no lifecycle, Grid API or cells). Extract grid logic into pure functions in `#lib/utils/grid-config.ts` (sort mapping, pagination bounds, responsive tiers, comparators, column metadata) and renderers/formatters into `#lib/utils/formatting.ts`, and unit-test those. Test grid integration (filter UI, sort clicks, responsive `$effect`s) with Playwright E2E or Vitest Browser Mode. See [ADDING_AG_GRID_COLUMN.md](../.claude/docs/ADDING_AG_GRID_COLUMN.md) testing section.
 
 **Custom AG Grid filter/cell components (vanilla `IFilterComp` classes) _are_ jsdom-testable:** instantiate, call `init()` with a stub `filterChangedCallback`, assert on `getGui()`. Mount the GUI first (`document.body.replaceChildren(filter.getGui())`): `.click()` on a detached checkbox fires no `change` event (see `tests/unit/contentTypeFilter.test.ts`).
 
-**No Set Filter in AG Grid Community.** For a small fixed value set, use a custom checkbox filter like `ContentTypeFilter` (`$lib/utils/contentTypeFilter.ts`, `{ filterType: 'set', values }` model) plus `filterSet: true` on its `ColumnMeta` (ADDING_AG_GRID_COLUMN.md Decision 6).
+**No Set Filter in AG Grid Community.** For a small fixed value set, use a custom checkbox filter like `ContentTypeFilter` (`#lib/utils/contentTypeFilter.ts`, `{ filterType: 'set', values }` model) plus `filterSet: true` on its `ColumnMeta` (ADDING_AG_GRID_COLUMN.md Decision 6).
 
 **Tests that pass alone but fail in the full run hit a cold cost under load, not a logic bug.** Pay it in `beforeAll` with `tests/helpers/warmUp.ts`: `preloadLazy(() => import(...))` for a component's `{#await import()}` target and for real modules a test body imports, and `warmUpRender(Comp, props)` for a heavy first render. Never skip the test, add retries or raise a global timeout. Only a test whose heavy work repeats on every run gets its own timeout, with a comment saying why (e.g. `SettingsDialog.test.ts` theme section, 28 presets): `it(name, fn, 15000)`. Rules, red/green probe, finding them: [../.docs/CI_STABLE_TESTS.md](../.docs/CI_STABLE_TESTS.md).
 

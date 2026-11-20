@@ -4,7 +4,7 @@
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { QueryClient } from '@tanstack/svelte-query';
-import { queryKeys } from '$lib/queries/keys';
+import { queryKeys } from '#lib/queries/keys.js';
 import { invalidationOutcome, makeClient, seed } from '../helpers/queryBudget';
 import { preloadLazy } from '../helpers/warmUp';
 
@@ -23,7 +23,7 @@ vi.mock('@tanstack/svelte-query', async (importOriginal) => {
 	};
 });
 vi.mock('svelte-sonner', () => ({ toast: { success: vi.fn(), error: vi.fn(), info: vi.fn() } }));
-vi.mock('$lib/queries/client', () => ({ graphqlRequest: vi.fn() }));
+vi.mock('#lib/queries/client.js', () => ({ graphqlRequest: vi.fn() }));
 
 beforeEach(() => {
 	client = makeClient();
@@ -32,7 +32,7 @@ beforeEach(() => {
 
 // The tests import these inside their bodies; load them once up front so the first
 // test doesn't pay the module transform, which balloons under full-suite load (#728).
-preloadLazy(() => import('$lib/queries/content/useCreateWebPage'));
+preloadLazy(() => import('#lib/queries/content/useCreateWebPage.js'));
 
 describe('eviction: useCreateWebPage.onSuccess invalidates content lists only', () => {
 	it('marks every content list stale and leaves details, rows, previews and other domains alone', async () => {
@@ -50,7 +50,7 @@ describe('eviction: useCreateWebPage.onSuccess invalidates content lists only', 
 		];
 		for (const k of [...affected, ...unrelated]) seed(client, k);
 
-		const { useCreateWebPage } = await import('$lib/queries/content/useCreateWebPage');
+		const { useCreateWebPage } = await import('#lib/queries/content/useCreateWebPage.js');
 		useCreateWebPage();
 		capturedMutationOptions.onSuccess({
 			createContentFromWebPage: {

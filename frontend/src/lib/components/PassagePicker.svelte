@@ -1,7 +1,7 @@
 <script lang="ts">
-	import { BIBLE_BOOKS } from '$lib/utils/bibleStructure';
-	import type { PassageRange } from '$lib/utils/bible';
-	import { defaultRange, isRangeOrdered } from '$lib/utils/passageRange';
+	import { BIBLE_BOOKS } from '#lib/utils/bibleStructure.js';
+	import type { PassageRange } from '#lib/utils/bible.js';
+	import { defaultRange, isRangeOrdered } from '#lib/utils/passageRange.js';
 
 	let {
 		range,

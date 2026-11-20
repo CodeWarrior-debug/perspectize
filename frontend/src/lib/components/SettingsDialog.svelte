@@ -1,15 +1,15 @@
 <script lang="ts">
-	import { Button, Dialog, DialogContent, DialogHeader, DialogTitle } from '$lib/components/shadcn';
-	import ThemeCustomizePanel from '$lib/components/theme/ThemeCustomizePanel.svelte';
-	import FontSettingsPanel from '$lib/components/fonts/FontSettingsPanel.svelte';
+	import { Button, Dialog, DialogContent, DialogHeader, DialogTitle } from '#lib/components/shadcn/index.js';
+	import ThemeCustomizePanel from '#lib/components/theme/ThemeCustomizePanel.svelte';
+	import FontSettingsPanel from '#lib/components/fonts/FontSettingsPanel.svelte';
 	import SettingsIcon from '@lucide/svelte/icons/settings';
-	import FeedbackDialog from '$lib/components/FeedbackDialog.svelte';
-	import ContributePanel from '$lib/components/contribute/ContributePanel.svelte';
-	import type { ThemeStore } from '$lib/theme/store.svelte';
-	import { createFontStore, type FontStore } from '$lib/fonts/store.svelte';
-	import { useMe } from '$lib/queries/users/useMe.svelte';
-	import { replayCoach } from '$lib/onboarding/coachGate.svelte';
-	import { CONTRIBUTE_TAB_ENABLED } from '$lib/contribute/config';
+	import FeedbackDialog from '#lib/components/FeedbackDialog.svelte';
+	import ContributePanel from '#lib/components/contribute/ContributePanel.svelte';
+	import type { ThemeStore } from '#lib/theme/store.svelte.js';
+	import { createFontStore, type FontStore } from '#lib/fonts/store.svelte.js';
+	import { useMe } from '#lib/queries/users/useMe.svelte.js';
+	import { replayCoach } from '#lib/onboarding/coachGate.svelte.js';
+	import { CONTRIBUTE_TAB_ENABLED } from '#lib/contribute/config.js';
 
 	let {
 		open = $bindable(false),

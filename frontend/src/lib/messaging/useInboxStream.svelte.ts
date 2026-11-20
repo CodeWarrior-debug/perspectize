@@ -1,8 +1,12 @@
 import type { QueryClient } from '@tanstack/svelte-query';
-import { subscribeGraphql } from '$lib/messaging/ws-client.svelte';
-import { INBOX_EVENTS_SUBSCRIPTION, type InboxEvent, type ListMessageThreadsResponse } from '$lib/queries/messaging';
-import { applyInboxEvent } from '$lib/messaging/inboxCache';
-import { queryKeys } from '$lib/queries/keys';
+import { subscribeGraphql } from '#lib/messaging/ws-client.svelte.js';
+import {
+	INBOX_EVENTS_SUBSCRIPTION,
+	type InboxEvent,
+	type ListMessageThreadsResponse,
+} from '#lib/queries/messaging/index.js';
+import { applyInboxEvent } from '#lib/messaging/inboxCache.js';
+import { queryKeys } from '#lib/queries/keys.js';
 
 export function createInboxStream(queryClient: QueryClient) {
 	let dispose: (() => void) | null = null;

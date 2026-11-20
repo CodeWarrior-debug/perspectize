@@ -2,7 +2,7 @@
  * Extracted AG Grid configuration logic from ActivityTable.svelte.
  * Pure functions and constants that can be unit-tested without a browser.
  */
-import type { ContentItem, ContentType } from '$lib/queries/content';
+import type { ContentItem, ContentType } from '#lib/queries/content/index.js';
 import {
 	percentLikedValueGetter,
 	formatTags,

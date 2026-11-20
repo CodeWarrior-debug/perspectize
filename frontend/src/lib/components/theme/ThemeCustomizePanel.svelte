@@ -1,12 +1,12 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import { Button, Input, Label } from '$lib/components/shadcn';
+	import { Button, Input, Label } from '#lib/components/shadcn/index.js';
 	import ColorWheel from './ColorWheel.svelte';
-	import { THEME_PRESETS, THEME_PRESET_TOKENS } from '$lib/theme/presets';
-	import { downloadThemeCss } from '$lib/theme/export';
-	import { deriveTheme, type BaseThemeTokens } from '$lib/theme/derive';
-	import { formatColorForUnit, parseColorInput, type ColorUnit } from '$lib/theme/format';
-	import type { ThemeStore } from '$lib/theme/store.svelte';
+	import { THEME_PRESETS, THEME_PRESET_TOKENS } from '#lib/theme/presets.js';
+	import { downloadThemeCss } from '#lib/theme/export.js';
+	import { deriveTheme, type BaseThemeTokens } from '#lib/theme/derive.js';
+	import { formatColorForUnit, parseColorInput, type ColorUnit } from '#lib/theme/format.js';
+	import type { ThemeStore } from '#lib/theme/store.svelte.js';
 
 	let { store }: { store: ThemeStore } = $props();
 

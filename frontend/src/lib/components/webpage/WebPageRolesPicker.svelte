@@ -1,6 +1,6 @@
 <script lang="ts">
-	import type { WebPageRole } from '$lib/queries/content';
-	import { WEB_PAGE_ROLE_OPTIONS, webPageRoleLabel } from '$lib/utils/webPage';
+	import type { WebPageRole } from '#lib/queries/content/index.js';
+	import { WEB_PAGE_ROLE_OPTIONS, webPageRoleLabel } from '#lib/utils/webPage.js';
 	import ChevronDownIcon from '@lucide/svelte/icons/chevron-down';
 
 	let {

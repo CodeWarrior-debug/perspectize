@@ -9,9 +9,9 @@ import {
 	agreementPercent,
 	SIMILAR_THRESHOLD,
 	DIVERGES_THRESHOLD,
-} from '$lib/utils/comparePerspectives';
-import type { RatingRow } from '$lib/utils/comparePerspectives';
-import type { PerspectiveItem } from '$lib/queries/perspectives';
+} from '#lib/utils/comparePerspectives.js';
+import type { RatingRow } from '#lib/utils/comparePerspectives.js';
+import type { PerspectiveItem } from '#lib/queries/perspectives/index.js';
 
 function makePerspective(overrides: Partial<PerspectiveItem>): PerspectiveItem {
 	return {

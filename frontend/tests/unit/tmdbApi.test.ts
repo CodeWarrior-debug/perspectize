@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({ graphqlRequest: vi.fn() }));
-vi.mock('$lib/queries/client', () => ({ graphqlRequest: mocks.graphqlRequest }));
+vi.mock('#lib/queries/client.js', () => ({ graphqlRequest: mocks.graphqlRequest }));
 
 import {
 	MOVIE_SEARCH,
@@ -13,7 +13,7 @@ import {
 	tmdbKeys,
 	tmdbPosterUrl,
 	type MovieSearchPage,
-} from '$lib/services/tmdbApi';
+} from '#lib/services/tmdbApi.js';
 
 const page: MovieSearchPage = {
 	items: [

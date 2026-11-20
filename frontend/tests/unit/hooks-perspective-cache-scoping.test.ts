@@ -14,8 +14,8 @@
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { QueryClient } from '@tanstack/svelte-query';
-import { queryKeys } from '$lib/queries/keys';
-import type { ListPerspectivesByUserResponse, PerspectiveItem } from '$lib/queries/perspectives';
+import { queryKeys } from '#lib/queries/keys.js';
+import type { ListPerspectivesByUserResponse, PerspectiveItem } from '#lib/queries/perspectives/index.js';
 import { preloadLazy } from '../helpers/warmUp';
 
 let client: QueryClient;
@@ -41,7 +41,7 @@ vi.mock('svelte-sonner', () => ({
 	toast: { success: vi.fn(), error: vi.fn() },
 }));
 
-vi.mock('$lib/queries/client', () => ({
+vi.mock('#lib/queries/client.js', () => ({
 	graphqlRequest: vi.fn(),
 }));
 
@@ -83,8 +83,8 @@ beforeEach(async () => {
 		perspectives: { items: [userRow({ id: 'other-content-row', contentID: '11' })] },
 	});
 
-	const { useCreatePerspective } = await import('$lib/queries/perspectives/useCreatePerspective');
-	const { useUpdatePerspective } = await import('$lib/queries/perspectives/useUpdatePerspective');
+	const { useCreatePerspective } = await import('#lib/queries/perspectives/useCreatePerspective.js');
+	const { useUpdatePerspective } = await import('#lib/queries/perspectives/useUpdatePerspective.js');
 	useCreatePerspective();
 	useUpdatePerspective();
 });
@@ -92,8 +92,8 @@ beforeEach(async () => {
 // The tests import these inside their bodies; load them once up front so the first
 // test doesn't pay the module transform, which balloons under full-suite load (#728).
 preloadLazy(
-	() => import('$lib/queries/perspectives/useCreatePerspective'),
-	() => import('$lib/queries/perspectives/useUpdatePerspective'),
+	() => import('#lib/queries/perspectives/useCreatePerspective.js'),
+	() => import('#lib/queries/perspectives/useUpdatePerspective.js'),
 );
 
 describe('perspective cache scoping (create)', () => {

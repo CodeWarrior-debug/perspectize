@@ -1,10 +1,10 @@
 import type { PageLoad } from './$types';
-import { browser } from '$app/environment';
-import { DEMO_MODE } from '$lib/auth';
-import { queryClient } from '$lib/queries/client';
-import { activityListRequest } from '$lib/queries/content';
-import { prefetchActivityList } from '$lib/queries/content/prefetchActivityList';
-import { parseGridParams } from '$lib/utils/gridUrlState';
+import { browser } from '$app/env';
+import { DEMO_MODE } from '#lib/auth/index.js';
+import { queryClient } from '#lib/queries/client.js';
+import { activityListRequest } from '#lib/queries/content/index.js';
+import { prefetchActivityList } from '#lib/queries/content/prefetchActivityList.js';
+import { parseGridParams } from '#lib/utils/gridUrlState.js';
 
 // Start the Library list when the route loads, in parallel with Clerk. The root layout renders
 // nothing until ClerkLoaded, so ActivityTable's own query could not start until Clerk finished.

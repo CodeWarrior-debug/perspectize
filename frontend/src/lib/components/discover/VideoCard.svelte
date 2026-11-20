@@ -1,10 +1,10 @@
 <script lang="ts">
 	import { tick } from 'svelte';
-	import type { VideoItem } from '$lib/services/youtubeApi';
-	import { Button } from '$lib/components/shadcn';
+	import type { VideoItem } from '#lib/services/youtubeApi.js';
+	import { Button } from '#lib/components/shadcn/index.js';
 	import LibraryStatus from './LibraryStatus.svelte';
 	import type { LibraryItem } from './libraryItem';
-	import { formatDate, formatIsoDuration } from '$lib/utils/formatting';
+	import { formatDate, formatIsoDuration } from '#lib/utils/formatting.js';
 	import GlassesIcon from '@lucide/svelte/icons/glasses';
 	import PlayIcon from '@lucide/svelte/icons/play';
 

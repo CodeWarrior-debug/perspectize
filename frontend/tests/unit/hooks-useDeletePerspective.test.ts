@@ -39,31 +39,31 @@ vi.mock('svelte-sonner', () => ({
 	toast: { success: mockToastSuccess, error: mockToastError },
 }));
 
-vi.mock('$lib/queries/client', () => ({
+vi.mock('#lib/queries/client.js', () => ({
 	graphqlRequest: vi.fn(),
 }));
 
 // The tests import these inside their bodies; load them once up front so the first
 // test doesn't pay the module transform, which balloons under full-suite load (#728).
 preloadLazy(
-	() => import('$lib/queries/client'),
-	() => import('$lib/queries/keys'),
-	() => import('$lib/queries/perspectives'),
-	() => import('$lib/queries/perspectives/useDeletePerspective'),
+	() => import('#lib/queries/client.js'),
+	() => import('#lib/queries/keys.js'),
+	() => import('#lib/queries/perspectives/index.js'),
+	() => import('#lib/queries/perspectives/useDeletePerspective.js'),
 );
 
 describe('useDeletePerspective hook', () => {
 	beforeEach(async () => {
 		vi.clearAllMocks();
 		capturedMutationOptions = undefined;
-		const { useDeletePerspective } = await import('$lib/queries/perspectives/useDeletePerspective');
+		const { useDeletePerspective } = await import('#lib/queries/perspectives/useDeletePerspective.js');
 		useDeletePerspective();
 	});
 
 	describe('mutationFn', () => {
 		it('sends DELETE_PERSPECTIVE with only the id', async () => {
-			const { graphqlRequest } = await import('$lib/queries/client');
-			const { DELETE_PERSPECTIVE } = await import('$lib/queries/perspectives');
+			const { graphqlRequest } = await import('#lib/queries/client.js');
+			const { DELETE_PERSPECTIVE } = await import('#lib/queries/perspectives/index.js');
 			(graphqlRequest as any).mockResolvedValue({ deletePerspective: true });
 
 			await capturedMutationOptions.mutationFn({ id: '7', contentID: '3' });
@@ -72,7 +72,7 @@ describe('useDeletePerspective hook', () => {
 		});
 
 		it('treats a false response as a failure', async () => {
-			const { graphqlRequest } = await import('$lib/queries/client');
+			const { graphqlRequest } = await import('#lib/queries/client.js');
 			(graphqlRequest as any).mockResolvedValue({ deletePerspective: false });
 
 			await expect(capturedMutationOptions.mutationFn({ id: '7', contentID: null })).rejects.toThrow();
@@ -122,7 +122,7 @@ describe('useDeletePerspective hook', () => {
 
 	describe('onSuccess', () => {
 		it('toasts and invalidates detail and the content aggregate', async () => {
-			const { queryKeys } = await import('$lib/queries/keys');
+			const { queryKeys } = await import('#lib/queries/keys.js');
 			capturedMutationOptions.onSuccess({ deletePerspective: true }, { id: '7', contentID: '3' });
 
 			expect(mockToastSuccess).toHaveBeenCalledWith('Perspective deleted');
@@ -132,7 +132,7 @@ describe('useDeletePerspective hook', () => {
 		});
 
 		it('skips the content aggregate when there is no contentID', async () => {
-			const { queryKeys } = await import('$lib/queries/keys');
+			const { queryKeys } = await import('#lib/queries/keys.js');
 			capturedMutationOptions.onSuccess({ deletePerspective: true }, { id: '7', contentID: null });
 			const keys = mockInvalidateQueries.mock.calls.map((c: any[]) => c[0].queryKey);
 			expect(keys.some((k: unknown[]) => k.includes('detail') && k.includes('content'))).toBe(false);

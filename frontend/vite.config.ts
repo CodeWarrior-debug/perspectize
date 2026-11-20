@@ -1,14 +1,14 @@
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { loadEnv } from 'vite';
-import { sveltekit } from '@sveltejs/kit/vite';
+import adapter from '@sveltejs/adapter-static';
 import { defineConfig } from 'vitest/config';
 import tailwindcss from '@tailwindcss/vite';
-import { SvelteKitPWA } from '@vite-pwa/sveltekit';
-import { faroSourcemapConfig } from './scripts/faro-sourcemaps';
-import { computeTag } from './src/lib/utils/buildTag';
-import { clerkPreloadValues } from './src/lib/utils/clerkScript';
-import { graphqlPreconnectOrigin } from './src/lib/utils/graphqlOrigin';
+import { withPwa } from '@vite-pwa/sveltekit';
+import { faroSourcemapConfig } from './scripts/faro-sourcemaps.ts';
+import { computeTag } from './src/lib/utils/buildTag.ts';
+import { clerkPreloadValues } from './src/lib/utils/clerkScript.ts';
+import { graphqlPreconnectOrigin } from './src/lib/utils/graphqlOrigin.ts';
 
 // app.html preloads clerk-js via %sveltekit.env.PUBLIC_CLERK_*% placeholders, which read
 // the public env at build time. Derive them here from the build env (process.env wins over
@@ -83,41 +83,66 @@ export default defineConfig({
 	server: { strictPort: true },
 	preview: { strictPort: true },
 	plugins: [
-		sveltekit(),
+		// Kit 3 reads its options here (svelte.config.js is gone). withPwa wraps
+		// sveltekit() and returns a plugin array. Poll _app/version.json so a long-lived
+		// tab learns about a new deploy (flips `updated.current`); `name` ties
+		// version.json to this build's commit, for the zzzv console hotkey.
+		withPwa(
+			{
+				adapter: adapter({
+					pages: 'build',
+					assets: 'build',
+					fallback: 'index.html',
+					strict: false,
+				}),
+				paths: {
+					base: '',
+				},
+				version: {
+					name: buildInfo.commit,
+					pollInterval: 5 * 60 * 1000,
+				},
+				serviceWorker: {
+					register: false,
+				},
+			},
+			{
+				registerType: 'autoUpdate',
+				generateSW: {
+					// Anchored to client/: an unanchored pattern makes the plugin add its own
+					// client/** pattern too, so every asset is precached twice (v2 warns on it).
+					globPatterns: withoutPrerenderedGlob(['client/**/*.{js,css,html,ico,png,svg,webp,woff2,webmanifest}']),
+					// registerType: 'autoUpdate' alone doesn't make a new service worker take
+					// over immediately — without these, a newly-deployed SW installs but sits
+					// in the "waiting" state until every old tab closes, so a page loaded
+					// right around a deploy can straddle old/new asset versions with no way
+					// out but a manual refresh (issue #311).
+					skipWaiting: true,
+					clientsClaim: true,
+				},
+				manifest: {
+					name: 'Perspectize',
+					short_name: 'Perspectize',
+					description: 'Store, refine, and share perspectives on content',
+					theme_color: '#1a365d',
+					background_color: '#1a365d',
+					display: 'standalone',
+					scope: '/',
+					start_url: '/',
+					icons: [
+						{ src: 'icons/icon-192.png', sizes: '192x192', type: 'image/png' },
+						{ src: 'icons/icon-512.png', sizes: '512x512', type: 'image/png' },
+						{
+							src: 'icons/icon-512-maskable.png',
+							sizes: '512x512',
+							type: 'image/png',
+							purpose: 'maskable',
+						},
+					],
+				},
+			},
+		),
 		tailwindcss(),
-		SvelteKitPWA({
-			registerType: 'autoUpdate',
-			workbox: {
-				globPatterns: withoutPrerenderedGlob(['**/*.{js,css,html,ico,png,svg,woff2}']),
-				// registerType: 'autoUpdate' alone doesn't make a new service worker take
-				// over immediately — without these, a newly-deployed SW installs but sits
-				// in the "waiting" state until every old tab closes, so a page loaded
-				// right around a deploy can straddle old/new asset versions with no way
-				// out but a manual refresh (issue #311).
-				skipWaiting: true,
-				clientsClaim: true,
-			},
-			manifest: {
-				name: 'Perspectize',
-				short_name: 'Perspectize',
-				description: 'Store, refine, and share perspectives on content',
-				theme_color: '#1a365d',
-				background_color: '#1a365d',
-				display: 'standalone',
-				scope: '/',
-				start_url: '/',
-				icons: [
-					{ src: 'icons/icon-192.png', sizes: '192x192', type: 'image/png' },
-					{ src: 'icons/icon-512.png', sizes: '512x512', type: 'image/png' },
-					{
-						src: 'icons/icon-512-maskable.png',
-						sizes: '512x512',
-						type: 'image/png',
-						purpose: 'maskable',
-					},
-				],
-			},
-		}),
 		...faro.plugins,
 	],
 	resolve: {
@@ -125,7 +150,7 @@ export default defineConfig({
 	},
 	build: {
 		...(faro.sourcemap ? { sourcemap: faro.sourcemap } : {}),
-		rollupOptions: {
+		rolldownOptions: {
 			output: {
 				// Tiptap/ProseMirror (the perspective editor's rich-text engine, ~170KB
 				// gzipped) is only reachable through a dynamic import (PerspectivePopover),
@@ -134,10 +159,13 @@ export default defineConfig({
 				// statically — which pulled the whole editor bundle into every page's
 				// critical path. Force it into its own chunk so it stays isolated behind
 				// the dynamic import.
-				manualChunks(id) {
-					if (id.includes('node_modules/@tiptap') || id.includes('node_modules/prosemirror')) {
-						return 'tiptap-vendor';
-					}
+				codeSplitting: {
+					groups: [
+						{
+							name: 'tiptap-vendor',
+							test: /node_modules[\\/](@tiptap|prosemirror)/,
+						},
+					],
 				},
 			},
 		},

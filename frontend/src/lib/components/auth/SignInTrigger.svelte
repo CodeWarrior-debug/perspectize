@@ -1,7 +1,7 @@
 <script lang="ts">
 	import type { Snippet } from 'svelte';
 	import { SignInButton } from 'svelte-clerk';
-	import { DEMO_MODE, demoSession } from '$lib/auth';
+	import { DEMO_MODE, demoSession } from '#lib/auth/index.js';
 
 	/**
 	 * Wraps a sign-in button: Clerk's modal normally, the demo persona picker in

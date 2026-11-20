@@ -1,15 +1,15 @@
 <script lang="ts">
 	import type { LibraryItem } from './libraryItem';
 	import { createQuery, useQueryClient } from '@tanstack/svelte-query';
-	import { Button } from '$lib/components/shadcn';
+	import { Button } from '#lib/components/shadcn/index.js';
 	import BookCard from './BookCard.svelte';
 	import {
 		BOOK_TRENDING_STALE_TIME,
 		fetchTrendingBooks,
 		openLibraryKeys,
 		type BookSearchPage,
-	} from '$lib/services/openLibraryApi';
-	import type { TrendingWindow } from '$lib/services/tmdbApi';
+	} from '#lib/services/openLibraryApi.js';
+	import type { TrendingWindow } from '#lib/services/tmdbApi.js';
 
 	// Trending books, shown on the Books source (the Trending tab, and the idle state of the search
 	// tab). The window lives in the owner (bound) so the toggle survives a search and coming back to idle.

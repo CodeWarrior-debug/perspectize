@@ -15,7 +15,7 @@ Symptom: `Failed to load module script: Expected a JavaScript-or-Wasm module scr
 
 - `app.html` `#stale-chunk-recovery` (inline, above SvelteKit's bootstrap): on `vite:preloadError`, a chunk-load `unhandledrejection`, or a failed `/_app/` `<script>`/`<link>`, it reloads once. A 30s `sessionStorage` guard stops reload loops by showing a "Reload" banner instead. It never auto-reloads when offline or when storage is unavailable.
 - `lib/utils/versionWatch.ts` (mounted in `+layout.svelte`): checks `_app/version.json` when the tab becomes visible, is restored from bfcache, or the window regains focus (at most once a minute; a desktop window left on screen never fires `visibilitychange`), and reloads if a newer build exists. It skips the reload while an input or contenteditable has focus.
-- `kit.version.pollInterval` (`svelte.config.js`) plus the layout's `beforeNavigate`: once `updated.current` is true, the next in-app navigation becomes a full page load.
+- `version.pollInterval` (the `withPwa`/`sveltekit()` options in `vite.config.ts`) plus the layout's `beforeNavigate`: once `updated.current` is true, the next in-app navigation becomes a full page load.
 
 **The PWA service worker is built but never registered.** Nothing injects `registerSW.js`, so production has no SW, and #312's `skipWaiting`/`clientsClaim` never took effect. Before wiring registration: `sw.js` routes navigations to a non-precached `/`, which fails install, and a precaching SW that activates mid-session deletes the old build's chunks, bringing back the version-skew problem above.
 

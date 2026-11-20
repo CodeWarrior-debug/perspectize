@@ -1,11 +1,11 @@
 <script lang="ts">
-	import { NO_AUTOFILL } from '$lib/utils/noAutofill';
+	import { NO_AUTOFILL } from '#lib/utils/noAutofill.js';
 	import PlusIcon from '@lucide/svelte/icons/plus';
 	import XIcon from '@lucide/svelte/icons/x';
-	import { Button } from '$lib/components/shadcn';
-	import { DEMO_MODE } from '$lib/auth/demo.svelte';
-	import type { ImportSourceType } from '$lib/queries/imports';
-	import { MAX_IMPORT_SOURCES, newSourceRow, type SourceRow } from '$lib/utils/import-sheet';
+	import { Button } from '#lib/components/shadcn/index.js';
+	import { DEMO_MODE } from '#lib/auth/demo.svelte.js';
+	import type { ImportSourceType } from '#lib/queries/imports/index.js';
+	import { MAX_IMPORT_SOURCES, newSourceRow, type SourceRow } from '#lib/utils/import-sheet.js';
 
 	/**
 	 * The editable source rows shared by the request form and "Add sources": a

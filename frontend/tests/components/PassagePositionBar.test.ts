@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { render, screen } from '@testing-library/svelte';
-import PassagePositionBar from '$lib/components/PassagePositionBar.svelte';
+import PassagePositionBar from '#lib/components/PassagePositionBar.svelte';
 
 describe('PassagePositionBar', () => {
 	it('shows the ordinal label', () => {

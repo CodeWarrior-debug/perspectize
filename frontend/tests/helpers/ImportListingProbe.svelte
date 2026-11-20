@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { useImportListingProgress } from '$lib/queries/imports/useImportListingProgress.svelte';
+	import { useImportListingProgress } from '#lib/queries/imports/useImportListingProgress.svelte.js';
 
 	/**
 	 * Mounts useImportListingProgress so a test can run its $effect (which the

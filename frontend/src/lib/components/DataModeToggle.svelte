@@ -1,5 +1,5 @@
 <script lang="ts">
-	import type { DataMode } from '$lib/utils/gridUrlState';
+	import type { DataMode } from '#lib/utils/gridUrlState.js';
 
 	let {
 		mode,

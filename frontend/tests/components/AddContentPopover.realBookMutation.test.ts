@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/svelte';
 import { tick } from 'svelte';
 import { QueryClient } from '@tanstack/svelte-query';
-import AddContentPopover from '$lib/components/AddContentPopover.svelte';
+import AddContentPopover from '#lib/components/AddContentPopover.svelte';
 import TestWrapper from '../helpers/TestWrapper.svelte';
 import { warmUp } from '../helpers/warmUp';
 
@@ -12,7 +12,7 @@ const mocks = vi.hoisted(() => ({
 	graphqlRequest: vi.fn(),
 }));
 
-vi.mock('$lib/queries/client', () => ({
+vi.mock('#lib/queries/client.js', () => ({
 	graphqlRequest: mocks.graphqlRequest,
 	graphqlClient: { request: mocks.graphqlRequest },
 }));

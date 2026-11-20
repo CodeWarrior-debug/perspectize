@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/svelte';
-import PassageText from '$lib/components/PassageText.svelte';
-import { verseOrdinal } from '$lib/utils/bible';
+import PassageText from '#lib/components/PassageText.svelte';
+import { verseOrdinal } from '#lib/utils/bible.js';
 
 const mocks = vi.hoisted(() => ({
 	mockQueryState: { data: null as unknown, isLoading: false, isError: false },
@@ -18,8 +18,8 @@ vi.mock('@tanstack/svelte-query', () => ({
 	createMutation: () => ({ mutate: mocks.mutate, isPending: false }),
 	useQueryClient: () => ({ invalidateQueries: vi.fn() }),
 }));
-vi.mock('$lib/queries/client', () => ({ graphqlRequest: vi.fn() }));
-vi.mock('$lib/components/interlinear/OriginalLanguage.svelte', async () => {
+vi.mock('#lib/queries/client.js', () => ({ graphqlRequest: vi.fn() }));
+vi.mock('#lib/components/interlinear/OriginalLanguage.svelte', async () => {
 	const { default: Stub } = await import('../helpers/OriginalLanguageStub.svelte');
 	return { default: Stub };
 });

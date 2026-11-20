@@ -1,4 +1,4 @@
-import type { LengthDisplay } from '$lib/queries/content';
+import type { LengthDisplay } from '#lib/queries/content/index.js';
 import { gql } from 'graphql-request';
 
 /**

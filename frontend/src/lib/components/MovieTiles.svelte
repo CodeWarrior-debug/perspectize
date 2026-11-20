@@ -16,7 +16,7 @@
 		formatMoneyCompact,
 		movieResponse,
 		type MovieRow,
-	} from '$lib/utils/formatting';
+	} from '#lib/utils/formatting.js';
 
 	// Movie-specific stat tiles, rendered as children of the modal's tile grid.
 	// Money/score formatting reuses the grid helpers so the modal and grid agree

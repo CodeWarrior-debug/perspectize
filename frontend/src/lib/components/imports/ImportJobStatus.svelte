@@ -1,5 +1,5 @@
 <script lang="ts">
-	import type { ImportJobSummary } from '$lib/queries/imports';
+	import type { ImportJobSummary } from '#lib/queries/imports/index.js';
 
 	/** Where an import stands: requested (by whom), declined (and why), or closed. Nothing for an open, approved import. */
 	let { job }: { job: ImportJobSummary } = $props();

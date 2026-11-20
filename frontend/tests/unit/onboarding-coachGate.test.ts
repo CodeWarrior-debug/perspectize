@@ -9,8 +9,8 @@ import {
 	getQuietGraduateAttempted,
 	replayCoach,
 	getCoachReplayNonce,
-} from '$lib/onboarding/coachGate.svelte';
-import { CURRENT_INTRO_VERSION } from '$lib/onboarding/config';
+} from '#lib/onboarding/coachGate.svelte.js';
+import { CURRENT_INTRO_VERSION } from '#lib/onboarding/config.js';
 
 describe('coachGate', () => {
 	beforeEach(() => {

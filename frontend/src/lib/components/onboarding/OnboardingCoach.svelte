@@ -6,29 +6,36 @@
 	import { MediaQuery } from 'svelte/reactivity';
 	import { createQuery } from '@tanstack/svelte-query';
 	import XIcon from '@lucide/svelte/icons/x';
-	import { Button, Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerDescription } from '$lib/components/shadcn';
-	import LazyLoadError from '$lib/components/LazyLoadError.svelte';
-	import OnboardingVideo from '$lib/components/onboarding/OnboardingVideo.svelte';
-	import AddVideoDialog from '$lib/components/AddVideoDialog.svelte';
-	import { ONBOARDING_VIDEOS, CURRENT_INTRO_VERSION } from '$lib/onboarding/config';
+	import {
+		Button,
+		Drawer,
+		DrawerContent,
+		DrawerHeader,
+		DrawerTitle,
+		DrawerDescription,
+	} from '#lib/components/shadcn/index.js';
+	import LazyLoadError from '#lib/components/LazyLoadError.svelte';
+	import OnboardingVideo from '#lib/components/onboarding/OnboardingVideo.svelte';
+	import AddVideoDialog from '#lib/components/AddVideoDialog.svelte';
+	import { ONBOARDING_VIDEOS, CURRENT_INTRO_VERSION } from '#lib/onboarding/config.js';
 	import {
 		advanceCoachStep,
 		skipCoachStep,
 		coachStepTitle,
 		coachStepBody,
 		type CoachStep,
-	} from '$lib/onboarding/steps';
-	import { useMarkOnboardingSeen } from '$lib/queries/users/useMarkOnboardingSeen';
-	import { graphqlRequest } from '$lib/queries/client';
-	import { LIST_CONTENT, type ContentItem, type ContentResponse } from '$lib/queries/content';
+	} from '#lib/onboarding/steps.js';
+	import { useMarkOnboardingSeen } from '#lib/queries/users/useMarkOnboardingSeen.js';
+	import { graphqlRequest } from '#lib/queries/client.js';
+	import { LIST_CONTENT, type ContentItem, type ContentResponse } from '#lib/queries/content/index.js';
 	import {
 		LIST_PERSPECTIVES_BY_USER,
 		MAX_PERSPECTIVES_PER_LIST,
 		type ListPerspectivesByUserResponse,
 		type PerspectiveItem,
-	} from '$lib/queries/perspectives';
-	import { queryKeys } from '$lib/queries/keys';
-	import { setCoachForceOpen } from '$lib/onboarding/coachGate.svelte';
+	} from '#lib/queries/perspectives/index.js';
+	import { queryKeys } from '#lib/queries/keys.js';
+	import { setCoachForceOpen } from '#lib/onboarding/coachGate.svelte.js';
 
 	let {
 		userId,
@@ -263,7 +270,7 @@
 <AddVideoDialog bind:open={addVideoOpen} onSuccess={handleActionSuccess} />
 
 {#if perspectiveOpen && perspectiveTarget}
-	{#await import('$lib/components/PerspectivePopover.svelte') then { default: PerspectivePopover }}
+	{#await import('#lib/components/PerspectivePopover.svelte') then { default: PerspectivePopover }}
 		<PerspectivePopover
 			contentId={parseInt(perspectiveTarget.id, 10)}
 			contentName={perspectiveTarget.name}

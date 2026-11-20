@@ -16,11 +16,11 @@
 </script>
 
 <script lang="ts">
-	import { NO_AUTOFILL } from '$lib/utils/noAutofill';
+	import { NO_AUTOFILL } from '#lib/utils/noAutofill.js';
 	import XIcon from '@lucide/svelte/icons/x';
 	import SearchIcon from '@lucide/svelte/icons/search';
 	import PlusIcon from '@lucide/svelte/icons/plus';
-	import { STANDARD_DIMENSIONS } from '$lib/utils/comparePerspectives';
+	import { STANDARD_DIMENSIONS } from '#lib/utils/comparePerspectives.js';
 
 	/** Search-box description shown for each standard dimension, keyed by STANDARD_DIMENSIONS' key. */
 	const STANDARD_DIMENSION_DESCRIPTIONS: Record<(typeof STANDARD_DIMENSIONS)[number]['key'], string> = {

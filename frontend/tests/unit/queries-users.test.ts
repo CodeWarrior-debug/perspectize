@@ -8,7 +8,7 @@ import {
 	type CreateUserInput,
 	type CreateUserResponse,
 	type Me,
-} from '$lib/queries/users';
+} from '#lib/queries/users/index.js';
 
 describe('User Queries', () => {
 	describe('Type exports', () => {

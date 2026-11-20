@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { render, screen } from '@testing-library/svelte';
-import Header from '$lib/components/Header.svelte';
+import Header from '#lib/components/Header.svelte';
 import { mockPageState } from '../setup';
 
 // Mock svelte-clerk components
@@ -33,7 +33,7 @@ vi.mock('svelte-clerk', () => ({
 // that this test file doesn't otherwise provide — mock the primitives instead of
 // wrapping every render() call site in a QueryClientProvider.
 vi.mock('@tanstack/svelte-query', () => ({
-	// $lib/queries/client builds the shared app QueryClient at import time.
+	// #lib/queries/client builds the shared app QueryClient at import time.
 	QueryClient: class {},
 	createQuery: vi.fn(() => ({ data: undefined, isSuccess: false, isError: false })),
 	createMutation: vi.fn(() => ({ mutate: vi.fn(), isPending: false })),
@@ -47,7 +47,7 @@ vi.mock('@tanstack/svelte-query', () => ({
 }));
 
 // Mock AddContentPopover component
-vi.mock('$lib/components/AddContentPopover.svelte', () => ({
+vi.mock('#lib/components/AddContentPopover.svelte', () => ({
 	default: vi.fn(() => ({
 		$$: {},
 		$set: vi.fn(),

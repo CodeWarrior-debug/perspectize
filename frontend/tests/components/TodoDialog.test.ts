@@ -1,8 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/svelte';
-import TodoDialog from '$lib/components/plan/TodoDialog.svelte';
-import { todayIso } from '$lib/utils/plan-todo-helpers';
-import type { TodoActionItem, UserTodoItem, UserTodoListItem } from '$lib/queries/userTodos';
+import TodoDialog from '#lib/components/plan/TodoDialog.svelte';
+import { todayIso } from '#lib/utils/plan-todo-helpers.js';
+import type { TodoActionItem, UserTodoItem, UserTodoListItem } from '#lib/queries/userTodos/index.js';
 import { warmUpRender } from '../helpers/warmUp';
 
 const mocks = vi.hoisted(() => ({
@@ -12,20 +12,20 @@ const mocks = vi.hoisted(() => ({
 	toastError: vi.fn(),
 }));
 
-vi.mock('$lib/components/CommentsEditor.svelte', async () => {
+vi.mock('#lib/components/CommentsEditor.svelte', async () => {
 	const mod = await import('../helpers/FakeCommentsEditor.svelte');
 	return { default: mod.default };
 });
 
-vi.mock('$lib/queries/userTodos/useCreateUserTodo', () => ({
+vi.mock('#lib/queries/userTodos/useCreateUserTodo.js', () => ({
 	useCreateUserTodo: vi.fn(() => ({ mutateAsync: mocks.createMutateAsync, isPending: false })),
 }));
 
-vi.mock('$lib/queries/userTodos/useUpdateUserTodo', () => ({
+vi.mock('#lib/queries/userTodos/useUpdateUserTodo.js', () => ({
 	useUpdateUserTodo: vi.fn(() => ({ mutateAsync: mocks.updateMutateAsync, isPending: false })),
 }));
 
-vi.mock('$lib/queries/userTodos/useTodoActions', () => ({
+vi.mock('#lib/queries/userTodos/useTodoActions.js', () => ({
 	useTodoActions: vi.fn(() => ({
 		data: {
 			todoActions: [
@@ -37,11 +37,11 @@ vi.mock('$lib/queries/userTodos/useTodoActions', () => ({
 	})),
 }));
 
-vi.mock('$lib/queries/userTodos/useCreateTodoAction', () => ({
+vi.mock('#lib/queries/userTodos/useCreateTodoAction.js', () => ({
 	useCreateTodoAction: vi.fn(() => ({ mutateAsync: vi.fn(), isPending: false })),
 }));
 
-vi.mock('$lib/queries/content/useContentPicker', () => ({
+vi.mock('#lib/queries/content/useContentPicker.js', () => ({
 	useContentPicker: vi.fn(() => ({
 		data: {
 			content: {
@@ -52,7 +52,7 @@ vi.mock('$lib/queries/content/useContentPicker', () => ({
 	})),
 }));
 
-vi.mock('$lib/utils/toast', () => ({
+vi.mock('#lib/utils/toast.js', () => ({
 	toastWithAction: mocks.toastWithAction,
 }));
 

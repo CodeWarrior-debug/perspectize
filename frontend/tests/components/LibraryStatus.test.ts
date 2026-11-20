@@ -1,17 +1,17 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/svelte';
-import LibraryStatus from '$lib/components/discover/LibraryStatus.svelte';
+import LibraryStatus from '#lib/components/discover/LibraryStatus.svelte';
 import { preloadLazy } from '../helpers/warmUp';
 
 // The real PerspectivePopover needs a QueryClientProvider/Clerk context; swap in a stub so we can
 // assert the dynamic-import wiring (contentId/contentName/userId).
-vi.mock('$lib/components/PerspectivePopover.svelte', async () => {
+vi.mock('#lib/components/PerspectivePopover.svelte', async () => {
 	const mod = await import('../helpers/FakePerspectivePopover.svelte');
 	return { default: mod.default };
 });
 
 const mocks = vi.hoisted(() => ({ me: { id: '7' } as { id: string } | null }));
-vi.mock('$lib/queries/users/useMe.svelte', () => ({
+vi.mock('#lib/queries/users/useMe.svelte.js', () => ({
 	useMe: () => ({
 		get me() {
 			return mocks.me;
@@ -21,7 +21,7 @@ vi.mock('$lib/queries/users/useMe.svelte', () => ({
 
 // The component renders this through {#await import(...)}: load it up front so a
 // findBy* waits on the UI, not on Vite's first transform of the module (#728).
-preloadLazy(() => import('$lib/components/PerspectivePopover.svelte'));
+preloadLazy(() => import('#lib/components/PerspectivePopover.svelte'));
 
 describe('LibraryStatus', () => {
 	it('shows the In Library badge with Add perspective, Compare and Go to item actions', () => {

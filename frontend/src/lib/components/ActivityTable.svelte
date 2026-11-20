@@ -1,6 +1,6 @@
 <script lang="ts">
 	import AgGridSvelte5Component from 'ag-grid-svelte5';
-	import LazyLoadError from '$lib/components/LazyLoadError.svelte';
+	import LazyLoadError from '#lib/components/LazyLoadError.svelte';
 	import { ClientSideRowModelModule } from '@ag-grid-community/client-side-row-model';
 	import type {
 		GridApi,
@@ -15,7 +15,7 @@
 	import { createQuery, hashKey, keepPreviousData } from '@tanstack/svelte-query';
 	import { page } from '$app/state';
 	import { goto } from '$app/navigation';
-	import { graphqlRequest } from '$lib/queries/client';
+	import { graphqlRequest } from '#lib/queries/client.js';
 	import {
 		ACTIVITY_LIST_STALE_TIME_MS,
 		cursorsAfterPage,
@@ -23,17 +23,17 @@
 		activityListRequest,
 		type ContentItem,
 		type ContentResponse,
-	} from '$lib/queries/content';
-	import { useContentDetails } from '$lib/queries/content/useContentDetails';
-	import { OPEN_CONTENT_PARAM } from '$lib/utils/contentLinks';
-	import { createRowOrderMemory } from '$lib/utils/rowOrder';
+	} from '#lib/queries/content/index.js';
+	import { useContentDetails } from '#lib/queries/content/useContentDetails.js';
+	import { OPEN_CONTENT_PARAM } from '#lib/utils/contentLinks.js';
+	import { createRowOrderMemory } from '#lib/utils/rowOrder.js';
 	import {
 		LIST_PERSPECTIVES_BY_USER,
 		MAX_PERSPECTIVES_PER_LIST,
 		type ListPerspectivesByUserResponse,
 		type PerspectiveItem,
-	} from '$lib/queries/perspectives';
-	import { queryKeys } from '$lib/queries/keys';
+	} from '#lib/queries/perspectives/index.js';
+	import { queryKeys } from '#lib/queries/keys.js';
 	import {
 		parseGridParams,
 		serializeGridParams,
@@ -41,8 +41,8 @@
 		filterToUrlParams,
 		filtersEqual,
 		nonGridFilters,
-	} from '$lib/utils/gridUrlState';
-	import type { DataMode, GridParams, SortSpec } from '$lib/utils/gridUrlState';
+	} from '#lib/utils/gridUrlState.js';
+	import type { DataMode, GridParams, SortSpec } from '#lib/utils/gridUrlState.js';
 	import {
 		typeCellRenderer,
 		categoryCellRenderer,
@@ -85,8 +85,8 @@
 		tmdbIdValueGetter,
 		textOrEmpty,
 		EMPTY_VALUE,
-	} from '$lib/utils/formatting';
-	import { headerMinWidth } from '$lib/utils/grid-header-width';
+	} from '#lib/utils/formatting.js';
+	import { headerMinWidth } from '#lib/utils/grid-header-width.js';
 	import {
 		capitalizeContentType,
 		durationComparator,
@@ -109,22 +109,22 @@
 		showColumnRelevanceCallout,
 		NUMERIC_COL_IDS,
 		liveGridApi,
-	} from '$lib/utils/grid-config';
-	import { ACTIVITY_GRID_THEME } from '$lib/utils/grid-theme';
-	import { emptyCellClassRules } from '$lib/utils/grid-empty';
-	import { useCardMode, useResponsiveTier } from '$lib/utils/responsive.svelte';
-	import { useMe } from '$lib/queries/users/useMe.svelte';
-	import { useUsernames } from '$lib/queries/users/useUsernames.svelte';
-	import ColumnPickerDialog from '$lib/components/ColumnPickerDialog.svelte';
-	import ExportMenu from '$lib/components/ExportMenu.svelte';
-	import PrintListView from '$lib/components/PrintListView.svelte';
-	import PrintOptionsDialog from '$lib/components/PrintOptionsDialog.svelte';
-	import type { PrintSpacing } from '$lib/components/PrintOptionsDialog.svelte';
-	import { isExportDisabled, readExportTable, type ExportGridApi } from '$lib/utils/exportGrid';
-	import type { ExportTable } from '$lib/utils/exportTable';
-	import { copyLibraryTable, downloadLibraryCsv } from '$lib/utils/exportActions';
-	import { copyWithToast, downloadWithToast } from '$lib/utils/toast';
-	import { addLandscapePageStyle, removeLandscapePageStyle, runPrint } from '$lib/utils/printing';
+	} from '#lib/utils/grid-config.js';
+	import { ACTIVITY_GRID_THEME } from '#lib/utils/grid-theme.js';
+	import { emptyCellClassRules } from '#lib/utils/grid-empty.js';
+	import { useCardMode, useResponsiveTier } from '#lib/utils/responsive.svelte.js';
+	import { useMe } from '#lib/queries/users/useMe.svelte.js';
+	import { useUsernames } from '#lib/queries/users/useUsernames.svelte.js';
+	import ColumnPickerDialog from '#lib/components/ColumnPickerDialog.svelte';
+	import ExportMenu from '#lib/components/ExportMenu.svelte';
+	import PrintListView from '#lib/components/PrintListView.svelte';
+	import PrintOptionsDialog from '#lib/components/PrintOptionsDialog.svelte';
+	import type { PrintSpacing } from '#lib/components/PrintOptionsDialog.svelte';
+	import { isExportDisabled, readExportTable, type ExportGridApi } from '#lib/utils/exportGrid.js';
+	import type { ExportTable } from '#lib/utils/exportTable.js';
+	import { copyLibraryTable, downloadLibraryCsv } from '#lib/utils/exportActions.js';
+	import { copyWithToast, downloadWithToast } from '#lib/utils/toast.js';
+	import { addLandscapePageStyle, removeLandscapePageStyle, runPrint } from '#lib/utils/printing.js';
 	import {
 		COLUMN_VIEW_LABEL,
 		clearLayout,
@@ -135,14 +135,14 @@
 		saveLayout,
 		type ColumnLayout,
 		type ColumnView,
-	} from '$lib/utils/columnLayouts';
+	} from '#lib/utils/columnLayouts.js';
 	import { toast } from 'svelte-sonner';
-	import SortPickerDialog from '$lib/components/SortPickerDialog.svelte';
+	import SortPickerDialog from '#lib/components/SortPickerDialog.svelte';
 	import SlidersHorizontalIcon from '@lucide/svelte/icons/sliders-horizontal';
 	import ArrowUpDownIcon from '@lucide/svelte/icons/arrow-up-down';
-	import CellPopover, { type PopoverState } from '$lib/components/CellPopover.svelte';
-	import { buildPopoverState, createHoverController } from '$lib/utils/tooltipHover';
-	import { ACTIVITY_TOOLTIP_SPECS } from '$lib/utils/activityTooltipSpecs';
+	import CellPopover, { type PopoverState } from '#lib/components/CellPopover.svelte';
+	import { buildPopoverState, createHoverController } from '#lib/utils/tooltipHover.js';
+	import { ACTIVITY_TOOLTIP_SPECS } from '#lib/utils/activityTooltipSpecs.js';
 	import {
 		authorCellRenderer,
 		authorValueGetter,
@@ -154,17 +154,17 @@
 		publishedValueGetter,
 		ratingValueGetter,
 		readersValueGetter,
-	} from '$lib/utils/bookFormatting';
+	} from '#lib/utils/bookFormatting.js';
 	import { onDestroy, untrack } from 'svelte';
 	import ListOrderedIcon from '@lucide/svelte/icons/list-ordered';
-	import DataModeToggle from '$lib/components/DataModeToggle.svelte';
-	import FilterChips from '$lib/components/FilterChips.svelte';
-	import ColumnRelevanceCallout from '$lib/components/ColumnRelevanceCallout.svelte';
-	import { ContentTypeFilter, AgeRatingFilter, WebRoleFilter } from '$lib/utils/contentTypeFilter';
-	import ActivityDetailsModal from '$lib/components/ActivityDetailsModal.svelte';
-	import ActivityCardList from '$lib/components/ActivityCardList.svelte';
-	import AddToPlanDialog from '$lib/components/plan/AddToPlanDialog.svelte';
-	import { activityItemCellRenderer } from '$lib/utils/activityItemCellRenderer';
+	import DataModeToggle from '#lib/components/DataModeToggle.svelte';
+	import FilterChips from '#lib/components/FilterChips.svelte';
+	import ColumnRelevanceCallout from '#lib/components/ColumnRelevanceCallout.svelte';
+	import { ContentTypeFilter, AgeRatingFilter, WebRoleFilter } from '#lib/utils/contentTypeFilter.js';
+	import ActivityDetailsModal from '#lib/components/ActivityDetailsModal.svelte';
+	import ActivityCardList from '#lib/components/ActivityCardList.svelte';
+	import AddToPlanDialog from '#lib/components/plan/AddToPlanDialog.svelte';
+	import { activityItemCellRenderer } from '#lib/utils/activityItemCellRenderer.js';
 	import {
 		webAuthorCellRenderer,
 		webPublishedFilterValueGetter,
@@ -172,11 +172,11 @@
 		webRolesCellRenderer,
 		webSiteCellRenderer,
 		formatWebPublished,
-	} from '$lib/utils/webPageFormatting';
-	import { webPageAuthor, webPageSite } from '$lib/utils/webPage';
-	import CategoryTypeahead from '$lib/components/CategoryTypeahead.svelte';
-	import { useSetPrimaryCategory } from '$lib/queries/categories/useSetPrimaryCategory';
-	import type { WikidataSearchResult } from '$lib/queries/categories';
+	} from '#lib/utils/webPageFormatting.js';
+	import { webPageAuthor, webPageSite } from '#lib/utils/webPage.js';
+	import CategoryTypeahead from '#lib/components/CategoryTypeahead.svelte';
+	import { useSetPrimaryCategory } from '#lib/queries/categories/useSetPrimaryCategory.js';
+	import type { WikidataSearchResult } from '#lib/queries/categories/index.js';
 
 	// Popover state for Perspectize column
 	let popoverOpen = $state(false);
@@ -341,7 +341,7 @@
 	// ---------------------------------------------------------------------------
 
 	// Derive grid params from current URL (reactive to URL changes)
-	const gridParams = $derived(parseGridParams(page.url.searchParams));
+	const gridParams = $derived(parseGridParams(new URLSearchParams(page.url.search)));
 
 	// Individual derived fields from URL
 	const mode = $derived(gridParams.mode);
@@ -370,7 +370,7 @@
 		const updated = { ...gridParams, ...changes };
 		const search = serializeGridParams(updated);
 		const url = search ? `?${search}` : page.url.pathname;
-		goto(url, { replaceState: replace, keepFocus: true, noScroll: true });
+		goto(url, { replace, reset: false });
 	}
 
 	// ---------------------------------------------------------------------------
@@ -502,10 +502,10 @@
 		const id = page.url.searchParams.get(OPEN_CONTENT_PARAM);
 		if (!id) return;
 		detailsModalContentId = id;
-		const params = new URLSearchParams(page.url.searchParams);
+		const params = new URLSearchParams(page.url.search);
 		params.delete(OPEN_CONTENT_PARAM);
 		const search = params.toString();
-		goto(search ? `?${search}` : page.url.pathname, { replaceState: true, keepFocus: true, noScroll: true });
+		goto(search ? `?${search}` : page.url.pathname, { replace: true, reset: false });
 	});
 	const totalCount = $derived(contentQuery.data?.content.totalCount ?? 0);
 	// The grid reports its displayed (post-filter) row count through onModelUpdated, which also
@@ -847,8 +847,7 @@
 				filterValueGetter: durationFilterValueGetter,
 				comparator: durationComparator,
 				context: { tooltipSpec: ACTIVITY_TOOLTIP_SPECS.duration },
-				headerTooltip:
-					'Length of the item.',
+				headerTooltip: 'Length of the item.',
 			},
 			{
 				colId: 'views',
@@ -1879,7 +1878,7 @@
      (~170KB gzipped), which would otherwise load eagerly on every visit to this page
      even for users who never open the editor. -->
 {#if popoverOpen && popoverContentId !== null}
-	{#await import('$lib/components/PerspectivePopover.svelte') then { default: PerspectivePopover }}
+	{#await import('#lib/components/PerspectivePopover.svelte') then { default: PerspectivePopover }}
 		<PerspectivePopover
 			contentId={popoverContentId}
 			contentName={popoverContentName}

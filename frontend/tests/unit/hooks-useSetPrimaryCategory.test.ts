@@ -31,7 +31,7 @@ vi.mock('svelte-sonner', () => ({
 	},
 }));
 
-vi.mock('$lib/queries/client', () => ({
+vi.mock('#lib/queries/client.js', () => ({
 	graphqlRequest: mockGraphqlRequest,
 	// Deliberately no `graphqlClient` export here — if the hook falls back to
 	// the raw unauthenticated client, this mock throws instead of silently
@@ -40,13 +40,13 @@ vi.mock('$lib/queries/client', () => ({
 
 // The tests import these inside their bodies; load them once up front so the first
 // test doesn't pay the module transform, which balloons under full-suite load (#728).
-preloadLazy(() => import('$lib/queries/categories/useSetPrimaryCategory'));
+preloadLazy(() => import('#lib/queries/categories/useSetPrimaryCategory.js'));
 
 describe('useSetPrimaryCategory hook', () => {
 	beforeEach(async () => {
 		vi.clearAllMocks();
 		capturedMutationOptions = undefined;
-		const { useSetPrimaryCategory } = await import('$lib/queries/categories/useSetPrimaryCategory');
+		const { useSetPrimaryCategory } = await import('#lib/queries/categories/useSetPrimaryCategory.js');
 		useSetPrimaryCategory();
 	});
 

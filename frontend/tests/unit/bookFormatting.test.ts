@@ -21,8 +21,8 @@ import {
 	formatReaders,
 	READING_LOG_CAVEAT,
 	type BookRow,
-} from '$lib/utils/bookFormatting';
-import { EMPTY_VALUE } from '$lib/utils/formatting';
+} from '#lib/utils/bookFormatting.js';
+import { EMPTY_VALUE } from '#lib/utils/formatting.js';
 
 // The four real cases from the Book design: the full record, a rating-only record, a sparse
 // zine with no cover or rating, and a record with no author or year.

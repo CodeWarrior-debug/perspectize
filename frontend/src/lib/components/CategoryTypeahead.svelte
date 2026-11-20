@@ -1,9 +1,13 @@
 <script lang="ts">
-	import { NO_AUTOFILL } from '$lib/utils/noAutofill';
+	import { NO_AUTOFILL } from '#lib/utils/noAutofill.js';
 	import { createQuery, keepPreviousData } from '@tanstack/svelte-query';
-	import { graphqlClient } from '$lib/queries/client';
-	import { WIKIDATA_SEARCH, type WikidataSearchResult, type WikidataSearchResponse } from '$lib/queries/categories';
-	import { queryKeys } from '$lib/queries/keys';
+	import { graphqlClient } from '#lib/queries/client.js';
+	import {
+		WIKIDATA_SEARCH,
+		type WikidataSearchResult,
+		type WikidataSearchResponse,
+	} from '#lib/queries/categories/index.js';
+	import { queryKeys } from '#lib/queries/keys.js';
 
 	let {
 		contentId,

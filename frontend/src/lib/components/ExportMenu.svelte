@@ -3,7 +3,7 @@
 	import DownloadIcon from '@lucide/svelte/icons/download';
 	import CopyIcon from '@lucide/svelte/icons/copy';
 	import ChevronDownIcon from '@lucide/svelte/icons/chevron-down';
-	import { Popover, PopoverContent, PopoverTrigger } from '$lib/components/shadcn';
+	import { Popover, PopoverContent, PopoverTrigger } from '#lib/components/shadcn/index.js';
 
 	interface Props {
 		disabled: boolean;

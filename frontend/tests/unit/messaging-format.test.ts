@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { initials, threadTitle, otherParticipants, messageClockTime, typingLabel } from '$lib/messaging/format';
+import { initials, threadTitle, otherParticipants, messageClockTime, typingLabel } from '#lib/messaging/format.js';
 
 const part = (id: string, username: string) => ({
 	user: { id, username },

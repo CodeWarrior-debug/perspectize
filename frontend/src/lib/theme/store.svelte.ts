@@ -1,4 +1,4 @@
-import { browser } from '$app/environment';
+import { browser } from '$app/env';
 import { deriveTheme, toCssVarMap, type BaseThemeTokens, type FullThemeTokens } from './derive';
 import { DEFAULT_THEME_ID, THEME_PRESETS, THEME_PRESET_TOKENS } from './presets';
 

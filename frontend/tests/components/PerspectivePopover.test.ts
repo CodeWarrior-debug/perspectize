@@ -1,9 +1,9 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/svelte';
-import PerspectivePopover from '$lib/components/PerspectivePopover.svelte';
+import PerspectivePopover from '#lib/components/PerspectivePopover.svelte';
 import { tick } from 'svelte';
 import { toast } from 'svelte-sonner';
-import type { PerspectiveItem } from '$lib/queries/perspectives';
+import type { PerspectiveItem } from '#lib/queries/perspectives/index.js';
 import { warmUp } from '../helpers/warmUp';
 
 const mocks = vi.hoisted(() => ({
@@ -19,48 +19,48 @@ const mocks = vi.hoisted(() => ({
 	mockToastWithAction: vi.fn(),
 }));
 
-vi.mock('$lib/queries/userTodos/useFetchUserTodos', () => ({
+vi.mock('#lib/queries/userTodos/useFetchUserTodos.js', () => ({
 	useFetchUserTodos: vi.fn(() => mocks.mockFetchTodos),
 }));
 
-vi.mock('$lib/queries/userTodos/useUpdateUserTodo', () => ({
+vi.mock('#lib/queries/userTodos/useUpdateUserTodo.js', () => ({
 	useUpdateUserTodo: vi.fn(() => ({
 		mutateAsync: mocks.mockUpdateTodoMutateAsync,
 		isPending: false,
 	})),
 }));
 
-vi.mock('$lib/utils/toast', () => ({
+vi.mock('#lib/utils/toast.js', () => ({
 	toastWithAction: mocks.mockToastWithAction,
 }));
 
-vi.mock('$lib/utils/perspectiveDraft', () => ({
+vi.mock('#lib/utils/perspectiveDraft.js', () => ({
 	draftKey: (contentId: number, userId: number) => `draft:${contentId}:${userId}`,
 	saveDraft: mocks.mockSaveDraft,
 	loadDraft: mocks.mockLoadDraft,
 	clearDraft: mocks.mockClearDraft,
 }));
 
-vi.mock('$lib/components/CommentsEditor.svelte', async () => {
+vi.mock('#lib/components/CommentsEditor.svelte', async () => {
 	const mod = await import('../helpers/FakeCommentsEditor.svelte');
 	return { default: mod.default };
 });
 
-vi.mock('$lib/queries/perspectives/useCreatePerspective', () => ({
+vi.mock('#lib/queries/perspectives/useCreatePerspective.js', () => ({
 	useCreatePerspective: vi.fn(() => ({
 		mutateAsync: mocks.mockCreateMutateAsync,
 		isPending: false,
 	})),
 }));
 
-vi.mock('$lib/queries/perspectives/useUpdatePerspective', () => ({
+vi.mock('#lib/queries/perspectives/useUpdatePerspective.js', () => ({
 	useUpdatePerspective: vi.fn(() => ({
 		mutateAsync: mocks.mockUpdateMutateAsync,
 		isPending: false,
 	})),
 }));
 
-vi.mock('$lib/queries/perspectives/useDeletePerspective', () => ({
+vi.mock('#lib/queries/perspectives/useDeletePerspective.js', () => ({
 	useDeletePerspective: vi.fn(() => ({
 		mutate: mocks.mockDeleteMutate,
 		isPending: false,

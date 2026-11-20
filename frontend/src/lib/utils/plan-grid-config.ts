@@ -5,7 +5,7 @@
  * the Activity grid. Nothing here touches the DOM.
  */
 import type { ColDef, ICellRendererParams, ValueFormatterParams, ValueGetterParams } from '@ag-grid-community/core';
-import type { TodoPrivacy, UserTodoItem, UserTodoSortBy, UserTodoStatus } from '$lib/queries/userTodos';
+import type { TodoPrivacy, UserTodoItem, UserTodoSortBy, UserTodoStatus } from '#lib/queries/userTodos/index.js';
 import { contentTypeLabel, type ResponsiveTier } from './grid-config';
 import { EMPTY_VALUE } from './formatting';
 import { headerMinWidth } from './grid-header-width';

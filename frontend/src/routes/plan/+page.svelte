@@ -1,10 +1,10 @@
 <script lang="ts">
-	import PageWrapper from '$lib/components/PageWrapper.svelte';
-	import PlanBoard from '$lib/components/plan/PlanBoard.svelte';
-	import SignInTrigger from '$lib/components/auth/SignInTrigger.svelte';
-	import { Button } from '$lib/components/shadcn';
-	import { useAuthState } from '$lib/auth/useAuthState';
-	import { useMe } from '$lib/queries/users/useMe.svelte';
+	import PageWrapper from '#lib/components/PageWrapper.svelte';
+	import PlanBoard from '#lib/components/plan/PlanBoard.svelte';
+	import SignInTrigger from '#lib/components/auth/SignInTrigger.svelte';
+	import { Button } from '#lib/components/shadcn/index.js';
+	import { useAuthState } from '#lib/auth/useAuthState.js';
+	import { useMe } from '#lib/queries/users/useMe.svelte.js';
 
 	// Signed-out visitors get a sign-in prompt; the plan itself loads only once the user id is known.
 	const auth = useAuthState();

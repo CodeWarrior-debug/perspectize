@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen, waitFor, fireEvent } from '@testing-library/svelte';
-import CommentsEditor from '$lib/components/CommentsEditor.svelte';
+import CommentsEditor from '#lib/components/CommentsEditor.svelte';
 
 describe('CommentsEditor', () => {
 	it('renders the default toolbar buttons', async () => {

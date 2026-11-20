@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/svelte';
-import CellPopover from '$lib/components/CellPopover.svelte';
+import CellPopover from '#lib/components/CellPopover.svelte';
 
 const mocks = vi.hoisted(() => ({ success: vi.fn(), error: vi.fn() }));
 vi.mock('svelte-sonner', () => ({ toast: { success: mocks.success, error: mocks.error } }));

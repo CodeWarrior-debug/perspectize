@@ -1,6 +1,6 @@
 <script lang="ts">
-	import type { MessageThread } from '$lib/queries/messaging';
-	import { Button } from '$lib/components/shadcn';
+	import type { MessageThread } from '#lib/queries/messaging/index.js';
+	import { Button } from '#lib/components/shadcn/index.js';
 	import PlusIcon from '@lucide/svelte/icons/plus';
 	import ThreadListItem from './ThreadListItem.svelte';
 

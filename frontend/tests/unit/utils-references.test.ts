@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { resolveAtReference, hasAtReference } from '$lib/utils/references';
+import { resolveAtReference, hasAtReference } from '#lib/utils/references.js';
 
 describe('resolveAtReference', () => {
 	it('replaces @this with the parent content name', () => {

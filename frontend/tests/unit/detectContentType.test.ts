@@ -5,9 +5,9 @@ const JOHN_3 = { bookId: 43, startChapter: 3, startVerse: 1, endChapter: 3, endV
 const { parseReference } = vi.hoisted(() => ({ parseReference: vi.fn() }));
 
 // The real parser (plan C1) lives on another branch; detection is tested against a table-driven fake.
-vi.mock('$lib/utils/passageParserAdapter', () => ({ parseReference }));
+vi.mock('#lib/utils/passageParserAdapter.js', () => ({ parseReference }));
 
-import { detectContentType, detectContentCandidates } from '$lib/utils/detectContentType';
+import { detectContentType, detectContentCandidates } from '#lib/utils/detectContentType.js';
 
 const fakeRefs: Record<string, unknown> = {
 	'Genesis 1:1-3': GEN_1_1_3,

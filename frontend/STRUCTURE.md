@@ -50,7 +50,7 @@ frontend/
 ├── static/
 │   └── fonts/
 │       └── Inter-Variable.woff2
-├── svelte.config.js         # SvelteKit config (adapter-static)
+├── vite.config.ts           # SvelteKit (Kit 3 options, adapter-static) + PWA
 ├── vite.config.ts           # Vite config (Tailwind plugin)
 ├── tailwind.config.ts       # Tailwind CSS v4 config
 ├── components.json          # shadcn-svelte config
@@ -125,11 +125,11 @@ shadcn-svelte components are in `src/lib/components/ui/`. These are generated vi
 pnpm dlx shadcn-svelte@latest add button
 ```
 
-Import via `$lib/components/ui/button`:
+Import via `#lib/components/ui/button`:
 
 ```svelte
 <script>
-	import { Button } from '$lib/components/ui/button';
+	import { Button } from '#lib/components/ui/button';
 </script>
 
 <Button variant="default">Primary Button</Button>
@@ -222,17 +222,17 @@ export enum Privacy {
 
 ## Example File Purposes
 
-| File                                        | Purpose                             |
-| ------------------------------------------- | ----------------------------------- |
+| File                                        | Purpose                                       |
+| ------------------------------------------- | --------------------------------------------- |
 | `src/routes/+page.svelte`                   | Home: sends signed-in visitors to the Library |
-| `src/routes/content-library/+page.svelte`   | Library page (content grid, search) |
-| `src/routes/perspectives/+page.svelte`      | Browse perspectives (grid, filters) |
-| `src/lib/components/PerspectiveCard.svelte` | Perspective display card            |
-| `src/lib/components/PerspectiveForm.svelte` | Create/edit perspective form        |
-| `src/lib/components/PerspectiveGrid.svelte` | AG Grid wrapper for perspectives    |
-| `src/lib/queries/perspectives.ts`           | TanStack Query definitions          |
-| `src/lib/utils/validation.ts`               | Validation utilities                |
-| `src/lib/types/perspective.ts`              | TypeScript types                    |
+| `src/routes/content-library/+page.svelte`   | Library page (content grid, search)           |
+| `src/routes/perspectives/+page.svelte`      | Browse perspectives (grid, filters)           |
+| `src/lib/components/PerspectiveCard.svelte` | Perspective display card                      |
+| `src/lib/components/PerspectiveForm.svelte` | Create/edit perspective form                  |
+| `src/lib/components/PerspectiveGrid.svelte` | AG Grid wrapper for perspectives              |
+| `src/lib/queries/perspectives.ts`           | TanStack Query definitions                    |
+| `src/lib/utils/validation.ts`               | Validation utilities                          |
+| `src/lib/types/perspective.ts`              | TypeScript types                              |
 
 ## Scripts
 

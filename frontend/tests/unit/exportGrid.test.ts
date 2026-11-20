@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
-import type { ContentItem } from '$lib/queries/content';
-import { isExportDisabled, readExportTable, type ExportGridApi } from '$lib/utils/exportGrid';
+import type { ContentItem } from '#lib/queries/content/index.js';
+import { isExportDisabled, readExportTable, type ExportGridApi } from '#lib/utils/exportGrid.js';
 
 type Node = { data?: ContentItem };
 

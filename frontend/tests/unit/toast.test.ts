@@ -4,7 +4,7 @@ const { toastFn } = vi.hoisted(() => ({ toastFn: vi.fn((..._args: unknown[]) => 
 
 vi.mock('svelte-sonner', () => ({ toast: toastFn }));
 
-import { ACTION_TOAST_DURATION_MS, isInsideToast, toastWithAction } from '$lib/utils/toast';
+import { ACTION_TOAST_DURATION_MS, isInsideToast, toastWithAction } from '#lib/utils/toast.js';
 
 describe('toastWithAction', () => {
 	beforeEach(() => {

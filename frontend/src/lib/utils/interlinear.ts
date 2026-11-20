@@ -1,4 +1,4 @@
-import type { InterlinearVerse, InterlinearWord } from '$lib/queries/bible';
+import type { InterlinearVerse, InterlinearWord } from '#lib/queries/bible/index.js';
 
 /** 'H0430G' -> 'H430', 'H1254B' -> 'H1254'. Zero padding and the sense letter are internal. */
 export function formatStrongs(tag: string): string {

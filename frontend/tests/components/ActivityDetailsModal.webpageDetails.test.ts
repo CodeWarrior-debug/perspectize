@@ -1,20 +1,20 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, cleanup, waitFor } from '@testing-library/svelte';
-import ActivityDetailsModal from '$lib/components/ActivityDetailsModal.svelte';
+import ActivityDetailsModal from '#lib/components/ActivityDetailsModal.svelte';
 import TestWrapper from '../helpers/TestWrapper.svelte';
 import { makeClient } from '../helpers/queryBudget';
-import { formatDateTime } from '$lib/utils/formatting';
-import { GET_CONTENT_DETAILS } from '$lib/queries/content';
-import { graphqlRequest } from '$lib/queries/client';
+import { formatDateTime } from '#lib/utils/formatting.js';
+import { GET_CONTENT_DETAILS } from '#lib/queries/content/index.js';
+import { graphqlRequest } from '#lib/queries/client.js';
 
 // A grid row for a webpage has the shaped list payload only: no `response`. The modal must load the
 // details itself. These tests use a REAL QueryClient, so they also prove how many details requests a
 // modal open costs.
 
-vi.mock('$lib/queries/client', () => ({ graphqlRequest: vi.fn() }));
+vi.mock('#lib/queries/client.js', () => ({ graphqlRequest: vi.fn() }));
 
 const authState = vi.hoisted(() => ({ userId: null as string | null }));
-vi.mock('$lib/auth/useAuthState', () => ({
+vi.mock('#lib/auth/useAuthState.js', () => ({
 	useAuthState: () => ({
 		get isLoaded() {
 			return true;

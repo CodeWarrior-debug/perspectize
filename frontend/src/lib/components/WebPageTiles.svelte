@@ -1,6 +1,12 @@
 <script lang="ts">
-	import { EMPTY_VALUE, formatDate, formatDateTime, formatPublishDate } from '$lib/utils/formatting';
-	import { webPageAuthor, webPageFetchedAt, webPageRolesLabel, webPageRolesOf, webPageSite } from '$lib/utils/webPage';
+	import { EMPTY_VALUE, formatDate, formatDateTime, formatPublishDate } from '#lib/utils/formatting.js';
+	import {
+		webPageAuthor,
+		webPageFetchedAt,
+		webPageRolesLabel,
+		webPageRolesOf,
+		webPageSite,
+	} from '#lib/utils/webPage.js';
 
 	// Webpage stat tiles, rendered as children of the modal's tile grid. Unknown is a dash, never a
 	// guess. The Author tile appears only when the page declares an author.

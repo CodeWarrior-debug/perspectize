@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { detectContentType } from '$lib/utils/detectContentType';
+import { detectContentType } from '#lib/utils/detectContentType.js';
 
 // Unmocked: exercises detection against the real reference parser (plan C1).
 describe('detectContentType with the real parser', () => {

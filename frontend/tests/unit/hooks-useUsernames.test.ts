@@ -5,7 +5,7 @@
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { hashKey } from '@tanstack/svelte-query';
-import { queryKeys } from '$lib/queries/keys';
+import { queryKeys } from '#lib/queries/keys.js';
 import { countingFetch, makeClient, mountConsumers } from '../helpers/queryBudget';
 
 let capturedOptions: { queryKey: unknown[]; queryFn: () => Promise<unknown>; staleTime?: number };
@@ -27,9 +27,9 @@ vi.mock('@tanstack/svelte-query', async (importOriginal) => {
 });
 
 const graphqlRequest = vi.hoisted(() => vi.fn());
-vi.mock('$lib/queries/client', () => ({ graphqlRequest }));
+vi.mock('#lib/queries/client.js', () => ({ graphqlRequest }));
 
-import { useUsernames } from '$lib/queries/users/useUsernames.svelte';
+import { useUsernames } from '#lib/queries/users/useUsernames.svelte.js';
 
 describe('useUsernames', () => {
 	beforeEach(() => {

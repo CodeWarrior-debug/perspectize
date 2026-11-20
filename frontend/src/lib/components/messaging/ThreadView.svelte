@@ -1,16 +1,20 @@
 <script lang="ts">
 	import { createQuery, useQueryClient } from '@tanstack/svelte-query';
-	import { graphqlRequest } from '$lib/queries/client';
-	import { GET_MESSAGE_THREAD, type GetMessageThreadResponse, type MessagingUser } from '$lib/queries/messaging';
-	import { queryKeys } from '$lib/queries/keys';
-	import { useMe } from '$lib/queries/users/useMe.svelte';
-	import { useThreadMessages } from '$lib/queries/messaging/useThreadMessages.svelte';
-	import { useSendMessage } from '$lib/queries/messaging/useSendMessage';
-	import { useSetTyping } from '$lib/queries/messaging/useSetTyping';
-	import { useMarkThreadRead } from '$lib/queries/messaging/useMarkThreadRead';
-	import { createThreadStream } from '$lib/messaging/useThreadStream.svelte';
-	import { streamIdle } from '$lib/messaging/streamIdle.svelte';
-	import { otherParticipants } from '$lib/messaging/format';
+	import { graphqlRequest } from '#lib/queries/client.js';
+	import {
+		GET_MESSAGE_THREAD,
+		type GetMessageThreadResponse,
+		type MessagingUser,
+	} from '#lib/queries/messaging/index.js';
+	import { queryKeys } from '#lib/queries/keys.js';
+	import { useMe } from '#lib/queries/users/useMe.svelte.js';
+	import { useThreadMessages } from '#lib/queries/messaging/useThreadMessages.svelte.js';
+	import { useSendMessage } from '#lib/queries/messaging/useSendMessage.js';
+	import { useSetTyping } from '#lib/queries/messaging/useSetTyping.js';
+	import { useMarkThreadRead } from '#lib/queries/messaging/useMarkThreadRead.js';
+	import { createThreadStream } from '#lib/messaging/useThreadStream.svelte.js';
+	import { streamIdle } from '#lib/messaging/streamIdle.svelte.js';
+	import { otherParticipants } from '#lib/messaging/format.js';
 	import {
 		showSenderForIndex,
 		lastKnownSeq,

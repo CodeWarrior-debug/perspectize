@@ -1,7 +1,7 @@
 <script lang="ts">
 	import SafeHtml from './SafeHtml.svelte';
 	import LockIcon from '@lucide/svelte/icons/lock';
-	import { nameInitials } from '$lib/utils/compareIdentity';
+	import { nameInitials } from '#lib/utils/compareIdentity.js';
 
 	let {
 		name,

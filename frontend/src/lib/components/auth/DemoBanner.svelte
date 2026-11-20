@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { demoSession } from '$lib/auth';
+	import { demoSession } from '#lib/auth/index.js';
 </script>
 
 <div

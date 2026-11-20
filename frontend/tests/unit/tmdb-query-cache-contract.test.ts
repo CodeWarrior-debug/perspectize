@@ -10,7 +10,7 @@
  */
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { hashKey } from '@tanstack/svelte-query';
-import { MOVIE_SEARCH_STALE_TIME, MOVIE_TRENDING_STALE_TIME, tmdbKeys } from '$lib/services/tmdbApi';
+import { MOVIE_SEARCH_STALE_TIME, MOVIE_TRENDING_STALE_TIME, tmdbKeys } from '#lib/services/tmdbApi.js';
 import { countingFetch, makeClient, mountConsumers } from '../helpers/queryBudget';
 
 afterEach(() => {

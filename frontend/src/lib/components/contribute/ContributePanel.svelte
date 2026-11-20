@@ -1,7 +1,7 @@
 <script lang="ts">
-	import { Button } from '$lib/components/shadcn';
+	import { Button } from '#lib/components/shadcn/index.js';
 	import ExternalLinkIcon from '@lucide/svelte/icons/external-link';
-	import { CONTRIBUTE_PATHS, type ContributePath } from '$lib/contribute/config';
+	import { CONTRIBUTE_PATHS, type ContributePath } from '#lib/contribute/config.js';
 
 	let { paths = CONTRIBUTE_PATHS }: { paths?: ContributePath[] } = $props();
 </script>

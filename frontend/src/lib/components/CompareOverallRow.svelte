@@ -1,5 +1,5 @@
 <script lang="ts">
-	import type { OverallComparison, OverallStatus } from '$lib/utils/comparePerspectives';
+	import type { OverallComparison, OverallStatus } from '#lib/utils/comparePerspectives.js';
 
 	let {
 		overall,

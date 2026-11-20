@@ -22,27 +22,27 @@ vi.mock('svelte-sonner', () => ({
 	toast: { success: mockToastSuccess, error: mockToastError },
 }));
 
-vi.mock('$lib/queries/client', () => ({ graphqlRequest: mockGraphqlRequest }));
+vi.mock('#lib/queries/client.js', () => ({ graphqlRequest: mockGraphqlRequest }));
 
 // The tests import these inside their bodies; load them once up front so the first
 // test doesn't pay the module transform, which balloons under full-suite load (#728).
 preloadLazy(
 	() => import('$app/navigation'),
-	() => import('$lib/queries/content'),
-	() => import('$lib/queries/content/useAddMovie'),
+	() => import('#lib/queries/content/index.js'),
+	() => import('#lib/queries/content/useAddMovie.js'),
 );
 
 describe('useAddMovie hook', () => {
 	beforeEach(async () => {
 		vi.clearAllMocks();
 		capturedMutationOptions = undefined;
-		const { useAddMovie } = await import('$lib/queries/content/useAddMovie');
+		const { useAddMovie } = await import('#lib/queries/content/useAddMovie.js');
 		useAddMovie();
 	});
 
 	it('sends the url through the authenticated graphqlRequest wrapper', async () => {
 		mockGraphqlRequest.mockResolvedValue({});
-		const { CREATE_CONTENT_FROM_MOVIE } = await import('$lib/queries/content');
+		const { CREATE_CONTENT_FROM_MOVIE } = await import('#lib/queries/content/index.js');
 		await capturedMutationOptions.mutationFn('tt0133093');
 		expect(mockGraphqlRequest).toHaveBeenCalledWith(CREATE_CONTENT_FROM_MOVIE, { input: { url: 'tt0133093' } });
 	});

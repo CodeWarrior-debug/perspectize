@@ -10,8 +10,8 @@
  * result's canonical work `url`, so dedupe is by work, not by edition or ISBN.
  */
 import { gql } from 'graphql-request';
-import { graphqlRequest } from '$lib/queries/client';
-import type { TrendingWindow } from '$lib/services/tmdbApi';
+import { graphqlRequest } from '#lib/queries/client.js';
+import type { TrendingWindow } from '#lib/services/tmdbApi.js';
 
 /** One book (a work, not an edition) from Open Library, as the backend maps it (schema.graphql BookSearchResult). */
 export interface BookSearchResult {
@@ -137,7 +137,7 @@ export async function lookupBookByIsbn(isbn: string): Promise<BookSearchResult |
 }
 
 // The cover URL is pure, so it lives in bookFormatting (cell renderers use it without this module's client).
-export { openLibraryCoverUrl, type CoverSize } from '$lib/utils/bookFormatting';
+export { openLibraryCoverUrl, type CoverSize } from '#lib/utils/bookFormatting.js';
 
 export const openLibraryKeys = {
 	all: ['openlibrary'] as const,

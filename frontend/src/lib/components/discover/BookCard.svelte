@@ -1,14 +1,14 @@
 <script lang="ts">
-	import { Button } from '$lib/components/shadcn';
+	import { Button } from '#lib/components/shadcn/index.js';
 	import LibraryStatus from './LibraryStatus.svelte';
 	import type { LibraryItem } from './libraryItem';
-	import type { BookSearchResult } from '$lib/services/openLibraryApi';
+	import type { BookSearchResult } from '#lib/services/openLibraryApi.js';
 	import {
 		READING_LOG_CAVEAT,
 		readingLogBreakdown,
 		readingLogOf,
 		openLibraryCoverUrl,
-	} from '$lib/utils/bookFormatting';
+	} from '#lib/utils/bookFormatting.js';
 	import BookIcon from '@lucide/svelte/icons/book';
 	import BookPlusIcon from '@lucide/svelte/icons/book-plus';
 

@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join, relative, resolve } from 'node:path';
-import { NO_AUTOFILL } from '$lib/utils/noAutofill';
+import { NO_AUTOFILL } from '#lib/utils/noAutofill.js';
 
 // Password managers decorate any text-like input they take for a login or identity field, so
 // every raw input/textarea must opt out. The shared shadcn Input does this by default; this test

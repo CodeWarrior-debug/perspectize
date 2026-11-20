@@ -11,7 +11,7 @@ import {
 	type CreatePerspectiveResponse,
 	type UpdatePerspectiveResponse,
 	type ListPerspectivesByUserResponse,
-} from '$lib/queries/perspectives';
+} from '#lib/queries/perspectives/index.js';
 
 describe('Perspective GraphQL query definitions', () => {
 	describe('Type exports', () => {

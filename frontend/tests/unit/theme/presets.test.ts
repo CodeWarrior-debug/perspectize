@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { THEME_PRESETS, DEFAULT_THEME_ID, THEME_PRESET_TOKENS, generatePresetCss } from '$lib/theme/presets';
+import { THEME_PRESETS, DEFAULT_THEME_ID, THEME_PRESET_TOKENS, generatePresetCss } from '#lib/theme/presets.js';
 
 describe('THEME_PRESET_TOKENS', () => {
 	it('derives a full token set for every preset', () => {

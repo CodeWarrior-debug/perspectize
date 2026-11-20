@@ -7,8 +7,8 @@
 		DialogDescription,
 		DialogFooter,
 		Button,
-	} from '$lib/components/shadcn';
-	import { DATA_COLUMNS, INTERNAL_COLUMNS, type TogglableColumn } from '$lib/utils/grid-config';
+	} from '#lib/components/shadcn/index.js';
+	import { DATA_COLUMNS, INTERNAL_COLUMNS, type TogglableColumn } from '#lib/utils/grid-config.js';
 
 	interface Props {
 		/** Two-way bound open state. */

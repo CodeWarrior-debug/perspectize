@@ -1,18 +1,18 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/svelte';
-import ClaimForm from '$lib/components/declare/ClaimForm.svelte';
-import type { ClaimRow } from '$lib/queries/content/claims';
+import ClaimForm from '#lib/components/declare/ClaimForm.svelte';
+import type { ClaimRow } from '#lib/queries/content/claims.js';
 
 const mocks = vi.hoisted(() => ({
 	createMutate: vi.fn(),
 	updateMutate: vi.fn(),
 }));
 
-vi.mock('$lib/queries/content/useCreateClaim', () => ({
+vi.mock('#lib/queries/content/useCreateClaim.js', () => ({
 	useCreateClaim: vi.fn(() => ({ mutate: mocks.createMutate, isPending: false })),
 }));
 
-vi.mock('$lib/queries/content/useUpdateClaim', () => ({
+vi.mock('#lib/queries/content/useUpdateClaim.js', () => ({
 	useUpdateClaim: vi.fn(() => ({ mutate: mocks.updateMutate, isPending: false })),
 }));
 

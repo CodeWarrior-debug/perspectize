@@ -32,16 +32,16 @@ vi.mock('svelte-sonner', () => ({
 	},
 }));
 
-vi.mock('$lib/queries/client', () => ({
+vi.mock('#lib/queries/client.js', () => ({
 	graphqlRequest: vi.fn(),
 }));
 
 // The tests import these inside their bodies; load them once up front so the first
 // test doesn't pay the module transform, which balloons under full-suite load (#728).
 preloadLazy(
-	() => import('$lib/queries/client'),
-	() => import('$lib/queries/users'),
-	() => import('$lib/queries/users/useCreateUser'),
+	() => import('#lib/queries/client.js'),
+	() => import('#lib/queries/users/index.js'),
+	() => import('#lib/queries/users/useCreateUser.js'),
 	() => import('@tanstack/svelte-query'),
 );
 
@@ -53,7 +53,7 @@ describe('useCreateUser hook', () => {
 
 	describe('hook initialization', () => {
 		it('returns a mutation object with mutate method', async () => {
-			const { useCreateUser } = await import('$lib/queries/users/useCreateUser');
+			const { useCreateUser } = await import('#lib/queries/users/useCreateUser.js');
 			const mutation = useCreateUser();
 
 			expect(mutation).toBeDefined();
@@ -63,7 +63,7 @@ describe('useCreateUser hook', () => {
 
 		it('calls createMutation with a function that returns options', async () => {
 			const { createMutation } = await import('@tanstack/svelte-query');
-			const { useCreateUser } = await import('$lib/queries/users/useCreateUser');
+			const { useCreateUser } = await import('#lib/queries/users/useCreateUser.js');
 
 			useCreateUser();
 
@@ -74,7 +74,7 @@ describe('useCreateUser hook', () => {
 		});
 
 		it('captures mutation options via createMutation factory', async () => {
-			const { useCreateUser } = await import('$lib/queries/users/useCreateUser');
+			const { useCreateUser } = await import('#lib/queries/users/useCreateUser.js');
 			useCreateUser();
 
 			expect(capturedMutationOptions).toBeDefined();
@@ -83,7 +83,7 @@ describe('useCreateUser hook', () => {
 
 	describe('mutationFn', () => {
 		beforeEach(async () => {
-			const { useCreateUser } = await import('$lib/queries/users/useCreateUser');
+			const { useCreateUser } = await import('#lib/queries/users/useCreateUser.js');
 			useCreateUser();
 		});
 
@@ -94,7 +94,7 @@ describe('useCreateUser hook', () => {
 		});
 
 		it('calls graphqlRequest with CREATE_USER and input params', async () => {
-			const { graphqlRequest } = await import('$lib/queries/client');
+			const { graphqlRequest } = await import('#lib/queries/client.js');
 			(graphqlRequest as any).mockResolvedValue({
 				createUser: { id: '1', username: 'testuser' },
 			});
@@ -106,8 +106,8 @@ describe('useCreateUser hook', () => {
 		});
 
 		it('passes the full CREATE_USER mutation document', async () => {
-			const { graphqlRequest } = await import('$lib/queries/client');
-			const { CREATE_USER } = await import('$lib/queries/users');
+			const { graphqlRequest } = await import('#lib/queries/client.js');
+			const { CREATE_USER } = await import('#lib/queries/users/index.js');
 			(graphqlRequest as any).mockResolvedValue({
 				createUser: { id: '1', username: 'testuser' },
 			});
@@ -121,7 +121,7 @@ describe('useCreateUser hook', () => {
 		});
 
 		it('returns the response from graphqlRequest', async () => {
-			const { graphqlRequest } = await import('$lib/queries/client');
+			const { graphqlRequest } = await import('#lib/queries/client.js');
 			const mockResponse = { createUser: { id: '42', username: 'newuser' } };
 			(graphqlRequest as any).mockResolvedValue(mockResponse);
 
@@ -134,7 +134,7 @@ describe('useCreateUser hook', () => {
 
 	describe('onSuccess callback', () => {
 		beforeEach(async () => {
-			const { useCreateUser } = await import('$lib/queries/users/useCreateUser');
+			const { useCreateUser } = await import('#lib/queries/users/useCreateUser.js');
 			useCreateUser();
 		});
 
@@ -182,7 +182,7 @@ describe('useCreateUser hook', () => {
 
 	describe('onError callback', () => {
 		beforeEach(async () => {
-			const { useCreateUser } = await import('$lib/queries/users/useCreateUser');
+			const { useCreateUser } = await import('#lib/queries/users/useCreateUser.js');
 			useCreateUser();
 		});
 
@@ -243,7 +243,7 @@ describe('useCreateUser hook', () => {
 
 	describe('integration with queryClient and toasts', () => {
 		beforeEach(async () => {
-			const { useCreateUser } = await import('$lib/queries/users/useCreateUser');
+			const { useCreateUser } = await import('#lib/queries/users/useCreateUser.js');
 			useCreateUser();
 		});
 
@@ -274,12 +274,12 @@ describe('useCreateUser hook', () => {
 
 	describe('mutation input handling', () => {
 		beforeEach(async () => {
-			const { useCreateUser } = await import('$lib/queries/users/useCreateUser');
+			const { useCreateUser } = await import('#lib/queries/users/useCreateUser.js');
 			useCreateUser();
 		});
 
 		it('accepts CreateUserInput with username only', async () => {
-			const { graphqlRequest } = await import('$lib/queries/client');
+			const { graphqlRequest } = await import('#lib/queries/client.js');
 			(graphqlRequest as any).mockResolvedValue({
 				createUser: { id: '1', username: 'testuser' },
 			});
@@ -291,7 +291,7 @@ describe('useCreateUser hook', () => {
 		});
 
 		it('accepts CreateUserInput with username and email', async () => {
-			const { graphqlRequest } = await import('$lib/queries/client');
+			const { graphqlRequest } = await import('#lib/queries/client.js');
 			(graphqlRequest as any).mockResolvedValue({
 				createUser: { id: '1', username: 'testuser' },
 			});

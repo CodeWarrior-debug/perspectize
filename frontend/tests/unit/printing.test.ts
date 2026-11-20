@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, it, expect, vi } from 'vitest';
-import { addLandscapePageStyle, removeLandscapePageStyle, runPrint } from '$lib/utils/printing';
+import { addLandscapePageStyle, removeLandscapePageStyle, runPrint } from '#lib/utils/printing.js';
 
 const appCss = readFileSync(resolve(process.cwd(), 'src/app.css'), 'utf8');
 

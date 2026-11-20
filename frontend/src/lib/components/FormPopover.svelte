@@ -11,7 +11,7 @@
 		DialogHeader,
 		DialogTitle,
 		DialogDescription,
-	} from '$lib/components/shadcn';
+	} from '#lib/components/shadcn/index.js';
 
 	let {
 		triggerLabel,

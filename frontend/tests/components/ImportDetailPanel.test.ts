@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/svelte';
-import ImportDetailPanel from '$lib/components/imports/ImportDetailPanel.svelte';
-import type { ImportItem, ImportItemDetails } from '$lib/queries/imports';
+import ImportDetailPanel from '#lib/components/imports/ImportDetailPanel.svelte';
+import type { ImportItem, ImportItemDetails } from '#lib/queries/imports/index.js';
 
 const mocks = vi.hoisted(() => ({
 	state: {
@@ -12,7 +12,7 @@ const mocks = vi.hoisted(() => ({
 	lastId: '',
 }));
 
-vi.mock('$lib/queries/imports/useImportItemDetails', () => ({
+vi.mock('#lib/queries/imports/useImportItemDetails.js', () => ({
 	useImportItemDetails: vi.fn((id: () => string) => ({
 		get isPending() {
 			mocks.lastId = id();

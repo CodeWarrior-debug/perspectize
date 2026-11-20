@@ -1,6 +1,6 @@
 import type { QueryClient } from '@tanstack/svelte-query';
-import type { MessageThread, InboxEvent, ListMessageThreadsResponse } from '$lib/queries/messaging';
-import { queryKeys } from '$lib/queries/keys';
+import type { MessageThread, InboxEvent, ListMessageThreadsResponse } from '#lib/queries/messaging/index.js';
+import { queryKeys } from '#lib/queries/keys.js';
 
 export function applyInboxEvent(threads: MessageThread[], event: InboxEvent): MessageThread[] {
 	const idx = threads.findIndex((t) => t.id === event.threadId);

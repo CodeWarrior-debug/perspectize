@@ -14,12 +14,12 @@ vi.mock('@tanstack/svelte-query', () => ({
 	}),
 	useQueryClient: vi.fn(() => ({ invalidateQueries: mocks.mockInvalidate })),
 }));
-vi.mock('$lib/queries/client', () => ({ graphqlRequest: (...a: unknown[]) => mocks.mockGraphql(...a) }));
+vi.mock('#lib/queries/client.js', () => ({ graphqlRequest: (...a: unknown[]) => mocks.mockGraphql(...a) }));
 vi.mock('svelte-sonner', () => ({ toast: { error: mocks.mockToastError, success: vi.fn() } }));
 
-import { useCreateMessageThread } from '$lib/queries/messaging/useCreateMessageThread';
-import { CREATE_MESSAGE_THREAD } from '$lib/queries/messaging';
-import { queryKeys } from '$lib/queries/keys';
+import { useCreateMessageThread } from '#lib/queries/messaging/useCreateMessageThread.js';
+import { CREATE_MESSAGE_THREAD } from '#lib/queries/messaging/index.js';
+import { queryKeys } from '#lib/queries/keys.js';
 
 describe('useCreateMessageThread', () => {
 	beforeEach(() => vi.clearAllMocks());

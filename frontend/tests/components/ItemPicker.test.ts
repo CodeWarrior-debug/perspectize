@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/svelte';
-import ItemPicker from '$lib/components/plan/ItemPicker.svelte';
+import ItemPicker from '#lib/components/plan/ItemPicker.svelte';
 
 const mocks = vi.hoisted(() => ({
 	useContentPicker: vi.fn(),
@@ -9,7 +9,7 @@ const mocks = vi.hoisted(() => ({
 	isPending: false,
 }));
 
-vi.mock('$lib/queries/content/useContentPicker', () => ({
+vi.mock('#lib/queries/content/useContentPicker.js', () => ({
 	useContentPicker: mocks.useContentPicker,
 }));
 

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { perspectiveRating } from '$lib/utils/grid-config';
-import { formatRatingScore } from '$lib/utils/formatting';
-import { activityItemCellRenderer } from '$lib/utils/activityItemCellRenderer';
+import { perspectiveRating } from '#lib/utils/grid-config.js';
+import { formatRatingScore } from '#lib/utils/formatting.js';
+import { activityItemCellRenderer } from '#lib/utils/activityItemCellRenderer.js';
 
 describe('perspectiveRating', () => {
 	const byContentId = new Map([['13', { quality: 7000, importance: 4000, agreement: null }]]);

@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { render, screen, cleanup, fireEvent, waitFor } from '@testing-library/svelte';
-import PrintOptionsDialog from '$lib/components/PrintOptionsDialog.svelte';
+import PrintOptionsDialog from '#lib/components/PrintOptionsDialog.svelte';
 import PrintOptionsDialogHarness from '../helpers/PrintOptionsDialogHarness.svelte';
 import { warmUpRender } from '../helpers/warmUp';
 

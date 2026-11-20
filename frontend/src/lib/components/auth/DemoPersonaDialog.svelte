@@ -1,6 +1,6 @@
 <script lang="ts">
-	import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '$lib/components/shadcn';
-	import { DEMO_PERSONAS, demoSession } from '$lib/auth';
+	import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '#lib/components/shadcn/index.js';
+	import { DEMO_PERSONAS, demoSession } from '#lib/auth/index.js';
 
 	/** Demo-mode "sign in": pick a seeded persona. Mounted once in the root layout. */
 </script>

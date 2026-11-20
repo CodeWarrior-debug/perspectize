@@ -10,7 +10,7 @@ import {
 	filterContentRows,
 	parsePersonFilter,
 	rowMatchesPerson,
-} from '$lib/utils/grid-config';
+} from '#lib/utils/grid-config.js';
 import {
 	filterToUrlParams,
 	urlParamsToFilter,
@@ -18,9 +18,9 @@ import {
 	nonGridFilters,
 	parseGridParams,
 	serializeGridParams,
-} from '$lib/utils/gridUrlState';
-import { AgeRatingFilter } from '$lib/utils/contentTypeFilter';
-import type { ContentItem } from '$lib/queries/content';
+} from '#lib/utils/gridUrlState.js';
+import { AgeRatingFilter } from '#lib/utils/contentTypeFilter.js';
+import type { ContentItem } from '#lib/queries/content/index.js';
 
 function movie(response: Record<string, unknown> | null, id = '1'): ContentItem {
 	return { id, contentType: 'MOVIE', movie: response } as unknown as ContentItem;

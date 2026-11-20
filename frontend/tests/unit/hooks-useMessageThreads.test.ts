@@ -13,13 +13,13 @@ vi.mock('@tanstack/svelte-query', () => ({
 	useQueryClient: vi.fn(() => ({ setQueryData: vi.fn() })),
 }));
 
-vi.mock('$lib/queries/client', () => ({
+vi.mock('#lib/queries/client.js', () => ({
 	graphqlRequest: (...a: unknown[]) => mocks.mockGraphql(...a),
 }));
 
-import { useMessageThreads } from '$lib/queries/messaging/useMessageThreads';
-import { LIST_MESSAGE_THREADS } from '$lib/queries/messaging';
-import { queryKeys } from '$lib/queries/keys';
+import { useMessageThreads } from '#lib/queries/messaging/useMessageThreads.js';
+import { LIST_MESSAGE_THREADS } from '#lib/queries/messaging/index.js';
+import { queryKeys } from '#lib/queries/keys.js';
 
 describe('useMessageThreads', () => {
 	beforeEach(() => vi.clearAllMocks());

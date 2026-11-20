@@ -47,29 +47,29 @@ vi.mock('svelte-sonner', () => ({
 	},
 }));
 
-vi.mock('$lib/queries/client', () => ({
+vi.mock('#lib/queries/client.js', () => ({
 	graphqlRequest: vi.fn(),
 }));
 
 // The tests import these inside their bodies; load them once up front so the first
 // test doesn't pay the module transform, which balloons under full-suite load (#728).
 preloadLazy(
-	() => import('$lib/queries/client'),
-	() => import('$lib/queries/perspectives'),
-	() => import('$lib/queries/perspectives/useUpdatePerspective'),
+	() => import('#lib/queries/client.js'),
+	() => import('#lib/queries/perspectives/index.js'),
+	() => import('#lib/queries/perspectives/useUpdatePerspective.js'),
 );
 
 describe('useUpdatePerspective hook', () => {
 	beforeEach(async () => {
 		vi.clearAllMocks();
 		capturedMutationOptions = undefined;
-		const { useUpdatePerspective } = await import('$lib/queries/perspectives/useUpdatePerspective');
+		const { useUpdatePerspective } = await import('#lib/queries/perspectives/useUpdatePerspective.js');
 		useUpdatePerspective();
 	});
 
 	describe('hook initialization', () => {
 		it('returns a mutation object with mutate method', async () => {
-			const { useUpdatePerspective } = await import('$lib/queries/perspectives/useUpdatePerspective');
+			const { useUpdatePerspective } = await import('#lib/queries/perspectives/useUpdatePerspective.js');
 			const mutation = useUpdatePerspective();
 			expect(mutation).toBeDefined();
 			expect(mutation.mutate).toBeDefined();
@@ -83,8 +83,8 @@ describe('useUpdatePerspective hook', () => {
 		});
 
 		it('calls graphqlRequest with UPDATE_PERSPECTIVE and input', async () => {
-			const { graphqlRequest } = await import('$lib/queries/client');
-			const { UPDATE_PERSPECTIVE } = await import('$lib/queries/perspectives');
+			const { graphqlRequest } = await import('#lib/queries/client.js');
+			const { UPDATE_PERSPECTIVE } = await import('#lib/queries/perspectives/index.js');
 			(graphqlRequest as any).mockResolvedValue({
 				updatePerspective: { id: '1', userID: '42', quality: 8000, privacy: 'PUBLIC', createdAt: '', updatedAt: '' },
 			});
@@ -96,7 +96,7 @@ describe('useUpdatePerspective hook', () => {
 		});
 
 		it('supports partial update with only quality', async () => {
-			const { graphqlRequest } = await import('$lib/queries/client');
+			const { graphqlRequest } = await import('#lib/queries/client.js');
 			(graphqlRequest as any).mockResolvedValue({
 				updatePerspective: { id: '5', userID: '42', quality: 6000, privacy: 'PUBLIC', createdAt: '', updatedAt: '' },
 			});
@@ -108,7 +108,7 @@ describe('useUpdatePerspective hook', () => {
 		});
 
 		it('supports partial update with only like', async () => {
-			const { graphqlRequest } = await import('$lib/queries/client');
+			const { graphqlRequest } = await import('#lib/queries/client.js');
 			(graphqlRequest as any).mockResolvedValue({
 				updatePerspective: {
 					id: '3',
@@ -174,8 +174,8 @@ describe('useUpdatePerspective hook', () => {
 
 	describe('privacy', () => {
 		it('forwards privacy and patches the cached row via applyEdit', async () => {
-			const { graphqlRequest } = await import('$lib/queries/client');
-			const { UPDATE_PERSPECTIVE } = await import('$lib/queries/perspectives');
+			const { graphqlRequest } = await import('#lib/queries/client.js');
+			const { UPDATE_PERSPECTIVE } = await import('#lib/queries/perspectives/index.js');
 			(graphqlRequest as any).mockResolvedValue({
 				updatePerspective: { id: '5', userID: '42', privacy: 'PRIVATE', createdAt: '', updatedAt: '' },
 			});
@@ -203,7 +203,7 @@ describe('useUpdatePerspective hook', () => {
 	// now only falls back to the cached value when the key is `undefined`.
 	describe('clearing fields (explicit null)', () => {
 		it('forwards explicit null fields to graphqlRequest, not dropped like undefined would be', async () => {
-			const { graphqlRequest } = await import('$lib/queries/client');
+			const { graphqlRequest } = await import('#lib/queries/client.js');
 			(graphqlRequest as any).mockResolvedValue({
 				updatePerspective: { id: '5', userID: '42', privacy: 'PUBLIC', createdAt: '', updatedAt: '' },
 			});

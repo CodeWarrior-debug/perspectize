@@ -1,8 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/svelte';
-import FontPicker from '$lib/components/fonts/FontPicker.svelte';
-import { parseCatalog, type FontCatalogRow } from '$lib/fonts/googleFonts';
-import { FONT_SLOT_INFO } from '$lib/fonts/slots';
+import FontPicker from '#lib/components/fonts/FontPicker.svelte';
+import { parseCatalog, type FontCatalogRow } from '#lib/fonts/googleFonts.js';
+import { FONT_SLOT_INFO } from '#lib/fonts/slots.js';
 import { warmUp } from '../helpers/warmUp';
 
 const CATALOG = parseCatalog([

@@ -8,7 +8,7 @@ import type {
 	ImportRequestStatus,
 	ImportSource,
 	ImportSourceType,
-} from '$lib/queries/imports';
+} from '#lib/queries/imports/index.js';
 import { EMPTY_VALUE, formatCount, formatCountExact, formatDurationSeconds, typeCellRenderer } from './formatting';
 import { contentTypeLabel } from './grid-config';
 import { sanitizeHtml } from './sanitize';

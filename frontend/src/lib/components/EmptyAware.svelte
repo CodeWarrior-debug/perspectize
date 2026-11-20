@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { EMPTY_CLASS, isEmptyMarker } from '$lib/utils/grid-empty';
+	import { EMPTY_CLASS, isEmptyMarker } from '#lib/utils/grid-empty.js';
 
 	let { text }: { text: string } = $props();
 </script>

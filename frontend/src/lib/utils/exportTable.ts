@@ -3,7 +3,7 @@
  * supplies its visible columns and rows, and this turns them into strings a spreadsheet or a
  * printed page can show.
  */
-import type { ContentItem } from '$lib/queries/content';
+import type { ContentItem } from '#lib/queries/content/index.js';
 import { bookAuthors } from './bookFormatting';
 import { EMPTY_VALUE, moviePeople } from './formatting';
 import { webPageRoleLabel, webPageRolesOf } from './webPage';

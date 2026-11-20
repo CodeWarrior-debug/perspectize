@@ -1,9 +1,9 @@
 <script lang="ts">
 	import { createQuery, useQueryClient } from '@tanstack/svelte-query';
-	import { useAuthState } from '$lib/auth/useAuthState';
-	import { graphqlRequest } from '$lib/queries/client';
-	import { ME, type MeResponse } from '$lib/queries/users';
-	import { setSelectedUserId, clearUserSelection } from '$lib/stores/userSelection.svelte';
+	import { useAuthState } from '#lib/auth/useAuthState.js';
+	import { graphqlRequest } from '#lib/queries/client.js';
+	import { ME, type MeResponse } from '#lib/queries/users/index.js';
+	import { setSelectedUserId, clearUserSelection } from '#lib/stores/userSelection.svelte.js';
 
 	const queryClient = useQueryClient();
 	const auth = useAuthState();

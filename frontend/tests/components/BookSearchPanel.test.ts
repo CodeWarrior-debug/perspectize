@@ -1,22 +1,22 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/svelte';
 import { tick, type Component } from 'svelte';
-import BookSearchPanel from '$lib/components/discover/BookSearchPanel.svelte';
+import BookSearchPanel from '#lib/components/discover/BookSearchPanel.svelte';
 import TestWrapper from '../helpers/TestWrapper.svelte';
 import { makeClient } from '../helpers/queryBudget';
 import { warmUp } from '../helpers/warmUp';
 
-vi.mock('$lib/queries/users/useMe.svelte', () => ({ useMe: () => ({ me: null }) }));
+vi.mock('#lib/queries/users/useMe.svelte.js', () => ({ useMe: () => ({ me: null }) }));
 import {
 	BOOK_SEARCH,
 	BOOK_SEARCH_DEBOUNCE_MS,
 	BOOK_TRENDING,
 	type BookSearchPage,
 	type BookSearchResult,
-} from '$lib/services/openLibraryApi';
+} from '#lib/services/openLibraryApi.js';
 
 const mocks = vi.hoisted(() => ({ graphqlRequest: vi.fn() }));
-vi.mock('$lib/queries/client', () => ({ graphqlRequest: mocks.graphqlRequest }));
+vi.mock('#lib/queries/client.js', () => ({ graphqlRequest: mocks.graphqlRequest }));
 
 const INPUT_NAME = /search books by title or author/i;
 const EAST_OF_EDEN_URL = 'https://openlibrary.org/works/OL1W';

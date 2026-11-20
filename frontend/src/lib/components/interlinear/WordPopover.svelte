@@ -1,6 +1,6 @@
 <script lang="ts">
-	import type { InterlinearWord } from '$lib/queries/bible';
-	import { formatStrongs } from '$lib/utils/interlinear';
+	import type { InterlinearWord } from '#lib/queries/bible/index.js';
+	import { formatStrongs } from '#lib/utils/interlinear.js';
 
 	let {
 		word,

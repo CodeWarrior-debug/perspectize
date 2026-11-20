@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
-import { ClipboardBlockedError } from '$lib/utils/toast';
-import { copyLibraryTable, downloadLibraryCsv } from '$lib/utils/exportActions';
-import type { ExportGridApi } from '$lib/utils/exportGrid';
+import { ClipboardBlockedError } from '#lib/utils/toast.js';
+import { copyLibraryTable, downloadLibraryCsv } from '#lib/utils/exportActions.js';
+import type { ExportGridApi } from '#lib/utils/exportGrid.js';
 
 function fakeApi(titles: string[]): ExportGridApi {
 	return {

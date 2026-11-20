@@ -8,7 +8,7 @@ const { mockRequest, clerkState } = vi.hoisted(() => ({
 	clerkState: { isLoaded: true, auth: { userId: '1' as string | null } },
 }));
 
-vi.mock('$lib/queries/client', () => ({
+vi.mock('#lib/queries/client.js', () => ({
 	graphqlRequest: mockRequest,
 }));
 
@@ -18,7 +18,7 @@ vi.mock('svelte-clerk', () => ({
 
 vi.mock('$app/navigation', () => ({ goto: vi.fn() }));
 
-import Compare from '$lib/components/Compare.svelte';
+import Compare from '#lib/components/Compare.svelte';
 import { goto } from '$app/navigation';
 
 const meResponse = {
@@ -324,7 +324,7 @@ describe('Compare', () => {
 
 		expect(vi.mocked(goto)).toHaveBeenCalledWith(
 			expect.stringContaining('left=p3'),
-			expect.objectContaining({ replaceState: true }),
+			expect.objectContaining({ replace: true }),
 		);
 		const [calledUrl] = vi.mocked(goto).mock.calls[0];
 		expect(calledUrl).toContain('left=p3');

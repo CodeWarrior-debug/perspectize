@@ -1,7 +1,7 @@
 <script lang="ts">
 	import type { LibraryItem } from './libraryItem';
 	import { createQuery, useQueryClient } from '@tanstack/svelte-query';
-	import { Button, Input } from '$lib/components/shadcn';
+	import { Button, Input } from '#lib/components/shadcn/index.js';
 	import BookCard from './BookCard.svelte';
 	import BookTrendingFeed from './BookTrendingFeed.svelte';
 	import {
@@ -12,8 +12,8 @@
 		openLibraryKeys,
 		searchBooks,
 		type BookSearchPage,
-	} from '$lib/services/openLibraryApi';
-	import type { TrendingWindow } from '$lib/services/tmdbApi';
+	} from '#lib/services/openLibraryApi.js';
+	import type { TrendingWindow } from '#lib/services/tmdbApi.js';
 	import SearchIcon from '@lucide/svelte/icons/search';
 	import XIcon from '@lucide/svelte/icons/x';
 

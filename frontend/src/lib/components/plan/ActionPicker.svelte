@@ -1,9 +1,9 @@
 <script lang="ts">
-	import { useTodoActions } from '$lib/queries/userTodos/useTodoActions';
-	import { NO_AUTOFILL } from '$lib/utils/noAutofill';
-	import { useCreateTodoAction } from '$lib/queries/userTodos/useCreateTodoAction';
-	import type { TodoActionItem } from '$lib/queries/userTodos';
-	import { actionAddText, actionMatchesQuery, sortTodoActions } from '$lib/utils/plan-todo-helpers';
+	import { useTodoActions } from '#lib/queries/userTodos/useTodoActions.js';
+	import { NO_AUTOFILL } from '#lib/utils/noAutofill.js';
+	import { useCreateTodoAction } from '#lib/queries/userTodos/useCreateTodoAction.js';
+	import type { TodoActionItem } from '#lib/queries/userTodos/index.js';
+	import { actionAddText, actionMatchesQuery, sortTodoActions } from '#lib/utils/plan-todo-helpers.js';
 
 	/**
 	 * ActionPicker: a combobox over the action list, presets first in typical

@@ -1,4 +1,4 @@
-import type { UserTodoItem } from '$lib/queries/userTodos';
+import type { UserTodoItem } from '#lib/queries/userTodos/index.js';
 import { activityItemCellRenderer } from './activityItemCellRenderer';
 import { planContentLabel } from './plan-grid-config';
 

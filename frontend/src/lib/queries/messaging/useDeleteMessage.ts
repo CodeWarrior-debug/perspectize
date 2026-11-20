@@ -2,7 +2,7 @@ import { createMutation, useQueryClient } from '@tanstack/svelte-query';
 import { graphqlRequest } from '../client';
 import { DELETE_MESSAGE, type DeleteMessageResponse } from './index';
 import { queryKeys } from '../keys';
-import { applyMessageDeleted, applyMessageEdited, type ThreadMessagesCache } from '$lib/messaging/threadCache';
+import { applyMessageDeleted, applyMessageEdited, type ThreadMessagesCache } from '#lib/messaging/threadCache.js';
 import { toast } from 'svelte-sonner';
 
 export function useDeleteMessage() {

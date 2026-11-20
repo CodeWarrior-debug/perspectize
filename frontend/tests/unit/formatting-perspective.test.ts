@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { PerspectiveHeaderRenderer, perspectiveCellRenderer } from '$lib/utils/formatting';
+import { PerspectiveHeaderRenderer, perspectiveCellRenderer } from '#lib/utils/formatting.js';
 
 describe('PerspectiveHeaderRenderer class', () => {
 	let renderer: PerspectiveHeaderRenderer;

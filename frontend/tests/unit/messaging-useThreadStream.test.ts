@@ -6,7 +6,7 @@ const mocks = vi.hoisted(() => ({
 	dispose: vi.fn(),
 }));
 
-vi.mock('$lib/messaging/ws-client.svelte', () => ({
+vi.mock('#lib/messaging/ws-client.svelte.js', () => ({
 	subscribeGraphql: (payload: any, handlers: any) => {
 		mocks.subscribeGraphql(payload);
 		mocks.handlers = handlers;
@@ -14,9 +14,9 @@ vi.mock('$lib/messaging/ws-client.svelte', () => ({
 	},
 }));
 
-import { createThreadStream } from '$lib/messaging/useThreadStream.svelte';
-import { THREAD_EVENTS_SUBSCRIPTION } from '$lib/queries/messaging';
-import { queryKeys } from '$lib/queries/keys';
+import { createThreadStream } from '#lib/messaging/useThreadStream.svelte.js';
+import { THREAD_EVENTS_SUBSCRIPTION } from '#lib/queries/messaging/index.js';
+import { queryKeys } from '#lib/queries/keys.js';
 
 function fakeQC(caches: Record<string, any>) {
 	return {

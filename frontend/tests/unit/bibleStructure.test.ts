@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { BIBLE_BOOKS, getBook } from '$lib/utils/bibleStructure';
+import { BIBLE_BOOKS, getBook } from '#lib/utils/bibleStructure.js';
 
 describe('bibleStructure', () => {
 	it('has exactly 66 books', () => {

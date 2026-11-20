@@ -7,7 +7,7 @@ let getAuthToken: () => Promise<string | null>;
 
 beforeEach(async () => {
 	vi.resetModules();
-	const mod = await import('$lib/queries/client');
+	const mod = await import('#lib/queries/client.js');
 	graphqlClient = mod.graphqlClient;
 	graphqlRequest = mod.graphqlRequest;
 	getAuthToken = mod.getAuthToken;
@@ -93,7 +93,7 @@ describe('GraphQL client', () => {
 		import.meta.env.VITE_GRAPHQL_URL = '';
 
 		try {
-			await import('$lib/queries/client');
+			await import('#lib/queries/client.js');
 			expect(consoleSpy).toHaveBeenCalledWith(
 				'VITE_GRAPHQL_URL is not set — GraphQL requests will fail in production.',
 				'Set VITE_GRAPHQL_URL as a BUILD_TIME environment variable in your deployment platform.',

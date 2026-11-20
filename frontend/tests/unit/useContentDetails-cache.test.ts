@@ -7,7 +7,7 @@
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { hashKey, type QueryClient } from '@tanstack/svelte-query';
-import { queryKeys } from '$lib/queries/keys';
+import { queryKeys } from '#lib/queries/keys.js';
 import { countingFetch, makeClient, mountConsumers } from '../helpers/queryBudget';
 
 let captured: any;
@@ -23,9 +23,9 @@ vi.mock('@tanstack/svelte-query', async (importOriginal) => {
 		}),
 	};
 });
-vi.mock('$lib/queries/client', () => ({ graphqlRequest: (...args: unknown[]) => request(...args) }));
+vi.mock('#lib/queries/client.js', () => ({ graphqlRequest: (...args: unknown[]) => request(...args) }));
 
-import { useContentDetails } from '$lib/queries/content/useContentDetails';
+import { useContentDetails } from '#lib/queries/content/useContentDetails.js';
 
 let client: QueryClient;
 

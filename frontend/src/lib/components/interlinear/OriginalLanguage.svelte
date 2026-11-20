@@ -2,9 +2,13 @@
 <script lang="ts">
 	import type { Snippet } from 'svelte';
 	import { createQuery } from '@tanstack/svelte-query';
-	import { graphqlRequest } from '$lib/queries/client';
-	import { PASSAGE_INTERLINEAR_QUERY, type PassageInterlinearResponse, type VerseText } from '$lib/queries/bible';
-	import { queryKeys } from '$lib/queries/keys';
+	import { graphqlRequest } from '#lib/queries/client.js';
+	import {
+		PASSAGE_INTERLINEAR_QUERY,
+		type PassageInterlinearResponse,
+		type VerseText,
+	} from '#lib/queries/bible/index.js';
+	import { queryKeys } from '#lib/queries/keys.js';
 	import InterlinearPassage from './InterlinearPassage.svelte';
 	import InterlinearCredit from './InterlinearCredit.svelte';
 

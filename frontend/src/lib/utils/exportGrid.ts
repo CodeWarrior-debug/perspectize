@@ -2,7 +2,7 @@
  * Reads the Library's export table from the AG Grid API: the visible, headed data columns and the
  * rows in the grid's current filter and sort order.
  */
-import type { ContentItem } from '$lib/queries/content';
+import type { ContentItem } from '#lib/queries/content/index.js';
 import {
 	EXPORT_EXCLUDED_COLIDS,
 	buildExportTable,

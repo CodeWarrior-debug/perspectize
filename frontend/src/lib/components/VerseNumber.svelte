@@ -1,6 +1,6 @@
 <!-- frontend/src/lib/components/VerseNumber.svelte -->
 <script lang="ts">
-	import { getVerseJump } from '$lib/utils/verseJump';
+	import { getVerseJump } from '#lib/utils/verseJump.js';
 
 	let {
 		verseId,

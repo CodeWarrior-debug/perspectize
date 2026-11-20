@@ -1,9 +1,9 @@
 <script lang="ts">
-	import { NO_AUTOFILL } from '$lib/utils/noAutofill';
+	import { NO_AUTOFILL } from '#lib/utils/noAutofill.js';
 	import XIcon from '@lucide/svelte/icons/x';
 	import SearchIcon from '@lucide/svelte/icons/search';
-	import RatingInput from '$lib/components/RatingInput.svelte';
-	import { FEEL_WHEEL, FAMILY_ORDER, searchExtendedFeelings, type ExtendedFeeling } from '$lib/data/feelings';
+	import RatingInput from '#lib/components/RatingInput.svelte';
+	import { FEEL_WHEEL, FAMILY_ORDER, searchExtendedFeelings, type ExtendedFeeling } from '#lib/data/feelings.js';
 
 	export interface Feeling {
 		emoji: string;

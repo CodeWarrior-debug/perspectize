@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { showColumnRelevanceCallout } from '$lib/utils/grid-config';
+import { showColumnRelevanceCallout } from '#lib/utils/grid-config.js';
 
 describe('showColumnRelevanceCallout', () => {
 	it('shows with no type filter', () => {

@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/svelte';
-import ExportMenu from '$lib/components/ExportMenu.svelte';
+import ExportMenu from '#lib/components/ExportMenu.svelte';
 
 function setup(props: Partial<{ disabled: boolean; onDownloadCsv: () => void; onCopy: () => void }> = {}) {
 	const onPrintAsSeen = vi.fn();

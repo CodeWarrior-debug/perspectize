@@ -1,6 +1,6 @@
 <script lang="ts">
-	import { bookResponse, bookSubjects, type BookRow } from '$lib/utils/bookFormatting';
-	import { descriptionText, safeRelatedWorks } from '$lib/utils/book';
+	import { bookResponse, bookSubjects, type BookRow } from '#lib/utils/bookFormatting.js';
+	import { descriptionText, safeRelatedWorks } from '#lib/utils/book.js';
 
 	// Open Library description, related works and subjects, then the attribution. Each section shows
 	// only when it has content. Descriptions are external markdown: they are reduced to plain text

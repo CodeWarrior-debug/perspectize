@@ -1,6 +1,6 @@
 // frontend/tests/unit/messaging-typing.test.ts
 import { describe, it, expect, vi } from 'vitest';
-import { createTypingController, type TypingClock } from '$lib/messaging/typing';
+import { createTypingController, type TypingClock } from '#lib/messaging/typing.js';
 
 function fakeClock() {
 	let seq = 1;

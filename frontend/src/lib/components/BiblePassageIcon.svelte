@@ -6,7 +6,7 @@
 		BIBLE_ICON_LEFT_CLASS,
 		BIBLE_ICON_RIGHT_CLASS,
 		bibleIconLabelLines,
-	} from '$lib/utils/icons';
+	} from '#lib/utils/icons.js';
 
 	// Labels come from bible.ts's passageIconLabels.
 	let { left = '', right = '' }: { left?: string; right?: string } = $props();

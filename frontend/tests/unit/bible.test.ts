@@ -12,8 +12,8 @@ import {
 	abbreviateReferenceFromVerseIds,
 	passageIconLabels,
 	type PassageRange,
-} from '$lib/utils/bible';
-import { BIBLE_BOOKS } from '$lib/utils/bibleStructure';
+} from '#lib/utils/bible.js';
+import { BIBLE_BOOKS } from '#lib/utils/bibleStructure.js';
 
 describe('parseReference', () => {
 	const cases: Array<[string, PassageRange | null]> = [

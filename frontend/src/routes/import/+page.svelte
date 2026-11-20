@@ -1,16 +1,16 @@
 <script lang="ts">
-	import PageWrapper from '$lib/components/PageWrapper.svelte';
-	import SignInTrigger from '$lib/components/auth/SignInTrigger.svelte';
-	import ImportJobActions from '$lib/components/imports/ImportJobActions.svelte';
-	import ImportDescription from '$lib/components/imports/ImportDescription.svelte';
-	import ImportJobStatus from '$lib/components/imports/ImportJobStatus.svelte';
-	import ImportListingProgress from '$lib/components/imports/ImportListingProgress.svelte';
-	import ImportRequestForm from '$lib/components/imports/ImportRequestForm.svelte';
-	import ImportSourceList from '$lib/components/imports/ImportSourceList.svelte';
-	import { Button } from '$lib/components/shadcn';
-	import { useAuthState } from '$lib/auth/useAuthState';
-	import { useImportJobs } from '$lib/queries/imports/useImportJobs';
-	import { useMe } from '$lib/queries/users/useMe.svelte';
+	import PageWrapper from '#lib/components/PageWrapper.svelte';
+	import SignInTrigger from '#lib/components/auth/SignInTrigger.svelte';
+	import ImportJobActions from '#lib/components/imports/ImportJobActions.svelte';
+	import ImportDescription from '#lib/components/imports/ImportDescription.svelte';
+	import ImportJobStatus from '#lib/components/imports/ImportJobStatus.svelte';
+	import ImportListingProgress from '#lib/components/imports/ImportListingProgress.svelte';
+	import ImportRequestForm from '#lib/components/imports/ImportRequestForm.svelte';
+	import ImportSourceList from '#lib/components/imports/ImportSourceList.svelte';
+	import { Button } from '#lib/components/shadcn/index.js';
+	import { useAuthState } from '#lib/auth/useAuthState.js';
+	import { useImportJobs } from '#lib/queries/imports/useImportJobs.js';
+	import { useMe } from '#lib/queries/users/useMe.svelte.js';
 
 	// Preliminary page: not in the main nav.
 	type Tab = 'imports' | 'request';

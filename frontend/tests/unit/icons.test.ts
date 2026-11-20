@@ -5,7 +5,7 @@ import {
 	BIBLE_ICON_RIGHT_CLASS,
 	BIBLE_ICON_WRAPPER_CLASS,
 	bibleIconLabelLines,
-} from '$lib/utils/icons';
+} from '#lib/utils/icons.js';
 
 describe('bibleIconLabelLines', () => {
 	it('keeps text without a dash on one line', () => {

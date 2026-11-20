@@ -7,14 +7,14 @@ const mocks = vi.hoisted(() => ({
 	mockGraphql: vi.fn(),
 }));
 
-vi.mock('$lib/queries/users/useMarkOnboardingSeen', () => ({
+vi.mock('#lib/queries/users/useMarkOnboardingSeen.js', () => ({
 	useMarkOnboardingSeen: () => ({
 		mutate: mocks.mockMarkMutate,
 		isPending: false,
 	}),
 }));
 
-vi.mock('$lib/queries/client', () => ({
+vi.mock('#lib/queries/client.js', () => ({
 	graphqlRequest: (...args: unknown[]) => mocks.mockGraphql(...args),
 }));
 
@@ -42,7 +42,7 @@ vi.mock('@tanstack/svelte-query', () => ({
 	})),
 }));
 
-vi.mock('$lib/onboarding/config', () => ({
+vi.mock('#lib/onboarding/config.js', () => ({
 	CURRENT_INTRO_VERSION: 1,
 	ONBOARDING_VIDEOS: {
 		guestProduct: undefined,
@@ -51,23 +51,23 @@ vi.mock('$lib/onboarding/config', () => ({
 	},
 }));
 
-vi.mock('$lib/components/AddVideoDialog.svelte', async () => {
+vi.mock('#lib/components/AddVideoDialog.svelte', async () => {
 	const mod = await import('../helpers/Passthrough.svelte');
 	return { default: mod.default };
 });
 
-vi.mock('$lib/components/PerspectivePopover.svelte', async () => {
+vi.mock('#lib/components/PerspectivePopover.svelte', async () => {
 	const mod = await import('../helpers/Passthrough.svelte');
 	return { default: mod.default };
 });
 
-import OnboardingCoach from '$lib/components/onboarding/OnboardingCoach.svelte';
-import { CURRENT_INTRO_VERSION } from '$lib/onboarding/config';
+import OnboardingCoach from '#lib/components/onboarding/OnboardingCoach.svelte';
+import { CURRENT_INTRO_VERSION } from '#lib/onboarding/config.js';
 import { preloadLazy, warmUpRender } from '../helpers/warmUp';
 
 // The component renders this through {#await import(...)}: load it up front so a
 // findBy* waits on the UI, not on Vite's first transform of the module (#728).
-preloadLazy(() => import('$lib/components/PerspectivePopover.svelte'));
+preloadLazy(() => import('#lib/components/PerspectivePopover.svelte'));
 
 // Pay the component's first-render cost before any test, not inside the first
 // one: under full-suite load it alone can pass the 5 s testTimeout (#728).

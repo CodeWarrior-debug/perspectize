@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { contentNotAllowedMessage, validateMovieInput } from '$lib/utils/movie';
+import { contentNotAllowedMessage, validateMovieInput } from '#lib/utils/movie.js';
 
 describe('validateMovieInput', () => {
 	it.each([

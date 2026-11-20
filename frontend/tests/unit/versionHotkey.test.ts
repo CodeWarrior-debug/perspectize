@@ -7,7 +7,7 @@ import {
 	initialKeySequenceState,
 	isTypingTarget,
 	type KeySequenceState,
-} from '$lib/utils/versionHotkey';
+} from '#lib/utils/versionHotkey.js';
 
 function typeSequence(keys: string[], gapMs = 100): boolean {
 	let state: KeySequenceState = initialKeySequenceState();

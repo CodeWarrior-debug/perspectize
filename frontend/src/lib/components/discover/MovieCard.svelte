@@ -1,8 +1,8 @@
 <script lang="ts">
-	import { Button } from '$lib/components/shadcn';
+	import { Button } from '#lib/components/shadcn/index.js';
 	import LibraryStatus from './LibraryStatus.svelte';
 	import type { LibraryItem } from './libraryItem';
-	import { releaseYear, tmdbPosterUrl, type MovieSearchResult } from '$lib/services/tmdbApi';
+	import { releaseYear, tmdbPosterUrl, type MovieSearchResult } from '#lib/services/tmdbApi.js';
 	import FilmIcon from '@lucide/svelte/icons/film';
 	import GlassesIcon from '@lucide/svelte/icons/glasses';
 	import StarIcon from '@lucide/svelte/icons/star';

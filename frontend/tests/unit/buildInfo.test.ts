@@ -6,7 +6,7 @@ vi.mock('@capacitor/core', () => ({
 	Capacitor: { getPlatform: mockGetPlatform },
 }));
 
-import { APP_VERSION, GIT_SHA, clientPlatform, clientInfoHeaders } from '$lib/buildInfo';
+import { APP_VERSION, GIT_SHA, clientPlatform, clientInfoHeaders } from '#lib/buildInfo.js';
 
 beforeEach(() => {
 	mockGetPlatform.mockReset();

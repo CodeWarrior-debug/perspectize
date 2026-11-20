@@ -5,13 +5,13 @@ import { createRawSnippet } from 'svelte';
 const state = vi.hoisted(() => ({ params: {} as Record<string, string> }));
 
 vi.mock('$app/state', () => ({ page: state }));
-vi.mock('$lib/queries/users/useMe.svelte', () => ({
+vi.mock('#lib/queries/users/useMe.svelte.js', () => ({
 	useMe: () => ({ me: { id: 'u1', username: 'me' }, isSettled: true }),
 }));
-vi.mock('$lib/queries/messaging/useMessageThreads', () => ({
+vi.mock('#lib/queries/messaging/useMessageThreads.js', () => ({
 	useMessageThreads: () => ({ data: { messageThreads: [] }, isLoading: false }),
 }));
-vi.mock('$lib/components/messaging/NewThreadDialog.svelte', () => ({
+vi.mock('#lib/components/messaging/NewThreadDialog.svelte', () => ({
 	default: vi.fn(() => ({ $$: {}, $set: vi.fn(), $on: vi.fn(), $destroy: vi.fn() })),
 }));
 

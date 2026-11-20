@@ -4,8 +4,8 @@ import { goto } from '$app/navigation';
 import { graphqlRequest } from '../client';
 import { CREATE_CONTENT_FROM_BOOK, type CreateContentFromBookResponse } from './index';
 import { queryKeys } from '../keys';
-import { libraryContentHref } from '$lib/utils/contentLinks';
-import { contentNotAllowedMessage } from '$lib/utils/movie';
+import { libraryContentHref } from '#lib/utils/contentLinks.js';
+import { contentNotAllowedMessage } from '#lib/utils/movie.js';
 
 /**
  * Adds a book from a work URL or a bare ISBN (the server resolves either to its work).

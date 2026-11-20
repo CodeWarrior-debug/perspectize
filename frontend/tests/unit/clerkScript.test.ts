@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { createRequire } from 'node:module';
 import { realpathSync } from 'node:fs';
-import { clerkFrontendApiOrigin, clerkPreloadValues, clerkScriptUrl } from '$lib/utils/clerkScript';
+import { clerkFrontendApiOrigin, clerkPreloadValues, clerkScriptUrl } from '#lib/utils/clerkScript.js';
 
 // The same @clerk/shared svelte-clerk resolves (it isn't hoisted, so resolve from its real path).
 const svelteClerkEntry = realpathSync(createRequire(import.meta.url).resolve('svelte-clerk'));

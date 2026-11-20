@@ -1,11 +1,11 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/svelte';
-import PassageLinks from '$lib/components/PassageLinks.svelte';
-import { createBibleVersionStore } from '$lib/utils/bibleVersion.svelte';
+import PassageLinks from '#lib/components/PassageLinks.svelte';
+import { createBibleVersionStore } from '#lib/utils/bibleVersion.svelte.js';
 
 const GEN_1_1_5 = { startVerseId: 1, endVerseId: 5 };
 // Psalms 51:10 — find the ordinal from the book table rather than hard-coding.
-import { rangeToVerseIds } from '$lib/utils/bible';
+import { rangeToVerseIds } from '#lib/utils/bible.js';
 const psalm51 = rangeToVerseIds({ bookId: 19, startChapter: 51, startVerse: 10, endChapter: 51, endVerse: 10 })!;
 
 describe('PassageLinks', () => {

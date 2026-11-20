@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/svelte';
-import ComparePickerRow from '$lib/components/ComparePickerRow.svelte';
+import ComparePickerRow from '#lib/components/ComparePickerRow.svelte';
 
 function avatarColor(select: HTMLElement): string | undefined {
 	const avatar = select.parentElement?.querySelector('span[style*="background-color"]') as HTMLElement | null;

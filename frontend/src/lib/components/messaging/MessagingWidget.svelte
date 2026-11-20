@@ -10,11 +10,11 @@
 		saveFabPosition,
 		type FabPosition,
 	} from './fabPosition';
-	import { useMe } from '$lib/queries/users/useMe.svelte';
-	import { useMessageThreads } from '$lib/queries/messaging/useMessageThreads';
-	import { useEditMessage } from '$lib/queries/messaging/useEditMessage';
-	import { useDeleteMessage } from '$lib/queries/messaging/useDeleteMessage';
-	import { totalUnread } from '$lib/messaging/inboxCache';
+	import { useMe } from '#lib/queries/users/useMe.svelte.js';
+	import { useMessageThreads } from '#lib/queries/messaging/useMessageThreads.js';
+	import { useEditMessage } from '#lib/queries/messaging/useEditMessage.js';
+	import { useDeleteMessage } from '#lib/queries/messaging/useDeleteMessage.js';
+	import { totalUnread } from '#lib/messaging/inboxCache.js';
 	import ThreadList from './ThreadList.svelte';
 	import ThreadView from './ThreadView.svelte';
 	import NewThreadDialog from './NewThreadDialog.svelte';

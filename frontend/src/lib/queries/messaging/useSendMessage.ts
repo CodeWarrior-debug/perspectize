@@ -3,8 +3,8 @@ import { toast } from 'svelte-sonner';
 import { graphqlRequest } from '../client';
 import { SEND_MESSAGE, type SendMessageResponse, type MessagingUser } from './index';
 import { queryKeys } from '../keys';
-import { makeClientNonce, optimisticMessage, addOptimistic, reconcileSentMessage } from '$lib/messaging/optimistic';
-import type { ThreadMessagesCache } from '$lib/messaging/threadCache';
+import { makeClientNonce, optimisticMessage, addOptimistic, reconcileSentMessage } from '#lib/messaging/optimistic.js';
+import type { ThreadMessagesCache } from '#lib/messaging/threadCache.js';
 
 export interface SendArgs {
 	threadId: string;

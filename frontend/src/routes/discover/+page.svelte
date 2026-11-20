@@ -2,29 +2,29 @@
 	import { createQuery, useQueryClient } from '@tanstack/svelte-query';
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
-	import PageWrapper from '$lib/components/PageWrapper.svelte';
-	import SearchBar from '$lib/components/discover/SearchBar.svelte';
-	import MovieSearchPanel from '$lib/components/discover/MovieSearchPanel.svelte';
-	import BookSearchPanel from '$lib/components/discover/BookSearchPanel.svelte';
-	import BookTrendingFeed from '$lib/components/discover/BookTrendingFeed.svelte';
-	import BookISBNPanel from '$lib/components/discover/BookISBNPanel.svelte';
-	import VideoResultsGrid from '$lib/components/discover/VideoResultsGrid.svelte';
-	import type { LibraryItem } from '$lib/components/discover/libraryItem';
-	import { Button } from '$lib/components/shadcn';
-	import { graphqlRequest } from '$lib/queries/client';
+	import PageWrapper from '#lib/components/PageWrapper.svelte';
+	import SearchBar from '#lib/components/discover/SearchBar.svelte';
+	import MovieSearchPanel from '#lib/components/discover/MovieSearchPanel.svelte';
+	import BookSearchPanel from '#lib/components/discover/BookSearchPanel.svelte';
+	import BookTrendingFeed from '#lib/components/discover/BookTrendingFeed.svelte';
+	import BookISBNPanel from '#lib/components/discover/BookISBNPanel.svelte';
+	import VideoResultsGrid from '#lib/components/discover/VideoResultsGrid.svelte';
+	import type { LibraryItem } from '#lib/components/discover/libraryItem.js';
+	import { Button } from '#lib/components/shadcn/index.js';
+	import { graphqlRequest } from '#lib/queries/client.js';
 	import {
 		LIST_CONTENT,
 		type ContentResponse,
 		type CreateContentResponse,
 		type CreateContentFromMovieResponse,
 		type CreateContentFromBookResponse,
-	} from '$lib/queries/content';
-	import { queryKeys } from '$lib/queries/keys';
-	import { useAddVideo } from '$lib/queries/content/useAddVideo';
-	import { useAddMovie } from '$lib/queries/content/useAddMovie';
-	import { useAddBook } from '$lib/queries/content/useAddBook';
-	import type { TrendingWindow } from '$lib/services/tmdbApi';
-	import { fetchYouTubeTrending, toWatchUrl, youtubeKeys, type VideoItem } from '$lib/services/youtubeApi';
+	} from '#lib/queries/content/index.js';
+	import { queryKeys } from '#lib/queries/keys.js';
+	import { useAddVideo } from '#lib/queries/content/useAddVideo.js';
+	import { useAddMovie } from '#lib/queries/content/useAddMovie.js';
+	import { useAddBook } from '#lib/queries/content/useAddBook.js';
+	import type { TrendingWindow } from '#lib/services/tmdbApi.js';
+	import { fetchYouTubeTrending, toWatchUrl, youtubeKeys, type VideoItem } from '#lib/services/youtubeApi.js';
 
 	// Two sources share this page. The choice lives in the URL (?source=movies),
 	// so a reload or a shared link lands on the same tab. YouTube is the default.
@@ -39,20 +39,20 @@
 
 	function setSource(next: Source) {
 		if (next === source) return;
-		const url = new URL(page.url);
+		const url = new URL(page.url.href);
 		if (next === 'youtube') url.searchParams.delete('source');
 		else url.searchParams.set('source', next);
 		// A tab belongs to one source, so switching source starts that source at its default tab.
 		url.searchParams.delete('tab');
-		goto(`${url.pathname}${url.search}`, { replaceState: true, keepFocus: true, noScroll: true });
+		goto(`${url.pathname}${url.search}`, { replace: true, reset: false });
 	}
 
 	function setBookTab(next: BookTab) {
 		if (next === bookTab) return;
-		const url = new URL(page.url);
+		const url = new URL(page.url.href);
 		if (next === 'search') url.searchParams.delete('tab');
 		else url.searchParams.set('tab', next);
-		goto(`${url.pathname}${url.search}`, { replaceState: true, keepFocus: true, noScroll: true });
+		goto(`${url.pathname}${url.search}`, { replace: true, reset: false });
 	}
 
 	// The search box hands off to youtube.com (search.list is capped at 100

@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { Popover as PopoverPrimitive } from 'bits-ui';
 	import { goto } from '$app/navigation';
-	import { Popover, PopoverContent, PopoverTrigger } from '$lib/components/shadcn/popover';
+	import { Popover, PopoverContent, PopoverTrigger } from '#lib/components/shadcn/popover/index.js';
 	import { internalPath, isInternalHref, isModifiedClick } from './linkify';
 
 	let {

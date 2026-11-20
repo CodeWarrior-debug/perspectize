@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { flushSync } from 'svelte';
 import { render } from '@testing-library/svelte';
 import { reactiveClerk } from './authUserSyncClerk.svelte';
-import AuthUserSync from '$lib/components/AuthUserSync.svelte';
+import AuthUserSync from '#lib/components/AuthUserSync.svelte';
 
 const { mockSetSelectedUserId, mockClearUserSelection, mockQueryClientClear, mockClerkContext, mockQueryState } =
 	vi.hoisted(() => ({
@@ -40,15 +40,15 @@ vi.mock('svelte-clerk', () => ({
 	useClerkContext: vi.fn(() => (useReactive ? reactiveClerk : mockClerkContext)),
 }));
 
-vi.mock('$lib/queries/client', () => ({
+vi.mock('#lib/queries/client.js', () => ({
 	graphqlRequest: vi.fn(),
 }));
 
-vi.mock('$lib/queries/users', () => ({
+vi.mock('#lib/queries/users/index.js', () => ({
 	ME: 'mock-me-query',
 }));
 
-vi.mock('$lib/stores/userSelection.svelte', () => ({
+vi.mock('#lib/stores/userSelection.svelte.js', () => ({
 	setSelectedUserId: (...args: unknown[]) => mockSetSelectedUserId(...args),
 	clearUserSelection: () => mockClearUserSelection(),
 }));

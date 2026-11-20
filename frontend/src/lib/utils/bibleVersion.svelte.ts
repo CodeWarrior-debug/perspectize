@@ -1,4 +1,4 @@
-import translations from '$lib/data/bible-translations.json';
+import translations from '#lib/data/bible-translations.json';
 import { DEFAULT_VERSION } from './bibleLinks';
 
 export const BIBLE_VERSION_KEY = 'perspectize:bible-version';

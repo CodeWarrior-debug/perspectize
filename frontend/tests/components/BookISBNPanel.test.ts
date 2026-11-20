@@ -1,15 +1,15 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/svelte';
 import { tick, type Component } from 'svelte';
-import BookISBNPanel from '$lib/components/discover/BookISBNPanel.svelte';
+import BookISBNPanel from '#lib/components/discover/BookISBNPanel.svelte';
 import TestWrapper from '../helpers/TestWrapper.svelte';
 import { makeClient } from '../helpers/queryBudget';
-import { BOOK_BY_ISBN, type BookSearchResult } from '$lib/services/openLibraryApi';
+import { BOOK_BY_ISBN, type BookSearchResult } from '#lib/services/openLibraryApi.js';
 
-vi.mock('$lib/queries/users/useMe.svelte', () => ({ useMe: () => ({ me: null }) }));
+vi.mock('#lib/queries/users/useMe.svelte.js', () => ({ useMe: () => ({ me: null }) }));
 
 const mocks = vi.hoisted(() => ({ graphqlRequest: vi.fn() }));
-vi.mock('$lib/queries/client', () => ({ graphqlRequest: mocks.graphqlRequest }));
+vi.mock('#lib/queries/client.js', () => ({ graphqlRequest: mocks.graphqlRequest }));
 
 // 9780434740024 has a matching check digit; 9780434740025 does not.
 const VALID_ISBN_13 = '9780434740024';

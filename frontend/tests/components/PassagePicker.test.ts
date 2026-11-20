@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/svelte';
-import PassagePicker from '$lib/components/PassagePicker.svelte';
-import { defaultRange } from '$lib/utils/passageRange';
+import PassagePicker from '#lib/components/PassagePicker.svelte';
+import { defaultRange } from '#lib/utils/passageRange.js';
 
 function setup(initial = defaultRange(59)) {
 	let range = initial;

@@ -19,12 +19,12 @@ vi.mock('@tanstack/svelte-query', () => ({
 	}),
 }));
 
-vi.mock('$lib/queries/client', () => ({ graphqlRequest: vi.fn() }));
+vi.mock('#lib/queries/client.js', () => ({ graphqlRequest: vi.fn() }));
 
 // The tests import these inside their bodies; load them once up front so the first
 // test doesn't pay the module transform, which balloons under full-suite load (#728).
 preloadLazy(
-	() => import('$lib/queries/users/useMe.svelte'),
+	() => import('#lib/queries/users/useMe.svelte.js'),
 	() => import('@tanstack/svelte-query'),
 );
 
@@ -36,14 +36,14 @@ describe('useMe', () => {
 	});
 
 	it('disables the query when Clerk has not loaded yet', async () => {
-		const { useMe } = await import('$lib/queries/users/useMe.svelte');
+		const { useMe } = await import('#lib/queries/users/useMe.svelte.js');
 		useMe();
 		expect(capturedQueryOptions.enabled).toBe(false);
 	});
 
 	it('disables the query when loaded but signed out', async () => {
 		clerkState.isLoaded = true;
-		const { useMe } = await import('$lib/queries/users/useMe.svelte');
+		const { useMe } = await import('#lib/queries/users/useMe.svelte.js');
 		useMe();
 		expect(capturedQueryOptions.enabled).toBe(false);
 	});
@@ -51,7 +51,7 @@ describe('useMe', () => {
 	it('enables the query once loaded and signed in, keying on the Clerk user id', async () => {
 		clerkState.isLoaded = true;
 		clerkState.auth.userId = 'user_42';
-		const { useMe } = await import('$lib/queries/users/useMe.svelte');
+		const { useMe } = await import('#lib/queries/users/useMe.svelte.js');
 		useMe();
 		expect(capturedQueryOptions.enabled).toBe(true);
 		expect(capturedQueryOptions.queryKey).toEqual(['me', 'user_42']);
@@ -60,7 +60,7 @@ describe('useMe', () => {
 	it('me/isAdmin reflect null when the query has no data', async () => {
 		const { createQuery } = await import('@tanstack/svelte-query');
 		(createQuery as any).mockReturnValueOnce({ data: undefined, isSuccess: false, isError: false });
-		const { useMe } = await import('$lib/queries/users/useMe.svelte');
+		const { useMe } = await import('#lib/queries/users/useMe.svelte.js');
 		const result = useMe();
 		expect(result.me).toBeNull();
 		expect(result.isAdmin).toBe(false);
@@ -74,7 +74,7 @@ describe('useMe', () => {
 			isSuccess: true,
 			isError: false,
 		});
-		const { useMe } = await import('$lib/queries/users/useMe.svelte');
+		const { useMe } = await import('#lib/queries/users/useMe.svelte.js');
 		const result = useMe();
 		expect(result.me).toEqual({ id: '1', role: 'MEMBER' });
 		expect(result.isAdmin).toBe(false);
@@ -89,14 +89,14 @@ describe('useMe', () => {
 			isSuccess: true,
 			isError: false,
 		});
-		const { useMe } = await import('$lib/queries/users/useMe.svelte');
+		const { useMe } = await import('#lib/queries/users/useMe.svelte.js');
 		expect(useMe().isAdmin).toBe(true);
 	});
 
 	it('isSettled/isError reflect a failed query', async () => {
 		const { createQuery } = await import('@tanstack/svelte-query');
 		(createQuery as any).mockReturnValueOnce({ data: undefined, isSuccess: false, isError: true });
-		const { useMe } = await import('$lib/queries/users/useMe.svelte');
+		const { useMe } = await import('#lib/queries/users/useMe.svelte.js');
 		const result = useMe();
 		expect(result.isError).toBe(true);
 		expect(result.isSettled).toBe(true);

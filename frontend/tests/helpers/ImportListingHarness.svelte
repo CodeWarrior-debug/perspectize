@@ -1,5 +1,5 @@
 <script lang="ts">
-	import ImportListingProgress from '$lib/components/imports/ImportListingProgress.svelte';
+	import ImportListingProgress from '#lib/components/imports/ImportListingProgress.svelte';
 	import { listingProps } from './listingProgressMock.svelte';
 
 	/**

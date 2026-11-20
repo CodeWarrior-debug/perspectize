@@ -1,5 +1,5 @@
 import type { QueryClient } from '@tanstack/svelte-query';
-import { graphqlRequestAnonymous } from '$lib/queries/client';
+import { graphqlRequestAnonymous } from '#lib/queries/client.js';
 import { LIST_CONTENT, type ContentResponse } from './index';
 import { ACTIVITY_LIST_STALE_TIME_MS, type activityListRequest } from './activityList';
 

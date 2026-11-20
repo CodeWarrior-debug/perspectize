@@ -1,5 +1,5 @@
 import type { IDoesFilterPassParams, IFilterComp, IFilterParams } from '@ag-grid-community/core';
-import type { ContentItem } from '$lib/queries/content';
+import type { ContentItem } from '#lib/queries/content/index.js';
 import { AGE_RATING_OPTIONS, CONTENT_TYPE_OPTIONS } from './grid-config';
 import { ratedValueGetter } from './formatting';
 import { WEB_PAGE_ROLE_OPTIONS, webPageRolesOf } from './webPage';

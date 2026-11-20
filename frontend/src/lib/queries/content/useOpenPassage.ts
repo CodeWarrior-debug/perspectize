@@ -4,8 +4,8 @@ import { goto } from '$app/navigation';
 import { graphqlRequest } from '../client';
 import { CREATE_CONTENT_FROM_PASSAGE, type CreateContentFromPassageResponse } from '../bible';
 import { queryKeys } from '../keys';
-import type { PassageRange } from '$lib/utils/bible';
-import { libraryContentHref } from '$lib/utils/contentLinks';
+import type { PassageRange } from '#lib/utils/bible.js';
+import { libraryContentHref } from '#lib/utils/contentLinks.js';
 
 /**
  * "See <ref> only": jumps from a longer passage to a narrower one (e.g. a single

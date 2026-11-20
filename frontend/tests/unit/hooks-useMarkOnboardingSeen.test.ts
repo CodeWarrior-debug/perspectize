@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { CURRENT_INTRO_VERSION } from '$lib/onboarding/config';
-import { setCoachForceOpen, getCoachForceOpen } from '$lib/onboarding/coachGate.svelte';
+import { CURRENT_INTRO_VERSION } from '#lib/onboarding/config.js';
+import { setCoachForceOpen, getCoachForceOpen } from '#lib/onboarding/coachGate.svelte.js';
 
 const mocks = vi.hoisted(() => ({
 	mockGraphql: vi.fn(),
@@ -21,12 +21,12 @@ vi.mock('@tanstack/svelte-query', () => ({
 	})),
 }));
 
-vi.mock('$lib/queries/client', () => ({
+vi.mock('#lib/queries/client.js', () => ({
 	graphqlRequest: (...args: unknown[]) => mocks.mockGraphql(...args),
 }));
 
-import { useMarkOnboardingSeen } from '$lib/queries/users/useMarkOnboardingSeen';
-import { MARK_ONBOARDING_SEEN } from '$lib/queries/users';
+import { useMarkOnboardingSeen } from '#lib/queries/users/useMarkOnboardingSeen.js';
+import { MARK_ONBOARDING_SEEN } from '#lib/queries/users/index.js';
 
 describe('useMarkOnboardingSeen', () => {
 	beforeEach(() => {

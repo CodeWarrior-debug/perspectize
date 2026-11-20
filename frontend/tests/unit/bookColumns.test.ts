@@ -8,12 +8,12 @@ import {
 	itemColumnHeader,
 	columnViewFor,
 	type ResponsiveTier,
-} from '$lib/utils/grid-config';
-import { columnViewFor as columnViewForFromLayouts } from '$lib/utils/columnLayouts';
-import { urlParamsToGraphQLFilter } from '$lib/utils/gridUrlState';
-import { headerMinWidth } from '$lib/utils/grid-header-width';
-import { ACTIVITY_TOOLTIP_SPECS } from '$lib/utils/activityTooltipSpecs';
-import activityTableSource from '$lib/components/ActivityTable.svelte?raw';
+} from '#lib/utils/grid-config.js';
+import { columnViewFor as columnViewForFromLayouts } from '#lib/utils/columnLayouts.js';
+import { urlParamsToGraphQLFilter } from '#lib/utils/gridUrlState.js';
+import { headerMinWidth } from '#lib/utils/grid-header-width.js';
+import { ACTIVITY_TOOLTIP_SPECS } from '#lib/utils/activityTooltipSpecs.js';
+import activityTableSource from '#lib/components/ActivityTable.svelte?raw';
 
 const TIERS: ResponsiveTier[] = ['xs', 'sm', 'md', 'lg'];
 

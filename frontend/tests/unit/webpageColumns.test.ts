@@ -7,7 +7,7 @@ import {
 	defaultColumnVisibility,
 	isWebPageOnlyTypeFilter,
 	itemColumnHeader,
-} from '$lib/utils/grid-config';
+} from '#lib/utils/grid-config.js';
 
 // The default Webpage set, exactly (spec §3): ◎, WebPage, Site, Category, Published, Added.
 const WEBPAGE_DEFAULT_SET = ['perspectize', 'item', 'webSite', 'category', 'webPublished', 'createdAt'];
