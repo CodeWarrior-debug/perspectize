@@ -4,10 +4,12 @@
 	import FontSettingsPanel from '$lib/components/fonts/FontSettingsPanel.svelte';
 	import SettingsIcon from '@lucide/svelte/icons/settings';
 	import FeedbackDialog from '$lib/components/FeedbackDialog.svelte';
+	import ContributePanel from '$lib/components/contribute/ContributePanel.svelte';
 	import type { ThemeStore } from '$lib/theme/store.svelte';
 	import { createFontStore, type FontStore } from '$lib/fonts/store.svelte';
 	import { useMe } from '$lib/queries/users/useMe.svelte';
 	import { replayCoach } from '$lib/onboarding/coachGate.svelte';
+	import { CONTRIBUTE_TAB_ENABLED } from '$lib/contribute/config';
 
 	let {
 		open = $bindable(false),
@@ -16,14 +18,17 @@
 		fontStore = createFontStore(),
 	}: { open?: boolean; store: ThemeStore; fontStore?: FontStore } = $props();
 
-	type SectionId = 'general' | 'theme' | 'fonts' | 'feedback';
+	type SectionId = 'general' | 'theme' | 'fonts' | 'feedback' | 'contribute';
 
-	const sections: { id: SectionId; label: string }[] = [
+	const ALL_SECTIONS: { id: SectionId; label: string }[] = [
 		{ id: 'general', label: 'General' },
 		{ id: 'theme', label: 'Customize Theme' },
 		{ id: 'fonts', label: 'Fonts' },
 		{ id: 'feedback', label: 'Send Feedback' },
+		{ id: 'contribute', label: 'Contribute' },
 	];
+
+	const sections = ALL_SECTIONS.filter((s) => s.id !== 'contribute' || CONTRIBUTE_TAB_ENABLED);
 
 	// "Peek" hides the dialog so font picks can be judged against the whole page, then a
 	// floating button brings Settings back on the same section.
@@ -72,6 +77,7 @@
 						class="shrink-0 whitespace-nowrap text-left text-sm px-2 py-1.5 rounded-md {activeSection === section.id
 							? 'bg-muted font-medium'
 							: 'text-muted-foreground hover:bg-muted/50'}"
+						aria-current={activeSection === section.id ? 'page' : undefined}
 						onclick={() => (activeSection = section.id)}
 					>
 						{section.label}
@@ -97,6 +103,8 @@
 					<ThemeCustomizePanel {store} />
 				{:else if activeSection === 'fonts'}
 					<FontSettingsPanel store={fontStore} onPeek={startPeek} />
+				{:else if activeSection === 'contribute'}
+					<ContributePanel />
 				{:else if activeSection === 'feedback'}
 					<FeedbackDialog
 						onClose={() => {
