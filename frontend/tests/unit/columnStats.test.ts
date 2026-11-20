@@ -171,6 +171,12 @@ describe('pieSlices', () => {
 		expect(slices.map((s) => s.count)).toEqual([4, 3, 3]);
 		expect(slices[2].label).toBe('Other');
 	});
+
+	it('carries the raw bin edges so the chart can format them, with Other open-ended', () => {
+		const slices = pieSlices(bins, 2);
+		expect(slices[1]).toMatchObject({ lo: 1, hi: 2 });
+		expect(slices[2]).toMatchObject({ lo: 2, hi: null });
+	});
 });
 
 describe('coverage', () => {

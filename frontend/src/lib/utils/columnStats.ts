@@ -128,14 +128,28 @@ export function density(values: number[], points: number): Point[] {
 
 const formatEdge = (n: number): string => String(Number(n.toPrecision(4)));
 
-export function pieSlices(bins: Bin[], cap: number): { label: string; count: number }[] {
-	const kept = bins.slice(0, Math.max(cap, 0)).map((b) => ({
+/**
+ * Slices for the pie: the first `cap` bins, then one slice for the rest. `lo`/`hi` are the raw
+ * bin edges so the chart can label them with the column's own formatter; `hi` is null for the
+ * open-ended "Other" slice, which covers everything from `lo` up.
+ */
+export function pieSlices(
+	bins: Bin[],
+	cap: number,
+): { label: string; count: number; lo: number; hi: number | null }[] {
+	const keep = Math.max(cap, 0);
+	const kept = bins.slice(0, keep).map((b) => ({
 		label: b.lo === b.hi ? formatEdge(b.lo) : `${formatEdge(b.lo)}–${formatEdge(b.hi)}`,
 		count: b.count,
+		lo: b.lo,
+		hi: b.hi,
 	}));
-	const rest = bins.slice(Math.max(cap, 0));
+	const rest = bins.slice(keep);
 	if (rest.length === 0) return kept;
-	return [...kept, { label: 'Other', count: rest.reduce((acc, b) => acc + b.count, 0) }];
+	return [
+		...kept,
+		{ label: 'Other', count: rest.reduce((acc, b) => acc + b.count, 0), lo: rest[0].lo, hi: null },
+	];
 }
 
 export function coverage(total: number, withValue: number): { filled: number; empty: number } {
