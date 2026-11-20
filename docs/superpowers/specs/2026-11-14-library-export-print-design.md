@@ -85,7 +85,7 @@ A pure module (for example `$lib/utils/exportTable.ts`) turns the displayed rows
 
 - **Rows:** the rows displayed after any client-side filter and sort (the grid's post-filter-and-sort node order).
 - **Columns:** the shown columns in on-screen order, minus the action column (the one with the empty header).
-- **Cell text:** the same formatting functions the grid's `valueFormatter`s already call (`formatCount`, `formatReleased`, and so on). The six renderer columns (perspective, item, type, category, cast, author) need a text form; Item uses the display title if set, otherwise the name.
+- **Cell text:** the same formatting functions the grid's `valueFormatter`s already call (`formatCount`, `formatReleased`, and so on). The six renderer columns (perspective, item, type, category, cast, author) need a text form; Item uses the display title if set, otherwise the name. Download CSV and Copy for spreadsheet write numeric cells as plain raw numbers (`1234567`, `0.8`) so they sum; Length, the 0-100 rating scores and TMDB ID keep the grid's text, and Print as list keeps the formatted text.
 - **DECIDED BY TRIAL: own serializer or AG Grid's `@ag-grid-community/csv-export` module for CSV and Copy.** Card mode is no longer a reason for either. Either way the cell-text function, the table builder, the injection guard and the print-as-list table are written by us, so they are built once on the shared base. Only the CSV and Copy step forks: two short spikes on separate branches off the shared base, one per path. The owner approved this plan on 2026-11-14.
 
 ### Deciding between the two CSV spikes
