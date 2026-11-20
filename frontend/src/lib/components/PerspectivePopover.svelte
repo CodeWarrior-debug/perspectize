@@ -104,8 +104,7 @@
 
 	// Dynamic fields — tracks which rating fields are shown
 	// Single source of truth: STANDARD_DIMENSIONS in comparePerspectives.ts (also used
-	// by AddFieldSearch's core-field entries and Compare's getFieldLabel). See the UI
-	// gap audit, gap #17.
+	// by AddFieldSearch's core-field entries and Compare's getFieldLabel).
 	const DEFAULT_FIELDS: string[] = STANDARD_DIMENSIONS.map((d) => d.key);
 	let activeFields = $state<string[]>([...DEFAULT_FIELDS]);
 
@@ -366,7 +365,7 @@
 
 		// Close immediately instead of waiting for the server: the mutation hooks
 		// patch the cached lists optimistically, so the change is already on
-		// screen, and a slow network (mobile) no longer holds the sheet open for
+		// screen, and a slow network (mobile) doesn't hold the sheet open for
 		// the full round trip. mutateAsync settles even after this component
 		// unmounts. On failure the hook rolls the optimistic patch back and
 		// offers Retry, and the review text survives as a draft (flushed below,
@@ -470,75 +469,88 @@
 				{@render commentRows(true)}
 			{/if}
 			<div class="px-5 py-4 flex flex-col gap-3.5">
-				<div class="grid grid-cols-2 gap-3">
-					{#each activeFields as fieldKey (fieldKey)}
-						<div class="relative" bind:this={fieldRefs[fieldKey]}>
-							{#if fieldKey === 'quality'}
-								<RatingInput
-									label="Quality"
-									name="quality"
-									bind:value={quality}
-									compact
-									trackWidth={110}
-									onRemove={() => removeField('quality')}
-								/>
-							{:else if fieldKey === 'agreement'}
-								<RatingInput
-									label="Agreement"
-									name="agreement"
-									bind:value={agreement}
-									compact
-									trackWidth={110}
-									onRemove={() => removeField('agreement')}
-								/>
-							{:else if fieldKey === 'importance'}
-								<RatingInput
-									label="Importance"
-									name="importance"
-									bind:value={importance}
-									compact
-									trackWidth={110}
-									onRemove={() => removeField('importance')}
-								/>
-							{:else if fieldKey === 'confidence'}
-								<RatingInput
-									label="Confidence"
-									name="confidence"
-									bind:value={confidence}
-									compact
-									trackWidth={110}
-									onRemove={() => removeField('confidence')}
-								/>
-							{:else}
-								<RatingInput
-									label={getFieldLabel(fieldKey)}
-									name={fieldKey}
-									bind:value={() => dynamicValues[fieldKey] ?? null, (v) => setFieldValue(fieldKey, v)}
-									compact
-									trackWidth={110}
-									onRemove={() => removeField(fieldKey)}
-								/>
-							{/if}
+				<!-- Wide screens put the feel wheel beside the ratings; narrow screens stack it below. -->
+				<div class="flex flex-col gap-3.5 sm:flex-row sm:items-start sm:gap-5">
+					<div class="flex min-w-0 flex-1 flex-col gap-3.5">
+						<div class="grid grid-cols-2 gap-3">
+							{#each activeFields as fieldKey (fieldKey)}
+								<div class="relative" bind:this={fieldRefs[fieldKey]}>
+									{#if fieldKey === 'quality'}
+										<RatingInput
+											label="Quality"
+											name="quality"
+											bind:value={quality}
+											compact
+											trackWidth={110}
+											onRemove={() => removeField('quality')}
+										/>
+									{:else if fieldKey === 'agreement'}
+										<RatingInput
+											label="Agreement"
+											name="agreement"
+											bind:value={agreement}
+											compact
+											trackWidth={110}
+											onRemove={() => removeField('agreement')}
+										/>
+									{:else if fieldKey === 'importance'}
+										<RatingInput
+											label="Importance"
+											name="importance"
+											bind:value={importance}
+											compact
+											trackWidth={110}
+											onRemove={() => removeField('importance')}
+										/>
+									{:else if fieldKey === 'confidence'}
+										<RatingInput
+											label="Confidence"
+											name="confidence"
+											bind:value={confidence}
+											compact
+											trackWidth={110}
+											onRemove={() => removeField('confidence')}
+										/>
+									{:else}
+										<RatingInput
+											label={getFieldLabel(fieldKey)}
+											name={fieldKey}
+											bind:value={() => dynamicValues[fieldKey] ?? null, (v) => setFieldValue(fieldKey, v)}
+											compact
+											trackWidth={110}
+											onRemove={() => removeField(fieldKey)}
+										/>
+									{/if}
+								</div>
+							{/each}
 						</div>
-					{/each}
-				</div>
 
-				<AddFieldSearch addedKeys={activeFields} onAdd={addField} placeholder="Add a field — e.g. clarity" dense />
+						<AddFieldSearch addedKeys={activeFields} onAdd={addField} placeholder="Add a field — e.g. clarity" dense />
 
-				{#if !feelWheelOpen}
-					<button
-						type="button"
-						onclick={() => (feelWheelOpen = true)}
-						class="flex items-center justify-center gap-1.5 rounded-md border border-dashed border-border py-2 text-sm text-muted-foreground hover:opacity-70"
+						{#if !feelWheelOpen}
+							<button
+								type="button"
+								onclick={() => (feelWheelOpen = true)}
+								class="flex items-center justify-center gap-1.5 rounded-md border border-dashed border-border py-2 text-sm text-muted-foreground hover:opacity-70 sm:hidden"
+							>
+								<span class="text-base leading-none">🙂</span>
+								Add a feeling
+							</button>
+						{/if}
+					</div>
+
+					<!-- Always mounted (one instance): wide screens show it beside the ratings,
+					     narrow screens show it below them only once it has been opened. -->
+					<div
+						class={[
+							'rounded-md border border-border p-3 sm:w-[346px] sm:shrink-0',
+							!feelWheelOpen && 'hidden sm:block',
+						]}
+						data-testid="feel-wheel-column"
 					>
-						<span class="text-base leading-none">🙂</span>
-						Add a feeling
-					</button>
-				{:else}
-					<div class="rounded-md border border-border p-3">
 						<FeelWheel bind:value={feelings} />
 					</div>
-				{/if}
+				</div>
 
 				<div class="flex items-center justify-between rounded-md border border-border px-3 py-2">
 					<div class="flex flex-col">
@@ -685,7 +697,6 @@
 			</button>
 		</div>
 	{/if}
-
 {/snippet}
 
 <!-- Desktop: centered dialog -->
@@ -697,10 +708,7 @@
 		}}
 	>
 		<DialogContent
-			class={[
-				'w-[calc(100vw-2rem)] max-h-[90vh] overflow-hidden p-0 flex flex-col transition-[max-width] duration-200',
-				commentExpanded ? 'sm:max-w-[760px]' : 'sm:max-w-[460px]',
-			]}
+			class="w-[calc(100vw-2rem)] max-h-[90vh] overflow-hidden p-0 flex flex-col sm:max-w-[760px]"
 			overlayClass="bg-black/45"
 		>
 			{@render modalBody(false)}

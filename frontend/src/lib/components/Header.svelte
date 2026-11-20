@@ -42,7 +42,8 @@
 			>
 				Perspectize
 			</a>
-			<nav class="flex items-center gap-0.5 sm:gap-2 shrink-0">
+			<!-- min-w-0 + overflow-x-auto: at phone width the links scroll inside the nav instead of running under the right-hand buttons. py/px padding keeps the focus ring from being clipped. -->
+			<nav class="flex items-center gap-0.5 sm:gap-2 min-w-0 overflow-x-auto py-1 -my-1 px-1 -mx-1">
 				{#each navLinks as link (link.href)}
 					<a
 						href={link.href}

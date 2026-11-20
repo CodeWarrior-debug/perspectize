@@ -83,7 +83,12 @@ export const TYPES = [
         icon: 'film',
         accent: '#0F9D8C',
         sharesUrlSpace: false,
-        thumbnail: 'TMDB poster_path — 2:3 tile (w92 in the grid, w342 in details)'
+        thumbnail: 'TMDB poster_path — 2:3 tile (w92 in the grid, w342 in details)',
+        contentPolicy: 'Reject NC-17 and TMDB adult:true (CONTENT_NOT_ALLOWED)',
+        mobileCardFields: 'year, rating, runtime, TMDB score',
+        searchFields: 'title, cast, director',
+        duplicateFeedback: 'TBD',
+        addContentEntry: 'Autodetect TMDB/IMDb movie links; select label Movie; TMDB attribution notice only for Movie'
     },
     {
         id: 'book',
@@ -1037,7 +1042,7 @@ export const COLUMNS = [
         bindings: {
             food: b('Serving', 'typical', 'api', "response->'serving' {amount, unit, label}", true, {
                 unit: 'g or ml',
-                tooltip: 'Serving size as on the label: weight or volume first, household measure in brackets. Blank when the source has none, and the nutrient cells then fall back to per 100 g/ml with a "/100g" suffix. Grams and millilitres never sort as one axis (mixed-unit alert).',
+                tooltip: 'Serving size as on the label: weight or volume first, household measure in brackets. Blank when the source has none, and the nutrient cells then fall back to per 100 g/ml with a "/100g" suffix. Grams and millilitres share one unit group ("g or ml"), so a sort on serving size does not split them.',
                 appearance: '"37 g (2 tbsp)", "355 ml (1 can)". Right-aligned.'
             }),
             youtube: b('Length', 'required', 'api', 'length + length_units', true, { unit: 'seconds → h:mm:ss', tooltip: 'Video duration from the YouTube API' }),
@@ -1071,7 +1076,7 @@ export const COLUMNS = [
             bible: b('Words - BSB', 'typical', 'derived', "Σ words of bible_verse_text (translation 'BSB') for verse_start_id..verse_end_id → length, length_units = 'words'", true, {
                 unit: 'words (BSB)',
                 tooltip: 'PLANNED — not written by CreateFromPassage today. Word count of the passage in the Berean Standard Bible; other translations differ. Counted once when the passage is added.',
-                appearance: 'Right-aligned integer with thousands separator, e.g. "453". The unit lives in the header, not the cell. Sorting alongside other types raises the mixed-unit alert (filter to one type, or sort by Type then Length).'
+                appearance: 'Right-aligned integer with thousands separator, e.g. "453". The unit lives in the header, not the cell. Sorting alongside other types groups rows by unit, so words are never ordered against seconds or minutes.'
             })
         }
     },

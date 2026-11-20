@@ -15,6 +15,7 @@ import (
 	"fmt"
 	"log/slog"
 	"strconv"
+	"strings"
 
 	"github.com/CodeWarrior-debug/perspectize/backend/internal/adapters/auth"
 	"github.com/CodeWarrior-debug/perspectize/backend/internal/adapters/graphql/generated"
@@ -43,6 +44,15 @@ func (r *mutationResolver) CreatePerspective(ctx context.Context, input model.Cr
 		}
 		if errors.Is(err, domain.ErrInvalidInput) {
 			return nil, fmt.Errorf("invalid input: %w", err)
+		}
+		// A duplicate (same user, content and privacy) is a user error, not a
+		// server fault: no error-level log, and no SQL in the message.
+		if errors.Is(err, domain.ErrAlreadyExists) {
+			privacy := domain.PrivacyPublic // the service's default when input.privacy is omitted
+			if input.Privacy != nil {
+				privacy = *input.Privacy
+			}
+			return nil, fmt.Errorf("you already have a %s perspective on this content", strings.ToLower(string(privacy)))
 		}
 		// Checked first: content not-found is also ErrNotFound, and must not be
 		// reported as a missing user.
@@ -86,6 +96,14 @@ func (r *mutationResolver) UpdatePerspective(ctx context.Context, input model.Up
 		}
 		if errors.Is(err, domain.ErrInvalidInput) {
 			return nil, fmt.Errorf("invalid input: %w", err)
+		}
+		// A duplicate is a user error (no error-level log, no SQL in the message).
+		// The final privacy is only known here when the input sets it.
+		if errors.Is(err, domain.ErrAlreadyExists) {
+			if input.Privacy != nil {
+				return nil, fmt.Errorf("you already have a %s perspective on this content", strings.ToLower(string(*input.Privacy)))
+			}
+			return nil, fmt.Errorf("you already have a perspective on this content with that privacy setting")
 		}
 		slog.Error("updating perspective failed", "error", err)
 		return nil, fmt.Errorf("failed to update perspective: %v", err)

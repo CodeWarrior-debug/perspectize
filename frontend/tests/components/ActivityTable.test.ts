@@ -268,7 +268,7 @@ describe('ActivityTable', () => {
 		window.matchMedia = vi.fn(
 			(query: string) =>
 				({
-					matches: query === '(max-width: 859px)',
+					matches: query.includes('max-width: 859px'),
 					media: query,
 					onchange: null,
 					addListener: vi.fn(),
@@ -295,7 +295,7 @@ describe('ActivityTable', () => {
 		window.matchMedia = vi.fn(
 			(query: string) =>
 				({
-					matches: query === '(max-width: 859px)',
+					matches: query.includes('max-width: 859px'),
 					media: query,
 					onchange: null,
 					addListener: vi.fn(),
@@ -333,6 +333,57 @@ describe('ActivityTable', () => {
 		await waitFor(() => {
 			expect(container.querySelector('button[aria-label="Choose columns"]')).toBeTruthy();
 		});
+	});
+
+	it('renders the Export trigger disabled while the grid is not ready', async () => {
+		mockRequest.mockResolvedValue(mockDataResponse);
+		const { container } = renderWithQuery();
+
+		await waitFor(() => {
+			const exportButton = container.querySelector<HTMLButtonElement>('button[aria-label="Export"]');
+			expect(exportButton).toBeTruthy();
+			// The mocked AG Grid never fires onGridReady, so gridReady stays false.
+			expect(exportButton?.disabled).toBe(true);
+		});
+	});
+
+	// The menu stays disabled under the mocked grid, so its items can't be opened here; ExportMenu.test.ts
+	// covers the items, and this pins that ActivityTable hands the menu its CSV and Copy handlers.
+	it('passes the CSV and Copy handlers to the Export menu', async () => {
+		const { readFileSync } = await import('node:fs');
+		const source = readFileSync('src/lib/components/ActivityTable.svelte', 'utf8');
+		const tag = source.match(/<ExportMenu[\s\S]*?\n\s*\/>/)?.[0] ?? '';
+		expect(tag).toContain('onDownloadCsv={handleDownloadCsv}');
+		expect(tag).toContain('onCopy={handleCopy}');
+	});
+
+	it('omits the Export trigger in card mode', async () => {
+		mockRequest.mockResolvedValue(mockDataResponse);
+		const originalMatchMedia = window.matchMedia;
+		window.matchMedia = vi.fn(
+			(query: string) =>
+				({
+					matches: query.includes('max-width: 859px'),
+					media: query,
+					onchange: null,
+					addListener: vi.fn(),
+					removeListener: vi.fn(),
+					addEventListener: vi.fn(),
+					removeEventListener: vi.fn(),
+					dispatchEvent: vi.fn(),
+				}) as unknown as MediaQueryList,
+		);
+
+		try {
+			const { container } = renderWithQuery();
+
+			await waitFor(() => {
+				expect(container.querySelector('[data-testid="activity-card-list"]')).toBeTruthy();
+			});
+			expect(container.querySelector('button[aria-label="Export"]')).toBeFalsy();
+		} finally {
+			window.matchMedia = originalMatchMedia;
+		}
 	});
 
 	// Regression: the +/glasses affordance is driven by a per-user perspectives

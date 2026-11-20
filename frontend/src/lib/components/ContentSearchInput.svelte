@@ -5,7 +5,7 @@
 	import XIcon from '@lucide/svelte/icons/x';
 
 	// Debounced in-app content search (Compare picker). Discover's SearchBar
-	// hands off to youtube.com instead, so it no longer debounces.
+	// hands off to youtube.com instead, so it doesn't debounce.
 
 	let {
 		value = $bindable(''),

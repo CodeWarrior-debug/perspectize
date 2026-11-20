@@ -144,9 +144,7 @@ func TestProgress_UnsubscribeClosesTheChannel(t *testing.T) {
 	case <-time.After(time.Second):
 		t.Fatal("not closed")
 	}
-	tr.mu.Lock()
-	assert.Empty(t, tr.jobs[4].subs)
-	tr.mu.Unlock()
+	assert.Equal(t, 0, tr.subscriberCount(4))
 	tr.begin(4, 1) // publishing after the subscriber left is safe
 	tr.end(4)
 }

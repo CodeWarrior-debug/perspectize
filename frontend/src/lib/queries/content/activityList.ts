@@ -3,12 +3,12 @@
  * LIST_CONTENT variables for a URL state. ActivityTable and the route prefetch
  * (routes/content-library/+page.ts and routes/+page.ts) both call this, so the key and the request cannot drift apart.
  *
- * Pure: no runes, no network, no Clerk, so it can run at route load (#636).
+ * Pure: no runes, no network, no Clerk, so it can run at route load.
  */
 import { queryKeys } from '$lib/queries/keys';
 import { sortsToGraphQL, urlParamsToGraphQLFilter, type GridParams } from '$lib/utils/gridUrlState';
 
-/** Rows fetched on first load in Loaded mode. Was 100; 50 halves the payload (#636). */
+/** Rows fetched on first load in Loaded mode. 50 rather than 100 halves the payload. */
 export const LOADED_MODE_FIRST = 50;
 
 /** Freshness window for the Activity list. A prefetch inside it is reused without a second request. */

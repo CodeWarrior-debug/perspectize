@@ -9,7 +9,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// Gap #2 in the UI gap audit: gqlgen only tells "omitted" and "explicit null"
+// gqlgen only tells "omitted" and "explicit null"
 // apart when a field is declared omittable (graphql.Omittable[T]) — these
 // tests prove modelToUpdatePerspectiveInput reads that tri-state correctly
 // and turns it into the ClearX flags perspective_service.go's Update() acts

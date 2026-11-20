@@ -14,9 +14,8 @@
 	} = $props();
 
 	// 'differ' uses red/green rather than the neutral amber "diverges" uses
-	// per-dimension, so the two are never styled the same (compare-no-overlap-summary
-	// #3). 'oneSided'/'none' are a missing verdict, not disagreement, so they
-	// stay neutral rather than amber (#2).
+	// per-dimension, so the two are never styled the same. 'oneSided'/'none' are a
+	// missing verdict, not disagreement, so they stay neutral rather than amber.
 	const STATUS_LABEL_STATIC: Record<Exclude<OverallStatus, 'oneSided'>, string> = {
 		agree: 'Agree overall',
 		differ: 'Different',

@@ -108,7 +108,7 @@ func TestDeletePerspectiveNotOwner(t *testing.T) {
 }
 
 // frontend LIST_PERSPECTIVES_BY_CONTENT-style selection plus the user and
-// content fields (which used to always be null): one statement for the list,
+// content fields: one statement for the list,
 // one for all users, one for all content — whatever the number of rows.
 func TestPerspectiveUserAndContentBatched(t *testing.T) {
 	h := newHarness(t)

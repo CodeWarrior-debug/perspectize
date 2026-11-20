@@ -35,6 +35,20 @@ export const MOVIE_SEARCH_SCOPES: SearchScopeKey[] = ['cast', 'director'];
 
 const EVERY_SEARCH_SCOPE: SearchScopeKey[] = [...ALL_SEARCH_SCOPES, ...MOVIE_SEARCH_SCOPES];
 
+/**
+ * Type options to offer as one-click switches while the Type filter holds exactly one type: every
+ * other content type, in option order. Empty for no type filter or several types, since a switch
+ * only makes sense from a single-type view.
+ */
+export function otherTypeOptionsWhenOne(filters: Record<string, string>): readonly { value: string; label: string }[] {
+	const selected = (filters.type ?? '')
+		.split(',')
+		.map((t) => t.trim().toLowerCase())
+		.filter(Boolean);
+	if (selected.length !== 1) return [];
+	return CONTENT_TYPE_OPTIONS.filter((option) => option.value !== selected[0]);
+}
+
 /** Scopes offered (and on by default) for a given set of URL filters: Cast/Director join in when `f.type` includes movie. */
 export function searchScopesFor(filters: Record<string, string>): SearchScopeKey[] {
 	const types = (filters.type ?? '').split(',').map((t) => t.trim().toLowerCase());

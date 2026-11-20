@@ -103,7 +103,7 @@ describe('ThemeCustomizePanel', () => {
 		await fireEvent.click(screen.getByRole('button', { name: 'Customize' }));
 		await fireEvent.click(screen.getByRole('button', { name: 'Save as...' }));
 
-		const nameInput = screen.getByPlaceholderText('Name your theme');
+		const nameInput = screen.getByPlaceholderText('Give your theme a title');
 		await fireEvent.input(nameInput, { target: { value: 'My Palette' } });
 		await fireEvent.click(screen.getByRole('button', { name: 'Save' }));
 

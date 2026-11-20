@@ -78,11 +78,12 @@ Given a selection of types, the preview flags:
 - **Sparse columns** — a default column populated for under half the selection.
 - **Mixed units** — e.g. Length across video seconds, book pages and Bible
   passage words (BSB), which must never be sorted as one numeric axis. The
-  sample table enforces the policy. Sorting such a column as the primary key
-  raises an alert and leaves the order unchanged until you pick one of two
-  fixes. **Filter to one type** keeps a single unit. **Sort by Type, then the
-  column** is a multi-column sort that puts the unit-consistent Type column
-  first. The spec emits that policy and the backend/frontend steps it needs.
+  sample table shows the policy. Sorting such a column is never blocked: rows
+  are grouped by unit (`length_units`), each group is ordered within itself,
+  and a divider row names each unit. A dismissible note explains the grouping
+  and offers a "Show only <type>" shortcut per type. The spec emits the
+  backend and frontend steps it needs; the Length two-key sort rule is
+  emitted only when Length is a mixed column.
 - **Mixed provenance** — a column that is fetched for some types and
   user-entered for others (Rating is the standing example).
 - **Lost required fields** — a type declaring a field required and
@@ -197,9 +198,20 @@ set the app ships today, which is the tool's sanity check.
 Two deterministic documents, copyable or downloadable:
 
 1. **Spec + checklist** — identity, ingestion, per-field decisions with storage
-   and migration implications, the resolved default grid, per-type header
-   aliases, the consistency review, and an implementation checklist keyed to
-   the files in `.claude/docs/ADDING_CONTENT_TYPE.md`.
+   and migration implications, a **Filters** table (for every chosen
+   `filterable` column: filter kind from the value type, proposed
+   `ContentFilter` field names, URL key, chip label, index note and the
+   Loaded/All parity rule; derived columns are listed as "no filter"), the
+   resolved default grid, per-type header aliases, the consistency review, an
+   **Undecided surfaces** section, and an implementation checklist (including
+   backend and frontend filter steps) keyed to the files in
+   `.claude/docs/ADDING_CONTENT_TYPE.md`.
+   *Undecided surfaces* lists the rows of that guide's "Per-type surface
+   checklist" the form cannot answer: the optional profile fields Content
+   policy, Duplicate-add feedback, Add Content entry, Mobile card facts and Search fields (empty
+   or "TBD" means undecided), a missing details-view attribution, plus rows no
+   field covers (computed sort keys, data modes, add-form errors, formatting
+   edge values, rollout). Each is a blocker until answered in the spec.
 2. **Column × content type matrix** — every column against every type, marking
    default-visible / available / not applicable. Useful on its own for spotting
    a column that only one type will ever fill.

@@ -130,3 +130,9 @@ export function headerChrome(
 
 /** The Activity grid's header chrome, computed once. */
 export const ACTIVITY_HEADER_CHROME: HeaderChrome = headerChrome(ACTIVITY_GRID_THEME, ACTIVITY_HEADER_TEXT_CASE);
+
+/** The Plan grid's theme: the shared params on the base theme, with headers in the default case. */
+export const PLAN_GRID_THEME = themeBalham.withParams(GRID_THEME_PARAMS);
+
+/** The Plan grid's header chrome, computed once. */
+export const PLAN_HEADER_CHROME: HeaderChrome = headerChrome(PLAN_GRID_THEME);

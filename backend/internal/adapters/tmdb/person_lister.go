@@ -14,13 +14,16 @@ import (
 
 	"github.com/CodeWarrior-debug/perspectize/backend/internal/core/domain"
 	"github.com/CodeWarrior-debug/perspectize/backend/internal/core/ports/services"
+	"github.com/CodeWarrior-debug/perspectize/backend/pkg/limiter"
 )
 
 // personBatchSize is how many films are enriched and emitted per batch.
 const personBatchSize = 20
 
-// personEnrichWorkers bounds concurrent /movie/{id} lookups (TMDB allows ~50 req/s).
-const personEnrichWorkers = 4
+// PersonEnrichConcurrency is how many /movie/{id} lookups one person listing
+// runs at once when no shared limiter is injected. It is TMDB's rate limit
+// (about 50 req/s), not our hardware, that this respects.
+const PersonEnrichConcurrency = 4
 
 // maxPersonItems caps one filmography; prolific actors have a few hundred credits.
 const maxPersonItems = 500
@@ -39,13 +42,36 @@ var personURLRe = regexp.MustCompile(`^(?:https?://)?(?:www\.)?themoviedb\.org/p
 type PersonLister struct {
 	c   *Client
 	now func() time.Time
+	// enrichLimiter, when set, caps /movie/{id} lookups across every listing
+	// that shares it. Nil means each enrich call caps itself.
+	enrichLimiter EnrichLimiter
 }
 
 var _ services.ImportSourceLister = (*PersonLister)(nil)
 
+// EnrichLimiter hands out slots for /movie/{id} lookups. *limiter.Limiter
+// satisfies it.
+type EnrichLimiter interface {
+	Acquire(ctx context.Context) (release func(), err error)
+}
+
+// PersonListerOption configures a PersonLister in NewPersonLister.
+type PersonListerOption func(*PersonLister)
+
+// WithEnrichLimiter makes every listing from this lister take its /movie/{id}
+// slots from l, so a limiter shared with other listers caps them all together.
+// Without it, each listing gets its own PersonEnrichConcurrency slots.
+func WithEnrichLimiter(l EnrichLimiter) PersonListerOption {
+	return func(p *PersonLister) { p.enrichLimiter = l }
+}
+
 // NewPersonLister builds a lister on the client's token and HTTP client.
-func NewPersonLister(c *Client) *PersonLister {
-	return &PersonLister{c: c, now: time.Now}
+func NewPersonLister(c *Client, opts ...PersonListerOption) *PersonLister {
+	l := &PersonLister{c: c, now: time.Now}
+	for _, opt := range opts {
+		opt(l)
+	}
+	return l
 }
 
 // Resolve accepts a TMDB person id, a themoviedb.org/person/… URL, or a name.
@@ -272,23 +298,27 @@ func pickCredits(cast, crew []personCredit, role *domain.ImportPersonRole) []fil
 	return out
 }
 
-// enrich fetches /movie/{id} for each film with bounded concurrency. A failed
-// lookup leaves that film's extras empty rather than failing the batch: the
-// row still shows everything the credits list had.
+// enrich fetches /movie/{id} for each film with bounded concurrency: through
+// the injected limiter if there is one, otherwise through a limiter of its own
+// that lasts for this call. A failed lookup, or a slot that never comes (the
+// context ended), leaves that film's extras empty rather than failing the
+// batch: the row still shows everything the credits list had.
 func (l *PersonLister) enrich(ctx context.Context, films []film) []movieExtras {
 	out := make([]movieExtras, len(films))
-	sem := make(chan struct{}, personEnrichWorkers)
+	slots := l.enrichLimiter
+	if slots == nil {
+		slots = limiter.New("tmdb_enrich_local", PersonEnrichConcurrency)
+	}
 	var wg sync.WaitGroup
 	for i := range films {
 		wg.Add(1)
 		go func(i int) {
 			defer wg.Done()
-			select {
-			case sem <- struct{}{}:
-			case <-ctx.Done():
+			release, err := slots.Acquire(ctx)
+			if err != nil {
 				return
 			}
-			defer func() { <-sem }()
+			defer release()
 			body, err := l.c.get(ctx, "/movie/"+strconv.Itoa(films[i].credit.ID), url.Values{"language": {"en-US"}, "append_to_response": {movieAppend}})
 			if err != nil {
 				return

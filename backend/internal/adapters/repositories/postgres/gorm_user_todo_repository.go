@@ -93,7 +93,7 @@ func (r *GormUserTodoRepository) List(ctx context.Context, params domain.UserTod
 	if err != nil {
 		return nil, fmt.Errorf("failed to list user todos: %w", err)
 	}
-	// Paginate() returns the query error on pageResult, not as err (issue #327).
+	// Paginate() returns the query error on pageResult, not as err.
 	if pageResult.Error != nil {
 		return nil, fmt.Errorf("failed to list user todos: %w", pageResult.Error)
 	}

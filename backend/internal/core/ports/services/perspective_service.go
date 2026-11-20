@@ -55,9 +55,9 @@ type UpdatePerspectiveInput struct {
 	// by the GraphQL adapter (modelToUpdatePerspectiveInput in helpers.go) when
 	// the client sent an explicit null (or, for Feelings/CustomFields, an empty
 	// list/object) -- distinct from omitting the field, which leaves it
-	// unchanged. When true, the paired value field above is ignored. See the UI
-	// gap audit, gap #2: without this, there was no way to clear a rating,
-	// review, feelings, or customFields once set.
+	// unchanged. When true, the paired value field above is ignored. Without
+	// these flags a rating, review, feelings, or customFields could not be
+	// cleared once set.
 	ClearQuality      bool
 	ClearAgreement    bool
 	ClearImportance   bool
