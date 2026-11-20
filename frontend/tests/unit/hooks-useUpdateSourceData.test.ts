@@ -63,20 +63,20 @@ describe('useUpdateSourceData hook', () => {
 	});
 
 	describe('onSuccess cache update callback', () => {
-		it('replaces only the matching item in cached list data', () => {
+		it('patches only the matching item in cached list data, keeping fields the mutation does not select', () => {
 			const updated = { id: '1', name: 'Refreshed Title' };
 			mockSetQueriesData.mockImplementation((_filter: any, updater: Function) => {
 				const oldData = {
 					content: {
 						items: [
-							{ id: '1', name: 'Old Title' },
+							{ id: '1', name: 'Old Title', primaryCategory: { label: 'Film' } },
 							{ id: '2', name: 'Untouched' },
 						],
 						totalCount: 2,
 					},
 				};
 				const result = updater(oldData);
-				expect(result.content.items[0]).toBe(updated);
+				expect(result.content.items[0]).toEqual({ ...updated, primaryCategory: { label: 'Film' } });
 				expect(result.content.items[1]).toEqual({ id: '2', name: 'Untouched' });
 			});
 
@@ -110,7 +110,7 @@ describe('useUpdateSourceData hook', () => {
 	describe('onError branches', () => {
 		it('shows "not found" message for content-not-found errors', () => {
 			capturedMutationOptions.onError(new Error('content not found'));
-			expect(mockToastError).toHaveBeenCalledWith('This video could not be found');
+			expect(mockToastError).toHaveBeenCalledWith('This item could not be found');
 		});
 
 		it('shows server unreachable message for "load failed" errors', () => {

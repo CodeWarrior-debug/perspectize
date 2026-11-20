@@ -20,13 +20,15 @@ export function useUpdateSourceData() {
 			toast.success(`Updated: ${updated.name}`);
 
 			// Patch just this one item in cached list queries — mirrors useAddVideo's
-			// direct cache write, scoped to the single refreshed row.
+			// direct cache write, scoped to the single refreshed row. The mutation selects
+			// a subset of LIST_CONTENT's fields, so merge rather than replace: list-only
+			// fields (primaryCategory, displayTitle, addedByUserID, ...) stay on the row.
 			queryClient.setQueriesData<ContentResponse>({ queryKey: queryKeys.content.lists() }, (oldData) => {
 				if (!oldData) return oldData;
 				return {
 					content: {
 						...oldData.content,
-						items: oldData.content.items.map((item) => (item.id === updated.id ? updated : item)),
+						items: oldData.content.items.map((item) => (item.id === updated.id ? { ...item, ...updated } : item)),
 					},
 				};
 			});
@@ -41,7 +43,7 @@ export function useUpdateSourceData() {
 			console.error('[UpdateSourceData] mutation failed:', err);
 			const message = err.message.toLowerCase();
 			if (message.includes('content not found')) {
-				toast.error('This video could not be found');
+				toast.error('This item could not be found');
 			} else if (message.includes('load failed') || message.includes('failed to fetch')) {
 				toast.error('Cannot reach the server. Check your connection and try again.');
 			} else if (message.includes('access denied') || message.includes('authentication required')) {

@@ -458,7 +458,7 @@
 						{#if onAddToPlan}
 							<AddToPlanButton variant="text" class="grow basis-36" onclick={() => onAddToPlan(content)} />
 						{/if}
-						{#if !isPassage && !isMovie && !isWebPage}
+						{#if !isPassage && !isWebPage}
 							<button
 								type="button"
 								disabled={updateSourceData.isPending || cooldown.active}
@@ -475,7 +475,7 @@
 							</button>
 						{/if}
 					</div>
-					{#if !isPassage && !isMovie && !isWebPage && cooldown.active}
+					{#if !isPassage && !isWebPage && cooldown.active}
 						<div class="mt-1.5 text-[11px] text-muted-foreground">
 							This was updated recently. Check back in {formatRemainingTime(cooldown.remainingMs)} to refresh again.
 						</div>

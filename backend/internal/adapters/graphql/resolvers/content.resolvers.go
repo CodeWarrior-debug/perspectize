@@ -493,6 +493,12 @@ func (r *mutationResolver) UpdateContentSourceData(ctx context.Context, contentI
 		if errors.Is(err, domain.ErrInvalidInput) || errors.Is(err, domain.ErrInvalidURL) {
 			return nil, fmt.Errorf("invalid content: %w", err)
 		}
+		if errors.Is(err, domain.ErrContentNotAllowed) {
+			return nil, &gqlerror.Error{
+				Message:    domain.ErrContentNotAllowed.Error(),
+				Extensions: map[string]any{"code": "CONTENT_NOT_ALLOWED"},
+			}
+		}
 
 		// Generic error for any other failure (including YouTube API errors)
 		// Details are already logged server-side by service layer

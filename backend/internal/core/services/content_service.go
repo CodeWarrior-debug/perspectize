@@ -210,11 +210,11 @@ func (s *ContentService) GetByIDs(ctx context.Context, ids []int) ([]*domain.Con
 }
 
 // UpdateSourceData refreshes an existing content item's metadata by re-fetching it from
-// the source (YouTube) and performing a direct UPDATE of the stored row. Unlike
-// CreateFromYouTube's upsert path, this always operates on a known existing row by ID —
-// it never inserts, and it never touches created_at or added_by_user_id.
-// A row the viewer can't see is domain.ErrNotFound, checked before anything
-// about the row's type is revealed.
+// its source (YouTube, Open Library for books, TMDB for movies) and performing a direct
+// UPDATE of the stored row. Unlike CreateFromYouTube's upsert path, this always operates
+// on a known existing row by ID: it never inserts, and it never touches created_at or
+// added_by_user_id. A row the viewer can't see is domain.ErrNotFound, checked before
+// anything about the row's type is revealed.
 func (s *ContentService) UpdateSourceData(ctx context.Context, contentID, viewerID int) (*domain.Content, error) {
 	if contentID <= 0 {
 		return nil, fmt.Errorf("%w: content id must be a positive integer", domain.ErrInvalidInput)
@@ -240,10 +240,12 @@ func (s *ContentService) UpdateSourceData(ctx context.Context, contentID, viewer
 	switch existing.ContentType {
 	case domain.ContentTypeBook:
 		return s.refreshBook(ctx, existing)
+	case domain.ContentTypeMovie:
+		return s.refreshMovie(ctx, existing)
 	case "", domain.ContentTypeYouTubeVideo:
 		// YouTube rows (and rows loaded without a type, as in older tests) take the path below.
 	default:
-		// Movie refresh is out of scope; other types have no refresh source yet.
+		// Other types have no refresh source yet.
 		return nil, fmt.Errorf("%w: content type %s cannot be refreshed", domain.ErrInvalidInput, existing.ContentType)
 	}
 
@@ -261,7 +263,7 @@ func (s *ContentService) UpdateSourceData(ctx context.Context, contentID, viewer
 		return nil, fmt.Errorf("failed to fetch video metadata")
 	}
 
-	updated, err := s.repo.UpdateMetadata(ctx, contentID, metadata.Title, metadata.Response, &metadata.Duration)
+	updated, err := s.repo.UpdateMetadata(ctx, contentID, metadata.Title, metadata.Response, &metadata.Duration, nil, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to update content metadata: %w", err)
 	}
@@ -331,7 +333,57 @@ func (s *ContentService) refreshBook(ctx context.Context, existing *domain.Conte
 		return nil, fmt.Errorf("failed to marshal book response: %w", err)
 	}
 
-	updated, err := s.repo.UpdateMetadata(ctx, existing.ID, result.Title, responseJSON, nil)
+	updated, err := s.repo.UpdateMetadata(ctx, existing.ID, result.Title, responseJSON, nil, nil, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to update content metadata: %w", err)
+	}
+	return updated, nil
+}
+
+// refreshMovie re-reads a MOVIE row from TMDB. The TMDB id comes from the stored
+// canonical URL, and the title and response are replaced with what CreateFromMovie
+// would store. The content policy is checked before the write, so a movie that is
+// now NC-17 or adult is refused and the row is left as it is. TMDB reporting no
+// runtime keeps the stored length, so a refresh never wipes it.
+func (s *ContentService) refreshMovie(ctx context.Context, existing *domain.Content) (*domain.Content, error) {
+	tmdbID, _, err := tmdb.ParseMovieInput(*existing.URL)
+	if err != nil || tmdbID == 0 {
+		return nil, fmt.Errorf("%w: content has no TMDB movie URL to refresh", domain.ErrInvalidInput)
+	}
+	if s.movieClient == nil {
+		return nil, ErrMovieClientUnavailable
+	}
+
+	metadata, err := s.movieClient.GetMovie(ctx, tmdbID)
+	if err != nil {
+		if errors.Is(err, domain.ErrNotFound) {
+			return nil, fmt.Errorf("%w: movie not found", domain.ErrNotFound)
+		}
+		if errors.Is(err, tmdb.ErrNotConfigured) {
+			return nil, fmt.Errorf("%w: movie refresh is not configured", tmdb.ErrNotConfigured)
+		}
+		slog.Error("failed to fetch movie metadata for refresh", "tmdbID", tmdbID, "contentID", existing.ID, "error", err)
+		return nil, fmt.Errorf("failed to fetch movie metadata")
+	}
+
+	// Policy: NC-17 and TMDB-adult movies are not enabled. Checked before any write.
+	if movieNotAllowed(metadata.Response) {
+		return nil, domain.ErrContentNotAllowed
+	}
+
+	// A runtime TMDB reports sets length, units and display together, as CreateFromMovie
+	// does. Without one, the stored length and its units and display are left as they are.
+	length := existing.Length
+	var lengthUnits *string
+	var lengthDisplay *domain.LengthDisplay
+	if metadata.RuntimeSeconds != nil {
+		length = metadata.RuntimeSeconds
+		units := "seconds"
+		lengthUnits = &units
+		lengthDisplay = domain.TMDBLengthDisplay()
+	}
+
+	updated, err := s.repo.UpdateMetadata(ctx, existing.ID, metadata.Title, metadata.Response, length, lengthUnits, lengthDisplay)
 	if err != nil {
 		return nil, fmt.Errorf("failed to update content metadata: %w", err)
 	}

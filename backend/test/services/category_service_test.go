@@ -91,7 +91,7 @@ func (m *mockContentRepoForCategory) GetByIDs(ctx context.Context, ids []int) ([
 func (m *mockContentRepoForCategory) GetByURL(ctx context.Context, url string) (*domain.Content, error) {
 	return nil, domain.ErrNotFound
 }
-func (m *mockContentRepoForCategory) UpdateMetadata(ctx context.Context, id int, name string, response json.RawMessage, length *int) (*domain.Content, error) {
+func (m *mockContentRepoForCategory) UpdateMetadata(ctx context.Context, id int, name string, response json.RawMessage, length *int, lengthUnits *string, lengthDisplay *domain.LengthDisplay) (*domain.Content, error) {
 	return &domain.Content{ID: id, Name: name}, nil
 }
 func (m *mockContentRepoForCategory) GetOrCreateByURL(ctx context.Context, content *domain.Content, refreshOnConflict bool) (*domain.Content, bool, error) {

@@ -249,7 +249,7 @@ func TestGormContentRepository_UpdateMetadata(t *testing.T) {
 		mock.ExpectQuery(`UPDATE "content" SET .* RETURNING \*`).
 			WillReturnRows(contentRows().AddRow(11, "Refreshed", "https://x", "youtube_video", 4, 420, "seconds", []byte(`{"a":1}`), nil, contentRepoTime, contentRepoTime))
 
-		got, err := NewGormContentRepository(db).UpdateMetadata(ctx, 11, "Refreshed", json.RawMessage(`{"a":1}`), cInt(420))
+		got, err := NewGormContentRepository(db).UpdateMetadata(ctx, 11, "Refreshed", json.RawMessage(`{"a":1}`), cInt(420), nil, nil)
 		require.NoError(t, err)
 		require.NotNil(t, got)
 		assert.Equal(t, "Refreshed", got.Name)
@@ -262,7 +262,7 @@ func TestGormContentRepository_UpdateMetadata(t *testing.T) {
 		db, mock := newMockDB(t)
 		mock.ExpectQuery(`UPDATE "content" SET`).WillReturnRows(contentRows())
 
-		got, err := NewGormContentRepository(db).UpdateMetadata(ctx, 404, "Refreshed", json.RawMessage(`{}`), nil)
+		got, err := NewGormContentRepository(db).UpdateMetadata(ctx, 404, "Refreshed", json.RawMessage(`{}`), nil, nil, nil)
 		assert.Nil(t, got)
 		assert.True(t, errors.Is(err, domain.ErrNotFound), "expected domain.ErrNotFound, got %v", err)
 		assertAllExpectationsMet(t, mock)
@@ -272,13 +272,41 @@ func TestGormContentRepository_UpdateMetadata(t *testing.T) {
 		db, mock := newMockDB(t)
 		mock.ExpectQuery(`UPDATE "content" SET`).WillReturnError(errors.New("meta boom"))
 
-		got, err := NewGormContentRepository(db).UpdateMetadata(ctx, 11, "x", json.RawMessage(`{}`), nil)
+		got, err := NewGormContentRepository(db).UpdateMetadata(ctx, 11, "x", json.RawMessage(`{}`), nil, nil, nil)
 		assert.Nil(t, got)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "failed to update content metadata")
 		assertAllExpectationsMet(t, mock)
 	})
 
+}
+
+// The length units and display columns are written only when given, so a refresh that
+// has no runtime to report leaves them as they are.
+func TestGormContentRepository_UpdateMetadataLengthColumns(t *testing.T) {
+	ctx := context.Background()
+
+	t.Run("writes length units and display when given", func(t *testing.T) {
+		db, mock := newMockDB(t)
+		mock.ExpectQuery(`UPDATE "content" SET .*"length_display".*"length_units".* RETURNING \*`).
+			WillReturnRows(contentRows().AddRow(11, "Refreshed", "https://x", "movie", 4, 8160, "seconds", []byte(`{}`), nil, contentRepoTime, contentRepoTime))
+
+		units := "seconds"
+		got, err := NewGormContentRepository(db).UpdateMetadata(ctx, 11, "Refreshed", json.RawMessage(`{}`), cInt(8160), &units, domain.TMDBLengthDisplay())
+		require.NoError(t, err)
+		require.NotNil(t, got)
+		assertAllExpectationsMet(t, mock)
+	})
+
+	t.Run("leaves units and display out of the statement when nil", func(t *testing.T) {
+		db, mock := newMockDB(t)
+		mock.ExpectQuery(`UPDATE "content" SET "length"=\$1,"name"=\$2,"response"=\$3,"updated_at"=\$4 WHERE .* RETURNING \*`).
+			WillReturnRows(contentRows().AddRow(11, "Refreshed", "https://x", "movie", 4, 8160, "seconds", []byte(`{}`), nil, contentRepoTime, contentRepoTime))
+
+		_, err := NewGormContentRepository(db).UpdateMetadata(ctx, 11, "Refreshed", json.RawMessage(`{}`), cInt(8160), nil, nil)
+		require.NoError(t, err)
+		assertAllExpectationsMet(t, mock)
+	})
 }
 
 func TestGormContentRepository_ReassignByUser(t *testing.T) {

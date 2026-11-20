@@ -20,9 +20,10 @@ type ContentRepository interface {
 	// Returns (*Content, true, nil) if content already existed, (*Content, false, nil) if newly created.
 	GetOrCreateByURL(ctx context.Context, content *domain.Content, refreshOnConflict bool) (*domain.Content, bool, error)
 	// UpdateMetadata performs a direct UPDATE of an existing content row's refreshable
-	// fields (name, response, length) plus updated_at. It never touches created_at or
-	// added_by_user_id, and it does not insert — the row must already exist.
-	UpdateMetadata(ctx context.Context, id int, name string, response json.RawMessage, length *int) (*domain.Content, error)
+	// fields (name, response, length) plus updated_at. lengthUnits and lengthDisplay are
+	// written only when non-nil; nil leaves the stored column as it is. It never touches
+	// created_at or added_by_user_id, and it does not insert — the row must already exist.
+	UpdateMetadata(ctx context.Context, id int, name string, response json.RawMessage, length *int, lengthUnits *string, lengthDisplay *domain.LengthDisplay) (*domain.Content, error)
 	List(ctx context.Context, params domain.ContentListParams) (*domain.PaginatedContent, error)
 	ReassignByUser(ctx context.Context, fromUserID, toUserID int) error
 	// UpdatePrimaryCategoryID sets the primary_category_id FK on a content

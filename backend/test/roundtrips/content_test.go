@@ -429,3 +429,24 @@ func TestCreateContentFromMovie(t *testing.T) {
 		t.Fatalf("duplicate add should return the existing row: %+v vs %+v", again, created)
 	}
 }
+
+// UNVERIFIED-AGAINST-DB: counts derived from ContentService.UpdateSourceData for a MOVIE row
+// (run with RT_MEASURE=1 against a database to print the statements).
+//   - refresh: GetByID (SELECT by id) + UpdateMetadata (UPDATE ... RETURNING) = 2. The TMDB
+//     call is the offline fixture client: no SQL.
+func TestUpdateContentSourceDataMovie(t *testing.T) {
+	h := newHarness(t)
+	_, token := h.user("movie-refresh")
+	h.warm(token)
+	url := fmt.Sprintf("https://www.themoviedb.org/movie/%d", 100_000_000+time.Now().UnixNano()%800_000_000)
+	vars := map[string]any{"input": map[string]any{"url": url}}
+
+	data := h.roundTrips(2, token, createFromMovieMutation, vars)
+	created := decode[struct {
+		ID string `json:"id"`
+	}](t, data, "createContentFromMovie")
+	h.trackContent(created.ID)
+
+	h.roundTrips(2, token, `mutation($id: IntID!) { updateContentSourceData(contentId: $id) { id name contentType } }`,
+		map[string]any{"id": created.ID})
+}
