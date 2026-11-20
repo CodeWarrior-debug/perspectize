@@ -5,7 +5,7 @@ import { sveltekit } from '@sveltejs/kit/vite';
  * Vitest config used only by StrykerJS (see stryker.config.json).
  *
  * vite.config.ts can't be reused as-is: its `test.projects` also pulls in the
- * Playwright browser project, and it loads the PWA plugin and shells out to git
+ * Playwright browser project, and it shells out to git
  * for build info — none of which a mutation run wants (Stryker re-runs the unit
  * project hundreds of times, in a sandbox copy of the tree with no .git).
  * Keep `test` in sync with the `unit` project in vite.config.ts.

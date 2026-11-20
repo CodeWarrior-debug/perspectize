@@ -6,7 +6,7 @@ import { activityListRequest } from '#lib/queries/content/index.js';
 import { prefetchActivityList } from '#lib/queries/content/prefetchActivityList.js';
 import { parseGridParams } from '#lib/utils/gridUrlState.js';
 
-// `/` is where the PWA starts. The page itself forwards signed-in visitors to /content-library;
+// `/` is where an installed home-screen app starts (manifest `start_url`). The page itself forwards signed-in visitors to /content-library;
 // starting the list here too keeps the head start (fetching in parallel with Clerk) for anyone
 // who lands on `/`.
 export const load: PageLoad = ({ url }) => {

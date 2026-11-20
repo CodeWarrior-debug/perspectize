@@ -99,31 +99,6 @@ updates:
       # Major updates stay ungrouped — individual PRs for careful review
 
   # ──────────────────────────────────────────────
-  # Gradle (frontend/android — Capacitor mobile shell)
-  # Formerly covered by Renovate; migrated to consolidate on one bot.
-  # ──────────────────────────────────────────────
-  - package-ecosystem: "gradle"
-    directory: "/frontend/android"
-    schedule:
-      interval: "weekly"
-      day: "monday"
-    open-pull-requests-limit: 5
-    labels:
-      - "dependencies"
-    commit-message:
-      prefix: "build(deps):"
-    groups:
-      patch-updates:
-        applies-to: version-updates
-        update-types:
-          - "patch"
-      minor-updates:
-        applies-to: version-updates
-        update-types:
-          - "minor"
-      # Major updates stay ungrouped — individual PRs for careful review
-
-  # ──────────────────────────────────────────────
   # Docker (backend build image)
   # Formerly covered by Renovate; migrated to consolidate on one bot.
   # ──────────────────────────────────────────────

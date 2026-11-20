@@ -12,7 +12,7 @@ Perspectize is a multi-dimensional perspective rating platform for YouTube conte
 +------------------------------------------------------------------+
 |                         Clients                                   |
 +------------------+------------------+-----------------------------+
-|   Svelte Web     |   Mobile PWA     |    Future Native Apps       |
+|   Svelte Web     |  Mobile browser  |    Future Native Apps       |
 +--------+---------+--------+---------+--------------+--------------+
          |                  |                        |
          v                  v                        v

@@ -1,17 +1,7 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-
-const { mockGetPlatform } = vi.hoisted(() => ({ mockGetPlatform: vi.fn() }));
-
-vi.mock('@capacitor/core', () => ({
-	Capacitor: { getPlatform: mockGetPlatform },
-}));
+import { describe, it, expect, vi, afterEach } from 'vitest';
 
 import { graphqlClient, graphqlRequest } from '#lib/queries/client.js';
 import { APP_VERSION } from '#lib/buildInfo.js';
-
-beforeEach(() => {
-	mockGetPlatform.mockReturnValue('android');
-});
 
 afterEach(() => {
 	delete (window as any).Clerk;
@@ -24,7 +14,7 @@ describe('graphqlRequest client-info headers', () => {
 		await graphqlRequest('query { __typename }');
 		expect(requestSpy).toHaveBeenCalledWith('query { __typename }', undefined, {
 			'X-Client-Version': APP_VERSION,
-			'X-Client-Platform': 'android',
+			'X-Client-Platform': 'web',
 		});
 	});
 
@@ -38,7 +28,7 @@ describe('graphqlRequest client-info headers', () => {
 			{
 				Authorization: 'Bearer tok_xyz',
 				'X-Client-Version': APP_VERSION,
-				'X-Client-Platform': 'android',
+				'X-Client-Platform': 'web',
 			},
 		);
 	});

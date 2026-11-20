@@ -2,9 +2,9 @@ import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { loadEnv } from 'vite';
 import adapter from '@sveltejs/adapter-static';
+import { sveltekit } from '@sveltejs/kit/vite';
 import { defineConfig } from 'vitest/config';
 import tailwindcss from '@tailwindcss/vite';
-import { withPwa } from '@vite-pwa/sveltekit';
 import { faroSourcemapConfig } from './scripts/faro-sourcemaps.ts';
 import { computeTag } from './src/lib/utils/buildTag.ts';
 import { clerkPreloadValues } from './src/lib/utils/clerkScript.ts';
@@ -61,18 +61,6 @@ function resolveGitBuildInfo() {
 
 const buildInfo = { ...resolveGitBuildInfo(), buildTime: new Date().toISOString() };
 
-/**
- * @vite-pwa/sveltekit `push()`es `prerendered/**\/*.{html,json}` onto globPatterns.
- * This is an SPA (prerender = false), so nothing exists there when workbox runs and
- * it emits "One of the glob patterns doesn't match any files" — surfaced as a Sevalla
- * deploy error. Drop just that pattern; the `client/` ones the plugin adds still apply.
- */
-function withoutPrerenderedGlob(patterns: string[]): string[] {
-	const push = patterns.push.bind(patterns);
-	patterns.push = (...items: string[]) => push(...items.filter((p) => !p.startsWith('prerendered/')));
-	return patterns;
-}
-
 export default defineConfig({
 	// The vitest 'unit' project below `extends` this file, so it inherits these too.
 	define: {
@@ -83,65 +71,27 @@ export default defineConfig({
 	server: { strictPort: true },
 	preview: { strictPort: true },
 	plugins: [
-		// Kit 3 reads its options here (svelte.config.js is gone). withPwa wraps
-		// sveltekit() and returns a plugin array. Poll _app/version.json so a long-lived
-		// tab learns about a new deploy (flips `updated.current`); `name` ties
-		// version.json to this build's commit, for the zzzv console hotkey.
-		withPwa(
-			{
-				adapter: adapter({
-					pages: 'build',
-					assets: 'build',
-					fallback: 'index.html',
-					strict: false,
-				}),
-				paths: {
-					base: '',
-				},
-				version: {
-					name: buildInfo.commit,
-					pollInterval: 5 * 60 * 1000,
-				},
-				serviceWorker: {
-					register: false,
-				},
+		// Kit 3 reads its options here (svelte.config.js is gone). Poll _app/version.json
+		// so a long-lived tab learns about a new deploy (flips `updated.current`); `name`
+		// ties version.json to this build's commit, for the zzzv console hotkey.
+		sveltekit({
+			adapter: adapter({
+				pages: 'build',
+				assets: 'build',
+				fallback: 'index.html',
+				strict: false,
+			}),
+			paths: {
+				base: '',
 			},
-			{
-				registerType: 'autoUpdate',
-				generateSW: {
-					// Anchored to client/: an unanchored pattern makes the plugin add its own
-					// client/** pattern too, so every asset is precached twice (v2 warns on it).
-					globPatterns: withoutPrerenderedGlob(['client/**/*.{js,css,html,ico,png,svg,webp,woff2,webmanifest}']),
-					// registerType: 'autoUpdate' alone doesn't make a new service worker take
-					// over immediately — without these, a newly-deployed SW installs but sits
-					// in the "waiting" state until every old tab closes, so a page loaded
-					// right around a deploy can straddle old/new asset versions with no way
-					// out but a manual refresh (issue #311).
-					skipWaiting: true,
-					clientsClaim: true,
-				},
-				manifest: {
-					name: 'Perspectize',
-					short_name: 'Perspectize',
-					description: 'Store, refine, and share perspectives on content',
-					theme_color: '#1a365d',
-					background_color: '#1a365d',
-					display: 'standalone',
-					scope: '/',
-					start_url: '/',
-					icons: [
-						{ src: 'icons/icon-192.png', sizes: '192x192', type: 'image/png' },
-						{ src: 'icons/icon-512.png', sizes: '512x512', type: 'image/png' },
-						{
-							src: 'icons/icon-512-maskable.png',
-							sizes: '512x512',
-							type: 'image/png',
-							purpose: 'maskable',
-						},
-					],
-				},
+			version: {
+				name: buildInfo.commit,
+				pollInterval: 5 * 60 * 1000,
 			},
-		),
+			serviceWorker: {
+				register: false,
+			},
+		}),
 		tailwindcss(),
 		...faro.plugins,
 	],

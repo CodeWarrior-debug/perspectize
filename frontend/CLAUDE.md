@@ -17,7 +17,7 @@ Small interface, lots of work hidden behind it (Ousterhout). The frontend isn't 
 - [Adding an AG Grid Column](../.claude/docs/ADDING_AG_GRID_COLUMN.md) — decision checklist for ActivityTable columns
 - [AG Grid setup](docs/AG_GRID.md)
 - Figma: see [Figma Design Workflow](#figma-design-workflow) below
-- [Frontend deployment](../.docs/FRONTEND_DEPLOYMENT.md) — read before editing `static/_headers`, `static/_redirects`, stale-chunk recovery (`app.html`, `versionWatch.ts`, `kit.version`) or PWA/service-worker config, or when a deployed page fails to load a JS chunk
+- [Frontend deployment](../.docs/FRONTEND_DEPLOYMENT.md) — read before editing `static/_headers`, `static/_redirects`, stale-chunk recovery (`app.html`, `versionWatch.ts`, `kit.version`) or the web manifest (`static/manifest.webmanifest`), or when a deployed page fails to load a JS chunk
 - [Vitest Browser Mode capture](../.docs/VITEST_BROWSER_CAPTURE.md) — read before taking screenshots or recording video from `tests/browser/`
 
 ## shadcn-svelte Components

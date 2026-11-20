@@ -28,9 +28,6 @@ vite.config.ts.timestamp-*
 # Test/Coverage
 /coverage
 
-# Capacitor build artifacts (ios/ and android/ directories ARE checked in)
-ios/App/App/public/
-android/app/src/main/assets/public/
 .lighthouseci/
 
 # Stryker mutation testing

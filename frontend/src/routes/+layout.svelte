@@ -22,14 +22,11 @@
 	import { watchForNewVersion } from '#lib/utils/versionWatch.js';
 	import { attachVersionHotkey } from '#lib/utils/versionHotkey.js';
 	import { printVersionInfo } from '#lib/utils/versionInfo.js';
-	import { pwaInfo } from 'virtual:pwa-info';
 	import '../app.css';
 
 	let { children } = $props();
 
 	const publishableKey = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY;
-
-	let webManifestLink = $derived(pwaInfo ? pwaInfo.webManifest.linkTag : '');
 
 	// Once a newer deploy is detected (version.json polling or a resume check),
 	// turn the next client-side navigation into a full page load — the old
@@ -62,7 +59,6 @@
 
 <svelte:head>
 	<link rel="icon" href={favicon} />
-	{@html webManifestLink}
 </svelte:head>
 
 {#snippet app()}
