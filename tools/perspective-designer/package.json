@@ -1,0 +1,13 @@
+{
+  "name": "perspective-designer",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Interactive design proposal for the Perspectize perspectives pages (content aggregates and per-perspective list)",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "watch": "tsc -p tsconfig.json --watch"
+  },
+  "devDependencies": {
+    "typescript": "^5.6.3"
+  }
+}
