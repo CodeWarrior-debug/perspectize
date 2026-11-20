@@ -14,6 +14,8 @@ import (
 
 	"github.com/99designs/gqlgen/graphql/playground"
 	"github.com/CodeWarrior-debug/perspectize/backend/internal/adapters/auth"
+	"github.com/CodeWarrior-debug/perspectize/backend/internal/adapters/lrclib"
+	"github.com/CodeWarrior-debug/perspectize/backend/internal/adapters/musicbrainz"
 	"github.com/CodeWarrior-debug/perspectize/backend/internal/adapters/realtime"
 	"github.com/CodeWarrior-debug/perspectize/backend/internal/adapters/repositories/cached"
 	"github.com/CodeWarrior-debug/perspectize/backend/internal/adapters/repositories/postgres"
@@ -22,6 +24,7 @@ import (
 	"github.com/CodeWarrior-debug/perspectize/backend/internal/adapters/webpage"
 	"github.com/CodeWarrior-debug/perspectize/backend/internal/adapters/wikidata"
 	"github.com/CodeWarrior-debug/perspectize/backend/internal/adapters/youtube"
+	"github.com/CodeWarrior-debug/perspectize/backend/internal/adapters/ytmusic"
 	"github.com/CodeWarrior-debug/perspectize/backend/internal/config"
 	"github.com/CodeWarrior-debug/perspectize/backend/internal/core/domain"
 	portservices "github.com/CodeWarrior-debug/perspectize/backend/internal/core/ports/services"
@@ -253,10 +256,14 @@ func main() {
 	buildInfoRepo := postgres.NewGormBuildInfoRepository(db)
 	importRepo := postgres.NewGormImportJobRepository(db)
 
+	audioTrackRepo := postgres.NewGormAudioTrackRepository(db)
+	// Cached: the genre tree is seeded and effectively static; every track resolves its genre through it.
+	musicGenreRepo := cached.NewMusicGenreRepository(postgres.NewGormMusicGenreRepository(db), cached.DefaultMusicGenreTTL)
+
 	// Initialize services
 	// The webpage reader is SSRF-safe on every connection (adapters/webpage). It has no
 	// configuration: the address policy is fixed, not environment-driven.
-	contentOpts := []services.ContentServiceOption{services.WithBibleReference(bibleReferenceRepo), services.WithYouTubeTrending(trendingClient), services.WithMovieSearch(movieSearchClient), services.WithMovieTrending(movieTrendingClient), services.WithWebPageClient(webpage.NewClient(webpage.Options{}))}
+	contentOpts := []services.ContentServiceOption{services.WithBibleReference(bibleReferenceRepo), services.WithYouTubeTrending(trendingClient), services.WithMovieSearch(movieSearchClient), services.WithMovieTrending(movieTrendingClient), services.WithWebPageClient(webpage.NewClient(webpage.Options{})), services.WithMusicEnrichment(ytmusic.NewClient(), musicbrainz.NewClient(), lrclib.NewClient()), services.WithAudioTracks(audioTrackRepo, musicGenreRepo)}
 	contentService := services.NewContentService(contentRepo, youtubeClient, movieClient, append(contentOpts, bookServiceOptions()...)...)
 	userService := services.NewUserService(userRepo, contentRepo, perspectiveRepo, todoRepo, todoListRepo, todoActionRepo,
 		services.WithImportJobRepository(importRepo))

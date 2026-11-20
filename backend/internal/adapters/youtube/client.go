@@ -51,6 +51,10 @@ type YouTubeAPIItem struct {
 	} `json:"snippet"`
 	ContentDetails struct {
 		Duration string `json:"duration"`
+		// Pointer + omitempty: absent for almost every video, and then not stored.
+		ContentRating *struct {
+			YtRating string `json:"ytRating,omitempty"`
+		} `json:"contentRating,omitempty"`
 	} `json:"contentDetails"`
 	Statistics struct {
 		ViewCount    string `json:"viewCount"`
@@ -142,11 +146,12 @@ func (c *Client) GetVideoMetadata(ctx context.Context, videoID string) (*service
 	}
 
 	return &services.VideoMetadata{
-		Title:       item.Snippet.Title,
-		Description: item.Snippet.Description,
-		Duration:    duration,
-		ChannelName: item.Snippet.ChannelTitle,
-		Response:    trimmed,
+		Title:         item.Snippet.Title,
+		Description:   item.Snippet.Description,
+		Duration:      duration,
+		ChannelName:   item.Snippet.ChannelTitle,
+		Response:      trimmed,
+		AgeRestricted: item.ContentDetails.ContentRating != nil && item.ContentDetails.ContentRating.YtRating == "ytAgeRestricted",
 	}, nil
 }
 

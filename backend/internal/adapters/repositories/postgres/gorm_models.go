@@ -52,6 +52,7 @@ type ContentModel struct {
 	LengthDisplay     json.RawMessage `gorm:"type:jsonb"`
 	Response          json.RawMessage `gorm:"type:jsonb"`
 	PrimaryCategoryID *int            `gorm:"column:primary_category_id"`
+	GenreID           *int            `gorm:"column:genre_id"`
 	VerseStartID      *int            `gorm:"column:verse_start_id"`
 	VerseEndID        *int            `gorm:"column:verse_end_id"`
 	DisplayTitle      *string         `gorm:"column:display_title"`

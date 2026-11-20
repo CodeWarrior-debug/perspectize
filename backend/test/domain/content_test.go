@@ -156,3 +156,7 @@ func TestWebPageMeta_MissingFieldsMarshalAsNull(t *testing.T) {
 	assert.Contains(t, string(raw), `"author":null`)
 	assert.Contains(t, string(raw), `"schemaVersion":0`)
 }
+
+func TestContentType_AudioTrack(t *testing.T) {
+	assert.Equal(t, domain.ContentType("AUDIO_TRACK"), domain.ContentTypeAudioTrack)
+}

@@ -170,7 +170,7 @@ func TestList_MovieColumnFilters(t *testing.T) {
 		wantArgs []driver.Value
 	}{
 		{"genre contains", domain.ContentFilter{GenreContains: cStr("sci")},
-			`WHERE \(response->'genres'\)::text ILIKE \$1 AND content\.privacy = \$2 ORDER BY`, []driver.Value{"%sci%", "public", int64(11)}},
+			`WHERE \(\(\(response->'genres'\)::text ILIKE \$1 OR genre_id IN \(SELECT id FROM music_genres WHERE name ILIKE \$2\)\)\) AND content\.privacy = \$3 ORDER BY`, []driver.Value{"%sci%", "%sci%", "public", int64(11)}},
 		{"age rating any of", domain.ContentFilter{AgeRating: []string{"PG-13", "R"}},
 			`WHERE response->>'certification' IN \(\$1,\$2\) AND content\.privacy = \$3 ORDER BY`, []driver.Value{"PG-13", "R", "public", int64(11)}},
 		{"released after", domain.ContentFilter{ReleasedAfter: cStr("2000-01-01")},
@@ -194,7 +194,7 @@ func TestList_MovieColumnFilters(t *testing.T) {
 		{"empty genre and ratings add nothing", domain.ContentFilter{GenreContains: cStr(""), AgeRating: []string{}},
 			`SELECT \* FROM "content" WHERE content\.privacy = \$1 ORDER BY`, []driver.Value{"public", int64(11)}},
 		{"filters AND together", domain.ContentFilter{GenreContains: cStr("x"), MinTmdbScore: f64(7)},
-			`ILIKE \$1 AND \(response->>'voteAverage'\)::FLOAT8 >= \$2 AND content\.privacy = \$3 ORDER BY`, []driver.Value{"%x%", 7.0, "public", int64(11)}},
+			`ILIKE \$2\)\)\) AND \(response->>'voteAverage'\)::FLOAT8 >= \$3 AND content\.privacy = \$4 ORDER BY`, []driver.Value{"%x%", "%x%", 7.0, "public", int64(11)}},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {

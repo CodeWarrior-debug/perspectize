@@ -25,6 +25,10 @@ type ContentService struct {
 	repo          repositories.ContentRepository
 	youtubeClient portservices.YouTubeClient
 	bibleRepo     repositories.BibleReferenceRepository
+	ytMusic       portservices.YTMusicClient
+	musicBrainz   portservices.MusicBrainzClient
+	lyrics        portservices.LyricsClient
+	async         func(func())
 	trending      portservices.YouTubeTrendingClient
 	movieClient   portservices.MovieClient
 	movieSearch   portservices.MovieSearchClient
@@ -35,7 +39,9 @@ type ContentService struct {
 	bookWork      portservices.BookWorkClient
 	webPage       portservices.WebPageClient
 	// now stamps a book's reading-log snapshot; tests inject a fixed clock.
-	now func() time.Time
+	now    func() time.Time
+	audio  repositories.AudioTrackRepository
+	genres repositories.MusicGenreRepository
 }
 
 // ContentServiceOption configures optional ContentService dependencies.
