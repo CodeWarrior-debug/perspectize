@@ -103,7 +103,10 @@ describe('PrintListView', () => {
 
 	it('fits the table to the page and wraps long words in print css', () => {
 		expect(appCss).toMatch(/\.print-root table\s*\{\s*width: 100%;\s*table-layout: auto;/);
-		expect(appCss).toMatch(/\.print-root td\s*\{\s*overflow-wrap: anywhere;/);
+		expect(appCss).toMatch(/\.print-root td\s*\{\s*overflow-wrap: break-word;/);
+		expect(appCss).not.toContain('overflow-wrap: anywhere');
+		expect(appCss).toMatch(/\.print-root td\[data-col='tags'\] \.cell-text\s*\{\s*-webkit-line-clamp: 2;/);
+		expect(appCss).toMatch(/th\[data-col='item'\],\s*\.print-root td\[data-col='item'\]\s*\{[^}]*min-width: 12em/);
 	});
 
 	it('ships print css that repeats headers and keeps rows whole', () => {

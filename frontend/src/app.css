@@ -1247,10 +1247,32 @@ select.select-inset {
 		vertical-align: top;
 		color: black;
 	}
-	/* Text columns (item, channel, tags, cast, author, ...) wrap, even mid-word, so the table fits the page. */
+	/* Text columns wrap at word boundaries; break-word only splits a single word wider than its column
+	   and, unlike `anywhere`, keeps each column's minimum width at its longest word. */
 	.print-root th,
 	.print-root td {
-		overflow-wrap: anywhere;
+		overflow-wrap: break-word;
+	}
+	/* Long text (tags, cast, description) is clamped so a row stays a few lines tall. */
+	.print-root .cell-text {
+		display: -webkit-box;
+		-webkit-box-orient: vertical;
+		-webkit-line-clamp: 3;
+		line-clamp: 3;
+		overflow: hidden;
+	}
+	.print-root td[data-col='tags'] .cell-text {
+		-webkit-line-clamp: 2;
+		line-clamp: 2;
+	}
+	.print-root th[data-col='item'],
+	.print-root td[data-col='item'] {
+		width: 30%;
+		min-width: 12em;
+	}
+	.print-root th[data-col='tags'],
+	.print-root td[data-col='tags'] {
+		width: 22%;
 	}
 	/* Short numeric and date values stay on one line; every other column wraps. */
 	.print-root td[data-col='duration'],
@@ -1281,7 +1303,6 @@ select.select-inset {
 	.print-root td[data-col='createdAt'],
 	.print-root td[data-col='updatedAt'] {
 		white-space: nowrap;
-		overflow-wrap: normal;
 	}
 	.print-root a {
 		color: black;

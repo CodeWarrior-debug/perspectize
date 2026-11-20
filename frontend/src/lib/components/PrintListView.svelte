@@ -32,11 +32,13 @@
 				<tr>
 					{#each row as cell, c (c)}
 						<td data-col={table.columnIds[c]}>
-							{#if table.columnIds[c] === 'item' && table.rowUrls[r]}
-								<a href={table.rowUrls[r]}>{cell}</a>
-							{:else}
-								{cell}
-							{/if}
+							<div class="cell-text">
+								{#if table.columnIds[c] === 'item' && table.rowUrls[r]}
+									<a href={table.rowUrls[r]}>{cell}</a>
+								{:else}
+									{cell}
+								{/if}
+							</div>
 						</td>
 					{/each}
 				</tr>
