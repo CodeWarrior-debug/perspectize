@@ -46,6 +46,7 @@ beforeEach(() => {
 preloadLazy(
 	() => import('#lib/queries/bible/useSetPassageDisplayTitle.js'),
 	() => import('#lib/queries/content/useAddMovie.js'),
+	() => import('#lib/queries/content/useUpdateSourceData.js'),
 	() => import('#lib/queries/perspectives/useDeletePerspective.js'),
 );
 
@@ -212,6 +213,49 @@ describe('eviction: useSetPassageDisplayTitle.onSuccess patches in place, evicts
 		// Entries without this passage's title come back as the same object: no re-render.
 		expect(client.getQueryData(aggregatesKey)).toBe(aggregates);
 		expect(client.getQueryData(otherRowKey)).toBe(otherRow);
+	});
+});
+
+describe('eviction: useUpdateSourceData.onSuccess merges the refreshed row, marks lists stale, leaves the rest', () => {
+	it('keeps list-only fields on the refreshed row and touches no other key', async () => {
+		const affected = [queryKeys.content.list({ first: 50 }), queryKeys.content.list({ first: 10, search: 'matrix' })];
+		const unrelated = [
+			queryKeys.content.detail('603'),
+			queryKeys.perspectives.listByContent(603),
+			queryKeys.users.list(),
+		];
+		const movieRow = {
+			id: '603',
+			name: 'The Matrix',
+			contentType: 'MOVIE',
+			updatedAt: '2026-03-01T00:00:00Z',
+			primaryCategory: { id: '1', label: 'Film' },
+			movie: { runtimeMinutes: 136 },
+		};
+		const otherRow = { id: '4', name: 'Other', contentType: 'YOUTUBE_VIDEO', updatedAt: '2026-03-01T00:00:00Z' };
+		for (const k of affected) seed(client, k, { content: { items: [movieRow, otherRow], totalCount: 2 } });
+		for (const k of unrelated) seed(client, k);
+
+		const { useUpdateSourceData } = await import('#lib/queries/content/useUpdateSourceData.js');
+		useUpdateSourceData();
+		capturedDeleteOptions.onSuccess({
+			updateContentSourceData: {
+				id: '603',
+				name: 'The Matrix',
+				contentType: 'MOVIE',
+				updatedAt: '2026-11-20T00:00:00Z',
+				movie: { runtimeMinutes: 137 },
+			},
+		});
+
+		for (const k of affected) {
+			const items = (client.getQueryData(k) as any).content.items;
+			expect(items[0]).toEqual({ ...movieRow, updatedAt: '2026-11-20T00:00:00Z', movie: { runtimeMinutes: 137 } });
+			expect(items[1]).toEqual(otherRow);
+		}
+		const outcome = invalidationOutcome(client, [...affected, ...unrelated]);
+		expect(outcome.invalidated).toEqual(affected);
+		expect(outcome.untouched).toEqual(unrelated);
 	});
 });
 

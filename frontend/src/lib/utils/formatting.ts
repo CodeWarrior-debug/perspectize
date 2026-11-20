@@ -159,7 +159,7 @@ export function formatDateTime(isoString: string): string {
 }
 
 /**
- * Client-side mirror of the backend's YouTube metadata cache window
+ * Client-side mirror of the backend's source-data cache window
  * (YOUTUBE_API_CACHE_TTL_SECONDS, default 6h — see backend/.env.example and
  * backend/internal/adapters/youtube/cache.go). This is a UX-only estimate
  * used to skip a pointless "Update source data" round trip and explain why
@@ -177,7 +177,7 @@ export interface SourceDataCooldown {
 
 /**
  * Whether a content item was updated recently enough that refreshing it
- * again would just re-serve the backend's cached YouTube response.
+ * again would just re-serve the backend's cached source response.
  */
 export function getSourceDataCooldown(updatedAtIso: string, now: Date = new Date()): SourceDataCooldown {
 	const updatedAt = new Date(updatedAtIso);

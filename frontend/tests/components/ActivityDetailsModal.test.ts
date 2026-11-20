@@ -313,29 +313,16 @@ describe('ActivityDetailsModal', () => {
 		const open = (movie: unknown) =>
 			render(ActivityDetailsModal, { props: { content: movieRow(movie), open: true, onClose: vi.fn() } });
 
-		it('labels the header Movie and drops YouTube-only tiles and the update button', () => {
+		it('labels the header Movie and drops the YouTube-only tiles', () => {
 			open(baseMovie);
 			expect(screen.getByText('Movie')).toBeInTheDocument();
 			expect(screen.queryByText('YouTube Video')).not.toBeInTheDocument();
 			expect(screen.queryByText('Views')).not.toBeInTheDocument();
 			expect(screen.queryByText('Likes')).not.toBeInTheDocument();
 			expect(screen.queryByText('Category')).not.toBeInTheDocument();
-			expect(screen.queryByRole('button', { name: /update source data/i })).not.toBeInTheDocument();
-			expect(screen.queryByText(/updated recently/i)).not.toBeInTheDocument();
 			expect(screen.getByRole('link', { name: /compare/i })).toBeInTheDocument();
 			expect(screen.getByText('https://www.themoviedb.org/movie/603')).toBeInTheDocument();
 			expect(screen.getByText(/uses the TMDB API/)).toBeInTheDocument();
-		});
-
-		it('hides the update note even when the row was updated moments ago', () => {
-			render(ActivityDetailsModal, {
-				props: {
-					content: { ...movieRow(baseMovie), updatedAt: new Date().toISOString() },
-					open: true,
-					onClose: vi.fn(),
-				},
-			});
-			expect(screen.queryByText(/check back/i)).not.toBeInTheDocument();
 		});
 
 		it('shows the movie fact tiles, poster and tagline', () => {
@@ -663,6 +650,86 @@ describe('ActivityDetailsModal', () => {
 		it('renders the description once, in the book body (never through the YouTube description section)', () => {
 			open(eastOfEden);
 			expect(screen.getAllByText('A saga of two families.')).toHaveLength(1);
+		});
+	});
+
+	describe('update source data across types', () => {
+		const HOUR_MS = 60 * 60 * 1000;
+		const updatedAgo = (ms: number) => new Date(Date.now() - ms).toISOString();
+		const movie = {
+			...content,
+			id: '603',
+			name: 'The Matrix',
+			url: 'https://www.themoviedb.org/movie/603',
+			channelTitle: null,
+			contentType: 'MOVIE',
+			viewCount: null,
+			likeCount: null,
+			length: 8160,
+			lengthUnits: 'seconds',
+			description: null,
+			tags: null,
+			primaryCategory: null,
+			movie: null,
+		};
+		const renderRow = (row: unknown) =>
+			render(ActivityDetailsModal, { props: { content: row as any, open: true, onClose: vi.fn() } });
+
+		it('is visible and enabled for a movie updated more than 6h ago', () => {
+			renderRow({ ...movie, updatedAt: updatedAgo(7 * HOUR_MS) });
+			const button = screen.getByRole('button', { name: 'Update source data' });
+			expect(button).toBeEnabled();
+			expect(screen.queryByText(/check back/i)).not.toBeInTheDocument();
+		});
+
+		it('is disabled, with the cooldown note, for a movie updated within 6h', () => {
+			renderRow({ ...movie, updatedAt: updatedAgo(HOUR_MS) });
+			expect(screen.getByRole('button', { name: 'Update source data' })).toBeDisabled();
+			expect(screen.getByText(/This was updated recently\. Check back in 5h to refresh again\./)).toBeInTheDocument();
+		});
+
+		it('shows a spinner and disables the button while a movie refresh is pending', () => {
+			mocks.mockMutationState.isPending = true;
+			renderRow({ ...movie, updatedAt: updatedAgo(7 * HOUR_MS) });
+			const button = screen.getByRole('button', { name: 'Update source data' });
+			expect(button).toBeDisabled();
+			const icons = button.querySelectorAll('svg');
+			expect(icons).toHaveLength(1);
+			expect(icons[0]).toHaveClass('animate-spin');
+		});
+
+		it('calls the update mutation with the movie id on click', async () => {
+			renderRow({ ...movie, updatedAt: updatedAgo(7 * HOUR_MS) });
+			await fireEvent.click(screen.getByRole('button', { name: 'Update source data' }));
+			expect(mocks.mockMutate).toHaveBeenCalledTimes(1);
+			expect(mocks.mockMutate).toHaveBeenCalledWith('603');
+		});
+
+		it('does not offer the button for a Bible passage, even when it is stale', () => {
+			renderRow({
+				...content,
+				id: '7',
+				name: 'Genesis 1:1-3',
+				url: 'https://www.biblegateway.com/passage/?search=Genesis+1%3A1-3',
+				contentType: 'BIBLE_PASSAGE',
+				verseStartID: 1,
+				verseEndID: 3,
+				updatedAt: updatedAgo(30 * 24 * HOUR_MS),
+			});
+			expect(screen.queryByRole('button', { name: 'Update source data' })).not.toBeInTheDocument();
+		});
+
+		it('does not offer the button for a web page, even when it is stale', () => {
+			renderRow({
+				...content,
+				id: '8',
+				name: 'An article',
+				url: 'https://example.com/article',
+				contentType: 'WEB_PAGE',
+				webPage: null,
+				updatedAt: updatedAgo(30 * 24 * HOUR_MS),
+			});
+			expect(screen.queryByRole('button', { name: 'Update source data' })).not.toBeInTheDocument();
 		});
 	});
 
