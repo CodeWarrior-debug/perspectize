@@ -55,9 +55,9 @@ type UpdatePerspectiveInput struct {
 	// by the GraphQL adapter (modelToUpdatePerspectiveInput in helpers.go) when
 	// the client sent an explicit null (or, for Feelings/CustomFields, an empty
 	// list/object) -- distinct from omitting the field, which leaves it
-	// unchanged. When true, the paired value field above is ignored. See the UI
-	// gap audit, gap #2: without this, there was no way to clear a rating,
-	// review, feelings, or customFields once set.
+	// unchanged. When true, the paired value field above is ignored. Without
+	// these flags a rating, review, feelings, or customFields could not be
+	// cleared once set.
 	ClearQuality      bool
 	ClearAgreement    bool
 	ClearImportance   bool
@@ -92,6 +92,11 @@ type PerspectiveService interface {
 	// AggregateByContentIDs computes the public-perspective count and average
 	// Quality rating for each given content ID, batched into a single query.
 	AggregateByContentIDs(ctx context.Context, contentIDs []int) (map[int]*domain.PerspectiveAggregate, error)
+
+	// CountVisibleByContentIDs counts, per content ID, the perspectives viewerID
+	// may read (public plus their own), batched into a single query. Absent
+	// IDs have none visible.
+	CountVisibleByContentIDs(ctx context.Context, contentIDs []int, viewerID *int) (map[int]int, error)
 
 	// FeelingStats computes count/average/stddev for perspectives carrying the
 	// given feeling (see domain.FeelingStats), scoped to one content ID or,

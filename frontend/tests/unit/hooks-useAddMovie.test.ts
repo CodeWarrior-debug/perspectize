@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { preloadLazy } from '../helpers/warmUp';
 
 const { mockInvalidateQueries, mockToastSuccess, mockToastError, mockGraphqlRequest } = vi.hoisted(() => ({
 	mockInvalidateQueries: vi.fn(),
@@ -22,6 +23,14 @@ vi.mock('svelte-sonner', () => ({
 }));
 
 vi.mock('$lib/queries/client', () => ({ graphqlRequest: mockGraphqlRequest }));
+
+// The tests import these inside their bodies; load them once up front so the first
+// test doesn't pay the module transform, which balloons under full-suite load (#728).
+preloadLazy(
+	() => import('$app/navigation'),
+	() => import('$lib/queries/content'),
+	() => import('$lib/queries/content/useAddMovie'),
+);
 
 describe('useAddMovie hook', () => {
 	beforeEach(async () => {
@@ -47,7 +56,7 @@ describe('useAddMovie hook', () => {
 			action: { label: 'Go to movie', onClick: expect.any(Function) },
 		});
 		mockToastSuccess.mock.calls[0][1].action.onClick();
-		expect(goto).toHaveBeenCalledWith('/?open=42');
+		expect(goto).toHaveBeenCalledWith('/content-library?open=42');
 	});
 
 	it('falls back to a generic label and no action when the response has no row', () => {

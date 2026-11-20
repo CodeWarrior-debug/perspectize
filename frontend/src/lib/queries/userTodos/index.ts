@@ -63,6 +63,7 @@ export interface TodoContentRef {
 	verseStartID?: number | null;
 	verseEndID?: number | null;
 	movie?: unknown;
+	book?: unknown;
 }
 
 export interface UserTodoItem {
@@ -275,6 +276,7 @@ const USER_TODO_FIELDS = gql`
 			verseStartID
 			verseEndID
 			movie
+			book
 		}
 		name
 		action {

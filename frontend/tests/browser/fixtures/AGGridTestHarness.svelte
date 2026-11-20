@@ -21,12 +21,12 @@
 		onGridReady: onGridReadyCb,
 		onSortChanged: onSortChangedCb,
 		onFilterChanged: onFilterChangedCb,
-	} = $props<{
+	}: {
 		testRowData?: any[];
 		onGridReady?: (api: GridApi) => void;
 		onSortChanged?: (event: any) => void;
 		onFilterChanged?: (event: any) => void;
-	}>();
+	} = $props();
 
 	let gridApi = $state<GridApi | null>(null);
 

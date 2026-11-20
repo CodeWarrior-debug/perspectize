@@ -29,7 +29,7 @@
 - **No chained bash commands (`&&`)**: one command per Bash call (repo rule).
 - **No backend or schema change and no migration.** `passageText` stays as the fallback and for any non-web consumer.
 - **The copyright string must stay identical** to `domain.BibleTranslationBSBCopyright` (`"Berean Standard Bible, public domain (CC0)"`). A test enforces this against the Go source, following the existing `books.json` parity-test pattern.
-- **Don't add a new `static/_headers` rule.** Chunks must go through Vite so they land in `_app/immutable/` (see `frontend/CLAUDE.md` → "`_headers` block overlap MERGES").
+- **Don't add a new `static/_headers` rule.** Chunks must go through Vite so they land in `_app/immutable/` (see `.docs/FRONTEND_DEPLOYMENT.md` → "`_headers` block overlap MERGES").
 - **Build-context risk:** the Sevalla static-site build must be able to read `../data/bible/bsb.tsv` from `frontend/`. Task 2 verifies this first. If it can't, commit the generated chunks instead (≈4.3 MB raw) and drop the `prebuild` hook.
 - **The baseline must be captured before the behaviour changes.** Task 1 ships alone and collects data for ≥ 7 days before Task 4 merges.
 - UI checks need a browser, which is local only (`CLAUDE.md` → Self-Verification). Cloud sessions run the headless checklist and hand the lab benchmark (Task 1, Step 4) back to a local session.

@@ -1,6 +1,7 @@
 ---
 name: monthly-maintenance
-description: Run the monthly repo maintenance routine (merged-branch cleanup, dependabot/security PR merges, graphify update, gsd map-codebase refresh, bundle size + lines-of-code measurement, video-capture demo tool compaction). Use when prompted by the SessionStart monthly-routine check, or when the user asks to "run the monthly routine" / "run monthly maintenance".
+description: Run the monthly repo maintenance routine (merged-branch cleanup, dependabot/security PR merges, harvesting merged-PR learnings and follow-ups, graphify update, gsd map-codebase refresh, bundle size + lines-of-code measurement, video-capture demo tool compaction). Use when prompted by the SessionStart monthly-routine check, or when the user asks to "run the monthly routine" / "run monthly maintenance".
+model: sonnet
 ---
 
 # Monthly Maintenance Routine
@@ -12,6 +13,12 @@ The run log lives in [ROUTINES.md](../../../ROUTINES.md) at the repo root — re
 ## Steps
 
 1. **Confirm scope with the user** before making changes — this routine touches branches and merges PRs. A quick one-line heads-up is enough ("Running monthly maintenance: cleaning merged branches, merging dependabot/security PRs, updating graphify, re-running gsd map-codebase — proceeding unless you'd like to skip any of these").
+
+1b. **Clean up worktrees first** (a branch checked out in a worktree cannot be deleted in step 2).
+   - Run `bash .claude/scripts/worktree-report.sh` (read-only).
+   - REMOVABLE: show the list; on the user's yes, run each printed line as its own command.
+   - MERGED-DIRTY, NO-PR, OUT-OF-PLACE: summarise to the user and remove none. A NO-PR worktree may hold the only copy of its commits; pushing it as `<branch>-followup` is the user's call.
+   - OPEN-PR: leave alone.
 
 2. **Delete merged branches (local + remote).**
    - `git fetch origin --prune`
@@ -25,6 +32,17 @@ The run log lives in [ROUTINES.md](../../../ROUTINES.md) at the repo root — re
    - For each, confirm CI is green (`gh pr checks <number>`), then merge per the repo's standard merge preferences: `gh pr merge <number> --squash --delete-branch --admin`.
    - Do not merge a PR with failing checks or merge conflicts — flag it for the user instead.
 
+3b. **Collect Session Learnings from merged PRs.**
+   - List PRs merged since the last run (date in [ROUTINES.md](../../../ROUTINES.md)): `gh pr list --state merged --search "merged:>=YYYY-MM-DD" --json number,title,body --limit 100`.
+   - Extract each body's `## Session Learnings` section (skip "None"/empty). These are the non-critical learnings; CRITICAL ones were already committed on their PR branch ([definition](../../../.docs/PR_WORKFLOW.md#session-learnings)).
+   - De-duplicate, then apply the ones still worth keeping to the right CLAUDE.md or `.docs/` file (root CLAUDE.md only for repo-wide rules), and list what was applied or dropped in the routine's PR body.
+
+3c. **Harvest merged PRs with the script** (extends 3b: run it instead of extracting Session Learnings by hand, and it also surfaces what 3b doesn't).
+   - PR bodies carry Session Learnings, Follow-up Steps checkboxes, QA tables and Known gaps that get lost after merge. Find the last run date from the most recent row of [ROUTINES.md](../../../ROUTINES.md) (use the first day of that row's month if only Month-Year is recorded).
+   - Run `python3 .claude/skills/monthly-maintenance/harvest-prs.py --since <last run date> --md`. Optionally save open issues first (`gh issue list --state open --json number,title > /tmp/issues.json`) and add `--issues /tmp/issues.json` so already-filed items are marked "possibly tracked". `FEATURE_BACKLOG.md` is checked automatically. The script is read-only: it lists items (Session Learnings with applied / partial / not found against the CLAUDE.md files, unchecked `- [ ]` items, QA rows with no Result, Known gaps, leftover labels such as `migrations-unapplied` / `needs-demo-video`) and a suggested home for each.
+   - Paste the digest into the routine's PR body, then present the items to the user and act only on approval: no GitHub issue created just to close it in a PR, no CLAUDE.md edits without approval, and private bug details go only in the gitignored `.planning/phases/bugs/BACKLOG.md`. Fix leftover labels directly when the user agrees.
+   - Tests: `python3 -I -m unittest discover -s .claude/skills/monthly-maintenance -p "test_harvest_prs.py"` (local fixtures, no GitHub calls).
+
 4. **Update graphify.**
    - `graphify update .` (AST-only refresh, no API cost) to keep the knowledge graph current.
 
@@ -35,6 +53,7 @@ The run log lives in [ROUTINES.md](../../../ROUTINES.md) at the repo root — re
    - Frontend: `npx npm-check-updates` in `frontend/`, refresh [FRONTEND_DEPENDENCY_ANALYSIS.md](FRONTEND_DEPENDENCY_ANALYSIS.md) with current findings.
    - Backend: `go list -m -u -f '{{if not .Indirect}}{{if .Update}}{{.Path}} {{.Version}} -> {{.Update.Version}}{{end}}{{end}}' all` in `backend/` (empty output = all direct deps current; an `and .Indirect .Update` template silently prints nothing), refresh [BACKEND_DEPENDENCY_ANALYSIS.md](BACKEND_DEPENDENCY_ANALYSIS.md).
    - Frontend CVE overrides live only in `frontend/pnpm-workspace.yaml` (never `package.json` `pnpm.overrides`); run `pnpm audit` (full tree) to find them.
+   - **TypeScript 6 removal check:** TypeScript 6 stays installed only because `svelte-check` refuses TypeScript 7 (`@typescript/native`, `--tsgo`) without it (see the note in `frontend/CLAUDE.md`). Run `npm view svelte-check@latest version peerDependencies.typescript` and `npm view @sveltejs/kit@latest peerDependencies.typescript`. Removal is ready only when the latest `svelte-check` accepts TypeScript 7 on its own: on a scratch branch, remove `typescript` 6.x and run `pnpm run check`; it must pass without the `ts-version-check` error. If it does, open a chore PR: drop 6.x, install TypeScript 7 as `typescript`, drop `--tsgo` only if the check still passes without it, and update the `frontend/CLAUDE.md` note. If not, record "TS6 still required by svelte-check <version>" in the routine's Comments. Peer warnings from `@sveltejs/kit` or `@sveltejs/acorn-typescript` alone do not block removal.
    - Root `README.md`: check its Tech Stack and Prerequisites version claims (Go, Node, pnpm, PostgreSQL) against `backend/go.mod`, `.github/workflows/ci.yml` (Node, Postgres, pnpm) and the Dockerfiles, and fix any that drifted.
    - Patch/minor bumps with no known breaking changes can be applied directly (verify with `go build`/`go test` or `pnpm run test:run` per `CLAUDE.md`'s self-verification checklist). Majors — especially interdependent ones (e.g. Vite + its Svelte plugin + Vitest) — get flagged in the doc for a follow-up PR rather than bundled into this routine's commit.
 

@@ -228,6 +228,88 @@ describe('ActivityCardList', () => {
 		});
 	});
 
+	describe('Book rows', () => {
+		const book = (id: string, bookFields: Record<string, unknown>) => ({
+			id,
+			name: 'East of Eden',
+			url: 'https://openlibrary.org/works/OL23166W',
+			channelTitle: null,
+			length: null,
+			lengthUnits: null,
+			contentType: 'BOOK',
+			book: { workKey: 'OL23166W', title: 'East of Eden', ...bookFields },
+		});
+		const eastOfEden = book('40', {
+			authors: [{ name: 'John Steinbeck' }],
+			coverId: 11386937,
+			firstPublishYear: 1952,
+			pageCountMedian: 611,
+			ratingsAverage: 4.1,
+			ratingsCount: 100,
+		});
+
+		it('shows the author, then the year, pages and rating in place of channel/views/likes', () => {
+			render(ActivityCardList, { props: { rowData: [eastOfEden], onOpenDetails: vi.fn() } });
+			expect(screen.getByTestId('card-book-author-40')).toHaveTextContent('John Steinbeck');
+			const facts = screen.getByTestId('card-book-facts-40');
+			expect(facts).toHaveTextContent('1952');
+			expect(facts).toHaveTextContent('611 pages');
+			expect(facts).toHaveTextContent('★ 4.1');
+			expect(screen.queryByText(/views/)).not.toBeInTheDocument();
+		});
+
+		it('shows the cover fitted (not cropped), at the medium size', () => {
+			render(ActivityCardList, { props: { rowData: [eastOfEden], onOpenDetails: vi.fn() } });
+			const img = screen.getByTestId('card-thumb-40').querySelector('img');
+			expect(img?.getAttribute('src')).toBe('https://covers.openlibrary.org/b/id/11386937-M.jpg');
+			expect(img?.className).toContain('object-contain');
+		});
+
+		it('skips facts Open Library does not have, with no stray separators or dashes (Brainscan: no rating)', () => {
+			render(ActivityCardList, {
+				props: {
+					rowData: [
+						book('41', {
+							authors: [{ name: 'Zine Author' }],
+							coverId: null,
+							firstPublishYear: 2011,
+							pageCountMedian: 30,
+							ratingsAverage: null,
+							ratingsCount: null,
+						}),
+					],
+					onOpenDetails: vi.fn(),
+				},
+			});
+			const facts = screen.getByTestId('card-book-facts-41');
+			expect(facts).toHaveTextContent('2011');
+			expect(facts).toHaveTextContent('30 pages');
+			expect(facts).not.toHaveTextContent('★');
+			expect(facts.textContent).not.toContain('—');
+		});
+
+		it('renders no facts line and no author line for a book with neither (Make a zine!)', () => {
+			render(ActivityCardList, {
+				props: {
+					rowData: [
+						book('42', {
+							authors: [],
+							coverId: null,
+							firstPublishYear: null,
+							pageCountMedian: null,
+							ratingsAverage: null,
+							ratingsCount: null,
+						}),
+					],
+					onOpenDetails: vi.fn(),
+				},
+			});
+			expect(screen.queryByTestId('card-book-facts-42')).not.toBeInTheDocument();
+			expect(screen.queryByTestId('card-book-author-42')).not.toBeInTheDocument();
+			expect(screen.getByText('East of Eden')).toBeInTheDocument();
+		});
+	});
+
 	describe('thumbnail states (poster, empty slot, video, passage)', () => {
 		const film = {
 			id: '6',

@@ -1,9 +1,10 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/svelte';
 import PerspectivePopover from '$lib/components/PerspectivePopover.svelte';
 import { tick } from 'svelte';
 import { toast } from 'svelte-sonner';
 import type { PerspectiveItem } from '$lib/queries/perspectives';
+import { warmUp } from '../helpers/warmUp';
 
 const mocks = vi.hoisted(() => ({
 	mockCreateMutateAsync: vi.fn(),
@@ -94,6 +95,10 @@ function renderPopover(props?: {
 	};
 	return render(PerspectivePopover, { props: defaultProps });
 }
+
+// Pay the component's first-render cost before any test, not inside the first
+// one: under full-suite load it alone can pass the 5 s testTimeout (#728).
+warmUp(() => renderPopover());
 
 describe('PerspectivePopover component', () => {
 	beforeEach(() => {
@@ -654,24 +659,43 @@ describe('PerspectivePopover component', () => {
 
 	describe('feel-wheel', () => {
 		const wheelSearch = () => screen.queryByPlaceholderText(/Search more feelings/);
+		const wheelColumn = () => screen.getByTestId('feel-wheel-column');
+		const addFeelingButton = () => screen.queryByRole('button', { name: /Add a feeling/ });
 
-		it('starts closed in create mode, showing only the "Add a feeling" button', async () => {
+		it('desktop: the wheel column is open beside the ratings from the first render, in a 760px dialog', async () => {
 			renderPopover({ existingPerspective: null });
 			await tick();
-			expect(screen.getByRole('button', { name: /Add a feeling/ })).toBeInTheDocument();
-			expect(wheelSearch()).not.toBeInTheDocument();
+			expect(wheelColumn()).toContainElement(wheelSearch() as HTMLElement);
+			expect(wheelColumn()).toHaveClass('sm:w-[346px]', 'sm:shrink-0', 'hidden', 'sm:block');
+			expect(wheelColumn().parentElement).toHaveClass('sm:flex-row');
+			expect(screen.getByRole('dialog').className).toContain('sm:max-w-[760px]');
+			expect(addFeelingButton()).toHaveClass('sm:hidden');
 		});
 
-		it('opens the wheel on the same tick as the click, with no loading state', async () => {
+		it('desktop: expanding the comment editor leaves the dialog at 760px and the wheel in place', async () => {
 			renderPopover({ existingPerspective: null });
 			await tick();
-			await fireEvent.click(screen.getByRole('button', { name: /Add a feeling/ }));
+			await fireEvent.click(screen.getByRole('button', { name: 'Expand comment' }));
+			expect(screen.getByRole('dialog').className).toContain('sm:max-w-[760px]');
+			expect(wheelColumn()).toContainElement(wheelSearch() as HTMLElement);
+		});
+
+		it('mobile: the wheel stays hidden below the ratings until "Add a feeling" opens it inline', async () => {
+			renderPopover({ existingPerspective: null });
+			await tick();
+			const button = addFeelingButton() as HTMLElement;
+			expect(wheelColumn()).toHaveClass('hidden');
+			// Stacked order on narrow screens: the button sits above the wheel it opens.
+			expect(button.compareDocumentPosition(wheelColumn()) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+
+			await fireEvent.click(button);
+			expect(wheelColumn()).not.toHaveClass('hidden');
 			expect(wheelSearch()).toBeInTheDocument();
 			expect(screen.queryByText(/Loading feel-wheel/)).not.toBeInTheDocument();
-			expect(screen.queryByRole('button', { name: /Add a feeling/ })).not.toBeInTheDocument();
+			expect(addFeelingButton()).not.toBeInTheDocument();
 		});
 
-		it('opens already expanded when editing a perspective that has feelings', async () => {
+		it('edit mode with saved feelings: the wheel shows them on every width and no button is offered', async () => {
 			renderPopover({
 				existingPerspective: {
 					id: '4',
@@ -684,9 +708,27 @@ describe('PerspectivePopover component', () => {
 				},
 			});
 			await tick();
-			expect(wheelSearch()).toBeInTheDocument();
-			expect(screen.getByRole('button', { name: 'Remove Happy' })).toBeInTheDocument();
-			expect(screen.queryByRole('button', { name: /Add a feeling/ })).not.toBeInTheDocument();
+			expect(wheelColumn()).not.toHaveClass('hidden');
+			expect(wheelColumn()).toContainElement(screen.getByRole('button', { name: 'Remove Happy' }));
+			expect(addFeelingButton()).not.toBeInTheDocument();
+		});
+
+		it('edit mode without feelings: the column is desktop-only and the mobile button is still offered', async () => {
+			renderPopover({
+				existingPerspective: {
+					id: '5',
+					quality: 7000,
+					agreement: null,
+					importance: null,
+					confidence: null,
+					like: null,
+					feelings: [],
+				},
+			});
+			await tick();
+			expect(wheelColumn()).toHaveClass('hidden', 'sm:block');
+			expect(addFeelingButton()).toHaveClass('sm:hidden');
+			expect(screen.getByRole('dialog').className).toContain('sm:max-w-[760px]');
 		});
 	});
 
@@ -1318,5 +1360,39 @@ describe('PerspectivePopover: mark an open todo done after a save', () => {
 		await saveNewPerspective();
 		expect(mocks.mockFetchTodos).not.toHaveBeenCalled();
 		expect(mocks.mockToastWithAction).not.toHaveBeenCalled();
+	});
+});
+
+describe('PerspectivePopover mobile layout', () => {
+	beforeEach(() => {
+		vi.clearAllMocks();
+		mocks.mockLoadDraft.mockReturnValue(null);
+		vi.stubGlobal(
+			'matchMedia',
+			vi.fn((query: string) => ({
+				matches: query.includes('max-width: 639px'),
+				media: query,
+				addEventListener: vi.fn(),
+				removeEventListener: vi.fn(),
+				addListener: vi.fn(),
+				removeListener: vi.fn(),
+				dispatchEvent: vi.fn(),
+			})),
+		);
+	});
+
+	afterEach(() => {
+		vi.unstubAllGlobals();
+	});
+
+	it('keeps the Overall/comment row inside the scrolling form so a tall editor cannot push Save out of view', () => {
+		renderPopover();
+		const form = screen.getByText('Overall').closest('form');
+		expect(form).not.toBeNull();
+		expect(form?.contains(screen.getByRole('button', { name: /save perspective/i }))).toBe(true);
+		// The scroll area (not a pinned row) is what grows; the action bar stays a sibling below it.
+		const scroller = screen.getByText('Overall').closest('.overflow-y-auto');
+		expect(scroller).not.toBeNull();
+		expect(scroller?.contains(screen.getByRole('button', { name: /save perspective/i }))).toBe(false);
 	});
 });

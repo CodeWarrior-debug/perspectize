@@ -1,4 +1,5 @@
 <script lang="ts">
+	import type { LibraryItem } from './libraryItem';
 	import { createQuery, useQueryClient } from '@tanstack/svelte-query';
 	import { Button, Input } from '$lib/components/shadcn';
 	import MovieCard from './MovieCard.svelte';
@@ -25,7 +26,7 @@
 	let {
 		value = $bindable(''),
 		inputRef = $bindable(null),
-		libraryUrls,
+		library,
 		pendingUrl = null,
 		onAdd,
 		onAddUrl,
@@ -34,7 +35,7 @@
 		/** Exposes the input element so the page can focus it (Cmd/Ctrl+K). */
 		inputRef?: HTMLInputElement | null;
 		/** Canonical movie URLs already in the library. */
-		libraryUrls: Set<string>;
+		library: ReadonlyMap<string, LibraryItem>;
 		/** URL of the movie being added right now, or null. */
 		pendingUrl?: string | null;
 		/** Called with a result's canonical url when its Add button is clicked. */
@@ -196,7 +197,7 @@
 				? 'Type at least 2 characters to search.'
 				: 'Search TMDB for a movie to add it to Perspectize.'}
 		</p>
-		<MovieTrendingFeed bind:timeWindow={trendingWindow} {libraryUrls} {pendingUrl} {onAdd} />
+		<MovieTrendingFeed bind:timeWindow={trendingWindow} {library} {pendingUrl} {onAdd} />
 	{:else if isDebouncing || (searchEnabled && search.isPending)}
 		<div class="flex flex-col gap-4" aria-busy="true" aria-label="Searching movies">
 			{#each Array(4) as _, i (i)}
@@ -226,7 +227,12 @@
 	{:else}
 		<div class="flex flex-col gap-4">
 			{#each items as result, i (`${i}-${result.tmdbId}`)}
-				<MovieCard {result} isInLibrary={libraryUrls.has(result.url)} isPending={pendingUrl === result.url} {onAdd} />
+				<MovieCard
+					{result}
+					libraryItem={library.get(result.url) ?? null}
+					isPending={pendingUrl === result.url}
+					{onAdd}
+				/>
 			{/each}
 
 			{#if moreForTerm.loading}

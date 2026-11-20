@@ -2,16 +2,8 @@ import { describe, it, expect, vi, afterEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/svelte';
 import VideoCard from '$lib/components/discover/VideoCard.svelte';
 import type { VideoItem } from '$lib/services/youtubeApi';
-import type { ContentItem } from '$lib/queries/content';
 
-// The real PerspectivePopover needs a QueryClientProvider/Clerk context (for
-// its useCreatePerspective/useUpdatePerspective mutations) that this test
-// doesn't set up — swap in a lightweight stub so we can assert VideoCard's
-// dynamic-import wiring (contentId/contentName/userId) without that.
-vi.mock('$lib/components/PerspectivePopover.svelte', async () => {
-	const mod = await import('../helpers/FakePerspectivePopover.svelte');
-	return { default: mod.default };
-});
+vi.mock('$lib/queries/users/useMe.svelte', () => ({ useMe: () => ({ me: null }) }));
 
 const video: VideoItem = {
 	id: 'abc123',
@@ -22,32 +14,6 @@ const video: VideoItem = {
 	thumbnails: {
 		medium: { url: 'https://img.example/medium.jpg', width: 320, height: 180 },
 	},
-};
-
-const addedContent: ContentItem = {
-	id: '42',
-	name: 'A great video',
-	addedByUserID: '1',
-	url: 'https://www.youtube.com/watch?v=abc123',
-	contentType: 'YOUTUBE_VIDEO',
-	length: 253,
-	lengthUnits: 'seconds',
-	viewCount: 1_500_000,
-	likeCount: 42_000,
-	channelTitle: 'Great Channel',
-	publishedAt: '2024-06-15T12:00:00Z',
-	tags: null,
-	description: 'A description of the great video',
-	primaryCategory: {
-		id: '1',
-		wikidataQid: 'Q1',
-		label: 'Music',
-		description: null,
-		entityType: null,
-		wikipediaUrl: null,
-	},
-	createdAt: '2024-06-16T00:00:00Z',
-	updatedAt: '2024-06-16T00:00:00Z',
 };
 
 // jsdom doesn't implement scrollIntoView.
@@ -191,53 +157,20 @@ describe('VideoCard', () => {
 			expect(button).toBeDisabled();
 		});
 
-		it('shows a disabled In Library button for pre-existing tracked videos with no addedContent', () => {
-			render(VideoCard, { props: { video, isInLibrary: true, onAdd: vi.fn() } });
-			const button = screen.getByRole('button', { name: /In Library/ });
-			expect(button).toBeDisabled();
-		});
-	});
+		it('shows the shared library actions instead of the Add button for a video already in the library', () => {
+			render(VideoCard, { props: { video, libraryItem: { id: '42', name: 'A great video' }, onAdd: vi.fn() } });
 
-	describe('content details card', () => {
-		it('renders duration/views/likes/channel/category once addedContent is present', () => {
-			render(VideoCard, { props: { video, onAdd: vi.fn(), addedContent } });
-
-			expect(screen.getByText('Added to Perspectize')).toBeInTheDocument();
-			expect(screen.getByText('4:13')).toBeInTheDocument();
-			expect(screen.getByText('1.5 M')).toBeInTheDocument();
-			expect(screen.getByText('42.0 K')).toBeInTheDocument();
-			// "Great Channel" also appears in the card's own byline, so the details
-			// card should push it to (at least) two occurrences.
-			expect(screen.getAllByText('Great Channel').length).toBeGreaterThanOrEqual(2);
-			expect(screen.getByText('Music')).toBeInTheDocument();
+			expect(screen.getByTestId('library-status')).toHaveTextContent('In Library');
+			expect(screen.queryByRole('button', { name: /Add to Perspectize/ })).not.toBeInTheDocument();
 		});
 
-		it('renders a working Compare link with the numeric contentId', () => {
-			render(VideoCard, { props: { video, onAdd: vi.fn(), addedContent } });
-
-			const compareLink = screen.getByRole('link', { name: 'Compare' });
-			expect(compareLink).toHaveAttribute('href', '/compare?contentId=42');
-		});
-
-		it('does not trigger the card click-to-watch handler when the Compare link is clicked', async () => {
-			render(VideoCard, { props: { video, onAdd: vi.fn(), addedContent } });
+		it('does not trigger the card click-to-watch handler when a library action is clicked', async () => {
+			render(VideoCard, { props: { video, libraryItem: { id: '42', name: 'A great video' }, onAdd: vi.fn() } });
 
 			await fireEvent.click(screen.getByRole('link', { name: 'Compare' }));
+			await fireEvent.click(screen.getByRole('link', { name: 'Go to item' }));
 
 			expect(Element.prototype.scrollIntoView).not.toHaveBeenCalled();
-		});
-
-		it('opens PerspectivePopover via the Add perspective button without triggering the card click-to-watch handler', async () => {
-			render(VideoCard, { props: { video, onAdd: vi.fn(), addedContent, userId: 7 } });
-
-			await fireEvent.click(screen.getByRole('button', { name: 'Add perspective' }));
-
-			expect(Element.prototype.scrollIntoView).not.toHaveBeenCalled();
-			await waitFor(() => {
-				const popover = screen.getByTestId('fake-perspective-popover');
-				expect(popover).toHaveAttribute('data-content-id', '42');
-				expect(popover).toHaveAttribute('data-user-id', '7');
-			});
 		});
 	});
 });

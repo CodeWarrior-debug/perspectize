@@ -104,8 +104,7 @@
 
 	// Dynamic fields — tracks which rating fields are shown
 	// Single source of truth: STANDARD_DIMENSIONS in comparePerspectives.ts (also used
-	// by AddFieldSearch's core-field entries and Compare's getFieldLabel). See the UI
-	// gap audit, gap #17.
+	// by AddFieldSearch's core-field entries and Compare's getFieldLabel).
 	const DEFAULT_FIELDS: string[] = STANDARD_DIMENSIONS.map((d) => d.key);
 	let activeFields = $state<string[]>([...DEFAULT_FIELDS]);
 
@@ -366,7 +365,7 @@
 
 		// Close immediately instead of waiting for the server: the mutation hooks
 		// patch the cached lists optimistically, so the change is already on
-		// screen, and a slow network (mobile) no longer holds the sheet open for
+		// screen, and a slow network (mobile) doesn't hold the sheet open for
 		// the full round trip. mutateAsync settles even after this component
 		// unmounts. On failure the hook rolls the optimistic patch back and
 		// offers Retry, and the review text survives as a draft (flushed below,
@@ -452,155 +451,114 @@
 				</div>
 			</div>
 		</div>
-		<p class="text-[13px] font-serif text-muted-foreground text-center mt-0.5 line-clamp-1 max-w-full">
+		<p class="font-slot-cell text-[13px] font-serif text-muted-foreground text-center mt-0.5 line-clamp-1 max-w-full">
 			{contentName}
 		</p>
 	</div>
 
-	<!-- Overall + Comment row -->
-	<div class="shrink-0 flex items-center gap-3.5 px-5 py-3.5 border-b border-border">
-		<div class="flex flex-col items-center gap-1.5 flex-shrink-0">
-			<span class="font-sans text-[11px] font-medium text-muted-foreground uppercase tracking-[0.06em]"> Overall </span>
-			<Thumbs
-				value={likeValue}
-				onChange={(val) => {
-					likeValue = val;
-				}}
-				size="md"
-			/>
-		</div>
-
-		{#if mobile && !commentExpanded}
-			<button
-				type="button"
-				onclick={() => {
-					commentExpanded = true;
-				}}
-				aria-label="Add comment"
-				class="flex flex-1 items-center justify-between gap-2 h-14 px-3 rounded-lg border border-border bg-card cursor-pointer text-left"
-			>
-				<span
-					class="font-serif text-[13px] line-clamp-2 flex-1"
-					class:text-foreground={hasComment}
-					class:text-muted-foreground={!hasComment}
-				>
-					{#if hasComment}
-						{reviewPreviewText(comment)}
-					{:else}
-						Add a comment
-					{/if}
-				</span>
-				<span class="text-muted-foreground flex-shrink-0">
-					<ExternalLinkIcon class="size-4" />
-				</span>
-			</button>
-		{:else}
-			<div class="flex-1 min-w-0 relative">
-				<CommentsEditor
-					value={comment}
-					onChange={handleCommentChange}
-					minHeight={68}
-					showPopout={true}
-					expanded={commentExpanded}
-					onPopout={() => {
-						commentExpanded = !commentExpanded;
-					}}
-					isMobile={mobile}
-				/>
-			</div>
-		{/if}
-	</div>
-
-	{#if restoredFromDraft}
-		<div
-			class="shrink-0 flex items-center justify-between gap-2 px-5 py-2 border-b border-border bg-accent text-[12px] text-muted-foreground"
-		>
-			<span>Restored unsaved draft</span>
-			<button type="button" class="text-muted-foreground underline hover:opacity-70" onclick={discardDraft}>
-				Discard draft
-			</button>
-		</div>
+	<!-- Desktop pins the comment rows under the header. On mobile they live inside the
+	     scroll area below, so an expanded editor can never squeeze the Save button out. -->
+	{#if !mobile}
+		{@render commentRows(false)}
 	{/if}
 
 	<!-- Scrollable body — ratings + add field -->
 	<form onsubmit={handleSubmit} class="flex flex-col flex-1 min-h-0 overflow-hidden">
-		<div class="flex-1 min-h-0 overflow-y-auto px-5 py-4 flex flex-col gap-3.5">
-			<div class="grid grid-cols-2 gap-3">
-				{#each activeFields as fieldKey (fieldKey)}
-					<div class="relative" bind:this={fieldRefs[fieldKey]}>
-						{#if fieldKey === 'quality'}
-							<RatingInput
-								label="Quality"
-								name="quality"
-								bind:value={quality}
-								compact
-								trackWidth={110}
-								onRemove={() => removeField('quality')}
-							/>
-						{:else if fieldKey === 'agreement'}
-							<RatingInput
-								label="Agreement"
-								name="agreement"
-								bind:value={agreement}
-								compact
-								trackWidth={110}
-								onRemove={() => removeField('agreement')}
-							/>
-						{:else if fieldKey === 'importance'}
-							<RatingInput
-								label="Importance"
-								name="importance"
-								bind:value={importance}
-								compact
-								trackWidth={110}
-								onRemove={() => removeField('importance')}
-							/>
-						{:else if fieldKey === 'confidence'}
-							<RatingInput
-								label="Confidence"
-								name="confidence"
-								bind:value={confidence}
-								compact
-								trackWidth={110}
-								onRemove={() => removeField('confidence')}
-							/>
-						{:else}
-							<RatingInput
-								label={getFieldLabel(fieldKey)}
-								name={fieldKey}
-								bind:value={() => dynamicValues[fieldKey] ?? null, (v) => setFieldValue(fieldKey, v)}
-								compact
-								trackWidth={110}
-								onRemove={() => removeField(fieldKey)}
-							/>
+		<div class="flex-1 min-h-0 overflow-y-auto overscroll-contain">
+			{#if mobile}
+				{@render commentRows(true)}
+			{/if}
+			<div class="px-5 py-4 flex flex-col gap-3.5">
+				<!-- Wide screens put the feel wheel beside the ratings; narrow screens stack it below. -->
+				<div class="flex flex-col gap-3.5 sm:flex-row sm:items-start sm:gap-5">
+					<div class="flex min-w-0 flex-1 flex-col gap-3.5">
+						<div class="grid grid-cols-2 gap-3">
+							{#each activeFields as fieldKey (fieldKey)}
+								<div class="relative" bind:this={fieldRefs[fieldKey]}>
+									{#if fieldKey === 'quality'}
+										<RatingInput
+											label="Quality"
+											name="quality"
+											bind:value={quality}
+											compact
+											trackWidth={110}
+											onRemove={() => removeField('quality')}
+										/>
+									{:else if fieldKey === 'agreement'}
+										<RatingInput
+											label="Agreement"
+											name="agreement"
+											bind:value={agreement}
+											compact
+											trackWidth={110}
+											onRemove={() => removeField('agreement')}
+										/>
+									{:else if fieldKey === 'importance'}
+										<RatingInput
+											label="Importance"
+											name="importance"
+											bind:value={importance}
+											compact
+											trackWidth={110}
+											onRemove={() => removeField('importance')}
+										/>
+									{:else if fieldKey === 'confidence'}
+										<RatingInput
+											label="Confidence"
+											name="confidence"
+											bind:value={confidence}
+											compact
+											trackWidth={110}
+											onRemove={() => removeField('confidence')}
+										/>
+									{:else}
+										<RatingInput
+											label={getFieldLabel(fieldKey)}
+											name={fieldKey}
+											bind:value={() => dynamicValues[fieldKey] ?? null, (v) => setFieldValue(fieldKey, v)}
+											compact
+											trackWidth={110}
+											onRemove={() => removeField(fieldKey)}
+										/>
+									{/if}
+								</div>
+							{/each}
+						</div>
+
+						<AddFieldSearch addedKeys={activeFields} onAdd={addField} placeholder="Add a field — e.g. clarity" dense />
+
+						{#if !feelWheelOpen}
+							<button
+								type="button"
+								onclick={() => (feelWheelOpen = true)}
+								class="flex items-center justify-center gap-1.5 rounded-md border border-dashed border-border py-2 text-sm text-muted-foreground hover:opacity-70 sm:hidden"
+							>
+								<span class="text-base leading-none">🙂</span>
+								Add a feeling
+							</button>
 						{/if}
 					</div>
-				{/each}
-			</div>
 
-			<AddFieldSearch addedKeys={activeFields} onAdd={addField} placeholder="Add a field — e.g. clarity" dense />
-
-			{#if !feelWheelOpen}
-				<button
-					type="button"
-					onclick={() => (feelWheelOpen = true)}
-					class="flex items-center justify-center gap-1.5 rounded-md border border-dashed border-border py-2 text-sm text-muted-foreground hover:opacity-70"
-				>
-					<span class="text-base leading-none">🙂</span>
-					Add a feeling
-				</button>
-			{:else}
-				<div class="rounded-md border border-border p-3">
-					<FeelWheel bind:value={feelings} />
+					<!-- Always mounted (one instance): wide screens show it beside the ratings,
+					     narrow screens show it below them only once it has been opened. -->
+					<div
+						class={[
+							'rounded-md border border-border p-3 sm:w-[346px] sm:shrink-0',
+							!feelWheelOpen && 'hidden sm:block',
+						]}
+						data-testid="feel-wheel-column"
+					>
+						<FeelWheel bind:value={feelings} />
+					</div>
 				</div>
-			{/if}
 
-			<div class="flex items-center justify-between rounded-md border border-border px-3 py-2">
-				<div class="flex flex-col">
-					<Label for="perspective-private">Private</Label>
-					<span class="text-xs text-muted-foreground">Only you can see private perspectives</span>
+				<div class="flex items-center justify-between rounded-md border border-border px-3 py-2">
+					<div class="flex flex-col">
+						<Label for="perspective-private">Private</Label>
+						<span class="text-xs text-muted-foreground">Only you can see private perspectives</span>
+					</div>
+					<Switch id="perspective-private" bind:checked={isPrivate} aria-label="Private" />
 				</div>
-				<Switch id="perspective-private" bind:checked={isPrivate} aria-label="Private" />
 			</div>
 		</div>
 
@@ -674,6 +632,73 @@
 	</form>
 {/snippet}
 
+{#snippet commentRows(mobile: boolean)}
+	<!-- Overall + Comment row -->
+	<div class="shrink-0 flex items-center gap-3.5 px-5 py-3.5 border-b border-border">
+		<div class="flex flex-col items-center gap-1.5 flex-shrink-0">
+			<span class="font-sans text-[11px] font-medium text-muted-foreground uppercase tracking-[0.06em]"> Overall </span>
+			<Thumbs
+				value={likeValue}
+				onChange={(val) => {
+					likeValue = val;
+				}}
+				size="md"
+			/>
+		</div>
+
+		{#if mobile && !commentExpanded}
+			<button
+				type="button"
+				onclick={() => {
+					commentExpanded = true;
+				}}
+				aria-label="Add comment"
+				class="flex flex-1 items-center justify-between gap-2 h-14 px-3 rounded-lg border border-border bg-card cursor-pointer text-left"
+			>
+				<span
+					class="font-slot-longform font-serif text-[13px] line-clamp-2 flex-1"
+					class:text-foreground={hasComment}
+					class:text-muted-foreground={!hasComment}
+				>
+					{#if hasComment}
+						{reviewPreviewText(comment)}
+					{:else}
+						Add a comment
+					{/if}
+				</span>
+				<span class="text-muted-foreground flex-shrink-0">
+					<ExternalLinkIcon class="size-4" />
+				</span>
+			</button>
+		{:else}
+			<div class="flex-1 min-w-0 relative">
+				<CommentsEditor
+					value={comment}
+					onChange={handleCommentChange}
+					minHeight={68}
+					showPopout={true}
+					expanded={commentExpanded}
+					onPopout={() => {
+						commentExpanded = !commentExpanded;
+					}}
+					isMobile={mobile}
+				/>
+			</div>
+		{/if}
+	</div>
+
+	{#if restoredFromDraft}
+		<div
+			class="shrink-0 flex items-center justify-between gap-2 px-5 py-2 border-b border-border bg-accent text-[12px] text-muted-foreground"
+		>
+			<span>Restored unsaved draft</span>
+			<button type="button" class="text-muted-foreground underline hover:opacity-70" onclick={discardDraft}>
+				Discard draft
+			</button>
+		</div>
+	{/if}
+{/snippet}
+
 <!-- Desktop: centered dialog -->
 {#if !isMobile.current}
 	<Dialog
@@ -683,10 +708,7 @@
 		}}
 	>
 		<DialogContent
-			class={[
-				'w-[calc(100vw-2rem)] max-h-[90vh] overflow-hidden p-0 flex flex-col transition-[max-width] duration-200',
-				commentExpanded ? 'sm:max-w-[760px]' : 'sm:max-w-[460px]',
-			]}
+			class="w-[calc(100vw-2rem)] max-h-[90vh] overflow-hidden p-0 flex flex-col sm:max-w-[760px]"
 			overlayClass="bg-black/45"
 		>
 			{@render modalBody(false)}
@@ -700,7 +722,7 @@
 			if (!isOpen) onClose();
 		}}
 	>
-		<DrawerContent class="max-h-[88vh] flex flex-col p-0">
+		<DrawerContent class="max-h-[88dvh] flex flex-col p-0">
 			{@render modalBody(true)}
 		</DrawerContent>
 	</Drawer>

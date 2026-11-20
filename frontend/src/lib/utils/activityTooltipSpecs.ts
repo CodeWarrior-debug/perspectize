@@ -1,9 +1,18 @@
 import type { CellCtx, ColTooltipSpec } from './tooltipSpec';
 import {
+	authorValueGetter,
+	bookAuthors,
+	ratingTooltip,
+	ratingValueGetter,
+	readersTooltip,
+	readersValueGetter,
+} from './bookFormatting';
+import {
 	formatCountExact,
 	percentLikedTooltip,
 	percentLikedValueGetter,
 	castTooltipItems,
+	castTooltipCopyValues,
 	boxOfficeTooltip,
 	boxOfficeValueGetter,
 	vsBudgetTooltip,
@@ -16,7 +25,10 @@ import {
 	synopsisValueGetter,
 	formatMoneyExact,
 	budgetValueGetter,
+	formatDate,
+	formatClaimDate,
 } from './formatting';
+import { webPageAuthor, webPagePublished, webPageRoleLabel, webPageRolesOf, webPageSite } from './webPage';
 
 /** Per-column hover popover specs for ActivityTable, keyed by colId. */
 export const ACTIVITY_TOOLTIP_SPECS = {
@@ -47,7 +59,12 @@ export const ACTIVITY_TOOLTIP_SPECS = {
 		copyValue: (c: CellCtx) => percentLikedValueGetter({ data: c.data }),
 	},
 	tags: { mode: 'multi', emptyText: 'No tags', items: (c: CellCtx) => contentTags(c.data) ?? [] },
-	cast: { mode: 'multi', emptyText: 'No cast or directors', items: (c: CellCtx) => castTooltipItems(c.data) },
+	cast: {
+		mode: 'multi',
+		emptyText: 'No cast or directors',
+		items: (c: CellCtx) => castTooltipItems(c.data),
+		itemCopyValues: (c: CellCtx) => castTooltipCopyValues(c.data),
+	},
 	boxOffice: {
 		text: (c: CellCtx) => boxOfficeTooltip({ data: c.data }),
 		copyValue: (c: CellCtx) => boxOfficeValueGetter({ data: c.data }),
@@ -60,10 +77,64 @@ export const ACTIVITY_TOOLTIP_SPECS = {
 		text: (c: CellCtx) => tmdbScoreTooltip({ data: c.data }),
 		copyValue: (c: CellCtx) => tmdbScoreValueGetter({ data: c.data }),
 	},
+	author: {
+		mode: 'multi',
+		emptyText: 'No author',
+		items: (c: CellCtx) => bookAuthors(c.data).map((a) => a.name),
+		copyValue: (c: CellCtx) => authorValueGetter({ data: c.data }),
+	},
+	rating: {
+		text: (c: CellCtx) => ratingTooltip({ data: c.data }),
+		copyValue: (c: CellCtx) => ratingValueGetter({ data: c.data }),
+	},
+	readers: {
+		text: (c: CellCtx) => readersTooltip({ data: c.data }),
+		copyValue: (c: CellCtx) => readersValueGetter({ data: c.data }),
+	},
 	budget: {
 		text: (c: CellCtx) => formatMoneyExact(budgetValueGetter({ data: c.data })),
 		copyValue: (c: CellCtx) => budgetValueGetter({ data: c.data }),
 	},
+	webSite: {
+		emptyText: 'No site',
+		text: (c: CellCtx) => webPageSite(c.data) ?? '',
+		copyValue: (c: CellCtx) => webPageSite(c.data),
+	},
+	webPublished: {
+		emptyText: 'No published date',
+		text: (c: CellCtx) => {
+			const iso = webPagePublished(c.data);
+			return iso ? formatDate(iso) : '';
+		},
+		copyValue: (c: CellCtx) => webPagePublished(c.data),
+	},
+	webRoles: {
+		mode: 'multi',
+		emptyText: 'No role set',
+		items: (c: CellCtx) => webPageRolesOf(c.data).map(webPageRoleLabel),
+	},
+	webAuthor: {
+		emptyText: 'No author',
+		text: (c: CellCtx) => webPageAuthor(c.data) ?? '',
+		copyValue: (c: CellCtx) => webPageAuthor(c.data),
+	},
 	synopsis: { emptyText: 'No synopsis', text: (c: CellCtx) => synopsisValueGetter({ data: c.data }) ?? '' },
+	// Claim dates: show the formatted day, copy the raw YYYY-MM-DD the backend stores.
+	effectiveDate: {
+		emptyText: 'No effective date',
+		text: (c: CellCtx) => {
+			const raw = c.data?.customFields?.effectiveDate;
+			return raw ? formatClaimDate(raw) : '';
+		},
+		copyValue: (c: CellCtx) => c.data?.customFields?.effectiveDate ?? null,
+	},
+	evaluateBy: {
+		emptyText: 'No evaluate-by date',
+		text: (c: CellCtx) => {
+			const raw = c.data?.customFields?.evaluateBy;
+			return raw ? formatClaimDate(raw) : '';
+		},
+		copyValue: (c: CellCtx) => c.data?.customFields?.evaluateBy ?? null,
+	},
 	description: { emptyText: 'No description', text: (c: CellCtx) => c.data?.description ?? '' },
 } satisfies Record<string, ColTooltipSpec>;

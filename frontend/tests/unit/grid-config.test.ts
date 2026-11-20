@@ -13,9 +13,43 @@ import {
 	COL_TO_SORT,
 	sortableColumnsFor,
 	releasedComparator,
+	labelComparator,
 	itemColumnHeader,
+	soloTypeFilter,
+	defaultColumnVisibility,
+	COLUMNS,
+	NUMERIC_COL_IDS,
+	CONTENT_TYPE_OPTIONS,
+	liveGridApi,
 } from '$lib/utils/grid-config';
 import type { ContentItem } from '$lib/queries/content';
+
+describe('CONTENT_TYPE_OPTIONS (Book)', () => {
+	it('offers Book as a type filter option', () => {
+		expect(CONTENT_TYPE_OPTIONS).toContainEqual({ value: 'book', label: 'Book' });
+	});
+});
+
+describe('liveGridApi', () => {
+	it('returns the api while the grid is alive', () => {
+		const api = { isDestroyed: () => false };
+		expect(liveGridApi(api)).toBe(api);
+	});
+
+	it('returns null once the grid is destroyed, so callers skip setFilterModel/sizeColumnsToFit', () => {
+		const setFilterModel = vi.fn();
+		const api = { isDestroyed: () => true, setFilterModel };
+		const live = liveGridApi(api);
+		live?.setFilterModel(null);
+		expect(live).toBeNull();
+		expect(setFilterModel).not.toHaveBeenCalled();
+	});
+
+	it('returns null for a missing api (no grid mounted)', () => {
+		expect(liveGridApi(null)).toBeNull();
+		expect(liveGridApi(undefined)).toBeNull();
+	});
+});
 
 function row(overrides: Partial<ContentItem>): ContentItem {
 	return {
@@ -42,6 +76,46 @@ function row(overrides: Partial<ContentItem>): ContentItem {
 // ---------------------------------------------------------------------------
 // capitalizeContentType
 // ---------------------------------------------------------------------------
+describe('NUMERIC_COL_IDS (right-aligned columns)', () => {
+	it('names only real columns, so a rename cannot leave a stale id behind', () => {
+		const real = new Set(togglableColIds(true));
+		for (const id of NUMERIC_COL_IDS) expect(real.has(id), id).toBe(true);
+	});
+
+	it('covers every count, money, score and duration column', () => {
+		for (const id of [
+			'duration',
+			'views',
+			'likes',
+			'percentLiked',
+			'boxOffice',
+			'vsBudget',
+			'tmdbScore',
+			'budget',
+			'votes',
+		]) {
+			expect(NUMERIC_COL_IDS.has(id), id).toBe(true);
+		}
+	});
+
+	it('leaves text, dates and identifiers left-aligned', () => {
+		for (const id of [
+			'item',
+			'type',
+			'genre',
+			'rated',
+			'cast',
+			'released',
+			'publishDate',
+			'channel',
+			'tags',
+			'tmdbId',
+		]) {
+			expect(NUMERIC_COL_IDS.has(id), id).toBe(false);
+		}
+	});
+});
+
 describe('capitalizeContentType', () => {
 	it('capitalizes first letter and lowercases rest', () => {
 		expect(capitalizeContentType('CLAIM')).toBe('Claim');
@@ -114,10 +188,15 @@ describe('durationComparator', () => {
 // Column-picker registry
 // ---------------------------------------------------------------------------
 describe('column-picker registry', () => {
-	it('DATA_COLUMNS holds the 25 user-togglable data columns', () => {
+	it('DATA_COLUMNS holds the 34 user-togglable data columns (30 + the 4 webpage columns)', () => {
 		expect(DATA_COLUMNS.map((c) => c.colId)).toEqual([
 			'type',
 			'category',
+			'effectiveDate',
+			'evaluateBy',
+			'myQuality',
+			'myImportance',
+			'myAgreement',
 			'genre',
 			'rated',
 			'cast',
@@ -134,6 +213,16 @@ describe('column-picker registry', () => {
 			'user',
 			'tags',
 			'description',
+			'author',
+			'published',
+			'pages',
+			'rating',
+			'webSite',
+			'webPublished',
+			'webRoles',
+			'webAuthor',
+			'editions',
+			'readers',
 			'budget',
 			'votes',
 			'collection',
@@ -164,13 +253,13 @@ describe('column-picker registry', () => {
 		}
 	});
 
-	it('togglableColIds(false) returns only the 25 data columns', () => {
+	it('togglableColIds(false) returns only the data columns', () => {
 		expect(togglableColIds(false)).toEqual(DATA_COLUMNS.map((c) => c.colId));
 	});
 
-	it('togglableColIds(true) returns all 28 columns', () => {
+	it('togglableColIds(true) returns every column', () => {
 		const ids = togglableColIds(true);
-		expect(ids).toHaveLength(28);
+		expect(ids).toHaveLength(DATA_COLUMNS.length + INTERNAL_COLUMNS.length);
 		expect(ids).toEqual([...DATA_COLUMNS.map((c) => c.colId), ...INTERNAL_COLUMNS.map((c) => c.colId)]);
 	});
 
@@ -445,14 +534,186 @@ describe('client-only sort columns', () => {
 	});
 });
 
+describe('Category column (client-only sort)', () => {
+	const withCategory = (id: string, label: string | null) =>
+		row({
+			id,
+			primaryCategory:
+				label == null
+					? null
+					: { id: `q-${id}`, wikidataQid: `Q${id}`, label, description: null, entityType: null, wikipediaUrl: null },
+		});
+	const rows = [
+		withCategory('a', 'Politics'),
+		withCategory('b', 'art'),
+		withCategory('c', null),
+		withCategory('d', 'Economics'),
+	];
+	const ids = (sorts: { col: string; dir: 'asc' | 'desc' }[]) =>
+		[...rows].sort((x, y) => compareContentBySorts(x, y, sorts)).map((r) => r.id);
+
+	it('is sortable in the picker and client-only (no server sort key)', () => {
+		expect(SORTABLE_COLUMNS.map((c) => c.colId)).toContain('category');
+		expect(CLIENT_ONLY_SORT_COLS).toContain('category');
+		expect(COL_TO_SORT).not.toHaveProperty('category');
+	});
+
+	it('is offered in "Loaded" mode and hidden in "All Items" mode', () => {
+		expect(sortableColumnsFor('loaded').map((c) => c.colId)).toContain('category');
+		expect(sortableColumnsFor('all').map((c) => c.colId)).not.toContain('category');
+	});
+
+	it('sorts by the category label, case-insensitively, with no category last in both directions', () => {
+		expect(ids([{ col: 'category', dir: 'asc' }])).toEqual(['b', 'd', 'a', 'c']);
+		expect(ids([{ col: 'category', dir: 'desc' }])).toEqual(['a', 'd', 'b', 'c']);
+	});
+
+	it('the value extractor yields the lowercased label, or null when there is no category', () => {
+		const sortValue = COLUMNS.find((c) => c.colId === 'category')?.sortValue;
+		expect(sortValue?.(withCategory('x', 'Art'))).toBe('art');
+		expect(sortValue?.(withCategory('x', null))).toBeNull();
+	});
+
+	it('labelComparator keeps unknown last in both directions (AG Grid negates for descending)', () => {
+		expect(labelComparator('apple', 'Banana')).toBeLessThan(0);
+		expect(labelComparator('APPLE', 'apple')).toBe(0);
+		expect(labelComparator(null, 'apple', null, null, false)).toBeGreaterThan(0);
+		expect(labelComparator(null, 'apple', null, null, true)).toBeLessThan(0);
+		expect(labelComparator('apple', null, null, null, false)).toBeLessThan(0);
+		expect(labelComparator('apple', null, null, null, true)).toBeGreaterThan(0);
+		expect(labelComparator(null, null)).toBe(0);
+	});
+});
+
 describe('itemColumnHeader', () => {
 	it('is "Film" when the type filter is exactly MOVIE', () => {
 		expect(itemColumnHeader('movie')).toBe('Film');
 	});
+	it('is "Claim" when the type filter is exactly CLAIM', () => {
+		expect(itemColumnHeader('claim')).toBe('Claim');
+		expect(itemColumnHeader(' Claim ')).toBe('Claim');
+	});
 	it('is "Item" for other filters, multiple types, or none', () => {
 		expect(itemColumnHeader('youtube_video')).toBe('Item');
 		expect(itemColumnHeader('movie,youtube_video')).toBe('Item');
+		expect(itemColumnHeader('claim,youtube_video')).toBe('Item');
 		expect(itemColumnHeader(undefined)).toBe('Item');
+	});
+});
+
+describe('soloTypeFilter', () => {
+	it('returns the lowercased type when the filter names exactly one type', () => {
+		expect(soloTypeFilter('movie')).toBe('movie');
+		expect(soloTypeFilter(' Claim ')).toBe('claim');
+		expect(soloTypeFilter('youtube_video')).toBe('youtube_video');
+		expect(soloTypeFilter('bible_passage')).toBe('bible_passage');
+		expect(soloTypeFilter('movie,movie')).toBe('movie');
+	});
+	it('returns null when no type or several different types are named', () => {
+		expect(soloTypeFilter(undefined)).toBeNull();
+		expect(soloTypeFilter('')).toBeNull();
+		expect(soloTypeFilter('claim,youtube_video')).toBeNull();
+	});
+});
+
+describe('Claim column set', () => {
+	it('shows the claim columns at each tier', () => {
+		expect(defaultColumnVisibility('xs', 'claim').visible).toEqual(['perspectize', 'item']);
+		expect(defaultColumnVisibility('sm', 'claim').visible).toEqual(['perspectize', 'item', 'category']);
+		expect(defaultColumnVisibility('md', 'claim').visible).toEqual([
+			'perspectize',
+			'item',
+			'category',
+			'effectiveDate',
+			'evaluateBy',
+		]);
+		expect(defaultColumnVisibility('lg', 'claim').visible).toEqual([
+			'perspectize',
+			'item',
+			'category',
+			'effectiveDate',
+			'evaluateBy',
+			'myQuality',
+			'myImportance',
+			'myAgreement',
+		]);
+	});
+
+	it('hides every YouTube and Movie column in the claim view', () => {
+		const { visible, hidden } = defaultColumnVisibility('lg', 'claim');
+		for (const id of [
+			'type',
+			'channel',
+			'duration',
+			'publishDate',
+			'views',
+			'likes',
+			'percentLiked',
+			'tags',
+			'user',
+			'description',
+			'genre',
+			'rated',
+			'cast',
+			'released',
+			'boxOffice',
+			'vsBudget',
+			'tmdbScore',
+			'budget',
+		]) {
+			expect(visible, id).not.toContain(id);
+			expect(hidden, id).toContain(id);
+		}
+	});
+
+	it('forces the claim date columns off in the general and movie views', () => {
+		for (const view of ['general', 'movie'] as const) {
+			const { visible, hidden } = defaultColumnVisibility('lg', view);
+			for (const id of ['effectiveDate', 'evaluateBy', 'createdAt']) {
+				expect(visible, `${view}:${id}`).not.toContain(id);
+				expect(hidden, `${view}:${id}`).toContain(id);
+			}
+		}
+	});
+
+	it('sorts claims by their date with missing dates last in both directions', () => {
+		const withDate = (d: string | null) =>
+			row({ contentType: 'CLAIM', customFields: { effectiveDate: d ?? undefined } });
+		const dated = [withDate('2026-11-01'), withDate(null), withDate('2026-10-23')];
+		const asc = [...dated].sort((a, b) => compareContentBySorts(a, b, [{ col: 'effectiveDate', dir: 'asc' }]));
+		expect(asc.map((r) => r.customFields?.effectiveDate ?? null)).toEqual(['2026-10-23', '2026-11-01', null]);
+		const desc = [...dated].sort((a, b) => compareContentBySorts(a, b, [{ col: 'effectiveDate', dir: 'desc' }]));
+		expect(desc.map((r) => r.customFields?.effectiveDate ?? null)).toEqual(['2026-11-01', '2026-10-23', null]);
+	});
+
+	it('registers the claim date columns as picker data columns sorted client-side only', () => {
+		for (const id of ['effectiveDate', 'evaluateBy']) {
+			const meta = COLUMNS.find((c) => c.colId === id);
+			expect(meta, id).toBeDefined();
+			expect(meta?.picker).toBe('data');
+			expect(meta?.sortable).toBe(true);
+			expect(meta?.serverSort, id).toBeUndefined();
+			expect(meta?.filterKey, id).toBeUndefined();
+		}
+	});
+});
+
+describe('Type column visibility', () => {
+	it.each([
+		['general', 'youtube_video'],
+		['general', 'bible_passage'],
+		['movie', 'movie'],
+		['claim', 'claim'],
+	] as const)('is hidden in the %s view when exactly %s is filtered', (view, solo) => {
+		const { visible, hidden } = defaultColumnVisibility('lg', view, solo);
+		expect(visible).not.toContain('type');
+		expect(hidden).toContain('type');
+	});
+
+	it('stays visible with no type filter or several types', () => {
+		expect(defaultColumnVisibility('lg', 'general', null).visible).toContain('type');
+		expect(defaultColumnVisibility('lg', 'general').visible).toContain('type');
+		expect(defaultColumnVisibility('xs', 'general').visible).toContain('type');
 	});
 });
 
@@ -480,5 +741,34 @@ describe('syncItemHeader (Film/Item header without closing an open filter popup)
 		const refreshHeader = vi.fn();
 		expect(syncItemHeader({ getColumn: () => null, refreshHeader }, 'Film')).toBe(false);
 		expect(refreshHeader).not.toHaveBeenCalled();
+	});
+});
+
+// ---------------------------------------------------------------------------
+// Type column: hidden whenever the filter names exactly one type (every type, every tier)
+// ---------------------------------------------------------------------------
+describe('Type column with a single-type filter', () => {
+	const tiers = ['xs', 'sm', 'md', 'lg'] as const;
+	const solos = [
+		{ view: 'general', solo: 'youtube_video' },
+		{ view: 'general', solo: 'bible_passage' },
+		{ view: 'movie', solo: 'movie' },
+		{ view: 'book', solo: 'book' },
+		{ view: 'claim', solo: 'claim' },
+	] as const;
+
+	it.each(solos)('hides Type for $solo at every tier', ({ view, solo }) => {
+		for (const tier of tiers) {
+			const { visible, hidden } = defaultColumnVisibility(tier, view, solo);
+			expect(visible, `${solo} ${tier}`).not.toContain('type');
+			expect(hidden, `${solo} ${tier}`).toContain('type');
+		}
+	});
+
+	it('shows Type when no single type is named (no filter or several types)', () => {
+		for (const tier of tiers) {
+			expect(defaultColumnVisibility(tier, 'general').visible).toContain('type');
+			expect(defaultColumnVisibility(tier, 'general', null).visible).toContain('type');
+		}
 	});
 });

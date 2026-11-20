@@ -4,6 +4,14 @@ import { tick } from 'svelte';
 import AddContentPopover from '$lib/components/AddContentPopover.svelte';
 
 const mocks = vi.hoisted(() => ({
+	book: {
+		mutate: vi.fn(),
+		reset: vi.fn(),
+		isPending: false,
+		isSuccess: false,
+		isError: false,
+		error: null as unknown,
+	},
 	video: { mutate: vi.fn(), isPending: false, isSuccess: false },
 	passage: { mutate: vi.fn(), isPending: false, isSuccess: false },
 	movie: {
@@ -18,7 +26,15 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock('$lib/queries/content/useAddVideo', () => ({ useAddVideo: () => mocks.video }));
 vi.mock('$lib/queries/content/useAddMovie', () => ({ useAddMovie: () => mocks.movie }));
+vi.mock('$lib/queries/content/useAddBook', () => ({ useAddBook: () => mocks.book }));
 vi.mock('$lib/queries/content/useAddPassage', () => ({ useAddPassage: () => mocks.passage }));
+// The webpage hooks are not exercised here (see AddContentPopover.webpage.test.ts); stub them so no QueryClient is needed.
+vi.mock('$lib/queries/content/useCreateWebPage', () => ({
+	useCreateWebPage: () => ({ mutate: vi.fn(), reset: vi.fn(), isPending: false, isSuccess: false, isError: false }),
+}));
+vi.mock('$lib/queries/content/useWebPagePreview', () => ({
+	useWebPagePreview: () => ({ data: undefined, isPending: false, isError: false }),
+}));
 
 const JOHN = 43;
 const YT = 'https://www.youtube.com/watch?v=dQw4w9WgXcQ';
@@ -28,6 +44,8 @@ const NOT_ALLOWED =
 	'While Perspectize does not intend to act as censor, adding NSFW content is not enabled until traffic necessitates a long-term decision about content access policies.';
 const ATTRIBUTION = 'This product uses the TMDB API but is not endorsed or certified by TMDB.';
 const BG = 'https://www.biblegateway.com/passage/?search=John+3%3A16-18&version=NIV';
+const OL_WORK = 'https://openlibrary.org/works/OL23166W';
+const BOOK_ATTRIBUTION = 'Data: Open Library (archive.org), community-contributed; may be incomplete.';
 
 async function openWith(text?: string) {
 	render(AddContentPopover);
@@ -37,7 +55,9 @@ async function openWith(text?: string) {
 }
 
 async function type(text: string) {
-	await fireEvent.input(screen.getByPlaceholderText(/paste a link or type a reference/i), { target: { value: text } });
+	await fireEvent.input(screen.getByPlaceholderText(/paste a link or type a reference/i), {
+		target: { value: text },
+	});
 	await tick();
 }
 
@@ -50,12 +70,14 @@ const pick = async (label: RegExp | string, value: string | number) => {
 
 beforeEach(() => {
 	vi.clearAllMocks();
-	for (const m of [mocks.video, mocks.passage, mocks.movie]) {
+	for (const m of [mocks.video, mocks.passage, mocks.movie, mocks.book]) {
 		m.isPending = false;
 		m.isSuccess = false;
 	}
 	mocks.movie.isError = false;
 	mocks.movie.error = null;
+	mocks.book.isError = false;
+	mocks.book.error = null;
 });
 
 describe('AddContentPopover detection states', () => {
@@ -113,11 +135,21 @@ describe('AddContentPopover detection states', () => {
 		expect(submit()).toBeDisabled();
 	});
 
-	it('claim-like text: chip says Claim, explained, submit disabled', async () => {
-		await openWith('Grace is unearned favor');
-		expect(chip()).toHaveTextContent('Detected: Claim');
-		expect(screen.getByText(/claims can't be added from here yet/i)).toBeInTheDocument();
+	it('free text only is no match: chip says Select a type, submit disabled, nothing is saved', async () => {
+		await openWith('  Grace is unearned favor  ');
+		expect(chip()).toHaveTextContent('Select a type');
 		expect(submit()).toBeDisabled();
+		await fireEvent.click(submit());
+		expect(mocks.video.mutate).not.toHaveBeenCalled();
+		expect(mocks.passage.mutate).not.toHaveBeenCalled();
+		expect(mocks.movie.mutate).not.toHaveBeenCalled();
+	});
+
+	it('the type select offers no Claim option', async () => {
+		await openWith('grace');
+		const select = screen.getByLabelText(/change type/i);
+		expect(select.querySelector('option[value="CLAIM"]')).toBeNull();
+		expect(screen.queryByRole('option', { name: 'Claim' })).toBeNull();
 	});
 });
 
@@ -239,6 +271,65 @@ describe('AddContentPopover mutation states', () => {
 		await openWith('John 3:16-18');
 		expect(screen.getByRole('button', { name: 'Adding...' })).toBeDisabled();
 		expect(screen.getByLabelText('Book')).toBeDisabled();
+	});
+});
+
+describe('AddContentPopover books', () => {
+	it('an Open Library work link autodetects Book, shows the attribution and submits the trimmed link', async () => {
+		await openWith(`  ${OL_WORK}  `);
+		expect(chip()).toHaveTextContent('Detected: Book');
+		expect(screen.getByText(BOOK_ATTRIBUTION)).toBeInTheDocument();
+		expect(screen.queryByTestId('passage-picker')).toBeNull();
+		await fireEvent.click(submit());
+		expect(mocks.book.mutate).toHaveBeenCalledWith(OL_WORK);
+		expect(mocks.movie.mutate).not.toHaveBeenCalled();
+		expect(mocks.video.mutate).not.toHaveBeenCalled();
+	});
+
+	it('an Open Library author link is not a book: it detects as a webpage and can be saved as one', async () => {
+		await openWith('https://openlibrary.org/authors/OL23919A');
+		expect(chip()).toHaveTextContent('Detected: Webpage');
+		expect(submit()).toBeEnabled();
+		expect(screen.queryByText(BOOK_ATTRIBUTION)).toBeNull();
+	});
+
+	it('Book can be chosen manually and the attribution shows only for Book', async () => {
+		await openWith('grace');
+		expect(screen.queryByText(BOOK_ATTRIBUTION)).toBeNull();
+		await pick('Change type', 'BOOK');
+		expect(chip()).toHaveTextContent('Type: Book');
+		expect(screen.getByText(BOOK_ATTRIBUTION)).toBeInTheDocument();
+		await type(YT);
+		expect(chip()).toHaveTextContent('Detected: YouTube');
+		expect(screen.queryByText(BOOK_ATTRIBUTION)).toBeNull();
+	});
+
+	it('a manual Book type with a non-book string shows the validation error and does not submit', async () => {
+		await openWith('grace');
+		await pick('Change type', 'BOOK');
+		await fireEvent.click(submit());
+		expect(screen.getByText('Please enter a valid Open Library book link')).toBeInTheDocument();
+		expect(mocks.book.mutate).not.toHaveBeenCalled();
+	});
+
+	it('pending disables the form and shows the pending label', async () => {
+		mocks.book.isPending = true;
+		await openWith(OL_WORK);
+		expect(screen.getByRole('button', { name: 'Adding...' })).toBeDisabled();
+		expect(screen.getByPlaceholderText(/paste a link or type a reference/i)).toBeDisabled();
+	});
+
+	it('a failed mutation shows the book error text and stays open', async () => {
+		mocks.book.isError = true;
+		mocks.book.error = new Error('boom');
+		await openWith(OL_WORK);
+		expect(screen.getByText('Could not add this book. Check the link and try again.')).toBeInTheDocument();
+		expect(screen.getByPlaceholderText(/paste a link or type a reference/i)).toBeEnabled();
+	});
+
+	it('opening the popover resets the book mutation', async () => {
+		await openWith();
+		expect(mocks.book.reset).toHaveBeenCalled();
 	});
 });
 

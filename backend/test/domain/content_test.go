@@ -7,6 +7,7 @@ import (
 
 	"github.com/CodeWarrior-debug/perspectize/backend/internal/core/domain"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestContentType_YouTube(t *testing.T) {
@@ -96,4 +97,62 @@ func TestMovieConstants(t *testing.T) {
 	assert.Equal(t, domain.ContentSortBy("TMDB_SCORE"), domain.ContentSortByTmdbScore)
 	assert.Equal(t, domain.PersonRole("CAST"), domain.PersonRoleCast)
 	assert.Equal(t, domain.PersonRole("DIRECTOR"), domain.PersonRoleDirector)
+}
+
+func TestBookConstants(t *testing.T) {
+	assert.Equal(t, domain.ContentType("BOOK"), domain.ContentTypeBook)
+	assert.Equal(t, domain.ContentSortBy("AUTHOR"), domain.ContentSortByAuthor)
+}
+
+func TestWebPageConstants(t *testing.T) {
+	assert.Equal(t, domain.ContentType("WEB_PAGE"), domain.ContentTypeWebPage)
+	assert.Equal(t, domain.WebPageRole("BLOG_POST"), domain.WebPageRoleBlogPost)
+	assert.Equal(t, domain.WebPageRole("SESSION_TRANSCRIPT"), domain.WebPageRoleSessionTranscript)
+	assert.Equal(t, domain.FetchStatus("OK"), domain.FetchStatusOK)
+	assert.Equal(t, domain.FetchStatus("BLOCKED"), domain.FetchStatusBlocked)
+	assert.Equal(t, domain.FetchStatus("ERROR"), domain.FetchStatusError)
+	assert.Equal(t, domain.FetchStatus("TIMEOUT"), domain.FetchStatusTimeout)
+	assert.Equal(t, domain.FetchStatus("NOT_HTML"), domain.FetchStatusNotHTML)
+	assert.Equal(t, domain.FetchStatus("TOO_LARGE"), domain.FetchStatusTooLarge)
+}
+
+func TestWebPageRole_SchemaOrgMapping(t *testing.T) {
+	assert.Equal(t, "BlogPosting", domain.WebPageRoleBlogPost.SchemaOrgType())
+	assert.Equal(t, "Conversation", domain.WebPageRoleSessionTranscript.SchemaOrgType())
+	assert.Equal(t, "", domain.WebPageRole("UNKNOWN").SchemaOrgType())
+}
+
+func TestWebPageMeta_JSONKeepsRoleOrder(t *testing.T) {
+	meta := domain.WebPageMeta{
+		SchemaVersion: 1,
+		FinalURL:      "https://example.test/post",
+		Domain:        "example.test",
+		Roles:         []domain.WebPageRole{domain.WebPageRoleBlogPost, domain.WebPageRoleSessionTranscript},
+		Fetch:         domain.WebPageFetch{Status: domain.FetchStatusOK},
+	}
+	raw, err := json.Marshal(meta)
+	require.NoError(t, err)
+
+	var generic map[string]any
+	require.NoError(t, json.Unmarshal(raw, &generic))
+	assert.Equal(t, []any{"BLOG_POST", "SESSION_TRANSCRIPT"}, generic["webPageRoles"])
+
+	var back domain.WebPageMeta
+	require.NoError(t, json.Unmarshal(raw, &back))
+	assert.Equal(t, meta.Roles, back.Roles)
+}
+
+func TestWebPageMeta_NilRolesMarshalAsEmptyArray(t *testing.T) {
+	raw, err := json.Marshal(domain.WebPageMeta{})
+	require.NoError(t, err)
+	assert.Contains(t, string(raw), `"webPageRoles":[]`)
+	assert.NotContains(t, string(raw), `"webPageRoles":null`)
+}
+
+func TestWebPageMeta_MissingFieldsMarshalAsNull(t *testing.T) {
+	raw, err := json.Marshal(domain.WebPageMeta{})
+	require.NoError(t, err)
+	assert.Contains(t, string(raw), `"title":null`)
+	assert.Contains(t, string(raw), `"author":null`)
+	assert.Contains(t, string(raw), `"schemaVersion":0`)
 }

@@ -117,8 +117,34 @@ func TestSetPrimaryCategory(t *testing.T) {
 	require.Equal(t, "Physics", got.PrimaryCategory.Label)
 }
 
-// Upsert refreshes wikipedia_url (it used to be left out of DO UPDATE, so a
-// URL was never updated), but a blank one — a failed or empty Wikidata
+const removePrimaryCategoryMut = `mutation($contentId: IntID!) {
+  removePrimaryCategory(contentId: $contentId) { id primaryCategory { id } }
+}`
+
+// Removing is one UPDATE ... RETURNING (no category write, no re-read) and leaves the
+// content with no primary category.
+func TestRemovePrimaryCategory(t *testing.T) {
+	h := newHarness(t)
+	userID, token := h.user("catrm")
+	contentID := h.content(userID, "catrm")
+	h.warm(token)
+	qid := fmt.Sprintf("Q%d", time.Now().UnixNano()%1_000_000_000)
+	t.Cleanup(func() { _ = h.db.Exec("DELETE FROM categories WHERE wikidata_qid = ?", qid).Error })
+
+	h.roundTrips(2, token, setPrimaryCategoryMut, map[string]any{"input": map[string]any{
+		"contentId": contentID, "qid": qid, "label": "Physics",
+	}})
+
+	data := h.roundTrips(1, token, removePrimaryCategoryMut, map[string]any{"contentId": contentID})
+	got := decode[struct {
+		PrimaryCategory *struct {
+			ID string `json:"id"`
+		} `json:"primaryCategory"`
+	}](t, data, "removePrimaryCategory")
+	require.Nil(t, got.PrimaryCategory, "the primary category must be cleared")
+}
+
+// Upsert refreshes wikipedia_url, but a blank one — a failed or empty Wikidata
 // lookup — keeps what's stored.
 func TestCategoryUpsertWikipediaURL(t *testing.T) {
 	h := newHarness(t)
@@ -232,8 +258,9 @@ func TestListContentGridCategoriesCached(t *testing.T) {
 	require.GreaterOrEqual(t, labels, 3, "cached category reflects this instance's own write")
 }
 
-// frontend GET_CONTENT_AGGREGATES (details modal)
-const contentAggregatesQuery = `query($id: ID!) { contentByID(id: $id) { id perspectiveCount averageRating qualityRatingCount } }`
+// frontend GET_CONTENT_AGGREGATES (details modal), verbatim selection set
+// including importedFrom ("Imported from" line).
+const contentAggregatesQuery = `query GetContentAggregates($id: ID!) { contentByID(id: $id) { id perspectiveCount averageRating qualityRatingCount importedFrom { id name } } }`
 
 func TestContentAggregates(t *testing.T) {
 	h := newHarness(t)
@@ -248,6 +275,23 @@ func TestContentAggregates(t *testing.T) {
 		PerspectiveCount int `json:"perspectiveCount"`
 	}](t, data, "contentByID")
 	require.Equal(t, 1, got.PerspectiveCount)
+}
+
+// The details-modal document on imported content: still no content row read
+// (the aggregate query carries import_job_id), plus one batched import-job load.
+func TestContentAggregatesImported(t *testing.T) {
+	h := newHarness(t)
+	_, adminToken := adminUser(t, h, "agg-imp")
+	job, contentIDs := importRowsAsAdmin(t, h, adminToken, 1)
+	h.warm(adminToken)
+
+	data := h.roundTrips(2, adminToken, contentAggregatesQuery, map[string]any{"id": contentIDs[0]})
+	got := decode[contentOrigin](t, data, "contentByID")
+	require.NotNil(t, got.ImportedFrom)
+	require.Equal(t, job.ID, got.ImportedFrom.ID)
+	for _, s := range h.counter.Statements() {
+		require.NotContains(t, s, "response", "the JSONB response column must not be read")
+	}
 }
 
 // An aggregates-only query for an unknown id still errors "content not found"

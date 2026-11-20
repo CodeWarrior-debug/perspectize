@@ -1,20 +1,21 @@
 <script lang="ts">
 	import { Button } from '$lib/components/shadcn';
+	import LibraryStatus from './LibraryStatus.svelte';
+	import type { LibraryItem } from './libraryItem';
 	import { releaseYear, tmdbPosterUrl, type MovieSearchResult } from '$lib/services/tmdbApi';
-	import CheckIcon from '@lucide/svelte/icons/check';
 	import FilmIcon from '@lucide/svelte/icons/film';
 	import GlassesIcon from '@lucide/svelte/icons/glasses';
 	import StarIcon from '@lucide/svelte/icons/star';
 
 	let {
 		result,
-		isInLibrary = false,
+		libraryItem = null,
 		isPending = false,
 		onAdd,
 	}: {
 		result: MovieSearchResult;
-		/** True when result.url is already in the user's library (from the page's libraryUrls set). */
-		isInLibrary?: boolean;
+		/** The result's library row when result.url is already in the user's library, else null. */
+		libraryItem?: LibraryItem | null;
 		isPending?: boolean;
 		onAdd: (url: string) => void;
 	} = $props();
@@ -72,12 +73,9 @@
 		{/if}
 	</div>
 
-	<div class="shrink-0 self-start w-full sm:w-44">
-		{#if isInLibrary}
-			<Button variant="outline" size="sm" class="w-full sm:w-auto" disabled>
-				<CheckIcon class="size-4" />
-				In Library
-			</Button>
+	<div class="shrink-0 self-start w-full sm:w-56">
+		{#if libraryItem}
+			<LibraryStatus contentId={libraryItem.id} contentName={libraryItem.name} />
 		{:else}
 			<Button
 				variant="default"

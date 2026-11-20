@@ -1,0 +1,86 @@
+name: Claude Code
+
+on:
+  issue_comment:
+    types: [created]
+  pull_request_review_comment:
+    types: [created]
+  issues:
+    types: [opened, assigned]
+  pull_request_review:
+    types: [submitted]
+
+jobs:
+  claude:
+    if: |
+      (github.event_name == 'issue_comment' && contains(github.event.comment.body, '@claude')) ||
+      (github.event_name == 'pull_request_review_comment' && contains(github.event.comment.body, '@claude')) ||
+      (github.event_name == 'pull_request_review' && contains(github.event.review.body, '@claude')) ||
+      (github.event_name == 'issues' && (contains(github.event.issue.body, '@claude') || contains(github.event.issue.title, '@claude')))
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+      issues: read
+      id-token: write
+      actions: read # Required for Claude to read CI results on PRs
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 1
+
+      # Dependencies are installed here, before Claude starts, so Claude never
+      # needs permission to run `pnpm install` (install scripts run arbitrary code).
+      - uses: pnpm/action-setup@v6
+        with:
+          version: 10
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          cache: 'pnpm'
+          cache-dependency-path: frontend/pnpm-lock.yaml
+
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: pnpm install --frozen-lockfile
+
+      # No DATABASE_URL is set on purpose: DB-backed Go tests skip themselves
+      # without it, and it must never point at the shared Neon database.
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: backend/go.mod
+          cache-dependency-path: backend/go.sum
+
+      - name: Download backend dependencies
+        working-directory: backend
+        run: go mod download
+
+      - name: Run Claude Code
+        id: claude
+        uses: anthropics/claude-code-action@v1
+        env:
+          # Same values ci.yml uses for `pnpm run build`
+          VITE_DEMO_MODE: 'true'
+          VITE_GRAPHQL_URL: http://localhost:8080/graphql
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+
+          # This is an optional setting that allows Claude to read CI results on PRs
+          additional_permissions: |
+            actions: read
+
+          # Optional: Give a custom prompt to Claude. If this is not specified, Claude will perform the instructions specified in the comment that tagged it.
+          # prompt: 'Update the pull request description to include a summary of changes.'
+
+          # Optional: Add claude_args to customize behavior and configuration
+          # See https://github.com/anthropics/claude-code-action/blob/main/docs/usage.md
+          # or https://code.claude.com/docs/en/cli-reference for available options
+          # Narrow allowlist: frontend and backend tests, type-check/vet and build only.
+          # Claude starts at the repo root (no working-directory input), so commands
+          # use `pnpm --dir frontend` and `go -C backend`. No install, curl, gh api,
+          # go run/generate, make or interpreters.
+          claude_args: |
+            --allowed-tools "Bash(pnpm --dir frontend run test:run:*),Bash(pnpm --dir frontend run check:*),Bash(pnpm --dir frontend run build:*),Bash(go -C backend build:*),Bash(go -C backend test:*),Bash(go -C backend vet:*),Bash(gofmt -l backend)"
+

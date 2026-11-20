@@ -2,8 +2,13 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, cleanup } from '@testing-library/svelte';
 import ColumnPickerDialog from '$lib/components/ColumnPickerDialog.svelte';
 import { DATA_COLUMNS, INTERNAL_COLUMNS } from '$lib/utils/grid-config';
+import { warmUpRender } from '../helpers/warmUp';
 
 const noop = () => {};
+
+// Pay the component's first-render cost before any test, not inside the first
+// one: under full-suite load it alone can pass the 5 s testTimeout (#728).
+warmUpRender(ColumnPickerDialog, { open: true, onToggle: () => {} });
 
 describe('ColumnPickerDialog', () => {
 	beforeEach(() => vi.clearAllMocks());
@@ -19,7 +24,8 @@ describe('ColumnPickerDialog', () => {
 	it('renders a checkbox row for every data column when open', () => {
 		render(ColumnPickerDialog, { props: { open: true, onToggle: noop } });
 		for (const col of DATA_COLUMNS) {
-			expect(screen.getByLabelText(col.label)).toBeTruthy();
+			// Labels are not unique: Book's Author and Webpage's Author are both "Author" in the picker.
+			expect(screen.getAllByLabelText(col.label).length).toBeGreaterThan(0);
 		}
 	});
 
@@ -33,7 +39,8 @@ describe('ColumnPickerDialog', () => {
 		render(ColumnPickerDialog, { props: { open: true, isAdmin: true, onToggle: noop } });
 		expect(screen.getByText('Internal')).toBeTruthy();
 		for (const col of INTERNAL_COLUMNS) {
-			expect(screen.getByLabelText(col.label)).toBeTruthy();
+			// Labels are not unique: Book's Author and Webpage's Author are both "Author" in the picker.
+			expect(screen.getAllByLabelText(col.label).length).toBeGreaterThan(0);
 		}
 	});
 

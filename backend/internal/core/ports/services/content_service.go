@@ -6,11 +6,39 @@ import (
 	"github.com/CodeWarrior-debug/perspectize/backend/internal/core/domain"
 )
 
-// CreateClaimInput holds the input for creating a claim content entry
+// CreateClaimInput holds the input for creating a claim content entry.
+// ParentContentID is optional: a claim may stand alone. EffectiveDate
+// (YYYY-MM-DD) defaults to today UTC when nil or empty; EvaluateBy
+// (YYYY-MM-DD) is optional and nil or empty means unset.
 type CreateClaimInput struct {
 	Text            string
 	UserID          int
-	ParentContentID int
+	ParentContentID *int
+	EffectiveDate   *string
+	EvaluateBy      *string
+	// Privacy is nil for the default (PUBLIC). PRIVATE keeps the claim owner-only.
+	Privacy *domain.Privacy
+}
+
+// UpdateClaimInput holds the input for replacing a claim's text and dates.
+// ActorUserID must own the claim. Nil or empty EffectiveDate means today UTC;
+// nil or empty EvaluateBy clears the evaluate-by date.
+type UpdateClaimInput struct {
+	ContentID     int
+	ActorUserID   int
+	Text          string
+	EffectiveDate *string
+	EvaluateBy    *string
+	// Privacy is nil to keep the stored privacy.
+	Privacy *domain.Privacy
+}
+
+// DeleteClaimInput holds the input for deleting a claim. ActorUserID must own it.
+// KeepAnonymous hands the claim to the [deleted] sentinel user instead of deleting it.
+type DeleteClaimInput struct {
+	ContentID     int
+	ActorUserID   int
+	KeepAnonymous bool
 }
 
 // CreatePassageInput holds the input for creating (or finding) a Bible passage
@@ -63,8 +91,18 @@ type ContentService interface {
 	// CreateClaim creates a new claim content entry associated with a parent content item
 	CreateClaim(ctx context.Context, input CreateClaimInput) (*domain.Content, error)
 
-	// UpdateSourceData refreshes an existing content item's metadata from its source
-	UpdateSourceData(ctx context.Context, contentID int) (*domain.Content, error)
+	// UpdateClaim replaces an owned claim's text and dates. A claim the actor
+	// does not own is domain.ErrNotFound.
+	UpdateClaim(ctx context.Context, input UpdateClaimInput) (*domain.Content, error)
+	// DeleteClaim deletes an owned claim, or with KeepAnonymous hands it to the
+	// [deleted] sentinel user. A claim another user has a perspective or plan item on
+	// can't be deleted: domain.ErrClaimHasOthers (use KeepAnonymous instead).
+	DeleteClaim(ctx context.Context, input DeleteClaimInput) error
+
+	// UpdateSourceData refreshes an existing content item's metadata from its source.
+	// viewerID must be able to see the row (0 for anonymous); a row they can't see
+	// is domain.ErrNotFound.
+	UpdateSourceData(ctx context.Context, contentID, viewerID int) (*domain.Content, error)
 
 	// YouTubeTrending returns one page of YouTube's most-popular chart for a
 	// region (ISO 3166-1 alpha-2, e.g. "US"). Served from the backend cache, so
@@ -80,4 +118,33 @@ type ContentService interface {
 	// page. The window defaults to WEEK; page 0 means 1, otherwise 1-500. Served
 	// from the backend cache.
 	TrendingMovies(ctx context.Context, window domain.TrendingWindow, page int) (*MovieSearchPage, error)
+
+	// CreateFromBook creates BOOK content from an Open Library work URL or a
+	// bare ISBN-10/13, attributed to the given user. If the work already
+	// exists, returns the existing content along with ErrAlreadyExists.
+	CreateFromBook(ctx context.Context, rawURLOrISBN string, userID int) (*domain.Content, error)
+
+	// SearchBooks returns one page of Open Library work search results for the
+	// Discover page's Books source. The query is trimmed and must be 1-100
+	// characters; page 0 means 1 and must otherwise be 1-500.
+	SearchBooks(ctx context.Context, query string, page int) (*BookSearchPage, error)
+
+	// TrendingBooks returns one page of Open Library's trending books for the
+	// Discover page. The window defaults to WEEK; page 0 means 1, otherwise
+	// 1-500. Served from the backend cache.
+	TrendingBooks(ctx context.Context, window domain.TrendingWindow, page int) (*BookSearchPage, error)
+
+	// ResolveBookISBN resolves an ISBN-10/13 to its Open Library work without
+	// writing, for the ISBN tab's preview-before-add. Returns ErrNotFound when
+	// Open Library has no record for the ISBN.
+	ResolveBookISBN(ctx context.Context, isbn string) (*BookSearchResult, error)
+
+	// CreateFromWebPage saves a webpage by URL, attributed to userID. roles are the
+	// adder's picks (the first is primary; empty means a plain webpage). If the URL
+	// is already saved, returns that row with ErrAlreadyExists and ignores roles.
+	CreateFromWebPage(ctx context.Context, rawURL string, roles []domain.WebPageRole, userID int) (*domain.Content, error)
+
+	// PreviewWebPage reads a page's metadata for the Add dialog's import preview.
+	// It never writes.
+	PreviewWebPage(ctx context.Context, rawURL string) (*WebPagePreview, error)
 }

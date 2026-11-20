@@ -5,8 +5,12 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"html"
 	"log/slog"
+	"regexp"
 	"strings"
+	"time"
+	"unicode"
 	"unicode/utf8"
 
 	"github.com/CodeWarrior-debug/perspectize/backend/internal/adapters/tmdb"
@@ -25,10 +29,22 @@ type ContentService struct {
 	movieClient   portservices.MovieClient
 	movieSearch   portservices.MovieSearchClient
 	movieTrending portservices.MovieTrendingClient
+	bookSearch    portservices.BookSearchClient
+	bookTrending  portservices.BookTrendingClient
+	bookISBN      portservices.BookISBNClient
+	bookWork      portservices.BookWorkClient
+	webPage       portservices.WebPageClient
+	// now stamps a book's reading-log snapshot; tests inject a fixed clock.
+	now func() time.Time
 }
 
 // ContentServiceOption configures optional ContentService dependencies.
 type ContentServiceOption func(*ContentService)
+
+// WithClock overrides the time source used to stamp snapshots (tests only).
+func WithClock(now func() time.Time) ContentServiceOption {
+	return func(s *ContentService) { s.now = now }
+}
 
 // WithBibleReference enables BIBLE_PASSAGE creation by supplying the reference-data repository.
 func WithBibleReference(repo repositories.BibleReferenceRepository) ContentServiceOption {
@@ -51,6 +67,38 @@ func WithMovieSearch(client portservices.MovieSearchClient) ContentServiceOption
 // caching client so every caller shares its cache.
 func WithMovieTrending(client portservices.MovieTrendingClient) ContentServiceOption {
 	return func(s *ContentService) { s.movieTrending = client }
+}
+
+// WithBookSearch enables the Discover page's Books source (Open Library title
+// search) and backs CreateFromBook's work-key lookup. Searches are not cached
+// server-side; each call reaches Open Library.
+func WithBookSearch(client portservices.BookSearchClient) ContentServiceOption {
+	return func(s *ContentService) { s.bookSearch = client }
+}
+
+// WithBookTrending enables the Discover page's trending books list. Pass the
+// caching client so every caller shares its cache.
+func WithBookTrending(client portservices.BookTrendingClient) ContentServiceOption {
+	return func(s *ContentService) { s.bookTrending = client }
+}
+
+// WithBookISBN enables ISBN-based book lookup (the ISBN tab's resolve-before-add
+// and CreateFromBook's raw-ISBN input path).
+func WithBookISBN(client portservices.BookISBNClient) ContentServiceOption {
+	return func(s *ContentService) { s.bookISBN = client }
+}
+
+// WithBookWork enables the Open Library work record (description and related
+// works) read at add and refresh time, and edition-link resolution. Its
+// failures never block a book from being added.
+func WithBookWork(client portservices.BookWorkClient) ContentServiceOption {
+	return func(s *ContentService) { s.bookWork = client }
+}
+
+// WithWebPageClient enables webpage adds and the import preview. Without it,
+// CreateFromWebPage and PreviewWebPage return ErrWebPageClientUnavailable.
+func WithWebPageClient(client portservices.WebPageClient) ContentServiceOption {
+	return func(s *ContentService) { s.webPage = client }
 }
 
 // NewContentService creates a new content service
@@ -114,6 +162,10 @@ func (s *ContentService) CreateFromYouTube(ctx context.Context, url string, user
 		Response:      metadata.Response,
 	}
 
+	if jobID, ok := importJobIDFrom(ctx); ok {
+		content.ImportJobID = &jobID
+	}
+
 	// 6. Atomic upsert — handles concurrent race condition
 	// refreshOnConflict=true: update response/updated_at if URL already exists (refreshes metadata)
 	created, alreadyExisted, err := s.repo.GetOrCreateByURL(ctx, content, true)
@@ -161,7 +213,9 @@ func (s *ContentService) GetByIDs(ctx context.Context, ids []int) ([]*domain.Con
 // the source (YouTube) and performing a direct UPDATE of the stored row. Unlike
 // CreateFromYouTube's upsert path, this always operates on a known existing row by ID —
 // it never inserts, and it never touches created_at or added_by_user_id.
-func (s *ContentService) UpdateSourceData(ctx context.Context, contentID int) (*domain.Content, error) {
+// A row the viewer can't see is domain.ErrNotFound, checked before anything
+// about the row's type is revealed.
+func (s *ContentService) UpdateSourceData(ctx context.Context, contentID, viewerID int) (*domain.Content, error) {
 	if contentID <= 0 {
 		return nil, fmt.Errorf("%w: content id must be a positive integer", domain.ErrInvalidInput)
 	}
@@ -173,8 +227,24 @@ func (s *ContentService) UpdateSourceData(ctx context.Context, contentID int) (*
 		}
 		return nil, fmt.Errorf("failed to get content: %w", err)
 	}
+	if !existing.VisibleTo(viewerID) {
+		return nil, fmt.Errorf("%w: content not found", domain.ErrNotFound)
+	}
+	if existing.ContentType == domain.ContentTypeClaim {
+		return nil, fmt.Errorf("%w: this content type has no source to refresh", domain.ErrInvalidInput)
+	}
 	if existing.URL == nil {
 		return nil, fmt.Errorf("%w: content has no source URL to refresh", domain.ErrInvalidInput)
+	}
+
+	switch existing.ContentType {
+	case domain.ContentTypeBook:
+		return s.refreshBook(ctx, existing)
+	case "", domain.ContentTypeYouTubeVideo:
+		// YouTube rows (and rows loaded without a type, as in older tests) take the path below.
+	default:
+		// Movie refresh is out of scope; other types have no refresh source yet.
+		return nil, fmt.Errorf("%w: content type %s cannot be refreshed", domain.ErrInvalidInput, existing.ContentType)
 	}
 
 	videoID, err := s.youtubeClient.ExtractVideoID(*existing.URL)
@@ -199,52 +269,286 @@ func (s *ContentService) UpdateSourceData(ctx context.Context, contentID int) (*
 	return updated, nil
 }
 
-// CreateClaim creates a new claim content entry associated with a parent content item.
-// The claim text is stored raw (preserving @this/@here tokens for display-time resolution).
-// The parent content ID and raw text are stored in the response JSONB column.
+// claimDateLayout is the only accepted format for a claim's dates.
+const claimDateLayout = "2006-01-02"
+
+// claimPrivacy resolves a claim's privacy: nil is PUBLIC, and only the two
+// real values are accepted.
+func claimPrivacy(p *domain.Privacy) (domain.Privacy, error) {
+	if p == nil {
+		return domain.PrivacyPublic, nil
+	}
+	if *p != domain.PrivacyPublic && *p != domain.PrivacyPrivate {
+		return "", fmt.Errorf("%w: privacy must be PUBLIC or PRIVATE", domain.ErrInvalidInput)
+	}
+	return *p, nil
+}
+
+// refreshBook re-reads a BOOK row's work from Open Library. The work id comes
+// from the stored URL, the search record gives fresh metadata, and the work
+// record is best effort. The existing description, related works and
+// resolvedFromISBN are carried over, so a refresh never wipes them: the
+// description and related works are replaced only by a successful fetch.
+func (s *ContentService) refreshBook(ctx context.Context, existing *domain.Content) (*domain.Content, error) {
+	kind, workKey, err := parseBookInput(*existing.URL)
+	if err != nil || kind != bookInputWorkID {
+		return nil, fmt.Errorf("%w: content has no Open Library work URL to refresh", domain.ErrInvalidInput)
+	}
+	if s.bookSearch == nil {
+		return nil, ErrBookClientUnavailable
+	}
+
+	result, err := s.lookupBookByWorkKey(ctx, workKey)
+	if err != nil {
+		return nil, err
+	}
+
+	// Stored values to keep. A corrupt payload only loses them, so it is logged, not fatal.
+	var prev struct {
+		Description      string              `json:"description"`
+		RelatedWorks     []shapedRelatedWork `json:"relatedWorks"`
+		ResolvedFromISBN string              `json:"resolvedFromISBN"`
+	}
+	if len(existing.Response) > 0 {
+		if err := json.Unmarshal(existing.Response, &prev); err != nil {
+			slog.Warn("stored book payload is not parseable; refreshing without its description", "contentID", existing.ID, "error", err)
+		}
+	}
+
+	shaped := shapeBookResult(*result, s.clock())
+	shaped.Description = prev.Description
+	if prev.RelatedWorks != nil {
+		shaped.RelatedWorks = prev.RelatedWorks
+	}
+	shaped.ResolvedFromISBN = prev.ResolvedFromISBN
+	if work := s.fetchBookWork(ctx, workKey); work != nil {
+		shaped.Description = work.Description
+		shaped.RelatedWorks = shapeRelatedWorks(work.RelatedWorks)
+	}
+
+	responseJSON, err := json.Marshal(shaped)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal book response: %w", err)
+	}
+
+	updated, err := s.repo.UpdateMetadata(ctx, existing.ID, result.Title, responseJSON, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to update content metadata: %w", err)
+	}
+	return updated, nil
+}
+
+// CreateClaim creates a new claim content entry. Claims are PUBLIC unless the
+// author asks for PRIVATE (visible only to their owner). ParentContentID is
+// optional; when set it must exist and be visible to the author. The claim text is stored raw (preserving @this/@here
+// tokens for display-time resolution) in Name and response.text; response.html
+// is the escaped, sanitised rendering.
 func (s *ContentService) CreateClaim(ctx context.Context, input portservices.CreateClaimInput) (*domain.Content, error) {
-	if input.Text == "" {
-		return nil, fmt.Errorf("%w: claim text cannot be empty", domain.ErrInvalidInput)
+	text, err := normalizeClaimText(input.Text)
+	if err != nil {
+		return nil, err
 	}
 	if input.UserID <= 0 {
 		return nil, fmt.Errorf("%w: user id must be a positive integer", domain.ErrInvalidInput)
 	}
-	if input.ParentContentID <= 0 {
+	effective, evaluate, err := claimDates(input.EffectiveDate, input.EvaluateBy)
+	if err != nil {
+		return nil, err
+	}
+	privacy, err := claimPrivacy(input.Privacy)
+	if err != nil {
+		return nil, err
+	}
+	if input.ParentContentID != nil && *input.ParentContentID <= 0 {
 		return nil, fmt.Errorf("%w: parent content id must be a positive integer", domain.ErrInvalidInput)
 	}
 
-	// Validate parent content exists
-	_, err := s.repo.GetByID(ctx, input.ParentContentID)
-	if err != nil {
-		if errors.Is(err, domain.ErrNotFound) {
+	responsePayload := map[string]interface{}{
+		"text": text,
+		"html": claimHTML(text),
+	}
+	if input.ParentContentID != nil {
+		parentID := *input.ParentContentID
+		parent, err := s.repo.GetByID(ctx, parentID)
+		if err != nil {
+			if errors.Is(err, domain.ErrNotFound) {
+				return nil, fmt.Errorf("%w: parent content not found", domain.ErrNotFound)
+			}
+			return nil, fmt.Errorf("failed to validate parent content: %w", err)
+		}
+		// A private parent is invisible to everyone but its owner, so it
+		// answers exactly like a missing one.
+		if parent.Privacy == domain.PrivacyPrivate && parent.AddedByUserID != input.UserID {
 			return nil, fmt.Errorf("%w: parent content not found", domain.ErrNotFound)
 		}
-		return nil, fmt.Errorf("failed to validate parent content: %w", err)
+		responsePayload["parentContentId"] = parentID
 	}
 
-	// Build response JSONB: stores parentContentId and raw text for reference resolution
-	responsePayload := map[string]interface{}{
-		"parentContentId": input.ParentContentID,
-		"text":            input.Text,
-	}
 	responseJSON, err := json.Marshal(responsePayload)
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal claim response: %w", err)
 	}
+	customFields, err := claimCustomFields(effective, evaluate)
+	if err != nil {
+		return nil, err
+	}
 
-	content := &domain.Content{
-		Name:          input.Text,
+	created, err := s.repo.Create(ctx, &domain.Content{
+		Name:          text,
 		ContentType:   domain.ContentTypeClaim,
 		AddedByUserID: input.UserID,
 		Response:      responseJSON,
-	}
-
-	created, err := s.repo.Create(ctx, content)
+		Privacy:       privacy,
+		CustomFields:  customFields,
+	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to save claim: %w", err)
 	}
 
 	return created, nil
+}
+
+// UpdateClaim replaces an owned claim's text and dates. The same text and date
+// rules as CreateClaim apply. Ownership is enforced in the repository's
+// owner-scoped UPDATE, so a claim the actor doesn't own is domain.ErrNotFound.
+func (s *ContentService) UpdateClaim(ctx context.Context, input portservices.UpdateClaimInput) (*domain.Content, error) {
+	if input.ContentID <= 0 {
+		return nil, fmt.Errorf("%w: content id must be a positive integer", domain.ErrInvalidInput)
+	}
+	if input.ActorUserID <= 0 {
+		return nil, fmt.Errorf("%w: user id must be a positive integer", domain.ErrInvalidInput)
+	}
+	text, err := normalizeClaimText(input.Text)
+	if err != nil {
+		return nil, err
+	}
+	if input.Privacy != nil {
+		if _, err := claimPrivacy(input.Privacy); err != nil {
+			return nil, err
+		}
+	}
+	effectiveIn := input.EffectiveDate
+	if effectiveIn == nil || *effectiveIn == "" {
+		effectiveIn, err = s.storedEffectiveDate(ctx, input.ContentID)
+		if err != nil {
+			return nil, err
+		}
+	}
+	effective, evaluate, err := claimDates(effectiveIn, input.EvaluateBy)
+	if err != nil {
+		return nil, err
+	}
+	customFields, err := claimCustomFields(effective, evaluate)
+	if err != nil {
+		return nil, err
+	}
+
+	// The repository clears evaluateBy unless the new object carries it.
+	updated, err := s.repo.UpdateClaim(ctx, input.ContentID, input.ActorUserID, text, claimHTML(text), customFields, input.Privacy)
+	if err != nil {
+		return nil, fmt.Errorf("failed to update claim: %w", err)
+	}
+	return updated, nil
+}
+
+// DeleteClaim deletes an owned claim, or with KeepAnonymous hands it to the
+// [deleted] sentinel user. A claim that another user has a perspective or plan
+// item on can only be kept anonymous: the plain delete returns ErrClaimHasOthers.
+func (s *ContentService) DeleteClaim(ctx context.Context, input portservices.DeleteClaimInput) error {
+	if input.ContentID <= 0 {
+		return fmt.Errorf("%w: content id must be a positive integer", domain.ErrInvalidInput)
+	}
+	if input.ActorUserID <= 0 {
+		return fmt.Errorf("%w: user id must be a positive integer", domain.ErrInvalidInput)
+	}
+	if input.KeepAnonymous {
+		return s.repo.AnonymizeOwnedClaim(ctx, input.ContentID, input.ActorUserID)
+	}
+	return s.repo.DeleteOwnedClaim(ctx, input.ContentID, input.ActorUserID)
+}
+
+// storedEffectiveDate returns the effective date a claim already holds, so an
+// edit that leaves the date empty keeps it. A claim with no stored date returns
+// nil, and claimDates then falls back to today. A missing claim is ErrNotFound.
+func (s *ContentService) storedEffectiveDate(ctx context.Context, id int) (*string, error) {
+	existing, err := s.repo.GetByID(ctx, id)
+	if err != nil {
+		return nil, fmt.Errorf("failed to load claim: %w", err)
+	}
+	var fields map[string]string
+	if len(existing.CustomFields) == 0 || json.Unmarshal(existing.CustomFields, &fields) != nil {
+		return nil, nil
+	}
+	effective, ok := fields["effectiveDate"]
+	if !ok {
+		return nil, nil
+	}
+	return &effective, nil
+}
+
+// normalizeClaimText trims the text, collapses whitespace runs to one space,
+// and enforces the claim rules: at least two words (a word is a whitespace
+// separated token holding a letter or digit) and at most ClaimMaxLength runes.
+func normalizeClaimText(raw string) (string, error) {
+	text := strings.Join(strings.Fields(raw), " ")
+	words := 0
+	for _, tok := range strings.Fields(text) {
+		if strings.IndexFunc(tok, func(r rune) bool { return unicode.IsLetter(r) || unicode.IsDigit(r) }) >= 0 {
+			words++
+		}
+	}
+	if words < 2 {
+		return "", fmt.Errorf("%w: claim must contain at least two words", domain.ErrInvalidInput)
+	}
+	if utf8.RuneCountInString(text) > domain.ClaimMaxLength {
+		return "", fmt.Errorf("%w: claim must be at most %d characters", domain.ErrInvalidInput, domain.ClaimMaxLength)
+	}
+	return text, nil
+}
+
+// claimDates resolves a claim's dates. The effective date defaults to today
+// (UTC) when unset; the evaluate-by date is optional and must not precede it.
+func claimDates(effectiveIn, evaluateIn *string) (string, *string, error) {
+	effective := time.Now().UTC().Format(claimDateLayout)
+	if effectiveIn != nil && *effectiveIn != "" {
+		effective = *effectiveIn
+	}
+	effectiveDate, err := time.Parse(claimDateLayout, effective)
+	if err != nil {
+		return "", nil, fmt.Errorf("%w: effective date must be YYYY-MM-DD", domain.ErrInvalidInput)
+	}
+
+	if evaluateIn == nil || *evaluateIn == "" {
+		return effective, nil, nil
+	}
+	evaluate := *evaluateIn
+	evaluateDate, err := time.Parse(claimDateLayout, evaluate)
+	if err != nil {
+		return "", nil, fmt.Errorf("%w: evaluate-by date must be YYYY-MM-DD", domain.ErrInvalidInput)
+	}
+	if evaluateDate.Before(effectiveDate) {
+		return "", nil, fmt.Errorf("%w: evaluate-by date cannot be before the effective date", domain.ErrInvalidInput)
+	}
+	return effective, &evaluate, nil
+}
+
+// claimCustomFields encodes the claim's dates. evaluateBy is present only when set.
+func claimCustomFields(effective string, evaluate *string) (json.RawMessage, error) {
+	fields := map[string]string{"effectiveDate": effective}
+	if evaluate != nil {
+		fields["evaluateBy"] = *evaluate
+	}
+	raw, err := json.Marshal(fields)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal claim fields: %w", err)
+	}
+	return raw, nil
+}
+
+// claimHTML renders claim text as safe HTML: the text is escaped first, so
+// typed markup stays inert, then passed through the review sanitiser.
+func claimHTML(text string) string {
+	return sanitizeReview(html.EscapeString(text))
 }
 
 // ListContent retrieves a paginated list of content
@@ -582,6 +886,9 @@ func (s *ContentService) CreateFromMovie(ctx context.Context, rawURL string, use
 		// TMDB reports runtime in whole minutes; Length holds them as seconds.
 		content.LengthDisplay = domain.TMDBLengthDisplay()
 	}
+	if jobID, ok := importJobIDFrom(ctx); ok {
+		content.ImportJobID = &jobID
+	}
 
 	created, alreadyExisted, err := s.repo.GetOrCreateByURL(ctx, content, true)
 	if err != nil {
@@ -605,4 +912,376 @@ func movieNotAllowed(response json.RawMessage) bool {
 		return false
 	}
 	return shaped.Adult || strings.EqualFold(strings.TrimSpace(shaped.Certification), "NC-17")
+}
+
+// bookWorkLinkRe and bookEditionLinkRe find an Open Library work or edition id
+// in a pasted link. The scheme and www are optional and the match is not
+// anchored at the front, like the Movie parser; any slug, query or fragment
+// after the id is ignored. The id is the only thing kept, so the stored URL
+// is always canonicalBookURL(workKey).
+var (
+	bookWorkLinkRe    = regexp.MustCompile(`(?i)openlibrary\.org/works/(OL\d+W)(?:[/?#]|$)`)
+	bookEditionLinkRe = regexp.MustCompile(`(?i)openlibrary\.org/books/(OL\d+M)(?:[/?#]|$)`)
+)
+
+// isbnRe matches a normalised ISBN-10 (9 digits + digit or X) or ISBN-13
+// (13 digits). Input is normalised by normalizeISBN first.
+var isbnRe = regexp.MustCompile(`^(?:\d{9}[0-9X]|\d{13})$`)
+
+// bookInputKind says which form of book input parseBookInput recognised.
+type bookInputKind int
+
+const (
+	bookInputWorkID bookInputKind = iota + 1
+	bookInputEditionID
+	bookInputISBN
+)
+
+// parseBookInput classifies a pasted Open Library work link, edition link or
+// ISBN and returns its bare id: a work id (OL…W), an edition id (OL…M) or a
+// normalised ISBN. Anything else is ErrInvalidInput, before any URL is built.
+func parseBookInput(raw string) (bookInputKind, string, error) {
+	s := strings.TrimSpace(raw)
+	if m := bookWorkLinkRe.FindStringSubmatch(s); m != nil {
+		return bookInputWorkID, strings.ToUpper(m[1]), nil
+	}
+	if m := bookEditionLinkRe.FindStringSubmatch(s); m != nil {
+		return bookInputEditionID, strings.ToUpper(m[1]), nil
+	}
+	if isbn := normalizeISBN(s); isbnRe.MatchString(isbn) {
+		return bookInputISBN, isbn, nil
+	}
+	return 0, "", fmt.Errorf("%w: not an Open Library work or edition link, or an ISBN", domain.ErrInvalidInput)
+}
+
+// normalizeISBN drops spaces and hyphens and uppercases a trailing X. It does
+// not validate the result; parseBookInput and ResolveBookISBN do that.
+func normalizeISBN(raw string) string {
+	var b strings.Builder
+	for _, r := range raw {
+		switch {
+		case unicode.IsSpace(r) || r == '-':
+			continue
+		case r == 'x':
+			b.WriteRune('X')
+		default:
+			b.WriteRune(r)
+		}
+	}
+	return b.String()
+}
+
+// ErrBookClientUnavailable is returned by CreateFromBook, SearchBooks,
+// TrendingBooks and ResolveBookISBN when the service was built without the
+// relevant Open Library client. Resolvers show clients a generic message.
+var ErrBookClientUnavailable = errors.New("book lookup is unavailable: no book client configured")
+
+// canonicalBookURL is the canonical content URL stored for an Open Library work.
+func canonicalBookURL(workKey string) string {
+	return "https://openlibrary.org/works/" + workKey
+}
+
+// shapedBook is the JSON shape stored in Content.Response for BOOK content,
+// mirroring BookSearchResult's fields in camelCase. Slice fields are never
+// nil so a missing Open Library field (e.g. no author_name) marshals to []
+// rather than null.
+type shapedBook struct {
+	WorkKey          string         `json:"workKey"`
+	Title            string         `json:"title"`
+	Authors          []shapedAuthor `json:"authors"`
+	CoverID          *int           `json:"coverId"`
+	FirstPublishYear *int           `json:"firstPublishYear"`
+	PageCountMedian  *int           `json:"pageCountMedian"`
+	Subjects         []string       `json:"subjects"`
+	RatingsAverage   *float64       `json:"ratingsAverage"`
+	RatingsCount     *int           `json:"ratingsCount"`
+	EditionCount     *int           `json:"editionCount"`
+	// Reading-log counts (Open Library users only) are a snapshot taken at
+	// ReadingLogFetchedAt (RFC 3339 UTC); nil when Open Library omitted one.
+	WantToReadCount       *int   `json:"wantToReadCount"`
+	CurrentlyReadingCount *int   `json:"currentlyReadingCount"`
+	AlreadyReadCount      *int   `json:"alreadyReadCount"`
+	ReadingLogCount       *int   `json:"readingLogCount"`
+	ReadingLogFetchedAt   string `json:"readingLogFetchedAt,omitempty"`
+	// Description comes from the work record; omitted when empty.
+	Description string `json:"description,omitempty"`
+	// RelatedWorks comes from the work record; never nil (empty list when none).
+	RelatedWorks []shapedRelatedWork `json:"relatedWorks"`
+	// ResolvedFromISBN is the normalised ISBN the user supplied, when the book
+	// was added by ISBN. Metadata only; identity stays the work URL.
+	ResolvedFromISBN string `json:"resolvedFromISBN,omitempty"`
+}
+
+// shapedRelatedWork is one related-works link in a stored book.
+type shapedRelatedWork struct {
+	Title string `json:"title"`
+	URL   string `json:"url"`
+}
+
+// shapeRelatedWorks converts work-record related works to their stored shape.
+// Never returns nil.
+func shapeRelatedWorks(in []portservices.BookRelatedWork) []shapedRelatedWork {
+	out := make([]shapedRelatedWork, 0, len(in))
+	for _, r := range in {
+		out = append(out, shapedRelatedWork{Title: r.Title, URL: r.URL})
+	}
+	return out
+}
+
+// shapedAuthor is one entry of a stored book's authors list. OpenLibraryKey is
+// omitted when Open Library gave no key for this author.
+type shapedAuthor struct {
+	Name           string `json:"name"`
+	OpenLibraryKey string `json:"openLibraryKey,omitempty"`
+}
+
+// shapeAuthors pairs each author name with its Open Library key by index, but
+// only when the two lists have equal length. With any mismatch the names are
+// kept and no key is attached, since a key on the wrong author is worse than
+// none. Never returns nil.
+func shapeAuthors(names, keys []string) []shapedAuthor {
+	authors := make([]shapedAuthor, 0, len(names))
+	paired := len(names) == len(keys)
+	for i, name := range names {
+		a := shapedAuthor{Name: name}
+		if paired {
+			a.OpenLibraryKey = keys[i]
+		}
+		authors = append(authors, a)
+	}
+	return authors
+}
+
+// shapeBookResult converts a BookSearchResult to the JSON shape stored in
+// Content.Response.
+func shapeBookResult(r portservices.BookSearchResult, fetchedAt time.Time) shapedBook {
+	subjects := r.Subjects
+	if subjects == nil {
+		subjects = []string{}
+	}
+	return shapedBook{
+		WorkKey:          r.WorkKey,
+		Title:            r.Title,
+		Authors:          shapeAuthors(r.AuthorName, r.AuthorKey),
+		RelatedWorks:     []shapedRelatedWork{},
+		CoverID:          r.CoverID,
+		FirstPublishYear: r.FirstPublishYear,
+		PageCountMedian:  r.PageCountMedian,
+		Subjects:         subjects,
+		RatingsAverage:   r.RatingsAverage,
+		RatingsCount:     r.RatingsCount,
+		EditionCount:     r.EditionCount,
+
+		WantToReadCount:       r.WantToReadCount,
+		CurrentlyReadingCount: r.CurrentlyReadingCount,
+		AlreadyReadCount:      r.AlreadyReadCount,
+		ReadingLogCount:       r.ReadingLogCount,
+		ReadingLogFetchedAt:   fetchedAt.UTC().Format(time.RFC3339),
+	}
+}
+
+// clock returns the snapshot time, defaulting to the wall clock.
+func (s *ContentService) clock() time.Time {
+	if s.now != nil {
+		return s.now()
+	}
+	return time.Now()
+}
+
+// lookupBookByWorkKey resolves a bare Open Library work key (e.g. "OL23166W")
+// to its BookSearchResult via search.json.
+//
+// search.json has no documented "look up a work by key directly" parameter.
+// Verified live (2026-11-09): q=key:"/works/OL23166W" returns exactly that
+// work as the sole result (numFound=1), so that is the query used here.
+func (s *ContentService) lookupBookByWorkKey(ctx context.Context, workKey string) (*portservices.BookSearchResult, error) {
+	page, err := s.bookSearch.SearchBooks(ctx, fmt.Sprintf(`key:"/works/%s"`, workKey), 1)
+	if err != nil {
+		if errors.Is(err, domain.ErrNotFound) {
+			return nil, fmt.Errorf("%w: book not found", domain.ErrNotFound)
+		}
+		// Log details server-side; clients get a generic message.
+		slog.Error("failed to fetch book metadata", "workKey", workKey, "error", err)
+		return nil, fmt.Errorf("failed to fetch book metadata")
+	}
+	if len(page.Items) == 0 {
+		return nil, fmt.Errorf("%w: book not found", domain.ErrNotFound)
+	}
+	return &page.Items[0], nil
+}
+
+// CreateFromBook creates BOOK content from an Open Library work URL
+// (https://openlibrary.org/works/<id>) or a bare ISBN-10/13, attributed to
+// the given user. If the work already exists, returns the existing content
+// along with domain.ErrAlreadyExists. Duplicates are detected by canonical
+// work URL before any Open Library search call, so a repeat add costs no
+// extra lookup beyond ISBN resolution (when the input was an ISBN).
+func (s *ContentService) CreateFromBook(ctx context.Context, rawURLOrISBN string, userID int) (*domain.Content, error) {
+	kind, id, err := parseBookInput(rawURLOrISBN)
+	if err != nil {
+		return nil, err
+	}
+
+	if s.bookSearch == nil {
+		return nil, ErrBookClientUnavailable
+	}
+
+	var workKey, isbn string
+	switch kind {
+	case bookInputWorkID:
+		workKey = id
+	case bookInputEditionID:
+		if s.bookWork == nil {
+			return nil, ErrBookClientUnavailable
+		}
+		resolved, err := s.bookWork.ResolveEdition(ctx, id)
+		if err != nil {
+			if errors.Is(err, domain.ErrNotFound) {
+				return nil, fmt.Errorf("%w: edition not found", domain.ErrNotFound)
+			}
+			slog.Error("failed to resolve edition", "editionID", id, "userID", userID, "error", err)
+			return nil, fmt.Errorf("failed to resolve edition")
+		}
+		workKey = resolved
+	case bookInputISBN:
+		if s.bookISBN == nil {
+			return nil, ErrBookClientUnavailable
+		}
+		resolved, err := s.bookISBN.ResolveISBN(ctx, id)
+		if err != nil {
+			if errors.Is(err, domain.ErrNotFound) {
+				return nil, fmt.Errorf("%w: isbn not found", domain.ErrNotFound)
+			}
+			slog.Error("failed to resolve isbn", "isbn", id, "userID", userID, "error", err)
+			return nil, fmt.Errorf("failed to resolve isbn")
+		}
+		workKey = resolved
+		isbn = id
+	}
+
+	canonicalURL := canonicalBookURL(workKey)
+
+	existing, err := s.repo.GetByURL(ctx, canonicalURL)
+	if err == nil && existing != nil {
+		return existing, domain.ErrAlreadyExists
+	}
+	if err != nil && !errors.Is(err, domain.ErrNotFound) {
+		return nil, fmt.Errorf("failed to check existing content: %w", err)
+	}
+
+	result, err := s.lookupBookByWorkKey(ctx, workKey)
+	if err != nil {
+		return nil, err
+	}
+
+	shaped := shapeBookResult(*result, s.clock())
+	if work := s.fetchBookWork(ctx, workKey); work != nil {
+		shaped.Description = work.Description
+		shaped.RelatedWorks = shapeRelatedWorks(work.RelatedWorks)
+	}
+	shaped.ResolvedFromISBN = isbn
+
+	responseJSON, err := json.Marshal(shaped)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal book response: %w", err)
+	}
+
+	content := &domain.Content{
+		Name:          result.Title,
+		URL:           &canonicalURL,
+		ContentType:   domain.ContentTypeBook,
+		AddedByUserID: userID,
+		Response:      responseJSON,
+	}
+
+	created, alreadyExisted, err := s.repo.GetOrCreateByURL(ctx, content, true)
+	if err != nil {
+		return nil, fmt.Errorf("failed to save content: %w", err)
+	}
+	if alreadyExisted {
+		return created, domain.ErrAlreadyExists
+	}
+	return created, nil
+}
+
+// fetchBookWork reads the work record's description and related works. It is
+// best effort: a nil result means no client is configured or the fetch failed,
+// and the caller keeps going without description data. Errors are logged
+// without upstream detail.
+func (s *ContentService) fetchBookWork(ctx context.Context, workKey string) *portservices.BookWork {
+	if s.bookWork == nil {
+		return nil
+	}
+	work, err := s.bookWork.FetchWork(ctx, workKey)
+	if err != nil {
+		slog.Warn("failed to fetch book work record; continuing without description", "workKey", workKey, "error", err)
+		return nil
+	}
+	return work
+}
+
+// SearchBooks returns one page of Open Library work search results. The
+// query is trimmed and must be 1-100 runes. Page 0 means page 1; otherwise it
+// must be 1-500. Invalid input never reaches Open Library.
+func (s *ContentService) SearchBooks(ctx context.Context, query string, page int) (*portservices.BookSearchPage, error) {
+	if s.bookSearch == nil {
+		return nil, ErrBookClientUnavailable
+	}
+	q := strings.TrimSpace(query)
+	if n := utf8.RuneCountInString(q); n < 1 || n > 100 {
+		return nil, fmt.Errorf("%w: query must be 1-100 characters", domain.ErrInvalidInput)
+	}
+	if page == 0 {
+		page = 1
+	}
+	if page < 1 || page > 500 {
+		return nil, fmt.Errorf("%w: page must be between 1 and 500", domain.ErrInvalidInput)
+	}
+	return s.bookSearch.SearchBooks(ctx, q, page)
+}
+
+// TrendingBooks returns one page of Open Library's trending books. An empty
+// window means WEEK and anything other than DAY or WEEK is invalid. Page 0
+// means 1; otherwise it must be 1-500. Invalid input never reaches Open
+// Library.
+func (s *ContentService) TrendingBooks(ctx context.Context, window domain.TrendingWindow, page int) (*portservices.BookSearchPage, error) {
+	if s.bookTrending == nil {
+		return nil, ErrBookClientUnavailable
+	}
+	if window == "" {
+		window = domain.TrendingWindowWeek
+	}
+	if window != domain.TrendingWindowDay && window != domain.TrendingWindowWeek {
+		return nil, fmt.Errorf("%w: window must be DAY or WEEK", domain.ErrInvalidInput)
+	}
+	if page == 0 {
+		page = 1
+	}
+	if page < 1 || page > 500 {
+		return nil, fmt.Errorf("%w: page must be between 1 and 500", domain.ErrInvalidInput)
+	}
+	return s.bookTrending.TrendingBooks(ctx, window, page)
+}
+
+// ResolveBookISBN resolves an ISBN-10/13 to its Open Library work and returns
+// the BookSearchResult without writing. Backs the ISBN tab's
+// preview-before-add (spec Section 5).
+func (s *ContentService) ResolveBookISBN(ctx context.Context, isbn string) (*portservices.BookSearchResult, error) {
+	raw := normalizeISBN(isbn)
+	if !isbnRe.MatchString(raw) {
+		return nil, fmt.Errorf("%w: not a valid ISBN", domain.ErrInvalidInput)
+	}
+	if s.bookISBN == nil || s.bookSearch == nil {
+		return nil, ErrBookClientUnavailable
+	}
+
+	workKey, err := s.bookISBN.ResolveISBN(ctx, raw)
+	if err != nil {
+		if errors.Is(err, domain.ErrNotFound) {
+			return nil, fmt.Errorf("%w: isbn not found", domain.ErrNotFound)
+		}
+		slog.Error("failed to resolve isbn", "isbn", raw, "error", err)
+		return nil, fmt.Errorf("failed to resolve isbn")
+	}
+	return s.lookupBookByWorkKey(ctx, workKey)
 }

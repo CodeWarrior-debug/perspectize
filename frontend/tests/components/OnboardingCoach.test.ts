@@ -63,6 +63,15 @@ vi.mock('$lib/components/PerspectivePopover.svelte', async () => {
 
 import OnboardingCoach from '$lib/components/onboarding/OnboardingCoach.svelte';
 import { CURRENT_INTRO_VERSION } from '$lib/onboarding/config';
+import { preloadLazy, warmUpRender } from '../helpers/warmUp';
+
+// The component renders this through {#await import(...)}: load it up front so a
+// findBy* waits on the UI, not on Vite's first transform of the module (#728).
+preloadLazy(() => import('$lib/components/PerspectivePopover.svelte'));
+
+// Pay the component's first-render cost before any test, not inside the first
+// one: under full-suite load it alone can pass the 5 s testTimeout (#728).
+warmUpRender(OnboardingCoach, { userId: 7, open: true });
 
 describe('OnboardingCoach', () => {
 	beforeEach(() => {

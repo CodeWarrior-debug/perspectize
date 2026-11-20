@@ -5,6 +5,8 @@
 		text: string;
 		copy: string | null;
 		items: string[];
+		/** Text copied per item (parallel to `items`); falls back to the item label. */
+		copyValues?: string[];
 	}
 </script>
 
@@ -51,6 +53,18 @@
 		if (next.has(item)) next.delete(item);
 		else next.add(item);
 		selected = next;
+	}
+
+	// Select-all and clear are the two ends of the selection range; each is disabled
+	// at its own end so the bar always shows the one move that changes something.
+	const allSelected = $derived(popover !== null && popover.items.every((item) => selected.has(item)));
+
+	function selectAll() {
+		if (popover) selected = new Set(popover.items);
+	}
+
+	function clearSelection() {
+		selected = new Set();
 	}
 </script>
 
@@ -99,12 +113,21 @@
 					<div class="tip-actions">
 						<button
 							type="button"
+							data-testid="tip-select-all"
+							disabled={allSelected}
+							onclick={selectAll}>Select all</button
+						>
+						<button
+							type="button"
+							data-testid="tip-clear-selection"
+							disabled={selected.size === 0}
+							onclick={clearSelection}>Clear</button
+						>
+						<button
+							type="button"
 							data-testid="tip-copy-selected"
 							disabled={selected.size === 0}
-							onclick={() => copy(itemsCopyText(popover.items, selected))}>Copy selected</button
-						>
-						<button type="button" data-testid="tip-copy-all" onclick={() => copy(itemsCopyText(popover.items, null))}
-							>Copy all</button
+							onclick={() => copy(itemsCopyText(popover.items, selected, popover.copyValues))}>Copy selected</button
 						>
 					</div>
 				{/if}

@@ -20,6 +20,7 @@ vi.mock('svelte-sonner', () => ({ toast: { success: mocks.success, error: mocks.
 vi.mock('$lib/queries/client', () => ({ graphqlRequest: mocks.graphqlRequest }));
 
 import { useAddPassage } from '$lib/queries/content/useAddPassage';
+import { preloadLazy } from '../helpers/warmUp';
 
 const range = { bookId: 43, startChapter: 3, startVerse: 16, endChapter: 3, endVerse: 18 };
 
@@ -27,6 +28,10 @@ beforeEach(() => {
 	vi.clearAllMocks();
 	useAddPassage();
 });
+
+// The tests import these inside their bodies; load them once up front so the first
+// test doesn't pay the module transform, which balloons under full-suite load (#728).
+preloadLazy(() => import('$app/navigation'));
 
 describe('useAddPassage', () => {
 	it('sends the range through the authenticated wrapper with the session-derived userID', async () => {
@@ -66,7 +71,7 @@ describe('useAddPassage', () => {
 			createContentFromPassage: { id: '7', name: 'John 3:16-18', contentType: 'BIBLE_PASSAGE', displayTitle: null },
 		});
 		mocks.success.mock.calls[0][1].action.onClick();
-		expect(goto).toHaveBeenCalledWith('/?open=7');
+		expect(goto).toHaveBeenCalledWith('/content-library?open=7');
 	});
 
 	it.each([

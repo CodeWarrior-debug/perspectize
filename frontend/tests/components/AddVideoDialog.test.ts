@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render } from '@testing-library/svelte';
 import AddVideoDialog from '$lib/components/AddVideoDialog.svelte';
+import { warmUpRender } from '../helpers/warmUp';
 
 // Hoisted mocks — shared pattern for useAddVideo components
 const mocks = vi.hoisted(() => ({
@@ -39,6 +40,10 @@ function reset() {
 	mocks.mockMutationState.isPending = false;
 	mocks.mockMutationState.isSuccess = false;
 }
+
+// Pay the component's first-render cost before any test, not inside the first
+// one: under full-suite load it alone can pass the 5 s testTimeout (#728).
+warmUpRender(AddVideoDialog, { open: true });
 
 describe('AddVideoDialog component', () => {
 	beforeEach(reset);

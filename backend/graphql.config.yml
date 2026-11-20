@@ -1,0 +1,5 @@
+schema:
+  - schema.graphql
+  - messaging.graphql
+# Backend has no operations to validate; the frontend's gql`` documents are covered by frontend/graphql.config.yml.
+documents: []

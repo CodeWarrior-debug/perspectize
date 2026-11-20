@@ -2,6 +2,7 @@
  * URL ↔ grid state synchronization utilities.
  * Serializes/deserializes AG Grid filter models to/from URL search params.
  */
+import type { WebPageRole } from '$lib/queries/content';
 import {
 	COL_TO_SORT,
 	SORT_TO_COL,
@@ -14,6 +15,7 @@ import {
 	PERSON_FILTER_KEY,
 	parsePersonFilter,
 } from './grid-config';
+import { WEB_PAGE_ROLE_OPTIONS } from './webPage';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -32,6 +34,20 @@ export const ALL_SEARCH_SCOPES: SearchScopeKey[] = ['title', 'desc', 'channel', 
 export const MOVIE_SEARCH_SCOPES: SearchScopeKey[] = ['cast', 'director'];
 
 const EVERY_SEARCH_SCOPE: SearchScopeKey[] = [...ALL_SEARCH_SCOPES, ...MOVIE_SEARCH_SCOPES];
+
+/**
+ * Type options to offer as one-click switches while the Type filter holds exactly one type: every
+ * other content type, in option order. Empty for no type filter or several types, since a switch
+ * only makes sense from a single-type view.
+ */
+export function otherTypeOptionsWhenOne(filters: Record<string, string>): readonly { value: string; label: string }[] {
+	const selected = (filters.type ?? '')
+		.split(',')
+		.map((t) => t.trim().toLowerCase())
+		.filter(Boolean);
+	if (selected.length !== 1) return [];
+	return CONTENT_TYPE_OPTIONS.filter((option) => option.value !== selected[0]);
+}
 
 /** Scopes offered (and on by default) for a given set of URL filters: Cast/Director join in when `f.type` includes movie. */
 export function searchScopesFor(filters: Record<string, string>): SearchScopeKey[] {
@@ -455,6 +471,8 @@ const SCOPE_TO_GQL_FIELD: Record<SearchScopeKey, ContentSearchFieldGQL> = {
 export interface ContentFilterInput {
 	contentType?: string;
 	contentTypes?: string[];
+	/** Webpage rows only; any of the listed roles matches (OR). Other content types never match. */
+	webPageRoles?: WebPageRole[];
 	minLengthSeconds?: number;
 	maxLengthSeconds?: number;
 	search?: string;
@@ -478,6 +496,14 @@ export interface ContentFilterInput {
 	personRole?: 'CAST' | 'DIRECTOR';
 	genreContains?: string;
 	castContains?: string;
+	// Book filter (book rows only): case-insensitive contains on the first author.
+	authorContains?: string;
+	minPublishYear?: number;
+	maxPublishYear?: number;
+	minPages?: number;
+	maxPages?: number;
+	minBookRating?: number;
+	maxBookRating?: number;
 	ageRating?: string[];
 	releasedAfter?: string;
 	releasedBefore?: string;
@@ -650,6 +676,11 @@ export function urlParamsToGraphQLFilter(
 				hasAny = true;
 				break;
 
+			case 'author':
+				result.authorContains = value;
+				hasAny = true;
+				break;
+
 			case 'genre':
 				result.genreContains = value;
 				hasAny = true;
@@ -699,6 +730,58 @@ export function urlParamsToGraphQLFilter(
 				}
 				if (max !== undefined) {
 					result.maxTmdbScore = max;
+					hasAny = true;
+				}
+				break;
+			}
+
+			case 'published': {
+				const { min, max } = parseNumberRange(value);
+				if (min !== undefined) {
+					result.minPublishYear = min;
+					hasAny = true;
+				}
+				if (max !== undefined) {
+					result.maxPublishYear = max;
+					hasAny = true;
+				}
+				break;
+			}
+
+			case 'pages': {
+				const { min, max } = parseNumberRange(value);
+				if (min !== undefined) {
+					result.minPages = min;
+					hasAny = true;
+				}
+				if (max !== undefined) {
+					result.maxPages = max;
+					hasAny = true;
+				}
+				break;
+			}
+
+			case 'bookrating': {
+				const { min, max } = parseNumberRange(value);
+				if (min !== undefined) {
+					result.minBookRating = min;
+					hasAny = true;
+				}
+				if (max !== undefined) {
+					result.maxBookRating = max;
+					hasAny = true;
+				}
+				break;
+			}
+
+			case 'webrole': {
+				// Unknown roles are dropped, like unknown types: the server rejects anything outside WebPageRole.
+				const known = new Set(WEB_PAGE_ROLE_OPTIONS.map((o) => o.value.toLowerCase()));
+				const roles = parseSetValue(value)
+					.filter((v) => known.has(v))
+					.map((v) => v.toUpperCase() as WebPageRole);
+				if (roles.length > 0) {
+					result.webPageRoles = roles;
 					hasAny = true;
 				}
 				break;

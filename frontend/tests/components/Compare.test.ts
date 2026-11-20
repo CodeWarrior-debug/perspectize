@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/svelte';
+import { fireEvent, render, screen, waitFor } from '@testing-library/svelte';
 import { QueryClient } from '@tanstack/svelte-query';
 import TestWrapper from '../helpers/TestWrapper.svelte';
 
@@ -75,6 +75,21 @@ describe('Compare', () => {
 	afterEach(() => {
 		const queries = mockRequest.mock.calls.map((c: unknown[]) => String(c[0]));
 		expect(queries.some((q: string) => q.includes('ListUsers'))).toBe(false);
+	});
+
+	it('shows the loading state, not an empty state, while perspectives are still in flight', async () => {
+		mockRequest.mockImplementation((query: string) => {
+			if (query.includes('ListPerspectivesByContent')) return new Promise(() => {});
+			if (query.includes('GetContent')) return Promise.resolve(contentResponse);
+			if (query.includes('query Me')) return Promise.resolve(meResponse);
+			return Promise.resolve({});
+		});
+
+		renderCompare({ contentId: '10', initialLeftId: null, initialRightId: null });
+
+		expect(await screen.findByText(/loading comparison/i)).toBeInTheDocument();
+		expect(screen.queryByText(/no one has shared a perspective/i)).not.toBeInTheDocument();
+		expect(screen.queryByText(/no other perspectives/i)).not.toBeInTheDocument();
 	});
 
 	it('shows an empty state when only one perspective exists on the content', async () => {
@@ -289,10 +304,10 @@ describe('Compare', () => {
 		const rightSelect = screen.getByTestId('picker-right') as HTMLSelectElement;
 
 		// Viewer (user 1) is signed in and has a perspective, so left defaults to them.
-		expect(leftSelect.value).toBe('1');
+		expect(leftSelect.value).toBe('p1');
 		// User 3's perspective (2026-01-03) is more recently updated than user 2's
 		// (2026-01-02), so the right default must be user 3, not user 2 or list order.
-		expect(rightSelect.value).toBe('3');
+		expect(rightSelect.value).toBe('p3');
 	});
 
 	it('calls goto with left/right reversed when the swap button is clicked', async () => {
@@ -308,12 +323,12 @@ describe('Compare', () => {
 		await swapButton.click();
 
 		expect(vi.mocked(goto)).toHaveBeenCalledWith(
-			expect.stringContaining('left=3'),
+			expect.stringContaining('left=p3'),
 			expect.objectContaining({ replaceState: true }),
 		);
 		const [calledUrl] = vi.mocked(goto).mock.calls[0];
-		expect(calledUrl).toContain('left=3');
-		expect(calledUrl).toContain('right=1');
+		expect(calledUrl).toContain('left=p3');
+		expect(calledUrl).toContain('right=p1');
 	});
 
 	// Regression test: picker options must come from the privacy-scoped
@@ -416,7 +431,7 @@ describe('Compare', () => {
 
 		// Viewer (user 1) defaults to the left picker and must be primary-colored.
 		const leftSelect = screen.getByTestId('picker-left') as HTMLSelectElement;
-		expect(leftSelect.value).toBe('1');
+		expect(leftSelect.value).toBe('p1');
 		const leftAvatar = leftSelect.parentElement?.querySelector('span[style*="background-color"]');
 		expect(leftAvatar).toHaveStyle({ backgroundColor: 'var(--color-primary)' });
 	});
@@ -489,7 +504,7 @@ describe('Compare', () => {
 		await waitFor(() => {
 			expect(screen.getByTestId('add-perspective-cta')).toBeInTheDocument();
 		});
-		expect(screen.getByRole('link', { name: 'Add yours' })).toHaveAttribute('href', '/');
+		expect(screen.getByRole('link', { name: 'Add yours' })).toHaveAttribute('href', '/content-library');
 	});
 
 	it('does not prompt when the viewer already has a perspective on this content', async () => {
@@ -684,5 +699,155 @@ describe('Compare', () => {
 			expect(screen.getByText("Couldn't load this content's details.")).toBeInTheDocument();
 		});
 		expect(screen.getByRole('button', { name: 'Retry' })).toBeInTheDocument();
+	});
+
+	// #738: the picker counts perspectives, but Compare used to key everything by
+	// userID. A content whose perspectives all belong to one person (or where one
+	// person has several) therefore showed "3 perspectives" in the picker and then
+	// "No other perspectives" on Compare. These states pin the per-perspective model.
+	describe('perspective-level selection (#738)', () => {
+		type Row = { id: string; userID: string; username: string; updatedAt: string };
+
+		function row({ id, userID, username, updatedAt }: Row) {
+			return {
+				id,
+				userID,
+				user: { id: userID, username },
+				contentID: '10',
+				quality: 5000,
+				agreement: null,
+				importance: null,
+				confidence: null,
+				like: null,
+				review: 'x',
+				privacy: 'PUBLIC',
+				description: null,
+				primaryPerspectiveID: null,
+				relatedPerspectiveIDs: null,
+				customFields: null,
+				feelings: null,
+				createdAt: '2026-01-01T00:00:00Z',
+				updatedAt,
+			};
+		}
+
+		function mockPerspectives(rows: Row[]) {
+			mockRequest.mockImplementation((query: string) => {
+				if (query.includes('ListPerspectivesByContent'))
+					return Promise.resolve({ perspectives: { items: rows.map(row) } });
+				if (query.includes('GetContent')) return Promise.resolve(contentResponse);
+				if (query.includes('query Me')) return Promise.resolve(meResponse);
+				return Promise.resolve({});
+			});
+		}
+
+		const mineThree: Row[] = [
+			{ id: 'a1', userID: '1', username: 'me', updatedAt: '2026-01-01T00:00:00Z' },
+			{ id: 'a2', userID: '1', username: 'me', updatedAt: '2026-01-02T00:00:00Z' },
+			{ id: 'a3', userID: '1', username: 'me', updatedAt: '2026-01-03T00:00:00Z' },
+		];
+
+		it('initial load, all 3 perspectives by the viewer: renders a comparison, not the empty state', async () => {
+			mockPerspectives(mineThree);
+			renderCompare({ contentId: '10', initialLeftId: null, initialRightId: null });
+
+			await waitFor(() => {
+				expect(screen.getByTestId('picker-left')).toBeInTheDocument();
+			});
+			expect(screen.queryByText(/no other perspectives/i)).not.toBeInTheDocument();
+			// Left defaults to the viewer's latest perspective, right to their next latest.
+			expect((screen.getByTestId('picker-left') as HTMLSelectElement).value).toBe('a3');
+			expect((screen.getByTestId('picker-right') as HTMLSelectElement).value).toBe('a2');
+			// One person with several rows: labels carry the date so they can be told apart.
+			const rightLabels = Array.from((screen.getByTestId('picker-right') as HTMLSelectElement).options).map(
+				(o) => o.textContent,
+			);
+			expect(rightLabels).toHaveLength(2);
+			expect(rightLabels.every((l) => l?.startsWith('You · '))).toBe(true);
+			expect(new Set(rightLabels).size).toBe(rightLabels.length);
+		});
+
+		it('initial load, mixed authors [A, A, B]: both pickers list distinct perspectives, no duplicate-key failure', async () => {
+			mockPerspectives([
+				...mineThree.slice(0, 2),
+				{ id: 'b1', userID: '2', username: 'Jamie Lee', updatedAt: '2026-01-05T00:00:00Z' },
+			]);
+			renderCompare({ contentId: '10', initialLeftId: null, initialRightId: null });
+
+			await waitFor(() => {
+				expect(screen.getByTestId('picker-left')).toBeInTheDocument();
+			});
+			// Right defaults to the most recently updated perspective that isn't left.
+			expect((screen.getByTestId('picker-right') as HTMLSelectElement).value).toBe('b1');
+			const leftValues = Array.from((screen.getByTestId('picker-left') as HTMLSelectElement).options).map(
+				(o) => o.value,
+			);
+			expect(leftValues).toEqual(expect.arrayContaining(['a1', 'a2']));
+			expect(leftValues).not.toContain('b1');
+		});
+
+		it('after changing the left side, navigates with that perspective id and keeps the right side', async () => {
+			mockPerspectives(mineThree);
+			renderCompare({ contentId: '10', initialLeftId: null, initialRightId: null });
+
+			await waitFor(() => {
+				expect(screen.getByTestId('picker-left')).toBeInTheDocument();
+			});
+			vi.mocked(goto).mockClear();
+			await fireEvent.change(screen.getByTestId('picker-left'), { target: { value: 'a1' } });
+
+			expect(vi.mocked(goto)).toHaveBeenCalledTimes(1);
+			const [calledUrl] = vi.mocked(goto).mock.calls[0];
+			expect(calledUrl).toContain('left=a1');
+			expect(calledUrl).toContain('right=a2');
+		});
+
+		it('after changing the right side, navigates with that perspective id and keeps the left side', async () => {
+			mockPerspectives(mineThree);
+			renderCompare({ contentId: '10', initialLeftId: null, initialRightId: null });
+
+			await waitFor(() => {
+				expect(screen.getByTestId('picker-right')).toBeInTheDocument();
+			});
+			vi.mocked(goto).mockClear();
+			await fireEvent.change(screen.getByTestId('picker-right'), { target: { value: 'a1' } });
+
+			const [calledUrl] = vi.mocked(goto).mock.calls[0];
+			expect(calledUrl).toContain('left=a3');
+			expect(calledUrl).toContain('right=a1');
+		});
+
+		it('a legacy user-id URL param resolves to that user latest perspective', async () => {
+			mockPerspectives([
+				...mineThree,
+				{ id: 'b1', userID: '2', username: 'Jamie Lee', updatedAt: '2026-01-05T00:00:00Z' },
+			]);
+			renderCompare({ contentId: '10', initialLeftId: '1', initialRightId: '2' });
+
+			await waitFor(() => {
+				expect(screen.getByTestId('picker-left')).toBeInTheDocument();
+			});
+			expect((screen.getByTestId('picker-left') as HTMLSelectElement).value).toBe('a3');
+			expect((screen.getByTestId('picker-right') as HTMLSelectElement).value).toBe('b1');
+		});
+
+		it('an unknown URL id falls back to the computed defaults', async () => {
+			mockPerspectives(mineThree);
+			renderCompare({ contentId: '10', initialLeftId: 'gone', initialRightId: 'gone' });
+
+			await waitFor(() => {
+				expect(screen.getByTestId('picker-left')).toBeInTheDocument();
+			});
+			expect((screen.getByTestId('picker-left') as HTMLSelectElement).value).toBe('a3');
+			expect((screen.getByTestId('picker-right') as HTMLSelectElement).value).toBe('a2');
+		});
+
+		it('empty state: no perspectives on the content shows the no-one-has-shared message', async () => {
+			mockPerspectives([]);
+			renderCompare({ contentId: '10', initialLeftId: null, initialRightId: null });
+
+			expect(await screen.findByText(/no one has shared a perspective/i)).toBeInTheDocument();
+			expect(screen.queryByTestId('picker-left')).not.toBeInTheDocument();
+		});
 	});
 });

@@ -15,6 +15,7 @@ import (
 	"fmt"
 	"log/slog"
 	"strconv"
+	"strings"
 
 	"github.com/CodeWarrior-debug/perspectize/backend/internal/adapters/auth"
 	"github.com/CodeWarrior-debug/perspectize/backend/internal/adapters/graphql/generated"
@@ -44,6 +45,20 @@ func (r *mutationResolver) CreatePerspective(ctx context.Context, input model.Cr
 		if errors.Is(err, domain.ErrInvalidInput) {
 			return nil, fmt.Errorf("invalid input: %w", err)
 		}
+		// A duplicate (same user, content and privacy) is a user error, not a
+		// server fault: no error-level log, and no SQL in the message.
+		if errors.Is(err, domain.ErrAlreadyExists) {
+			privacy := domain.PrivacyPublic // the service's default when input.privacy is omitted
+			if input.Privacy != nil {
+				privacy = *input.Privacy
+			}
+			return nil, fmt.Errorf("you already have a %s perspective on this content", strings.ToLower(string(privacy)))
+		}
+		// Checked first: content not-found is also ErrNotFound, and must not be
+		// reported as a missing user.
+		if errors.Is(err, domain.ErrContentNotFound) {
+			return nil, fmt.Errorf("content not found")
+		}
 		if errors.Is(err, domain.ErrNotFound) {
 			return nil, fmt.Errorf("user not found: %w", err)
 		}
@@ -70,6 +85,9 @@ func (r *mutationResolver) UpdatePerspective(ctx context.Context, input model.Up
 		if errors.Is(err, domain.ErrForbidden) {
 			return nil, fmt.Errorf("access denied: you can only modify your own perspectives")
 		}
+		if errors.Is(err, domain.ErrContentNotFound) {
+			return nil, fmt.Errorf("content not found")
+		}
 		if errors.Is(err, domain.ErrNotFound) {
 			return nil, fmt.Errorf("perspective not found")
 		}
@@ -78,6 +96,14 @@ func (r *mutationResolver) UpdatePerspective(ctx context.Context, input model.Up
 		}
 		if errors.Is(err, domain.ErrInvalidInput) {
 			return nil, fmt.Errorf("invalid input: %w", err)
+		}
+		// A duplicate is a user error (no error-level log, no SQL in the message).
+		// The final privacy is only known here when the input sets it.
+		if errors.Is(err, domain.ErrAlreadyExists) {
+			if input.Privacy != nil {
+				return nil, fmt.Errorf("you already have a %s perspective on this content", strings.ToLower(string(*input.Privacy)))
+			}
+			return nil, fmt.Errorf("you already have a perspective on this content with that privacy setting")
 		}
 		slog.Error("updating perspective failed", "error", err)
 		return nil, fmt.Errorf("failed to update perspective: %v", err)
@@ -145,6 +171,23 @@ func (r *queryResolver) PerspectiveByID(ctx context.Context, id string) (*model.
 	if perspective.Privacy == domain.PrivacyPrivate {
 		viewer, ok := auth.ForContext(ctx)
 		if !ok || viewer.ID != perspective.UserID {
+			return nil, nil
+		}
+	}
+
+	// Content privacy dominates perspective privacy: a perspective on a private
+	// claim is visible only to that claim's owner, so the same nil as above.
+	if perspective.ContentID != nil {
+		viewerID := 0
+		if viewer, ok := auth.ForContext(ctx); ok {
+			viewerID = viewer.ID
+		}
+		content, err := r.ContentService.GetByID(ctx, *perspective.ContentID)
+		if err != nil && !errors.Is(err, domain.ErrNotFound) {
+			slog.Error("getting perspective content failed", "id", id, "error", err)
+			return nil, fmt.Errorf("failed to get perspective")
+		}
+		if err != nil || !content.VisibleTo(viewerID) {
 			return nil, nil
 		}
 	}
@@ -299,6 +342,11 @@ func (r *perspectiveResolver) Content(ctx context.Context, obj *model.Perspectiv
 	c, err := r.contentByID(ctx, id)
 	if err != nil || c == nil {
 		return nil, err
+	}
+	// Backstop for the write-side check: a perspective never shows content the
+	// viewer can't read, so a private row someone else owns resolves to null.
+	if !canViewContent(ctx, c.Privacy, c.AddedByUserID) {
+		return nil, nil
 	}
 	return domainToModel(c), nil
 }

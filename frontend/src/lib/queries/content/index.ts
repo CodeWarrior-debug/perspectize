@@ -8,9 +8,79 @@ export interface LengthDisplay {
 }
 
 export type { ContentFilterInput } from '$lib/utils/gridUrlState';
+export { activityListRequest, cursorsAfterPage, ACTIVITY_LIST_STALE_TIME_MS, LOADED_MODE_FIRST } from './activityList';
 
 // Values the API returns in Content.contentType (a String, not a GraphQL enum).
-export type ContentType = 'YOUTUBE_VIDEO' | 'CLAIM' | 'BIBLE_PASSAGE' | 'MOVIE';
+export type ContentType = 'YOUTUBE_VIDEO' | 'CLAIM' | 'BIBLE_PASSAGE' | 'MOVIE' | 'BOOK' | 'WEB_PAGE';
+
+/**
+ * A webpage's role (the backend `WebPageRole` enum). Chosen by the adder, never read from the page.
+ * The first entry is the primary role. Stored in `response.webPageRoles`.
+ */
+export type WebPageRole = 'BLOG_POST' | 'SESSION_TRANSCRIPT';
+
+export type WebPageFetchStatus = 'OK' | 'BLOCKED' | 'ERROR' | 'TIMEOUT' | 'NOT_HTML' | 'TOO_LARGE';
+
+/** `fetch` on a webpage: internal status (drives the fallback title and the dialog message) plus when it was read. */
+export interface WebPageFetch {
+	status: WebPageFetchStatus;
+	/** Null when no HTTP response arrived (TIMEOUT, network ERROR). Never render it as "HTTP null". */
+	httpStatus: number | null;
+	at: string;
+}
+
+/** The metadata read from a webpage's `<head>`, as stored in `Content.response` for WEB_PAGE rows. */
+export interface WebPageMeta {
+	finalUrl: string;
+	domain: string;
+	siteName: string | null;
+	title: string | null;
+	description: string | null;
+	imageUrl: string | null;
+	faviconUrl: string | null;
+	publishedAt: string | null;
+	lang: string | null;
+	author: string | null;
+	webPageRoles: WebPageRole[];
+	fetch: WebPageFetch;
+}
+
+/**
+ * The shaped webpage fields a list row carries (`ContentItem.webPage`). Every field is nullable
+ * except `webPageRoles`, which is never null (`[]` when the page has none). Missing is null, not a guess.
+ */
+export interface WebPageListMeta {
+	siteName: string | null;
+	domain: string | null;
+	imageUrl: string | null;
+	faviconUrl: string | null;
+	publishedAt: string | null;
+	author: string | null;
+	webPageRoles: WebPageRole[];
+}
+
+/** The read-only import preview (`previewWebPage`). It never carries roles: the adder picks those. */
+export interface WebPagePreview {
+	finalUrl: string;
+	domain: string;
+	siteName: string | null;
+	title: string | null;
+	description: string | null;
+	imageUrl: string | null;
+	faviconUrl: string | null;
+	publishedAt: string | null;
+	lang: string | null;
+	author: string | null;
+	fetch: WebPageFetch;
+	/** IntID: the id of a row already saved for this page, or null. Serialised as a string, like `ContentItem.id`. */
+	alreadyExistsContentId: string | null;
+}
+
+/** The import job that created a content row. Mirrors the backend `ImportJobRef`. */
+export interface ImportJobRef {
+	id: string;
+	name: string;
+}
 
 export interface ContentItem {
 	id: string;
@@ -41,6 +111,12 @@ export interface ContentItem {
 	// MOVIE rows only: the shaped TMDB payload. List rows select this instead of `response`
 	// (so YouTube rows don't ship their snippet twice); null for every other type.
 	movie?: Record<string, unknown> | null;
+	// BOOK rows only: the shaped Open Library payload (same list-row/details split as `movie`);
+	// null for every other type. Read it through bookFormatting's bookResponse().
+	book?: Record<string, unknown> | null;
+	// WEB_PAGE rows only: the shaped page fields for list rows (same split as `movie`/`book`; the raw
+	// `response` is never selected in lists). Null for every other type. Read it through webPage.ts.
+	webPage?: WebPageListMeta | null;
 	primaryCategory: {
 		id: string;
 		wikidataQid: string;
@@ -51,6 +127,8 @@ export interface ContentItem {
 	} | null;
 	createdAt: string;
 	updatedAt: string;
+	// CLAIM rows only: the claim's dates (YYYY-MM-DD). Null on other types and on legacy claims without dates.
+	customFields?: { effectiveDate?: string; evaluateBy?: string } | null;
 }
 
 export interface ContentResponse {
@@ -123,6 +201,9 @@ export const LIST_CONTENT = gql`
 				tags
 				description
 				movie
+				customFields
+				book
+				webPage
 				primaryCategory {
 					id
 					wikidataQid
@@ -145,19 +226,22 @@ export const LIST_CONTENT = gql`
 	}
 `;
 
-// Compare page's "choose something to compare" picker: needs perspectiveCount
-// per row to filter down to content that actually has 2+ perspectives to
-// compare, which is why this is a separate query from LIST_CONTENT (see the
-// cost comment on GET_CONTENT_AGGREGATES below) — capped at a modest `first`
-// so the added per-row dataloader cost stays bounded to this one picker
-// fetch, not every Activity grid page load.
+// Compare page's "choose something to compare" picker: filters server-side to
+// content with 2+ perspectives the viewer can read (minPerspectiveCount) and
+// shows each row's visiblePerspectiveCount. A separate query from LIST_CONTENT
+// (see the cost comment on GET_CONTENT_AGGREGATES below) — capped at a modest
+// `first` so the added per-row dataloader cost stays bounded to this one
+// picker fetch, not every Activity grid page load.
 export interface ComparePickerContentItem {
 	id: string;
 	name: string;
 	contentType: string;
 	channelTitle: string | null;
 	url: string | null;
-	perspectiveCount: number | null;
+	// Perspectives the viewer can read (public + their own). perspectiveCount
+	// also counts other people's private ones, so it can read higher than the
+	// Compare page can show.
+	visiblePerspectiveCount: number | null;
 }
 
 export interface ListComparableContentResponse {
@@ -175,7 +259,7 @@ export const LIST_COMPARABLE_CONTENT = gql`
 				contentType
 				channelTitle
 				url
-				perspectiveCount
+				visiblePerspectiveCount
 			}
 		}
 	}
@@ -261,6 +345,8 @@ export const GET_CONTENT_DETAILS = gql`
 			description
 			response
 			movie
+			customFields
+			book
 			primaryCategory {
 				id
 				wikidataQid
@@ -286,6 +372,9 @@ export interface ContentDetailsResponse {
 export interface ContentAggregates {
 	perspectiveCount: number | null;
 	averageRating: number | null;
+	// The import that created this row, or null: hand-added content, and a closed import
+	// the viewer can't see (the backend decides; the UI shows the row only when set).
+	importedFrom?: ImportJobRef | null;
 	// How many public perspectives set a Quality rating — i.e. how many
 	// values averageRating was actually averaged over. Can be less than
 	// perspectiveCount since Quality is optional. Shown in a tooltip on the
@@ -304,6 +393,10 @@ export const GET_CONTENT_AGGREGATES = gql`
 			perspectiveCount
 			averageRating
 			qualityRatingCount
+			importedFrom {
+				id
+				name
+			}
 		}
 	}
 `;
@@ -366,6 +459,81 @@ export interface CreateContentFromMovieResponse {
 	};
 }
 
+// Idempotent like CREATE_CONTENT_FROM_MOVIE: an existing book (same work) comes back as a normal Content.
+// `url` is a work URL or a bare ISBN; the server resolves either to the work.
+export const CREATE_CONTENT_FROM_BOOK = gql`
+	mutation CreateContentFromBook($input: CreateContentFromBookInput!) {
+		createContentFromBook(input: $input) {
+			id
+			name
+			url
+			contentType
+		}
+	}
+`;
+
+export interface CreateContentFromBookResponse {
+	createContentFromBook: {
+		id: string;
+		name: string;
+		url: string | null;
+		contentType: string;
+	};
+}
+
+// Same result shape as CREATE_CONTENT_FROM_YOUTUBE: `alreadyExisted` tells the caller whether the
+// page was already saved (find-or-create). `webPageRoles` is omitted from the input when none are
+// picked, which stores a plain webpage. The server reads the page itself; the client sends only the url.
+export const CREATE_CONTENT_FROM_WEB_PAGE = gql`
+	mutation CreateContentFromWebPage($input: CreateContentFromWebPageInput!) {
+		createContentFromWebPage(input: $input) {
+			content {
+				id
+				name
+				url
+				contentType
+			}
+			alreadyExisted
+		}
+	}
+`;
+
+export interface CreateContentFromWebPageResponse {
+	createContentFromWebPage: {
+		content: { id: string; name: string; url: string | null; contentType: string };
+		alreadyExisted: boolean;
+	};
+}
+
+// Read-only: runs the same fetch and parse as the create, and writes nothing. Shown in the add dialog
+// before Save. Never cached for long: `useWebPagePreview` sets its staleTime.
+export const PREVIEW_WEB_PAGE = gql`
+	query PreviewWebPage($url: String!) {
+		previewWebPage(url: $url) {
+			finalUrl
+			domain
+			siteName
+			title
+			description
+			imageUrl
+			faviconUrl
+			publishedAt
+			lang
+			author
+			fetch {
+				status
+				httpStatus
+				at
+			}
+			alreadyExistsContentId
+		}
+	}
+`;
+
+export interface PreviewWebPageResponse {
+	previewWebPage: WebPagePreview | null;
+}
+
 export const UPDATE_CONTENT_SOURCE_DATA = gql`
 	mutation UpdateContentSourceData($contentId: IntID!) {
 		updateContentSourceData(contentId: $contentId) {
@@ -385,6 +553,8 @@ export const UPDATE_CONTENT_SOURCE_DATA = gql`
 			publishedAt
 			tags
 			description
+			movie
+			book
 			createdAt
 			updatedAt
 		}

@@ -109,7 +109,9 @@ describe('verse ordinals', () => {
 			}
 		}
 		expect(expected).toBe(31102);
-	});
+		// 62k assertions on every run, not a cold cost: ~1 s idle, 3.6-10.6 s under
+		// full-suite load (#728), so it gets its own limit (.docs/CI_STABLE_TESTS.md rule 4).
+	}, 30_000);
 
 	it('converts ranges to ids and back', () => {
 		const range = parseReference('John 3:16-4:2')!;

@@ -2,9 +2,6 @@
 -- user_todo_lists (named, ordered groups), user_todos (the plan itself).
 -- Spec: docs/superpowers/specs/2026-10-08-user-todos-design.md (Data model, Foreign keys).
 --
--- Numbering note: the spec and plan say 000030, but main already has
--- 000030_add_content_length_display (#567). This migration is 000031.
---
 -- Every FK is ON DELETE RESTRICT: nothing cascades and nothing is nulled. The
 -- service clears or reassigns references before it deletes a parent.
 --

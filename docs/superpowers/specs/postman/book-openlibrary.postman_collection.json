@@ -1,0 +1,342 @@
+{
+  "info": {
+    "_postman_id": "8eca633a-1d1e-4254-b6de-3bde959c1235",
+    "name": "Book content type \u2014 Open Library (design spike)",
+    "description": "Exercises the three Open Library endpoints the Book content type design (`docs/superpowers/specs/2026-11-09-book-content-type-discover-design.md`) relies on, before any backend adapter exists. Nothing here hits the Perspectize backend \u2014 there is no `BookSearchClient`/`BookTrendingClient`/`BookISBNClient` yet. This collection is the reference for building those adapters: every URL and `fields=` list here is what the design doc assumes.\n\n### Adapter facts encoded here\n- Base URL `https://openlibrary.org`\n- No API key, no auth, no quota \u2014 confirmed live 2026-11-09\n- `search.json` and `trending/{window}.json` return the *same* work-shaped item and both honor `fields=`; `isbn/{isbn}.json` is a different shape (a 302 to a specific **edition**, which Postman follows automatically)\n- The `fields=` list used throughout (`key,title,author_name,cover_i,first_publish_year,number_of_pages_median,subject,ratings_average,ratings_count,edition_count`) is exactly what `CreateFromBook` needs in one call (design doc \u00a74)\n- Folder 2 proves the design doc's \u00a77a/\u00a77b findings live: an edition's own `number_of_pages` differs from the work's `number_of_pages_median`; `genres` is often empty and needs a second lookup\n\n### Setup\nNo variables need changing to run this as-is. `work_key`/`isbn` point at *East of Eden* throughout \u2014 swap them to explore a different book. Run folders in order; Folder 2's requests depend on values Folder 0/1 return (noted per-request).",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "https://openlibrary.org",
+      "type": "string"
+    },
+    {
+      "key": "fields",
+      "value": "key,title,author_name,cover_i,first_publish_year,number_of_pages_median,subject,ratings_average,ratings_count,edition_count",
+      "type": "string",
+      "description": "Exactly what the design doc's CreateFromBook/BookSearchResult needs (\u00a74). Trimmed from a search/trending response \u2014 see Folder 0's test scripts."
+    },
+    {
+      "key": "search_query",
+      "value": "East of Eden Steinbeck",
+      "type": "string"
+    },
+    {
+      "key": "trending_window",
+      "value": "weekly",
+      "type": "string",
+      "description": "daily | weekly \u2014 the two the design doc reuses from domain.TrendingWindow (\u00a73). monthly/yearly/now/forever exist on Open Library but are deferred."
+    },
+    {
+      "key": "work_key",
+      "value": "OL23166W",
+      "type": "string",
+      "description": "East of Eden's work id. Auto-filled from Folder 0a's top result by its test script."
+    },
+    {
+      "key": "isbn",
+      "value": "9780434740024",
+      "type": "string",
+      "description": "ISBN-13 for the 1970 Heinemann East of Eden reprint (OL22640535M) \u2014 resolves to the same work_key above, the dedupe case design doc \u00a72 describes."
+    },
+    {
+      "key": "isbn_unknown",
+      "value": "9780000000001",
+      "type": "string",
+      "description": "A well-formed, unassigned ISBN-13 confirmed live 2026-11-09 to 404. Caution: not every nonsense-looking ISBN 404s \u2014 \"9999999999999\" surprisingly resolved to an unrelated real record (a 2026-11-09 finding), so client-side checksum validation matters more than assuming Open Library will reject garbage."
+    },
+    {
+      "key": "sparse_query",
+      "value": "Brainscan zine Alex Wrekk",
+      "type": "string",
+      "description": "A real sparse record (no cover, no rating) \u2014 design doc \u00a77a/\u00a77b's edge case."
+    }
+  ],
+  "item": [
+    {
+      "name": "0. Quickstart \u2014 Search and Trending",
+      "description": "The two Discover-tab data sources (design doc \u00a71). Both return a work-shaped item list and both honor `fields=`.",
+      "item": [
+        {
+          "name": "0a - search.json (title/author search)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "pm.test('has at least one doc', () => body.docs && body.docs.length > 0);",
+                  "if (body.docs && body.docs.length) {",
+                  "  const top = body.docs[0];",
+                  "  pm.collectionVariables.set('work_key', top.key.replace('/works/', ''));",
+                  "  console.log('Top result:', top.title, '\u2014', top.key);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/search.json?q={{search_query}}&limit=5&fields={{fields}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "search.json"
+              ],
+              "query": [
+                {
+                  "key": "q",
+                  "value": "{{search_query}}"
+                },
+                {
+                  "key": "limit",
+                  "value": "5"
+                },
+                {
+                  "key": "fields",
+                  "value": "{{fields}}"
+                }
+              ]
+            },
+            "description": "Design doc \u00a71: confirmed live 2026-11-09 that the top result for \"East of Eden Steinbeck\" is the work itself (/works/OL23166W), not a random edition, with author_name, cover_i, first_publish_year=1952, number_of_pages_median=611, subject[] (65 entries), ratings_average=4.1, ratings_count=100."
+          }
+        },
+        {
+          "name": "0b - trending/{window}.json",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "pm.test('has works[]', () => Array.isArray(body.works) && body.works.length > 0);",
+                  "if (body.works && body.works.length) {",
+                  "  console.log('Top trending:', body.works[0].title, '\u2014', body.works[0].key);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/trending/{{trending_window}}.json?limit=5&fields={{fields}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "trending",
+                "{{trending_window}}.json"
+              ],
+              "query": [
+                {
+                  "key": "limit",
+                  "value": "5"
+                },
+                {
+                  "key": "fields",
+                  "value": "{{fields}}"
+                }
+              ]
+            },
+            "description": "Design doc \u00a71/\u00a76: the response shape matches 0a exactly (same `fields=` support), but the content skews toward current nonfiction bestsellers (Atomic Habits, The 48 Laws of Power as of 2026-11-09) rather than classics \u2014 the UI disclosure this finding drove."
+          }
+        }
+      ]
+    },
+    {
+      "name": "1. ISBN tab \u2014 resolve a specific edition",
+      "description": "Design doc \u00a75: the ISBN tab's resolution path. isbn/{isbn}.json 302s to an edition record; the edition's works[0].key feeds back into the same search.json lookup as Folder 0a to get the full BookSearchResult shape.",
+      "item": [
+        {
+          "name": "1a - isbn/{isbn}.json (edition lookup, follows redirect)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK after redirect', () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "pm.test('has isbn_13', () => Array.isArray(body.isbn_13) && body.isbn_13.includes(pm.collectionVariables.get('isbn')));",
+                  "pm.test('has a works[] back-reference', () => body.works && body.works.length > 0);",
+                  "console.log('Edition', body.key, 'number_of_pages:', body.number_of_pages, '\u2014 compare to the work-level number_of_pages_median from 0a (611). Different numbers: one is a single printing, the other a cross-edition median (design doc \u00a77a).');"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/isbn/{{isbn}}.json",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "isbn",
+                "{{isbn}}.json"
+              ]
+            },
+            "description": "Confirmed live 2026-11-09: GET /isbn/9780434740024.json \u2192 302 \u2192 /books/OL22640535M.json, the 1970 Heinemann East of Eden edition. Its own number_of_pages (525) differs from the work's search-index number_of_pages_median (611) \u2014 the exact distinction design doc \u00a77a documents. Note: the edition record has no author_name/ratings_average/number_of_pages_median of its own \u2014 only Folder 0a-style search gives those."
+          }
+        },
+        {
+          "name": "1b - works/{work_key}.json (canonical record \u2014 description, genres, subject split)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "console.log('description present:', !!body.description);",
+                  "console.log('genres (often empty):', JSON.stringify(body.genres));",
+                  "console.log('subject_people (entities, not genre/theme):', (body.subject_people || []).slice(0, 5));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/works/{{work_key}}.json",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "works",
+                "{{work_key}}.json"
+              ]
+            },
+            "description": "Design doc \u00a74/\u00a77b: this canonical record has `description` (not fetched in v1 \u2014 needs this separate call) and a `genres` field \u2014 but `genres` is an array of opaque /tags/{id} references, often empty, and resolving each one to a label needs yet another call. This is the evidence behind \"no genre/theme split, reuse the shared Tags column\" (\u00a77b). Also lacks author_name, ratings_average, and number_of_pages_median \u2014 those are search-index aggregates (Folder 0), not on this record."
+          }
+        }
+      ]
+    },
+    {
+      "name": "2. Edge cases",
+      "description": "The states the design doc's testing section (and the preview's sparse/not-found rows) must cover.",
+      "item": [
+        {
+          "name": "2a - unknown ISBN (expect 404)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('404 Not Found', () => pm.response.to.have.status(404));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/isbn/{{isbn_unknown}}.json",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "isbn",
+                "{{isbn_unknown}}.json"
+              ]
+            },
+            "description": "Design doc \u00a75's error case: \"No book found for that ISBN\" \u2014 the ISBN tab must surface this cleanly, not as a raw 404/500."
+          }
+        },
+        {
+          "name": "2b - sparse record (no cover, no rating)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "if (body.docs && body.docs.length) {",
+                  "  const top = body.docs[0];",
+                  "  console.log('cover_i:', top.cover_i, '(expect undefined/null)');",
+                  "  console.log('ratings_average:', top.ratings_average, '(expect undefined/null)');",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/search.json?q={{sparse_query}}&limit=3&fields={{fields}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "search.json"
+              ],
+              "query": [
+                {
+                  "key": "q",
+                  "value": "{{sparse_query}}"
+                },
+                {
+                  "key": "limit",
+                  "value": "3"
+                },
+                {
+                  "key": "fields",
+                  "value": "{{fields}}"
+                }
+              ]
+            },
+            "description": "Confirmed live 2026-11-09: Brainscan (a zine) has no cover_i and no ratings_average/ratings_count at all \u2014 the \"unknown, not zero\" row the preview's sparse-fill example is built from."
+          }
+        }
+      ]
+    }
+  ]
+}

@@ -5,8 +5,11 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/CodeWarrior-debug/perspectize/backend/internal/adapters/auth"
 	"log/slog"
+	"regexp"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/99designs/gqlgen/graphql"
@@ -16,6 +19,44 @@ import (
 	"github.com/CodeWarrior-debug/perspectize/backend/internal/core/domain"
 	portservices "github.com/CodeWarrior-debug/perspectize/backend/internal/core/ports/services"
 )
+
+// webPageInputMessage is the user-facing message for a webpage input error, or ""
+// when err is not one. The role is checked before the URL: an unknown role wraps
+// domain.ErrInvalidInput too, and must not be reported as a bad URL. An SSRF refusal
+// is reported as a URL problem and names no address.
+func webPageInputMessage(err error) string {
+	switch {
+	case errors.Is(err, domain.ErrUnknownWebPageRole):
+		return "unknown webpage role"
+	case errors.Is(err, domain.ErrInvalidInput):
+		return "invalid webpage URL: use an http or https link to a public page"
+	}
+	return ""
+}
+
+// webPagePreviewToModel maps the import-preview result to its GraphQL shape.
+// Missing metadata stays nil (missing is not a value). The read time is RFC 3339 UTC.
+func webPagePreviewToModel(p *portservices.WebPagePreview) *model.WebPagePreview {
+	m := p.Meta
+	return &model.WebPagePreview{
+		FinalURL:    m.FinalURL,
+		Domain:      m.Domain,
+		SiteName:    m.SiteName,
+		Title:       m.Title,
+		Description: m.Description,
+		ImageURL:    m.ImageURL,
+		FaviconURL:  m.FaviconURL,
+		PublishedAt: m.PublishedAt,
+		Author:      m.Author,
+		Lang:        m.Lang,
+		Fetch: &model.WebPageFetch{
+			Status:     m.Fetch.Status,
+			HTTPStatus: m.Fetch.HTTPStatus,
+			At:         m.Fetch.At.UTC().Format(time.RFC3339),
+		},
+		AlreadyExistsContentID: p.AlreadyExistsContentID,
+	}
+}
 
 // movieSearchPageToModel maps one TMDB search page to the GraphQL shape. The
 // canonical url is what createContentFromMovie takes, so the add path dedupes
@@ -39,6 +80,69 @@ func movieSearchPageToModel(page *portservices.MovieSearchPage) *model.MovieSear
 		})
 	}
 	return out
+}
+
+// bookWorksURLPrefix is the canonical Open Library work URL prefix, used to
+// build BookSearchResult.URL the same way ContentService.CreateFromBook
+// builds the content row's canonical URL.
+const bookWorksURLPrefix = "https://openlibrary.org/works/"
+
+// bookSearchResultToModel maps one Open Library work result to the GraphQL
+// shape, deriving the canonical URL from the work key the same way
+// ContentService's own canonicalBookURL does — createContentFromBook takes
+// that URL, so the add path dedupes the same way as a pasted link.
+func bookSearchResultToModel(r portservices.BookSearchResult) *model.BookSearchResult {
+	return &model.BookSearchResult{
+		WorkKey:          r.WorkKey,
+		Title:            r.Title,
+		AuthorName:       stringsOrEmpty(r.AuthorName),
+		CoverID:          r.CoverID,
+		FirstPublishYear: r.FirstPublishYear,
+		PageCountMedian:  r.PageCountMedian,
+		Subjects:         stringsOrEmpty(r.Subjects),
+		RatingsAverage:   r.RatingsAverage,
+		RatingsCount:     r.RatingsCount,
+		EditionCount:     r.EditionCount,
+
+		WantToReadCount:       r.WantToReadCount,
+		CurrentlyReadingCount: r.CurrentlyReadingCount,
+		AlreadyReadCount:      r.AlreadyReadCount,
+		ReadingLogCount:       r.ReadingLogCount,
+
+		URL: bookWorksURLPrefix + r.WorkKey,
+	}
+}
+
+// bookSearchPageToModel maps one Open Library search/trending page to the
+// GraphQL shape. Items is never null.
+func bookSearchPageToModel(page *portservices.BookSearchPage) *model.BookSearchPage {
+	out := &model.BookSearchPage{
+		Items:        make([]*model.BookSearchResult, 0, len(page.Items)),
+		Page:         page.Page,
+		TotalPages:   page.TotalPages,
+		TotalResults: page.TotalResults,
+	}
+	for _, item := range page.Items {
+		out.Items = append(out.Items, bookSearchResultToModel(item))
+	}
+	return out
+}
+
+// hyphenatedISBNRe matches a string made only of digits, X/x and hyphens —
+// shaped like a human-entered ISBN-10/13 (e.g. "978-0-434-74002-4").
+var hyphenatedISBNRe = regexp.MustCompile(`^[0-9Xx-]+$`)
+
+// normalizeHyphenatedISBN strips hyphens from a raw ISBN-shaped input before
+// it reaches ContentService: its isbnRe only matches bare-digit ISBN-10/13,
+// so a hyphenated ISBN would otherwise be misclassified and rejected with
+// ErrInvalidInput (Task 5 review finding). Input that isn't ISBN-shaped (an
+// Open Library work URL, or an already bare ISBN) passes through unchanged.
+func normalizeHyphenatedISBN(raw string) string {
+	trimmed := strings.TrimSpace(raw)
+	if strings.Contains(trimmed, "-") && hyphenatedISBNRe.MatchString(trimmed) {
+		return strings.ReplaceAll(trimmed, "-", "")
+	}
+	return raw
 }
 
 // userDomainToModel converts a domain User to a GraphQL model User
@@ -73,6 +177,25 @@ func onboardingDomainToModel(o *domain.UserOnboarding) *model.UserOnboarding {
 	}
 }
 
+// webPageGridPayload is the trimmed webpage payload the grid reads, taken from the
+// stored response already loaded with the row. A key the page never declared is
+// null (missing is not a value); webPageRoles is never null, [] when there are none.
+func webPageGridPayload(response map[string]any) map[string]any {
+	roles, ok := response["webPageRoles"].([]any)
+	if !ok || roles == nil {
+		roles = []any{}
+	}
+	return map[string]any{
+		"siteName":     response["siteName"],
+		"domain":       response["domain"],
+		"imageUrl":     response["imageUrl"],
+		"faviconUrl":   response["faviconUrl"],
+		"publishedAt":  response["publishedAt"],
+		"author":       response["author"],
+		"webPageRoles": roles,
+	}
+}
+
 // domainToModel converts a domain Content to a GraphQL model Content
 func domainToModel(c *domain.Content) *model.Content {
 	m := &model.Content{
@@ -89,9 +212,22 @@ func domainToModel(c *domain.Content) *model.Content {
 		// Non-schema field — lets contentResolver.PrimaryCategory batch-load the
 		// category by FK via dataloader instead of re-fetching the content row.
 		PrimaryCategoryID: c.PrimaryCategoryID,
-		VerseStartID:      c.VerseStartID,
-		VerseEndID:        c.VerseEndID,
-		DisplayTitle:      c.DisplayTitle,
+		// Non-schema field — lets contentResolver.ImportedFrom batch-load the import.
+		ImportJobID:  c.ImportJobID,
+		VerseStartID: c.VerseStartID,
+		VerseEndID:   c.VerseEndID,
+		DisplayTitle: c.DisplayTitle,
+		Privacy:      contentPrivacy(c.Privacy),
+	}
+
+	// Parse the user-set custom fields JSONB; nil/empty stays null in GraphQL.
+	if len(c.CustomFields) > 0 {
+		var customMap map[string]interface{}
+		if err := json.Unmarshal(c.CustomFields, &customMap); err != nil {
+			slog.Warn("failed to parse content custom fields JSON", "contentID", c.ID, "error", err)
+		} else {
+			m.CustomFields = customMap
+		}
 	}
 
 	// Parse the raw response JSON into a map for GraphQL
@@ -103,6 +239,12 @@ func domainToModel(c *domain.Content) *model.Content {
 			m.Response = responseMap
 			if c.ContentType == domain.ContentTypeMovie {
 				m.Movie = responseMap
+			}
+			if c.ContentType == domain.ContentTypeBook {
+				m.Book = responseMap
+			}
+			if c.ContentType == domain.ContentTypeWebPage {
+				m.WebPage = webPageGridPayload(responseMap)
 			}
 		}
 
@@ -632,6 +774,15 @@ func nilIfEmpty(s string) *string {
 	return &s
 }
 
+// contentPrivacy maps an unset domain privacy to PUBLIC for the non-null
+// GraphQL field.
+func contentPrivacy(p domain.Privacy) domain.Privacy {
+	if p == "" {
+		return domain.PrivacyPublic
+	}
+	return p
+}
+
 // contentFieldsFromID are the Content fields that resolve from its id alone.
 var contentFieldsFromID = map[string]bool{
 	"__typename":         true,
@@ -639,6 +790,9 @@ var contentFieldsFromID = map[string]bool{
 	"perspectiveCount":   true,
 	"averageRating":      true,
 	"qualityRatingCount": true,
+	// importedFrom needs only the row's import_job_id, which the aggregate
+	// query carries (see ContentByID), so it keeps the fast path.
+	"importedFrom": true,
 }
 
 // onlyIDAndAggregatesSelected reports whether the current field's selection
@@ -657,6 +811,16 @@ func onlyIDAndAggregatesSelected(ctx context.Context) bool {
 		}
 	}
 	return true
+}
+
+// canViewContent reports whether the caller may read a content row: public
+// rows are readable by anyone, private rows only by their owner.
+func canViewContent(ctx context.Context, privacy domain.Privacy, ownerID int) bool {
+	if privacy != domain.PrivacyPrivate {
+		return true
+	}
+	viewer, ok := auth.ForContext(ctx)
+	return ok && viewer.ID == ownerID
 }
 
 // ---- User todo ("Plan") mappers ----
@@ -927,4 +1091,203 @@ func (r *Resolver) userTodoListByKey(ctx context.Context, key dataloader.UserTod
 		}
 	}
 	return nil, nil
+}
+
+// --- Import staging mapping -------------------------------------------------
+
+func isoTime(t time.Time) string { return t.UTC().Format(time.RFC3339) }
+
+func isoTimePtr(t *time.Time) *string {
+	if t == nil {
+		return nil
+	}
+	s := isoTime(*t)
+	return &s
+}
+
+func int64ToFloatPtr(n *int64) *float64 {
+	if n == nil {
+		return nil
+	}
+	f := float64(*n)
+	return &f
+}
+
+// importJobRefToModel is the short form of an import, as Content.importedFrom shows it.
+func importJobRefToModel(j *domain.ImportJob) *model.ImportJobRef {
+	return &model.ImportJobRef{ID: strconv.Itoa(j.ID), Name: j.Name}
+}
+
+func importJobToModel(j *domain.ImportJob) *model.ImportJob {
+	sources := make([]*model.ImportSource, len(j.Sources))
+	for i, s := range j.Sources {
+		sources[i] = &model.ImportSource{
+			ID:              strconv.Itoa(s.ID),
+			SourceType:      s.SourceType,
+			SourceRef:       s.SourceRef,
+			Title:           s.Title,
+			URL:             s.URL,
+			Role:            s.Role,
+			DestinationType: s.DestinationType,
+			Status:          s.Status,
+			StatusDetail:    s.StatusDetail,
+			ItemCount:       s.ItemCount,
+			FetchedAt:       isoTimePtr(s.FetchedAt),
+		}
+	}
+	return &model.ImportJob{
+		ID:              strconv.Itoa(j.ID),
+		Name:            j.Name,
+		Description:     j.Description,
+		RequestStatus:   j.RequestStatus,
+		ReviewNote:      j.ReviewNote,
+		ReviewedAt:      isoTimePtr(j.ReviewedAt),
+		ClosedAt:        isoTimePtr(j.ClosedAt),
+		Sources:         sources,
+		CreatedAt:       isoTime(j.CreatedAt),
+		UpdatedAt:       isoTime(j.UpdatedAt),
+		RequesterUserID: j.UserID,
+	}
+}
+
+func importItemToModel(it *domain.ImportItem) *model.ImportItem {
+	m := &model.ImportItem{
+		ID:              strconv.Itoa(it.ID),
+		SourceID:        strconv.Itoa(it.SourceID),
+		DestinationType: it.DestinationType,
+		ExternalID:      it.ExternalID,
+		URL:             it.CanonicalURL,
+		Title:           it.Title,
+		Facts:           importFactsToMap(it.Facts),
+		Position:        it.Position,
+		Excluded:        it.Excluded,
+		StatsFetchedAt:  isoTime(it.StatsFetchedAt),
+		InLibrary:       it.InLibrary,
+		ImportStatus:    it.ImportStatus,
+		ImportError:     it.ImportError,
+		ImportedAt:      isoTimePtr(it.ImportedAt),
+	}
+	if it.ContentID != nil {
+		id := strconv.Itoa(*it.ContentID)
+		m.ContentID = &id
+	}
+	return m
+}
+
+// importFactsToMap turns facts into the JSON scalar's map through their json
+// tags, so the keys clients see are exactly the stored ones and unknown facts
+// stay absent. Facts are plain values, so encoding can't fail; if it ever did,
+// the row shows no facts rather than failing the whole sheet.
+func importFactsToMap(f domain.ImportFacts) map[string]any {
+	out := map[string]any{}
+	b, err := json.Marshal(f)
+	if err != nil {
+		slog.Warn("failed to encode import facts", "error", err)
+		return out
+	}
+	if err := json.Unmarshal(b, &out); err != nil {
+		slog.Warn("failed to decode import facts", "error", err)
+	}
+	return out
+}
+
+func importItemDetailsToModel(d *domain.ImportItemWithDetails) *model.ImportItemDetails {
+	chapters := make([]*model.ImportChapter, len(d.Details.Chapters))
+	for i, c := range d.Details.Chapters {
+		chapters[i] = &model.ImportChapter{StartSeconds: c.StartSeconds, Title: c.Title}
+	}
+	people := make([]*model.ImportPerson, len(d.Details.People))
+	for i, p := range d.Details.People {
+		people[i] = &model.ImportPerson{Name: p.Name, Role: p.Role}
+	}
+	out := &model.ImportItemDetails{
+		Item:        importItemToModel(&d.Item),
+		Description: d.Details.Description,
+		Tags:        stringsOrEmpty(d.Details.Tags),
+		Chapters:    chapters,
+		Links:       stringsOrEmpty(d.Details.Links),
+		People:      people,
+		Genres:      stringsOrEmpty(d.Details.Genres),
+	}
+	if d.Details.Language != "" {
+		lang := d.Details.Language
+		out.Language = &lang
+	}
+	return out
+}
+
+func modelToCreateImportJobInput(in model.CreateImportJobInput) domain.CreateImportJobInput {
+	out := domain.CreateImportJobInput{Name: in.Name, Description: in.Description, Sources: make([]domain.CreateImportSourceInput, len(in.Sources))}
+	for i, s := range in.Sources {
+		out.Sources[i] = domain.CreateImportSourceInput{SourceType: s.SourceType, Ref: s.Ref, Role: s.Role}
+	}
+	return out
+}
+
+// stringsOrEmpty returns s, or an empty slice for nil, for non-null GraphQL lists.
+func stringsOrEmpty(s []string) []string {
+	if s == nil {
+		return []string{}
+	}
+	return s
+}
+
+func importProgressToModel(p domain.ImportProgress) *model.ImportProgress {
+	return &model.ImportProgress{
+		JobID:     strconv.Itoa(p.JobID),
+		Total:     p.Total,
+		Done:      p.Done,
+		Imported:  p.Imported,
+		Skipped:   p.Skipped,
+		Failed:    p.Failed,
+		Running:   p.Running,
+		UpdatedAt: isoTime(p.UpdatedAt),
+	}
+}
+
+func importListingProgressToModel(p domain.ImportListingProgress) *model.ImportListingProgress {
+	sources := make([]*model.ImportSourceListingProgress, len(p.Sources))
+	for i, src := range p.Sources {
+		sources[i] = &model.ImportSourceListingProgress{
+			SourceID: strconv.Itoa(src.SourceID),
+			Staged:   src.Staged,
+			Batches:  src.Batches,
+			Status:   src.Status,
+		}
+	}
+	return &model.ImportListingProgress{
+		JobID:     strconv.Itoa(p.JobID),
+		Listing:   p.Listing,
+		Sources:   sources,
+		UpdatedAt: isoTime(p.UpdatedAt),
+	}
+}
+
+// forward maps each value read from in and sends it on the returned channel,
+// which has a buffer of one. The output is closed when in closes or ctx ends,
+// whichever comes first, so a subscription's stream always ends with its
+// request. ctx is watched while waiting for the next value and while sending,
+// so a reader that has gone away, or an input that stays open and silent, never
+// leaves the goroutine behind. forward never closes in: the sender owns it.
+func forward[In, Out any](ctx context.Context, in <-chan In, mapFn func(In) Out) <-chan Out {
+	out := make(chan Out, 1)
+	go func() {
+		defer close(out)
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case v, open := <-in:
+				if !open {
+					return
+				}
+				select {
+				case out <- mapFn(v):
+				case <-ctx.Done():
+					return
+				}
+			}
+		}
+	}()
+	return out
 }

@@ -1,10 +1,10 @@
 <script lang="ts">
-	import { browser } from '$app/environment';
 	import { beforeNavigate } from '$app/navigation';
 	import { updated } from '$app/state';
 	import { onMount } from 'svelte';
 	import { ClerkProvider, ClerkLoaded, ClerkLoading } from 'svelte-clerk';
-	import { QueryClient, QueryClientProvider } from '@tanstack/svelte-query';
+	import { QueryClientProvider } from '@tanstack/svelte-query';
+	import { queryClient } from '$lib/queries/client';
 	import { Toaster } from 'svelte-sonner';
 	import { TOASTER_PROPS } from '$lib/utils/toast';
 	import favicon from '$lib/assets/favicon.svg';
@@ -24,16 +24,6 @@
 	import { printVersionInfo } from '$lib/utils/versionInfo';
 	import { pwaInfo } from 'virtual:pwa-info';
 	import '../app.css';
-
-	const queryClient = new QueryClient({
-		defaultOptions: {
-			queries: {
-				enabled: browser,
-				staleTime: 60 * 1000,
-				retry: 1,
-			},
-		},
-	});
 
 	let { children } = $props();
 

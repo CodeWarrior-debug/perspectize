@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { preloadLazy } from '../helpers/warmUp';
 
 const { mockMutate, mockInvalidateQueries, mockToastSuccess, mockToastError } = vi.hoisted(() => ({
 	mockMutate: vi.fn(),
@@ -32,6 +33,13 @@ vi.mock('svelte-sonner', () => ({
 vi.mock('$lib/queries/client', () => ({
 	graphqlRequest: vi.fn(),
 }));
+
+// The tests import these inside their bodies; load them once up front so the first
+// test doesn't pay the module transform, which balloons under full-suite load (#728).
+preloadLazy(
+	() => import('$lib/queries/client'),
+	() => import('$lib/queries/content/useCreateClaim'),
+);
 
 describe('useCreateClaim hook', () => {
 	beforeEach(() => {
@@ -78,9 +86,9 @@ describe('useCreateClaim hook', () => {
 			useCreateClaim();
 		});
 
-		it('shows success toast "Claim created"', () => {
+		it('shows a success toast', () => {
 			capturedMutationOptions.onSuccess();
-			expect(mockToastSuccess).toHaveBeenCalledWith('Claim created');
+			expect(mockToastSuccess).toHaveBeenCalledWith('Claim saved');
 		});
 
 		it('invalidates content lists cache', () => {

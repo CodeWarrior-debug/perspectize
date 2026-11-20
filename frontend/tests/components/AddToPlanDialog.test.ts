@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/svelte';
 import AddToPlanDialog from '$lib/components/plan/AddToPlanDialog.svelte';
 import type { TodoActionItem, UserTodoListItem } from '$lib/queries/userTodos';
+import { preloadLazy } from '../helpers/warmUp';
 
 const mocks = vi.hoisted(() => ({
 	createMutateAsync: vi.fn(),
@@ -67,6 +68,10 @@ function renderDialog() {
 function submit() {
 	fireEvent.submit(document.querySelector('form') as HTMLFormElement);
 }
+
+// The component renders this through {#await import(...)}: load it up front so a
+// findBy* waits on the UI, not on Vite's first transform of the module (#728).
+preloadLazy(() => import('$lib/components/plan/TodoDialog.svelte'));
 
 describe('AddToPlanDialog', () => {
 	beforeEach(() => {

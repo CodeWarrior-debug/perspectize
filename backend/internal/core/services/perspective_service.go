@@ -12,16 +12,52 @@ import (
 
 // PerspectiveService implements business logic for perspective operations
 type PerspectiveService struct {
-	repo     repositories.PerspectiveRepository
-	userRepo repositories.UserRepository
+	repo        repositories.PerspectiveRepository
+	userRepo    repositories.UserRepository
+	contentRepo repositories.ContentRepository
+}
+
+// PerspectiveServiceOption configures optional PerspectiveService dependencies.
+type PerspectiveServiceOption func(*PerspectiveService)
+
+// WithContentRepository lets Create and Update check that the content a
+// perspective names is visible to the acting user. Without it that check is
+// skipped; tests that don't care about content privacy omit it, and production
+// always wires it.
+func WithContentRepository(repo repositories.ContentRepository) PerspectiveServiceOption {
+	return func(s *PerspectiveService) { s.contentRepo = repo }
 }
 
 // NewPerspectiveService creates a new perspective service
-func NewPerspectiveService(repo repositories.PerspectiveRepository, userRepo repositories.UserRepository) *PerspectiveService {
-	return &PerspectiveService{
+func NewPerspectiveService(repo repositories.PerspectiveRepository, userRepo repositories.UserRepository, opts ...PerspectiveServiceOption) *PerspectiveService {
+	s := &PerspectiveService{
 		repo:     repo,
 		userRepo: userRepo,
 	}
+	for _, opt := range opts {
+		opt(s)
+	}
+	return s
+}
+
+// requireVisibleContent answers domain.ErrContentNotFound unless the content
+// exists and viewerID may read it. A private row someone else owns is answered
+// the same as a missing one, so the id's existence isn't disclosed.
+func (s *PerspectiveService) requireVisibleContent(ctx context.Context, contentID, viewerID int) error {
+	if s.contentRepo == nil {
+		return nil
+	}
+	content, err := s.contentRepo.GetByID(ctx, contentID)
+	if err != nil {
+		if errors.Is(err, domain.ErrNotFound) {
+			return domain.ErrContentNotFound
+		}
+		return fmt.Errorf("failed to get content: %w", err)
+	}
+	if !content.VisibleTo(viewerID) {
+		return domain.ErrContentNotFound
+	}
+	return nil
 }
 
 // Create creates a new perspective with validation
@@ -62,7 +98,8 @@ func (s *PerspectiveService) Create(ctx context.Context, input portservices.Crea
 		input.Confidence != nil ||
 		input.Like != nil ||
 		input.Review != nil ||
-		input.Description != nil
+		input.Description != nil ||
+		len(input.Feelings) > 0
 	if !hasContent {
 		return nil, fmt.Errorf("%w: at least one field must be provided", domain.ErrInvalidInput)
 	}
@@ -113,6 +150,12 @@ func (s *PerspectiveService) Create(ctx context.Context, input portservices.Crea
 		RelatedPerspectiveIDs: input.RelatedPerspectiveIDs,
 		CustomFields:          input.CustomFields,
 		Review:                sanitizedReview,
+	}
+
+	if input.ContentID != nil {
+		if err := s.requireVisibleContent(ctx, *input.ContentID, input.UserID); err != nil {
+			return nil, err
+		}
 	}
 
 	created, err := s.repo.Create(ctx, perspective)
@@ -183,6 +226,14 @@ func (s *PerspectiveService) Update(ctx context.Context, input portservices.Upda
 			return nil, fmt.Errorf("%w: you can only modify your own perspectives", domain.ErrForbidden)
 		}
 		return nil, fmt.Errorf("failed to get perspective: %w", domain.ErrNotFound)
+	}
+
+	// Attaching different content is checked against the acting user. An
+	// unchanged content id is not a new attachment, so it isn't re-checked.
+	if input.ContentID != nil && (existing.ContentID == nil || *existing.ContentID != *input.ContentID) {
+		if err := s.requireVisibleContent(ctx, *input.ContentID, actorUserID); err != nil {
+			return nil, err
+		}
 	}
 
 	// Validate and update ratings. Explicit clear wins over a provided value (the
@@ -361,6 +412,17 @@ func (s *PerspectiveService) AggregateByContentIDs(ctx context.Context, contentI
 		return nil, fmt.Errorf("failed to aggregate perspectives by content: %w", err)
 	}
 	return aggregates, nil
+}
+
+// CountVisibleByContentIDs counts the perspectives the viewer may read per
+// content ID (public plus their own) — the count the Compare page can
+// actually show, unlike AggregateByContentIDs which counts every row.
+func (s *PerspectiveService) CountVisibleByContentIDs(ctx context.Context, contentIDs []int, viewerID *int) (map[int]int, error) {
+	counts, err := s.repo.CountVisibleByContentIDs(ctx, contentIDs, viewerID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to count visible perspectives by content: %w", err)
+	}
+	return counts, nil
 }
 
 // FeelingStats computes feeling count/average/stddev intensity — see

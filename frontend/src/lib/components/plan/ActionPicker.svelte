@@ -9,6 +9,8 @@
 	 * ActionPicker: a combobox over the action list, presets first in typical
 	 * sequence. Each option's description is its hover tooltip. Typed text that
 	 * matches no action offers `Add "<text>"`, which creates the action and selects it.
+	 * The list opens on a click, ArrowDown or typing, never on focus alone, so the
+	 * dialog's autofocus (or a programmatic focus) leaves it closed.
 	 */
 	let {
 		value = null,
@@ -41,7 +43,7 @@
 	const listId = $derived(`${id}-listbox`);
 
 	function startEditing() {
-		if (disabled) return;
+		if (disabled || open) return;
 		editing = true;
 		text = '';
 		open = true;
@@ -72,6 +74,9 @@
 	function handleKeydown(e: KeyboardEvent) {
 		if (e.key === 'Escape') {
 			close();
+		} else if (e.key === 'ArrowDown' && !open) {
+			e.preventDefault();
+			startEditing();
 		} else if (e.key === 'Enter') {
 			e.preventDefault();
 			if (matches.length > 0) choose(matches[0]);
@@ -97,7 +102,7 @@
 			editing = true;
 			open = true;
 		}}
-		onfocus={startEditing}
+		onclick={startEditing}
 		onblur={close}
 		onkeydown={handleKeydown}
 		class="border-input bg-background placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-ring/50 flex h-9 w-full min-w-0 rounded-md border px-3 py-1 text-sm shadow-xs outline-none focus-visible:ring-[3px] disabled:cursor-not-allowed disabled:opacity-50"

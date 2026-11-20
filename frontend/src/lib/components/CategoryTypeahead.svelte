@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { NO_AUTOFILL } from '$lib/utils/noAutofill';
 	import { createQuery, keepPreviousData } from '@tanstack/svelte-query';
 	import { graphqlClient } from '$lib/queries/client';
 	import { WIKIDATA_SEARCH, type WikidataSearchResult, type WikidataSearchResponse } from '$lib/queries/categories';
@@ -51,6 +52,7 @@
 	<!-- Search input: focused on open, since the user just opened this picker to search -->
 	<!-- svelte-ignore a11y_autofocus -->
 	<input
+		{...NO_AUTOFILL}
 		type="text"
 		bind:value={searchTerm}
 		placeholder="Search Wikidata..."

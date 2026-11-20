@@ -5,31 +5,53 @@
 	import PageWrapper from '$lib/components/PageWrapper.svelte';
 	import SearchBar from '$lib/components/discover/SearchBar.svelte';
 	import MovieSearchPanel from '$lib/components/discover/MovieSearchPanel.svelte';
+	import BookSearchPanel from '$lib/components/discover/BookSearchPanel.svelte';
+	import BookTrendingFeed from '$lib/components/discover/BookTrendingFeed.svelte';
+	import BookISBNPanel from '$lib/components/discover/BookISBNPanel.svelte';
 	import VideoResultsGrid from '$lib/components/discover/VideoResultsGrid.svelte';
+	import type { LibraryItem } from '$lib/components/discover/libraryItem';
 	import { Button } from '$lib/components/shadcn';
 	import { graphqlRequest } from '$lib/queries/client';
 	import {
 		LIST_CONTENT,
 		type ContentResponse,
-		type ContentItem,
 		type CreateContentResponse,
+		type CreateContentFromMovieResponse,
+		type CreateContentFromBookResponse,
 	} from '$lib/queries/content';
 	import { queryKeys } from '$lib/queries/keys';
 	import { useAddVideo } from '$lib/queries/content/useAddVideo';
 	import { useAddMovie } from '$lib/queries/content/useAddMovie';
-	import { useMe } from '$lib/queries/users/useMe.svelte';
+	import { useAddBook } from '$lib/queries/content/useAddBook';
+	import type { TrendingWindow } from '$lib/services/tmdbApi';
 	import { fetchYouTubeTrending, toWatchUrl, youtubeKeys, type VideoItem } from '$lib/services/youtubeApi';
 
 	// Two sources share this page. The choice lives in the URL (?source=movies),
 	// so a reload or a shared link lands on the same tab. YouTube is the default.
-	type Source = 'youtube' | 'movies';
-	const source = $derived<Source>(page.url.searchParams.get('source') === 'movies' ? 'movies' : 'youtube');
+	type Source = 'youtube' | 'movies' | 'books';
+	const sourceParam = $derived(page.url.searchParams.get('source'));
+	const source = $derived<Source>(sourceParam === 'movies' || sourceParam === 'books' ? sourceParam : 'youtube');
+
+	// The Books source has three tabs in ?tab=; search is the default and has no param.
+	type BookTab = 'search' | 'trending' | 'isbn';
+	const tabParam = $derived(page.url.searchParams.get('tab'));
+	const bookTab = $derived<BookTab>(tabParam === 'trending' || tabParam === 'isbn' ? tabParam : 'search');
 
 	function setSource(next: Source) {
 		if (next === source) return;
 		const url = new URL(page.url);
-		if (next === 'movies') url.searchParams.set('source', 'movies');
-		else url.searchParams.delete('source');
+		if (next === 'youtube') url.searchParams.delete('source');
+		else url.searchParams.set('source', next);
+		// A tab belongs to one source, so switching source starts that source at its default tab.
+		url.searchParams.delete('tab');
+		goto(`${url.pathname}${url.search}`, { replaceState: true, keepFocus: true, noScroll: true });
+	}
+
+	function setBookTab(next: BookTab) {
+		if (next === bookTab) return;
+		const url = new URL(page.url);
+		if (next === 'search') url.searchParams.delete('tab');
+		else url.searchParams.set('tab', next);
 		goto(`${url.pathname}${url.search}`, { replaceState: true, keepFocus: true, noScroll: true });
 	}
 
@@ -49,12 +71,31 @@
 	function handleAddMovie(url: string, { clearOnSuccess = false } = {}) {
 		pendingMovieUrl = url;
 		addMovie.mutate(url, {
-			onSuccess: () => {
+			onSuccess: (data: CreateContentFromMovieResponse) => {
+				rememberAdded(data?.createContentFromMovie);
 				// A pasted link is cleared once added, like the YouTube search box.
 				if (clearOnSuccess) movieQuery = '';
 			},
 			onSettled: () => {
 				pendingMovieUrl = null;
+			},
+		});
+	}
+
+	// Books source: the page owns the input ref (Cmd/Ctrl+K), the typed text (Escape), the trending
+	// window and the add mutation, shared by the Search, Trending and ISBN tabs.
+	let bookQuery = $state('');
+	let bookInputRef: HTMLInputElement | null = $state(null);
+	let bookTrendingWindow = $state<TrendingWindow>('WEEK');
+	let pendingBookUrl = $state<string | null>(null);
+	const addBook = useAddBook();
+
+	function handleAddBook(url: string) {
+		pendingBookUrl = url;
+		addBook.mutate(url, {
+			onSuccess: (data: CreateContentFromBookResponse) => rememberAdded(data?.createContentFromBook),
+			onSettled: () => {
+				pendingBookUrl = null;
 			},
 		});
 	}
@@ -110,36 +151,32 @@
 		queryFn: () => graphqlRequest<ContentResponse>(LIST_CONTENT, { first: 100, includeTotalCount: false }),
 	}));
 
-	const libraryUrls = $derived(
-		new Set(
-			(libraryQuery.data?.content.items ?? []).map((item) => item.url).filter((url): url is string => Boolean(url)),
-		),
-	);
+	// Items added this session, by URL. The list refetches after an add, but until it lands the
+	// card would flip back to "Add" for a moment; this keeps it on "In Library" straight away.
+	let addedThisSession = $state<ReadonlyMap<string, LibraryItem>>(new Map());
+
+	function rememberAdded(item: { id: string; name: string; url: string | null } | null | undefined) {
+		if (!item?.url) return;
+		addedThisSession = new Map(addedThisSession).set(item.url, { id: item.id, name: item.name });
+	}
+
+	// URL → library row for every item already in the library, whatever its type. The cards use
+	// it both to show "In Library" and to link the follow-up actions (Add perspective, Compare, Go to item).
+	const library = $derived.by(() => {
+		const map = new Map<string, LibraryItem>(addedThisSession);
+		for (const item of libraryQuery.data?.content.items ?? []) {
+			if (item.url) map.set(item.url, { id: item.id, name: item.name });
+		}
+		return map as ReadonlyMap<string, LibraryItem>;
+	});
 
 	const addVideo = useAddVideo();
 	let pendingId = $state<string | null>(null);
 
-	// Full content metadata for videos added THIS session, keyed by video id —
-	// populated from CreateContentFromYouTube's response so VideoCard can
-	// render the inline details card (duration/views/likes/channel/category)
-	// plus working Add-perspective/Compare links right after a successful add.
-	// Pre-existing already-tracked videos (found via libraryUrls below) don't
-	// get an entry here and fall back to VideoCard's disabled "In Library"
-	// state — see VideoCard.svelte's isInLibrary branch for why.
-	let addedContentByVideoId = $state<Map<string, ContentItem>>(new Map());
-
-	const meCtx = useMe();
-	const currentUserId = $derived(meCtx.me ? parseInt(meCtx.me.id, 10) : null);
-
 	function handleAdd(videoId: string) {
 		pendingId = videoId;
 		addVideo.mutate(toWatchUrl(videoId), {
-			onSuccess: (data: CreateContentResponse) => {
-				const content = data?.createContentFromYouTube?.content;
-				if (content) {
-					addedContentByVideoId = new Map(addedContentByVideoId).set(videoId, content);
-				}
-			},
+			onSuccess: (data: CreateContentResponse) => rememberAdded(data?.createContentFromYouTube?.content),
 			onSettled: () => {
 				pendingId = null;
 			},
@@ -151,7 +188,8 @@
 	function handleAddUrl(url: string) {
 		isAddingUrl = true;
 		addVideo.mutate(url, {
-			onSuccess: () => {
+			onSuccess: (data: CreateContentResponse) => {
+				rememberAdded(data?.createContentFromYouTube?.content);
 				searchQuery = '';
 			},
 			onSettled: () => {
@@ -167,11 +205,21 @@
 			const isModK = (event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k';
 			if (isModK) {
 				event.preventDefault();
-				(source === 'movies' ? movieInputRef : searchInputRef)?.focus();
+				(source === 'movies'
+					? movieInputRef
+					: source === 'books'
+						? bookTab === 'search'
+							? bookInputRef
+							: null
+						: searchInputRef
+				)?.focus();
 			} else if (event.key === 'Escape') {
 				if (source === 'movies' && movieQuery) {
 					event.preventDefault();
 					movieQuery = '';
+				} else if (source === 'books' && bookTab === 'search' && bookQuery) {
+					event.preventDefault();
+					bookQuery = '';
 				} else if (source === 'youtube' && searchQuery) {
 					event.preventDefault();
 					searchQuery = '';
@@ -211,7 +259,9 @@
 			<p class="text-sm text-muted-foreground mt-1">
 				{source === 'movies'
 					? 'Search TMDB or browse trending movies and add them to Perspectize'
-					: "Browse what's trending on YouTube and add videos to Perspectize"}
+					: source === 'books'
+						? 'Search Open Library, browse trending books or add one by ISBN'
+						: "Browse what's trending on YouTube and add videos to Perspectize"}
 			</p>
 		</div>
 
@@ -238,17 +288,63 @@
 			>
 				Movies
 			</Button>
+			<Button
+				role="tab"
+				aria-selected={source === 'books'}
+				variant={source === 'books' ? 'default' : 'ghost'}
+				size="sm"
+				onclick={() => setSource('books')}
+			>
+				Books
+			</Button>
 		</div>
 
 		{#if source === 'movies'}
 			<MovieSearchPanel
 				bind:value={movieQuery}
 				bind:inputRef={movieInputRef}
-				{libraryUrls}
+				{library}
 				pendingUrl={pendingMovieUrl}
 				onAdd={handleAddMovie}
 				onAddUrl={(url) => handleAddMovie(url, { clearOnSuccess: true })}
 			/>
+		{:else if source === 'books'}
+			<div
+				role="tablist"
+				aria-label="Book view"
+				class="flex gap-1 p-1 w-fit rounded-md bg-muted/60 border border-border"
+			>
+				{#each [{ value: 'search', label: 'Search' }, { value: 'trending', label: 'Trending' }, { value: 'isbn', label: 'ISBN' }] as tab (tab.value)}
+					<Button
+						role="tab"
+						aria-selected={bookTab === tab.value}
+						variant={bookTab === tab.value ? 'default' : 'ghost'}
+						size="sm"
+						onclick={() => setBookTab(tab.value as BookTab)}
+					>
+						{tab.label}
+					</Button>
+				{/each}
+			</div>
+
+			{#if bookTab === 'trending'}
+				<BookTrendingFeed
+					bind:timeWindow={bookTrendingWindow}
+					{library}
+					pendingUrl={pendingBookUrl}
+					onAdd={handleAddBook}
+				/>
+			{:else if bookTab === 'isbn'}
+				<BookISBNPanel {library} pendingUrl={pendingBookUrl} onAdd={handleAddBook} />
+			{:else}
+				<BookSearchPanel
+					bind:value={bookQuery}
+					bind:inputRef={bookInputRef}
+					{library}
+					pendingUrl={pendingBookUrl}
+					onAdd={handleAddBook}
+				/>
+			{/if}
 		{:else}
 			<SearchBar
 				bind:value={searchQuery}
@@ -270,14 +366,12 @@
 					items={allResults}
 					{nextPageToken}
 					onLoadMore={handleLoadMore}
-					{libraryUrls}
+					{library}
 					label="Trending on YouTube"
 					onAdd={handleAdd}
 					{pendingId}
 					isLoading={trendingResult.isPending}
 					{isLoadingMore}
-					{addedContentByVideoId}
-					userId={currentUserId}
 				/>
 				{#if loadMoreError}
 					<p class="text-sm text-destructive">{loadMoreError}</p>

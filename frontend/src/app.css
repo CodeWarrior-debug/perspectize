@@ -1006,6 +1006,34 @@
 	font-family: 'Geist', system-ui, sans-serif;
 }
 
+/*
+ * Settings → Fonts overrides (lib/fonts/store.svelte.ts). Each rule only matches while the
+ * user has picked a font for that slot (data-font-* on <html>), so the defaults above are
+ * untouched otherwise. Unlayered on purpose: beats the `font-[family-name:…]` / `font-serif`
+ * utilities on the marked elements. Mark an element with font-slot-{heading,cell,longform}
+ * to put it in a slot.
+ */
+:root[data-font-heading]
+	:is(
+		h1,
+		h2,
+		h3,
+		h4,
+		[data-slot='dialog-title'],
+		[data-slot='drawer-title'],
+		.ag-header-cell-text,
+		.ag-header-group-text,
+		.font-slot-heading
+	) {
+	font-family: var(--font-slot-heading);
+}
+:root[data-font-cell] :is(.ag-cell:not([col-id='type']), .font-slot-cell) {
+	font-family: var(--font-slot-cell);
+}
+:root[data-font-longform] .font-slot-longform {
+	font-family: var(--font-slot-longform);
+}
+
 /* Column resize handles and filter buttons show on hover/focus (filter also when active), so the
    header reads as labels first instead of a row of dividers and icons. */
 .ag-header-cell-resize::after {
@@ -1022,6 +1050,49 @@
 .ag-header-cell:hover .ag-header-cell-filter-button,
 .ag-header-cell:focus-within .ag-header-cell-filter-button {
 	opacity: 1;
+}
+
+/* Header spacing. headerMinWidth (lib/utils/grid-header-width.ts) reserves exactly this layout,
+   so a column at its minimum width shows its whole label, sort arrow and funnel: one --ag-spacing
+   between the label and the funnel (AG Grid leaves none), and the sort arrow one gap from its
+   label rather than two (AG Grid adds its own padding on top of the label's gap). Change these
+   and headerChrome (grid-theme.ts) together. */
+.ag-header-cell .ag-cell-label-container {
+	gap: var(--ag-spacing);
+}
+.ag-header-cell .ag-sort-indicator-icon {
+	padding-left: 0;
+	padding-right: 0;
+}
+
+/* Funnel states. AG Grid marks an active filter with a tinted block plus a 4px ring around the
+   icon, which reads as an oversized rectangle in a 36px header. Instead the funnel itself takes
+   the foreground colour and keeps AG Grid's small dot; hover is a small rounded wash. Foreground,
+   not primary: Midnight's primary is a dark navy almost identical to its header (contrast 1.1), while
+   foreground contrasts with the header on every preset (5 or more for the funnel, 11 or more for the dot). */
+.ag-header-cell .ag-header-cell-filter-button:hover {
+	border-radius: 4px;
+	box-shadow: 0 0 0 2px var(--ag-icon-button-hover-color);
+}
+.ag-header-cell .ag-header-cell-filter-button.ag-filter-active {
+	background-color: transparent;
+	box-shadow: none;
+	color: var(--color-foreground);
+}
+/* AG Grid paints the dot with the grid accent (--color-primary), so it needs the same override. */
+.ag-header-cell .ag-header-cell-filter-button.ag-filter-active::after {
+	background-color: var(--color-foreground);
+}
+.ag-header-cell .ag-header-cell-filter-button.ag-filter-active:hover {
+	background-color: var(--ag-icon-button-hover-color);
+	border-radius: 4px;
+	box-shadow: 0 0 0 2px var(--ag-icon-button-hover-color);
+}
+
+/* Activity headers: small uppercase labels (size and colour come from ACTIVITY_HEADER_PARAMS). */
+.activity-grid .ag-header-cell-text {
+	text-transform: uppercase;
+	letter-spacing: 0.06em;
 }
 
 /* Hover bar — drawn on AG Grid's own hover overlay so it sits on top of the opaque hover colour. */
@@ -1127,4 +1198,143 @@ select.select-inset {
 		calc(100% - 0.8rem) 50%;
 	background-size: 0.35rem 0.35rem;
 	background-repeat: no-repeat;
+}
+
+/* Activity grid: always-visible, themed horizontal scrollbar (mouse users get no
+   gesture to discover sideways scroll, and macOS overlay scrollbars hide until used).
+   The spacers sit under the pinned columns and carry their own scrollbar gutter. */
+.ag-body-horizontal-scroll-viewport,
+.ag-horizontal-left-spacer,
+.ag-horizontal-right-spacer {
+	overflow-x: scroll;
+	scrollbar-width: thin;
+	scrollbar-color: var(--color-primary) var(--color-muted);
+}
+.ag-horizontal-left-spacer,
+.ag-horizontal-right-spacer {
+	/* Nothing to scroll here: show the track only, no thumb. */
+	scrollbar-color: transparent var(--color-muted);
+}
+
+/* Library print view (PrintListView): hidden on screen, and the only thing shown when the page is
+   printed with html[data-print='list']. Plain black on white, no theme colours. */
+.print-root {
+	display: none;
+}
+@media print {
+	html[data-print='list'] body > :not(.print-root) {
+		display: none !important;
+	}
+	html[data-print='list'] .print-root {
+		display: block;
+		background: white;
+		color: black;
+	}
+	.print-root h1 {
+		margin: 0 0 12px;
+		font-size: 18pt;
+	}
+	.print-root table {
+		width: 100%;
+		table-layout: auto;
+		border-collapse: collapse;
+	}
+	.print-root thead {
+		display: table-header-group;
+	}
+	.print-root tr {
+		break-inside: avoid;
+	}
+	.print-root th,
+	.print-root td {
+		padding: 6px 8px;
+		border-bottom: 1px solid black;
+		text-align: left;
+		vertical-align: top;
+		color: black;
+	}
+	/* Text columns wrap at word boundaries; break-word only splits a single word wider than its column
+	   and, unlike `anywhere`, keeps each column's minimum width at its longest word. */
+	.print-root th,
+	.print-root td {
+		overflow-wrap: break-word;
+	}
+	/* Long text (tags, cast, description) is clamped so a row stays a few lines tall. */
+	.print-root .cell-text {
+		display: -webkit-box;
+		-webkit-box-orient: vertical;
+		-webkit-line-clamp: 3;
+		line-clamp: 3;
+		overflow: hidden;
+	}
+	.print-root td[data-col='tags'] .cell-text {
+		-webkit-line-clamp: 2;
+		line-clamp: 2;
+	}
+	.print-root th[data-col='item'],
+	.print-root td[data-col='item'] {
+		width: 30%;
+		min-width: 12em;
+	}
+	.print-root th[data-col='tags'],
+	.print-root td[data-col='tags'] {
+		width: 22%;
+	}
+	/* Short numeric and date values stay on one line; every other column wraps. */
+	.print-root td[data-col='duration'],
+	.print-root td[data-col='views'],
+	.print-root td[data-col='likes'],
+	.print-root td[data-col='percentLiked'],
+	.print-root td[data-col='boxOffice'],
+	.print-root td[data-col='vsBudget'],
+	.print-root td[data-col='tmdbScore'],
+	.print-root td[data-col='budget'],
+	.print-root td[data-col='votes'],
+	.print-root td[data-col='pages'],
+	.print-root td[data-col='rating'],
+	.print-root td[data-col='editions'],
+	.print-root td[data-col='readers'],
+	.print-root td[data-col='tmdbId'],
+	.print-root td[data-col='id'],
+	.print-root td[data-col='rated'],
+	.print-root td[data-col='myQuality'],
+	.print-root td[data-col='myImportance'],
+	.print-root td[data-col='myAgreement'],
+	.print-root td[data-col='effectiveDate'],
+	.print-root td[data-col='evaluateBy'],
+	.print-root td[data-col='released'],
+	.print-root td[data-col='publishDate'],
+	.print-root td[data-col='published'],
+	.print-root td[data-col='webPublished'],
+	.print-root td[data-col='createdAt'],
+	.print-root td[data-col='updatedAt'] {
+		white-space: nowrap;
+	}
+	.print-root a {
+		color: black;
+		text-decoration: underline;
+	}
+	.print-root[data-spacing='compact'] th,
+	.print-root[data-spacing='compact'] td {
+		padding-block: 2px;
+	}
+	.print-root[data-spacing='standard'] th,
+	.print-root[data-spacing='standard'] td {
+		padding-block: 6px;
+	}
+	.print-root[data-spacing='roomy'] th,
+	.print-root[data-spacing='roomy'] td {
+		padding-block: 12px;
+	}
+	/* As seen: hide everything that is not the grid or one of its ancestors. */
+	html[data-print='grid'] body *:not(.activity-grid):not(.activity-grid *):not(:has(.activity-grid)) {
+		display: none !important;
+	}
+	/* Every ancestor of the grid has a fixed height or clips; let the whole table flow onto pages. */
+	html[data-print='grid'] body *:has(.activity-grid),
+	html[data-print='grid'] .activity-grid {
+		height: auto !important;
+		max-height: none !important;
+		overflow: visible !important;
+	}
 }

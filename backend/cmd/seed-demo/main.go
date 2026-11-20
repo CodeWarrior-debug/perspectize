@@ -22,10 +22,14 @@ import (
 	"net/url"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/CodeWarrior-debug/perspectize/backend/internal/adapters/repositories/postgres"
 	"github.com/CodeWarrior-debug/perspectize/backend/internal/adapters/youtube"
 	"github.com/CodeWarrior-debug/perspectize/backend/internal/core/domain"
+	"github.com/CodeWarrior-debug/perspectize/backend/internal/core/ports/repositories"
+	portservices "github.com/CodeWarrior-debug/perspectize/backend/internal/core/ports/services"
+	"github.com/CodeWarrior-debug/perspectize/backend/internal/core/services"
 	"github.com/CodeWarrior-debug/perspectize/backend/internal/demo"
 	gormpg "gorm.io/driver/postgres"
 	"gorm.io/gorm"
@@ -54,13 +58,17 @@ func main() {
 		log.Fatalf("connect: %v", err)
 	}
 
+	contentRepo := postgres.NewGormContentRepository(db)
 	s := &seeder{
 		db:           db,
 		users:        postgres.NewGormUserRepository(db),
-		content:      postgres.NewGormContentRepository(db),
+		content:      contentRepo,
+		claims:       services.NewContentService(contentRepo, nil, nil),
+		claimExists:  claimExistsIn(db),
 		perspectives: postgres.NewGormPerspectiveRepository(db),
 		threads:      postgres.NewGormMessageThreadRepository(db),
 		messages:     postgres.NewGormMessageRepository(db),
+		imports:      postgres.NewGormImportJobRepository(db),
 		userIDs:      map[string]int{},
 		contentIDs:   map[string]int{},
 	}
@@ -108,6 +116,8 @@ func resetDemoData(ctx context.Context, db *gorm.DB) error {
 	statements := []string{
 		"DELETE FROM message_threads WHERE id IN (SELECT thread_id FROM thread_participants WHERE user_id IN (" + demoUsers + "))",
 		"DELETE FROM perspectives WHERE user_id IN (" + demoUsers + ") OR content_id IN (SELECT id FROM content WHERE added_by_user_id IN (" + demoUsers + "))",
+		// Import sources and rows cascade from their job.
+		"DELETE FROM import_jobs WHERE user_id IN (" + demoUsers + ")",
 		"DELETE FROM content WHERE added_by_user_id IN (" + demoUsers + ")",
 		"DELETE FROM users WHERE id IN (" + demoUsers + ")",
 	}
@@ -121,17 +131,27 @@ func resetDemoData(ctx context.Context, db *gorm.DB) error {
 	})
 }
 
+// claimCreator is the claim create path, satisfied by *services.ContentService.
+// Seeding goes through it so demo claims get the same text, date and privacy
+// rules as a claim made in the UI.
+type claimCreator interface {
+	CreateClaim(ctx context.Context, input portservices.CreateClaimInput) (*domain.Content, error)
+}
+
 type seeder struct {
 	db           *gorm.DB
 	users        *postgres.GormUserRepository
 	content      *postgres.GormContentRepository
+	claims       claimCreator
+	claimExists  func(ctx context.Context, userID int, text string) (bool, error)
 	perspectives *postgres.GormPerspectiveRepository
 	threads      *postgres.GormMessageThreadRepository
 	messages     *postgres.GormMessageRepository
+	imports      *postgres.GormImportJobRepository
 
 	userIDs    map[string]int // persona key -> users.id
 	contentIDs map[string]int // video ID -> content.id
-	created    [4]int         // users, content, perspectives, messages
+	created    [6]int         // users, content, claims, perspectives, messages, import rows
 }
 
 func (s *seeder) run(ctx context.Context) error {
@@ -141,15 +161,60 @@ func (s *seeder) run(ctx context.Context) error {
 	if err := s.seedContent(ctx); err != nil {
 		return err
 	}
+	if err := s.seedClaims(ctx); err != nil {
+		return err
+	}
 	if err := s.seedPerspectives(ctx); err != nil {
 		return err
 	}
-	return s.seedMessages(ctx)
+	if err := s.seedMessages(ctx); err != nil {
+		return err
+	}
+	return s.seedImports(ctx)
 }
 
 func (s *seeder) summary() string {
-	return fmt.Sprintf("seed-demo: created %d users, %d content, %d perspectives, %d messages (existing rows left untouched)",
-		s.created[0], s.created[1], s.created[2], s.created[3])
+	return fmt.Sprintf("seed-demo: created %d users, %d content, %d claims, %d perspectives, %d messages, %d import rows (existing rows left untouched)",
+		s.created[0], s.created[1], s.created[2], s.created[3], s.created[4], s.created[5])
+}
+
+// claimExistsIn looks up whether a user already owns a claim with this exact text.
+func claimExistsIn(db *gorm.DB) func(ctx context.Context, userID int, text string) (bool, error) {
+	return func(ctx context.Context, userID int, text string) (bool, error) {
+		var n int64
+		err := db.WithContext(ctx).Table("content").
+			Where("added_by_user_id = ? AND content_type = 'claim' AND name = ?", userID, text).
+			Count(&n).Error
+		if err != nil {
+			return false, fmt.Errorf("count claims: %w", err)
+		}
+		return n > 0, nil
+	}
+}
+
+func (s *seeder) seedClaims(ctx context.Context) error {
+	for _, c := range demo.Claims {
+		userID := s.userIDs[c.Persona]
+		if userID == 0 {
+			return fmt.Errorf("claim %q references unknown persona %q", c.Text, c.Persona)
+		}
+		exists, err := s.claimExists(ctx, userID, c.Text)
+		if err != nil {
+			return fmt.Errorf("lookup claim %q: %w", c.Text, err)
+		}
+		if exists {
+			continue
+		}
+		input := portservices.CreateClaimInput{Text: c.Text, UserID: userID, EffectiveDate: &c.EffectiveDate}
+		if c.EvaluateBy != "" {
+			input.EvaluateBy = &c.EvaluateBy
+		}
+		if _, err := s.claims.CreateClaim(ctx, input); err != nil {
+			return fmt.Errorf("create claim %q: %w", c.Text, err)
+		}
+		s.created[2]++
+	}
+	return nil
 }
 
 func (s *seeder) seedUsers(ctx context.Context) error {
@@ -253,7 +318,7 @@ func (s *seeder) seedPerspectives(ctx context.Context) error {
 		if _, err := s.perspectives.Create(ctx, p); err != nil {
 			return fmt.Errorf("create perspective %s/%s: %w", sp.Persona, sp.VideoID, err)
 		}
-		s.created[2]++
+		s.created[3]++
 	}
 	return nil
 }
@@ -287,7 +352,73 @@ func (s *seeder) seedMessages(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("message seq: %w", err)
 	}
-	s.created[3] += int(after - before)
+	s.created[4] += int(after - before)
+	return nil
+}
+
+// seedImports stages the demo import sheet (demo/imports.json) under the
+// admin persona, one import per fixture entry, skipping names already there.
+func (s *seeder) seedImports(ctx context.Context) error {
+	fixture, err := demo.Imports()
+	if err != nil {
+		return err
+	}
+	fetched, err := time.Parse(time.RFC3339, fixture.FetchedAt)
+	if err != nil {
+		return fmt.Errorf("demo imports fetchedAt: %w", err)
+	}
+	owner := s.userIDs["carmen"]
+	existing, err := s.imports.ListJobs(ctx, true)
+	if err != nil {
+		return fmt.Errorf("list imports: %w", err)
+	}
+	have := map[string]bool{}
+	for _, j := range existing {
+		if j.UserID == owner {
+			have[j.Name] = true
+		}
+	}
+
+	for _, fj := range fixture.Imports {
+		if have[fj.Name] {
+			continue
+		}
+		job := &domain.ImportJob{UserID: owner, Name: fj.Name}
+		for _, src := range fj.Sources {
+			st := domain.ImportSourceType(strings.ToUpper(src.Type))
+			title, url := src.Title, src.URL
+			is := &domain.ImportSource{SourceType: st, SourceRef: src.Ref, Title: &title, URL: &url,
+				DestinationType: st.DestinationType(), Status: domain.ImportSourceStatusListing}
+			if src.Role != "" {
+				role := domain.ImportPersonRole(strings.ToUpper(src.Role))
+				is.Role = &role
+			}
+			job.Sources = append(job.Sources, is)
+		}
+		created, err := s.imports.CreateJob(ctx, job)
+		if err != nil {
+			return fmt.Errorf("create import %q: %w", fj.Name, err)
+		}
+		for i, src := range fj.Sources {
+			saved := created.Sources[i]
+			rows := src.Rows(fetched)
+			for _, r := range rows {
+				r.Item.JobID, r.Item.SourceID = created.ID, saved.ID
+			}
+			for start := 0; start < len(rows); start += 50 {
+				if err := s.imports.UpsertItems(ctx, rows[start:min(start+50, len(rows))]); err != nil {
+					return fmt.Errorf("stage import %q: %w", fj.Name, err)
+				}
+			}
+			count := len(rows)
+			if err := s.imports.UpdateSource(ctx, saved.ID, repositories.ImportSourceUpdate{
+				Status: domain.ImportSourceStatusReady, ItemCount: &count, FetchedAt: &fetched,
+			}); err != nil {
+				return fmt.Errorf("finish import %q: %w", fj.Name, err)
+			}
+			s.created[5] += count
+		}
+	}
 	return nil
 }
 

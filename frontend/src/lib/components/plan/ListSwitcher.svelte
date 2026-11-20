@@ -124,8 +124,8 @@
 		<form class="flex flex-wrap items-center gap-2" onsubmit={submit}>
 			<Input
 				type="text"
-				aria-label={mode === 'create' ? 'New list name' : 'List name'}
-				placeholder="List name"
+				aria-label={mode === 'create' ? 'New list title' : 'List title'}
+				placeholder="List title"
 				maxlength={100}
 				bind:value={draftName}
 				class="max-w-xs"

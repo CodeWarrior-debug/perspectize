@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { NO_AUTOFILL } from '$lib/utils/noAutofill';
 	import ChevronDownIcon from '@lucide/svelte/icons/chevron-down';
 	import ChevronUpIcon from '@lucide/svelte/icons/chevron-up';
 	import XIcon from '@lucide/svelte/icons/x';
@@ -166,6 +167,7 @@
 
 			<!-- Number input -->
 			<input
+				{...NO_AUTOFILL}
 				id={name}
 				{name}
 				type="number"
@@ -199,10 +201,10 @@
 				<button
 					type="button"
 					onclick={clearRating}
-					class="absolute -right-5 flex items-center justify-center transition-opacity hover:opacity-70 text-muted-foreground"
+					class="absolute -top-2 -left-3 flex items-center justify-center transition-opacity hover:opacity-70 text-destructive"
 					aria-label="Clear {label} rating"
 				>
-					<XIcon class="size-3" />
+					<XIcon class="size-3" strokeWidth={1.25} />
 				</button>
 			{/if}
 
@@ -212,7 +214,7 @@
 					type="button"
 					onclick={onRemove}
 					class="hover-tooltip flex items-center justify-center bg-card border border-border rounded-full shadow-sm text-muted-foreground hover:opacity-70 transition-opacity z-10"
-					style="position: absolute; top: 50%; left: 100%; margin-left: 4px; transform: translateY(-50%); width: 16px; height: 16px;"
+					style="position: absolute; top: 50%; left: 100%; margin-left: 10px; transform: translateY(-50%); width: 16px; height: 16px;"
 					aria-label="Remove {label}"
 					data-tooltip="Remove {label}"
 				>

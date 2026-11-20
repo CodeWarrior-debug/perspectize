@@ -78,11 +78,12 @@ Given a selection of types, the preview flags:
 - **Sparse columns** — a default column populated for under half the selection.
 - **Mixed units** — e.g. Length across video seconds, book pages and Bible
   passage words (BSB), which must never be sorted as one numeric axis. The
-  sample table enforces the policy. Sorting such a column as the primary key
-  raises an alert and leaves the order unchanged until you pick one of two
-  fixes. **Filter to one type** keeps a single unit. **Sort by Type, then the
-  column** is a multi-column sort that puts the unit-consistent Type column
-  first. The spec emits that policy and the backend/frontend steps it needs.
+  sample table shows the policy. Sorting such a column is never blocked: rows
+  are grouped by unit (`length_units`), each group is ordered within itself,
+  and a divider row names each unit. A dismissible note explains the grouping
+  and offers a "Show only <type>" shortcut per type. The spec emits the
+  backend and frontend steps it needs; the Length two-key sort rule is
+  emitted only when Length is a mixed column.
 - **Mixed provenance** — a column that is fetched for some types and
   user-entered for others (Rating is the standing example).
 - **Lost required fields** — a type declaring a field required and
@@ -134,21 +135,48 @@ change.
 
 ## Seeded types
 
-Seventeen deliberately dissimilar types ship as seed data, so the catalog is not
+Twenty-two deliberately dissimilar types ship as seed data, so the catalog is not
 quietly YouTube-shaped:
 
 YouTube video · Movie · Book · Blog article · Podcast episode · Music track ·
 Propositional truth claim · Joke · Purchase · Another person's perspective ·
 Place visit · Research paper · Bible passage · TV show · TV season · TV episode ·
-Painting
+Painting · Sculpture · Drawing · Print · Photograph · Food & drink
 
 They differ on every axis that matters: API-enriched vs scraped vs manual vs
 internal-reference; URL-identified vs ISBN/DOI/GUID-identified vs text-hash
 identified; with and without duration, audience counts, money, and stance.
 
-A fresh open (or **Reset form**) lands on the Painting seed, the type
+A fresh open (or **Reset form**) lands on the Food & drink seed, the type
 currently being designed (see
-`docs/superpowers/specs/2026-09-26-painting-content-type-design.md`). The
+`docs/superpowers/specs/2026-11-01-food-item-content-type-design.md`). Its sample rows
+are real Open Food Facts records (fetched 2026-11-01) plus two USDA generics, and it
+adds a **Nutrition** column group (Calories, Protein, Carbs, Fat, Sugars, Sodium,
+Nutri-Score, NOVA, Allergens) that no other type binds.
+
+The Painting seed (spec `docs/superpowers/specs/2026-09-26-painting-content-type-design.md`) is
+filled to the Movie seed's depth from two real catalogues: five Met records
+and five Europeana records (Rijksmuseum, Mauritshuis, Finnish National
+Gallery, MNAC). Each binding names its path per source ("Met … | Europeana …"),
+and the Europeana rows were picked for their metadata problems: an artist
+name in "Surname, Given" form, a URL-encoded date, unlabelled dimensions, a
+Catalan-only medium, a CC BY-NC image and a record with no Wikidata QID. The
+Reuse rights column exists for this type: on Europeana, the rights statement
+decides which image Perspectize may show.
+
+Painting is one of five independent **museum types**: Painting, Sculpture,
+Drawing, Print and Photograph, grouped under "Museum" in the single-type view
+(`MUSEUM_TYPES`). They share sources, the rights column and a details layout
+(`museumLayout` in `src/details.ts`). A Met or Europeana URL doesn't say which
+type it is, so the five share one link rule (`MUSEUM_DETECT`). The Add Content
+tester simulates the backend's after-fetch routing (`routedBy`) by looking the
+id up in the sample rows. Each new type has 3 Met and 2 Europeana sample rows,
+generated from the API JSON. Its bindings come from the `ART` table in
+`src/catalog.ts`, which says what Medium, Artist and Date mean for that type.
+Prints and photographs are multiples: the row is the impression, and the
+Wikidata QID names the work, so it groups rows and never merges them.
+
+The
 Bible passage seed's bindings mirror `feature/bible-outbound-links`,
 where every passage field is a real `content` column (`name`,
 `display_title`, `verse_start_id`/`verse_end_id`) or a `bible_book` join. Fields
@@ -170,9 +198,20 @@ set the app ships today, which is the tool's sanity check.
 Two deterministic documents, copyable or downloadable:
 
 1. **Spec + checklist** — identity, ingestion, per-field decisions with storage
-   and migration implications, the resolved default grid, per-type header
-   aliases, the consistency review, and an implementation checklist keyed to
-   the files in `.claude/docs/ADDING_CONTENT_TYPE.md`.
+   and migration implications, a **Filters** table (for every chosen
+   `filterable` column: filter kind from the value type, proposed
+   `ContentFilter` field names, URL key, chip label, index note and the
+   Loaded/All parity rule; derived columns are listed as "no filter"), the
+   resolved default grid, per-type header aliases, the consistency review, an
+   **Undecided surfaces** section, and an implementation checklist (including
+   backend and frontend filter steps) keyed to the files in
+   `.claude/docs/ADDING_CONTENT_TYPE.md`.
+   *Undecided surfaces* lists the rows of that guide's "Per-type surface
+   checklist" the form cannot answer: the optional profile fields Content
+   policy, Duplicate-add feedback, Add Content entry, Mobile card facts and Search fields (empty
+   or "TBD" means undecided), a missing details-view attribution, plus rows no
+   field covers (computed sort keys, data modes, add-form errors, formatting
+   edge values, rollout). Each is a blocker until answered in the spec.
 2. **Column × content type matrix** — every column against every type, marking
    default-visible / available / not applicable. Useful on its own for spotting
    a column that only one type will ever fill.
@@ -181,7 +220,7 @@ Two deterministic documents, copyable or downloadable:
 
 | File | Purpose |
 |---|---|
-| `src/catalog.ts` | The 17 seeded type profiles, the generic column catalog with per-type bindings (tooltip, cell popover, appearance), and sample rows |
+| `src/catalog.ts` | The 22 seeded type profiles, the generic column catalog with per-type bindings (tooltip, cell popover, appearance), and sample rows |
 | `src/details.ts` | Details-view layouts per type, with a generic fallback |
 | `src/model.ts` | State shape, visibility resolution (incl. what-if overrides), row fill states, gap analysis |
 | `src/emit.ts` | Deterministic markdown generation (spec, matrix, single-type views) |
@@ -190,3 +229,4 @@ Two deterministic documents, copyable or downloadable:
 | `src/detect.ts` | Mirror of the app's Add Content link detection, plus the draft's rule |
 | `src/thumbs.ts` | Generated inline thumbnails (`scripts/build_thumbs.py`) |
 | `src/main.ts` | Form rendering and localStorage persistence |
+| `previews/<type>-activity.html` | Throwaway single-type previews, built by the `content-type-preview` skill (`.claude/skills/content-type-preview/`) from its `examples/<type>.spec.json`. Never hand-edit; rebuild |

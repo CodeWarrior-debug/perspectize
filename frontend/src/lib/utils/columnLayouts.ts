@@ -1,16 +1,18 @@
-import { defaultColumnVisibility, isMovieOnlyTypeFilter, togglableColIds, type ResponsiveTier } from './grid-config';
+import { defaultColumnVisibility, togglableColIds, type ColumnView, type ResponsiveTier } from './grid-config';
+
+export { columnViewFor, type ColumnView } from './grid-config';
 
 /**
- * columnLayouts — per-view Activity table column setups (issue #559).
+ * columnLayouts — per-view Activity table column setups.
  *
  * A "view" is the default column set a type filter maps to: `movie` when the
- * filter is exactly MOVIE, `general` for everything else (YouTube, Bible
- * passages, several types, no filter). A view with a saved layout shows it; one
- * without shows its defaults for the current responsive tier. Layouts are kept
- * in localStorage so they survive a refresh; failures fall back to defaults.
+ * filter is exactly MOVIE, `book` when it is exactly BOOK, `claim` when it is exactly
+ * CLAIM, `general` for everything else (YouTube, Bible passages, several types, no
+ * filter). A view with a saved layout shows it; one without shows its defaults for the
+ * current responsive tier. Layouts are kept in localStorage so they survive a refresh;
+ * failures fall back to defaults. The view mapping itself lives in grid-config
+ * (columnViewFor).
  */
-
-export type ColumnView = 'movie' | 'general';
 
 /** colId -> visible. */
 export type ColumnLayout = Record<string, boolean>;
@@ -20,12 +22,11 @@ export const COLUMN_LAYOUTS_KEY = 'perspectize:activityColumns:v1';
 /** Toast wording for each view ("Showing Movie columns"). */
 export const COLUMN_VIEW_LABEL: Record<ColumnView, string> = {
 	movie: 'Movie columns',
+	book: 'Book columns',
+	webpage: 'Webpage columns',
+	claim: 'Claim columns',
 	general: 'standard columns',
 };
-
-export function columnViewFor(typeFilter: string | undefined): ColumnView {
-	return isMovieOnlyTypeFilter(typeFilter) ? 'movie' : 'general';
-}
 
 function isLayout(value: unknown): value is ColumnLayout {
 	return (
@@ -78,8 +79,8 @@ export function clearLayout(view: ColumnView): void {
  * (admin ones included) so applying it also hides picker-only columns such as
  * Date Added that a previous custom layout turned on.
  */
-export function defaultLayout(tier: ResponsiveTier, view: ColumnView): ColumnLayout {
-	const { visible } = defaultColumnVisibility(tier, view === 'movie');
+export function defaultLayout(tier: ResponsiveTier, view: ColumnView, soloType: string | null = null): ColumnLayout {
+	const { visible } = defaultColumnVisibility(tier, view, soloType);
 	const shown = new Set(visible);
 	const layout: ColumnLayout = {};
 	for (const colId of new Set([...togglableColIds(true), ...visible])) layout[colId] = shown.has(colId);

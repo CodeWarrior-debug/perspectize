@@ -2,6 +2,7 @@ import type { IDoesFilterPassParams, IFilterComp, IFilterParams } from '@ag-grid
 import type { ContentItem } from '$lib/queries/content';
 import { AGE_RATING_OPTIONS, CONTENT_TYPE_OPTIONS } from './grid-config';
 import { ratedValueGetter } from './formatting';
+import { WEB_PAGE_ROLE_OPTIONS, webPageRolesOf } from './webPage';
 
 /** Model this filter reads and writes — same shape as AG Grid Enterprise's Set Filter. */
 export interface ContentTypeFilterModel {
@@ -23,8 +24,8 @@ export interface CheckboxOption {
 export abstract class CheckboxSetFilter implements IFilterComp<ContentItem> {
 	protected abstract readonly options: readonly CheckboxOption[];
 	protected abstract readonly ariaLabel: string;
-	/** Lowercased row value this filter matches against, or null when the row has none. */
-	protected abstract rowValue(row: ContentItem | undefined): string | null;
+	/** Lowercased row values this filter matches against. A row passes when any of them is ticked; none = fails. */
+	protected abstract rowValues(row: ContentItem | undefined): string[];
 
 	private params!: IFilterParams<ContentItem>;
 	private gui!: HTMLElement;
@@ -80,8 +81,7 @@ export abstract class CheckboxSetFilter implements IFilterComp<ContentItem> {
 	}
 
 	doesFilterPass(params: IDoesFilterPassParams<ContentItem>): boolean {
-		const value = this.rowValue(params.data);
-		return value != null && this.selected.has(value);
+		return this.rowValues(params.data).some((value) => this.selected.has(value));
 	}
 
 	getModel(): ContentTypeFilterModel | null {
@@ -107,8 +107,9 @@ export abstract class CheckboxSetFilter implements IFilterComp<ContentItem> {
 export class ContentTypeFilter extends CheckboxSetFilter {
 	protected readonly options = CONTENT_TYPE_OPTIONS;
 	protected readonly ariaLabel = 'Filter by content type';
-	protected rowValue(row: ContentItem | undefined): string | null {
-		return row?.contentType?.toLowerCase() ?? null;
+	protected rowValues(row: ContentItem | undefined): string[] {
+		const value = row?.contentType?.toLowerCase();
+		return value ? [value] : [];
 	}
 }
 
@@ -116,7 +117,24 @@ export class ContentTypeFilter extends CheckboxSetFilter {
 export class AgeRatingFilter extends CheckboxSetFilter {
 	protected readonly options = AGE_RATING_OPTIONS;
 	protected readonly ariaLabel = 'Filter by age rating';
-	protected rowValue(row: ContentItem | undefined): string | null {
-		return ratedValueGetter({ data: row })?.toLowerCase() ?? null;
+	protected rowValues(row: ContentItem | undefined): string[] {
+		const value = ratedValueGetter({ data: row })?.toLowerCase();
+		return value ? [value] : [];
+	}
+}
+
+/**
+ * Roles column (Webpage): BLOG_POST / SESSION_TRANSCRIPT as lowercase values (the URL form). A page can
+ * carry both roles, so a row passes when either is ticked. Server-side only: the mobile card list
+ * cannot filter a multi-valued field, so it ignores this filter (see FILTER_VALUE_GETTERS).
+ */
+export class WebRoleFilter extends CheckboxSetFilter {
+	protected readonly options: readonly CheckboxOption[] = WEB_PAGE_ROLE_OPTIONS.map((o) => ({
+		value: o.value.toLowerCase(),
+		label: o.label,
+	}));
+	protected readonly ariaLabel = 'Filter by role';
+	protected rowValues(row: ContentItem | undefined): string[] {
+		return webPageRolesOf({ url: row?.url ?? null, webPage: row?.webPage }).map((r) => r.toLowerCase());
 	}
 }

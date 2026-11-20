@@ -155,6 +155,33 @@ func TestGormPerspectiveRepository_Create(t *testing.T) {
 		assertAllExpectationsMet(t, mock)
 	})
 
+	t.Run("duplicate (user, content, privacy) maps to domain.ErrAlreadyExists", func(t *testing.T) {
+		db, mock := newMockDB(t)
+		mock.ExpectQuery(`INSERT INTO "perspectives"`).
+			WillReturnError(&pgconn.PgError{Code: "23505", ConstraintName: "uq_perspectives_user_content_privacy"})
+
+		got, err := NewGormPerspectiveRepository(db).Create(ctx, &domain.Perspective{UserID: 2, ContentID: pInt(11), Privacy: domain.PrivacyPrivate})
+		assert.Nil(t, got)
+		assert.True(t, errors.Is(err, domain.ErrAlreadyExists), "expected domain.ErrAlreadyExists, got %v", err)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "you already have a private perspective on this content")
+		assert.NotContains(t, err.Error(), "uq_perspectives")
+		assertAllExpectationsMet(t, mock)
+	})
+
+	t.Run("unique violation on a different constraint stays generic", func(t *testing.T) {
+		db, mock := newMockDB(t)
+		mock.ExpectQuery(`INSERT INTO "perspectives"`).
+			WillReturnError(&pgconn.PgError{Code: "23505", ConstraintName: "perspectives_pkey"})
+
+		got, err := NewGormPerspectiveRepository(db).Create(ctx, &domain.Perspective{UserID: 2, ContentID: pInt(11)})
+		assert.Nil(t, got)
+		require.Error(t, err)
+		assert.False(t, errors.Is(err, domain.ErrAlreadyExists), "must not be mapped to ErrAlreadyExists: %v", err)
+		assert.Contains(t, err.Error(), "failed to insert perspective")
+		assertAllExpectationsMet(t, mock)
+	})
+
 	t.Run("other constraint errors stay generic", func(t *testing.T) {
 		tests := []struct {
 			name string
@@ -251,6 +278,34 @@ func TestGormPerspectiveRepository_Update(t *testing.T) {
 			assert.True(t, errors.Is(err, domain.ErrNotFound), "owner %d: expected domain.ErrNotFound, got %v", owner, err)
 			assertAllExpectationsMet(t, mock)
 		}
+	})
+
+	t.Run("duplicate (user, content, privacy) maps to domain.ErrAlreadyExists", func(t *testing.T) {
+		db, mock := newMockDB(t)
+		mock.ExpectQuery(`UPDATE "perspectives" SET`).
+			WillReturnError(&pgconn.PgError{Code: "23505", ConstraintName: "uq_perspectives_user_content_privacy"})
+
+		got, err := NewGormPerspectiveRepository(db).Update(ctx, &domain.Perspective{ID: 5, UserID: 2, ContentID: pInt(11), Privacy: domain.PrivacyPublic}, 2)
+		assert.Nil(t, got)
+		assert.True(t, errors.Is(err, domain.ErrAlreadyExists), "expected domain.ErrAlreadyExists, got %v", err)
+		assert.False(t, errors.Is(err, domain.ErrNotFound))
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "you already have a public perspective on this content")
+		assert.NotContains(t, err.Error(), "uq_perspectives")
+		assertAllExpectationsMet(t, mock)
+	})
+
+	t.Run("unique violation on a different constraint stays generic", func(t *testing.T) {
+		db, mock := newMockDB(t)
+		mock.ExpectQuery(`UPDATE "perspectives" SET`).
+			WillReturnError(&pgconn.PgError{Code: "23505", ConstraintName: "perspectives_pkey"})
+
+		got, err := NewGormPerspectiveRepository(db).Update(ctx, &domain.Perspective{ID: 5, UserID: 2}, 2)
+		assert.Nil(t, got)
+		require.Error(t, err)
+		assert.False(t, errors.Is(err, domain.ErrAlreadyExists), "must not be mapped to ErrAlreadyExists: %v", err)
+		assert.Contains(t, err.Error(), "failed to update perspective")
+		assertAllExpectationsMet(t, mock)
 	})
 
 	t.Run("wraps update errors", func(t *testing.T) {
@@ -441,7 +496,7 @@ func TestGormPerspectiveRepository_List(t *testing.T) {
 
 	t.Run("RestrictToPublicOrOwner with no viewer restricts to public only", func(t *testing.T) {
 		db, mock := newMockDB(t)
-		mock.ExpectQuery(`WHERE user_id = \$1 AND privacy = \$2 ORDER BY`).
+		mock.ExpectQuery(`WHERE user_id = \$1 AND privacy = \$2 AND \(EXISTS \(SELECT 1 FROM content c WHERE c.id = perspectives.content_id AND c.privacy = \$3\)\) ORDER BY`).
 			WillReturnRows(perspectiveRows())
 
 		got, err := NewGormPerspectiveRepository(db).List(ctx, domain.PerspectiveListParams{
@@ -454,14 +509,28 @@ func TestGormPerspectiveRepository_List(t *testing.T) {
 		assertAllExpectationsMet(t, mock)
 	})
 
-	t.Run("RestrictToPublicOrOwner false leaves the query unrestricted", func(t *testing.T) {
+	t.Run("RestrictToPublicOrOwner false still requires public content for an anonymous caller", func(t *testing.T) {
 		db, mock := newMockDB(t)
-		// No privacy predicate expected — a plain user_id filter only.
-		mock.ExpectQuery(`SELECT \* FROM "perspectives" WHERE user_id = \$1 ORDER BY`).
+		// The perspective's own privacy is not restricted, but its content is.
+		mock.ExpectQuery(`SELECT \* FROM "perspectives" WHERE user_id = \$1 AND \(EXISTS \(SELECT 1 FROM content c WHERE c.id = perspectives.content_id AND c.privacy = \$2\)\) ORDER BY`).
 			WillReturnRows(perspectiveRows())
 
 		_, err := NewGormPerspectiveRepository(db).List(ctx, domain.PerspectiveListParams{
 			Filter:                  &domain.PerspectiveFilter{UserID: pInt(7)},
+			RestrictToPublicOrOwner: false,
+		})
+		require.NoError(t, err)
+		assertAllExpectationsMet(t, mock)
+	})
+
+	t.Run("content privacy: a viewer sees public content or content they own", func(t *testing.T) {
+		db, mock := newMockDB(t)
+		mock.ExpectQuery(`EXISTS \(SELECT 1 FROM content c WHERE c.id = perspectives.content_id AND \(c.privacy = \$1 OR c.added_by_user_id = \$2\)\)`).
+			WillReturnRows(perspectiveRows())
+
+		viewer := 7
+		_, err := NewGormPerspectiveRepository(db).List(ctx, domain.PerspectiveListParams{
+			ViewerID:                &viewer,
 			RestrictToPublicOrOwner: false,
 		})
 		require.NoError(t, err)
@@ -479,7 +548,7 @@ func TestGormPerspectiveRepository_AggregateByContentIDs(t *testing.T) {
 		// COUNT(quality)/the Quality column at all.
 		rows := sqlmock.NewRows([]string{"content_id", "count", "quality_count", "avg_quality"}).
 			AddRow(11, 1, 0, nil)
-		mock.ExpectQuery(`SELECT c.id AS content_id, COUNT\(p.id\) AS count, COUNT\(p.quality\) AS quality_count, AVG\(p.quality\) AS avg_quality FROM content AS c LEFT JOIN perspectives p ON p.content_id = c.id WHERE c.id = ANY\(CAST\(\$1 AS bigint\[\]\)\) GROUP BY "c"."id"`).
+		mock.ExpectQuery(`SELECT c.id AS content_id, COUNT\(p.id\) AS count, COUNT\(p.quality\) AS quality_count, AVG\(p.quality\) AS avg_quality, c.privacy AS privacy, c.added_by_user_id AS owner_id, c.import_job_id FROM content AS c LEFT JOIN perspectives p ON p.content_id = c.id WHERE c.id = ANY\(CAST\(\$1 AS bigint\[\]\)\) GROUP BY "c"."id"`).
 			WithArgs("{11}"). // one bigint[] parameter, not one placeholder per id
 			WillReturnRows(rows)
 
@@ -515,6 +584,53 @@ func TestGormPerspectiveRepository_AggregateByContentIDs(t *testing.T) {
 		got, err := NewGormPerspectiveRepository(db).AggregateByContentIDs(ctx, []int{})
 		require.NoError(t, err)
 		assert.Empty(t, got)
+		assertAllExpectationsMet(t, mock)
+	})
+}
+
+func TestGormPerspectiveRepository_CountVisibleByContentIDs(t *testing.T) {
+	ctx := context.Background()
+
+	t.Run("signed in counts public or own, one bigint[] parameter", func(t *testing.T) {
+		db, mock := newMockDB(t)
+		mock.ExpectQuery(`SELECT content_id, COUNT\(\*\) AS count FROM "perspectives" WHERE content_id = ANY\(CAST\(\$1 AS bigint\[\]\)\) AND \(privacy = \$2 OR user_id = \$3\) GROUP BY "content_id"`).
+			WithArgs("{11,12}", "public", 7).
+			WillReturnRows(sqlmock.NewRows([]string{"content_id", "count"}).AddRow(11, 3))
+
+		got, err := NewGormPerspectiveRepository(db).CountVisibleByContentIDs(ctx, []int{11, 12}, cInt(7))
+		require.NoError(t, err)
+		assert.Equal(t, map[int]int{11: 3}, got, "content with none visible is absent")
+		assertAllExpectationsMet(t, mock)
+	})
+
+	t.Run("anonymous counts public only", func(t *testing.T) {
+		db, mock := newMockDB(t)
+		mock.ExpectQuery(`AND privacy = \$2 GROUP BY "content_id"`).
+			WithArgs("{11}", "public").
+			WillReturnRows(sqlmock.NewRows([]string{"content_id", "count"}).AddRow(11, 1))
+
+		got, err := NewGormPerspectiveRepository(db).CountVisibleByContentIDs(ctx, []int{11}, nil)
+		require.NoError(t, err)
+		assert.Equal(t, map[int]int{11: 1}, got)
+		assertAllExpectationsMet(t, mock)
+	})
+
+	t.Run("empty contentIDs short-circuits without a query", func(t *testing.T) {
+		db, mock := newMockDB(t)
+		got, err := NewGormPerspectiveRepository(db).CountVisibleByContentIDs(ctx, []int{}, nil)
+		require.NoError(t, err)
+		assert.Empty(t, got)
+		assertAllExpectationsMet(t, mock)
+	})
+
+	t.Run("wraps a database error", func(t *testing.T) {
+		db, mock := newMockDB(t)
+		mock.ExpectQuery(`FROM "perspectives"`).WillReturnError(errors.New("boom"))
+
+		got, err := NewGormPerspectiveRepository(db).CountVisibleByContentIDs(ctx, []int{1}, nil)
+		assert.Nil(t, got)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "failed to count visible perspectives by content")
 		assertAllExpectationsMet(t, mock)
 	})
 }

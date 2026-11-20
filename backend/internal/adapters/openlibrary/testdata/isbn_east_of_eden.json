@@ -1,0 +1,75 @@
+{
+    "publishers": [
+        "Heinemann"
+    ],
+    "source_records": [
+        "marc:talis_openlibrary_contribution/talis-openlibrary-contribution.mrc:1861790439:374",
+        "bwb:9780434740024",
+        "ia:eastofeden0000stei",
+        "promise:bwb_daily_pallets_2021-01-21"
+    ],
+    "title": "East of Eden",
+    "identifiers": {
+        "librarything": [
+            "2499"
+        ],
+        "goodreads": [
+            "2014961"
+        ]
+    },
+    "languages": [
+        {
+            "key": "/languages/eng"
+        }
+    ],
+    "publish_date": "1970",
+    "publish_country": "xxk",
+    "key": "/books/OL22640535M",
+    "authors": [
+        {
+            "key": "/authors/OL25788A"
+        }
+    ],
+    "publish_places": [
+        "London"
+    ],
+    "works": [
+        {
+            "key": "/works/OL23166W"
+        }
+    ],
+    "type": {
+        "key": "/type/edition"
+    },
+    "isbn_10": [
+        "0434740020"
+    ],
+    "ocaid": "eastofeden0000stei",
+    "oclc_numbers": [
+        "799123345"
+    ],
+    "isbn_13": [
+        "9780434740024"
+    ],
+    "classifications": {},
+    "number_of_pages": 525,
+    "physical_format": "Hardcover",
+    "edition_name": "Reprint",
+    "pagination": "524p.",
+    "covers": [
+        11386937
+    ],
+    "local_id": [
+        "urn:bwbsku:KO-741-428"
+    ],
+    "latest_revision": 12,
+    "revision": 12,
+    "created": {
+        "type": "/type/datetime",
+        "value": "2008-11-18T12:34:47.029512"
+    },
+    "last_modified": {
+        "type": "/type/datetime",
+        "value": "2022-12-09T02:01:46.166242"
+    }
+}

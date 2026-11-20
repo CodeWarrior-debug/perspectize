@@ -43,5 +43,10 @@ describe('itemsCopyText', () => {
 	const items = ['a', 'b', 'c'];
 	it('null selection copies all', () => expect(itemsCopyText(items, null)).toBe('a, b, c'));
 	it('copies only selected, in original order', () => expect(itemsCopyText(items, new Set(['c', 'a']))).toBe('a, c'));
+	it('uses parallel copy values instead of labels, keyed by label selection', () => {
+		const labels = ['A · x', 'B · y'];
+		expect(itemsCopyText(labels, new Set(['B · y']), ['A', 'B'])).toBe('B');
+		expect(itemsCopyText(labels, null, ['A', 'B'])).toBe('A, B');
+	});
 	it('empty selection yields empty string', () => expect(itemsCopyText(items, new Set())).toBe(''));
 });

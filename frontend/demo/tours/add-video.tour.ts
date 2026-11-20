@@ -18,7 +18,7 @@ test('add a video from a YouTube link', async ({ page, tour }) => {
 	await tour.click(page.getByRole('button', { name: 'Add', exact: true }));
 	await expect(page.getByText('Added: Me at the zoo')).toBeVisible();
 	await expect(activityRow(page, 'Me at the zoo')).toBeVisible();
-	await tour.caption('Done — it shows up in Activity for everyone.');
+	await tour.caption('Done — it shows up in the Library for everyone.');
 
 	await tour.hideCaption();
 	await tour.pause(800);

@@ -7,8 +7,11 @@
 	import SettingsIcon from '@lucide/svelte/icons/settings';
 	import { page } from '$app/state';
 	import { createThemeStore } from '$lib/theme/store.svelte';
+	import { createFontStore } from '$lib/fonts/store.svelte';
+	import { LIBRARY_PATH } from '$lib/utils/contentLinks';
 
 	const themeStore = createThemeStore();
+	const fontStore = createFontStore();
 	let settingsOpen = $state(false);
 
 	// The header sits on --color-primary, so the ring uses --color-primary-foreground (always
@@ -17,14 +20,16 @@
 		'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-foreground/80 focus-visible:ring-offset-2 focus-visible:ring-offset-primary';
 
 	const navLinks = [
-		{ href: '/', label: 'Activity' },
+		{ href: LIBRARY_PATH, label: 'Library' },
 		{ href: '/discover', label: 'Discover' },
 		{ href: '/compare', label: 'Compare' },
 		{ href: '/plan', label: 'Plan' },
+		{ href: '/declare', label: 'Declare' },
+		{ href: '/import', label: 'Import' },
 	];
 
 	function isActive(href: string): boolean {
-		return href === '/' ? page.url.pathname === '/' : page.url.pathname.startsWith(href);
+		return page.url.pathname.startsWith(href);
 	}
 </script>
 
@@ -37,7 +42,8 @@
 			>
 				Perspectize
 			</a>
-			<nav class="flex items-center gap-0.5 sm:gap-2 shrink-0">
+			<!-- min-w-0 + overflow-x-auto: at phone width the links scroll inside the nav instead of running under the right-hand buttons. py/px padding keeps the focus ring from being clipped. -->
+			<nav class="flex items-center gap-0.5 sm:gap-2 min-w-0 overflow-x-auto py-1 -my-1 px-1 -mx-1">
 				{#each navLinks as link (link.href)}
 					<a
 						href={link.href}
@@ -67,7 +73,7 @@
 				<UserMenu />
 			</AuthShow>
 
-			<SettingsDialog bind:open={settingsOpen} store={themeStore} />
+			<SettingsDialog bind:open={settingsOpen} store={themeStore} {fontStore} />
 
 			<AuthShow when="signed-out">
 				<SignInTrigger>

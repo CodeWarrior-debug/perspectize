@@ -1,0 +1,30 @@
+{
+  "numFound": 3,
+  "start": 0,
+  "numFoundExact": true,
+  "docs": [
+    {
+      "key": "/works/OL23166W",
+      "title": "East of Eden",
+      "author_name": ["John Steinbeck"],
+      "ratings_count": 20,
+      "edition_count": 105,
+      "want_to_read_count": 1189,
+      "currently_reading_count": 79,
+      "already_read_count": 153,
+      "readinglog_count": 1421
+    },
+    {
+      "key": "/works/OL2W",
+      "title": "Shelved but unread by anyone",
+      "want_to_read_count": 3,
+      "currently_reading_count": 0,
+      "already_read_count": 0,
+      "readinglog_count": 3
+    },
+    {
+      "key": "/works/OL3W",
+      "title": "No reading log fields at all"
+    }
+  ]
+}

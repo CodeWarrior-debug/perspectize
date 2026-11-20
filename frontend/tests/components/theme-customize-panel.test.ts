@@ -11,6 +11,11 @@ vi.mock('$lib/components/theme/ColorWheel.svelte', () => ({
 }));
 
 import ThemeCustomizePanel from '$lib/components/theme/ThemeCustomizePanel.svelte';
+import { warmUp } from '../helpers/warmUp';
+
+// Pay the component's first-render cost before any test, not inside the first
+// one: under full-suite load it alone can pass the 5 s testTimeout (#728).
+warmUp(() => render(ThemeCustomizePanel, { props: { store: createThemeStore() } }));
 
 describe('ThemeCustomizePanel', () => {
 	beforeEach(() => {
@@ -98,7 +103,7 @@ describe('ThemeCustomizePanel', () => {
 		await fireEvent.click(screen.getByRole('button', { name: 'Customize' }));
 		await fireEvent.click(screen.getByRole('button', { name: 'Save as...' }));
 
-		const nameInput = screen.getByPlaceholderText('Name your theme');
+		const nameInput = screen.getByPlaceholderText('Give your theme a title');
 		await fireEvent.input(nameInput, { target: { value: 'My Palette' } });
 		await fireEvent.click(screen.getByRole('button', { name: 'Save' }));
 

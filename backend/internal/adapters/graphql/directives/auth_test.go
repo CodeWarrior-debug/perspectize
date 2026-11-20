@@ -66,6 +66,14 @@ func (m *mockContentService) CreateClaim(ctx context.Context, input portservices
 	return nil, nil
 }
 
+func (m *mockContentService) DeleteClaim(ctx context.Context, input portservices.DeleteClaimInput) error {
+	return nil
+}
+
+func (m *mockContentService) UpdateClaim(ctx context.Context, input portservices.UpdateClaimInput) (*domain.Content, error) {
+	return nil, nil
+}
+
 func (m *mockContentService) CreateFromPassage(ctx context.Context, input portservices.CreatePassageInput) (*domain.Content, error) {
 	return nil, nil
 }
@@ -86,7 +94,31 @@ func (m *mockContentService) PassageInterlinear(ctx context.Context, startVerseI
 	return nil, nil
 }
 
-func (m *mockContentService) UpdateSourceData(ctx context.Context, contentID int) (*domain.Content, error) {
+func (m *mockContentService) UpdateSourceData(ctx context.Context, contentID, viewerID int) (*domain.Content, error) {
+	return nil, nil
+}
+
+func (m *mockContentService) CreateFromBook(ctx context.Context, rawURLOrISBN string, userID int) (*domain.Content, error) {
+	return nil, nil
+}
+
+func (m *mockContentService) CreateFromWebPage(ctx context.Context, rawURL string, roles []domain.WebPageRole, userID int) (*domain.Content, error) {
+	return nil, nil
+}
+
+func (m *mockContentService) PreviewWebPage(ctx context.Context, rawURL string) (*portservices.WebPagePreview, error) {
+	return nil, nil
+}
+
+func (m *mockContentService) SearchBooks(ctx context.Context, query string, page int) (*portservices.BookSearchPage, error) {
+	return nil, nil
+}
+
+func (m *mockContentService) TrendingBooks(ctx context.Context, window domain.TrendingWindow, page int) (*portservices.BookSearchPage, error) {
+	return nil, nil
+}
+
+func (m *mockContentService) ResolveBookISBN(ctx context.Context, isbn string) (*portservices.BookSearchResult, error) {
 	return nil, nil
 }
 
@@ -120,6 +152,10 @@ func (m *mockPerspectiveService) ListPerspectives(ctx context.Context, params do
 
 func (m *mockPerspectiveService) AggregateByContentIDs(ctx context.Context, contentIDs []int) (map[int]*domain.PerspectiveAggregate, error) {
 	return map[int]*domain.PerspectiveAggregate{}, nil
+}
+
+func (m *mockPerspectiveService) CountVisibleByContentIDs(ctx context.Context, contentIDs []int, viewerID *int) (map[int]int, error) {
+	return map[int]int{}, nil
 }
 
 func (m *mockPerspectiveService) FeelingStats(ctx context.Context, contentID *int, emoji string, label *string) (*domain.FeelingStats, error) {

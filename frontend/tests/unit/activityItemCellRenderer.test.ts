@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, afterEach } from 'vitest';
 import { activityItemCellRenderer } from '$lib/utils/activityItemCellRenderer';
 
 describe('activityItemCellRenderer', () => {
@@ -194,5 +194,86 @@ describe('activityItemCellRenderer: one thumbnail slot for every type (titles li
 		const thumb = cell.querySelector('[data-testid="item-thumb"]');
 		expect(thumb?.className).toContain('w-7');
 		expect(thumb?.querySelector('img')?.getAttribute('src')).toBe('https://image.tmdb.org/t/p/w92/p.jpg');
+	});
+});
+
+describe('activityItemCellRenderer: BOOK rows', () => {
+	const WORK_URL = 'https://openlibrary.org/works/OL23166W';
+	const bookRow = (book: unknown) => ({
+		id: '40',
+		name: 'East of Eden',
+		url: WORK_URL,
+		contentType: 'BOOK',
+		book,
+	});
+	const eastOfEden = {
+		workKey: 'OL23166W',
+		title: 'East of Eden',
+		authors: [{ name: 'John Steinbeck' }],
+		coverId: 11386937,
+	};
+
+	afterEach(() => {
+		vi.restoreAllMocks();
+	});
+
+	it('cover and author: the small cover fitted (not cropped), the title, and the author as subtitle', () => {
+		const cell = activityItemCellRenderer({ data: bookRow(eastOfEden) }) as HTMLElement;
+		const img = cell.querySelector('[data-testid="item-thumb"] img');
+		expect(img?.getAttribute('src')).toBe('https://covers.openlibrary.org/b/id/11386937-S.jpg');
+		expect(img?.className).toContain('object-contain');
+		expect(cell.querySelector('[data-testid="item-title"]')?.textContent).toBe('East of Eden');
+		expect(cell.querySelector('[data-testid="item-subtitle"]')?.textContent).toBe('John Steinbeck');
+	});
+
+	it('no cover: no image and a grey empty slot, so no broken image', () => {
+		const cell = activityItemCellRenderer({
+			data: bookRow({ ...eastOfEden, coverId: null, authors: [{ name: 'Zine Author' }] }),
+		}) as HTMLElement;
+		const thumb = cell.querySelector('[data-testid="item-thumb"]');
+		expect(thumb?.querySelector('img')).toBeNull();
+		expect(thumb?.className).toContain('bg-muted');
+	});
+
+	it('no author: no subtitle element at all', () => {
+		const cell = activityItemCellRenderer({ data: bookRow({ ...eastOfEden, authors: [] }) }) as HTMLElement;
+		expect(cell.querySelector('[data-testid="item-subtitle"]')).toBeNull();
+		expect(cell.querySelector('[data-testid="item-title"]')?.textContent).toBe('East of Eden');
+	});
+
+	it('neither book nor response: a plain tile with just the title', () => {
+		const cell = activityItemCellRenderer({ data: bookRow(undefined) }) as HTMLElement;
+		expect(cell.querySelector('img')).toBeNull();
+		expect(cell.querySelector('[data-testid="item-subtitle"]')).toBeNull();
+		expect(cell.querySelector('[data-testid="item-title"]')?.textContent).toBe('East of Eden');
+	});
+
+	it('removes the cover image if it fails to load', () => {
+		const cell = activityItemCellRenderer({ data: bookRow(eastOfEden) }) as HTMLElement;
+		const img = cell.querySelector('img') as HTMLImageElement;
+		img.dispatchEvent(new Event('error'));
+		expect(cell.querySelector('img')).toBeNull();
+	});
+
+	it('clicking the cover opens the Open Library work in a new tab, without opening details', () => {
+		const open = vi.spyOn(window, 'open').mockReturnValue(null);
+		const onOpenDetails = vi.fn();
+		const cell = activityItemCellRenderer({
+			data: bookRow(eastOfEden),
+			context: { onOpenDetails },
+		}) as HTMLElement;
+		(cell.querySelector('[data-testid="item-thumb"]') as HTMLElement).click();
+		expect(open).toHaveBeenCalledWith(WORK_URL, '_blank', 'noopener,noreferrer');
+		expect(onOpenDetails).not.toHaveBeenCalled();
+	});
+
+	it('clicking anywhere else in the cell opens the details modal with the row id', () => {
+		const onOpenDetails = vi.fn();
+		const cell = activityItemCellRenderer({
+			data: bookRow(eastOfEden),
+			context: { onOpenDetails },
+		}) as HTMLElement;
+		(cell.querySelector('[data-testid="item-title"]') as HTMLElement).click();
+		expect(onOpenDetails).toHaveBeenCalledWith('40');
 	});
 });

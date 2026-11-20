@@ -45,8 +45,8 @@ func TestCreatePerspective(t *testing.T) {
 	contentID := h.content(userID, "create")
 	h.warm(token)
 
-	// INSERT ... RETURNING
-	data := h.roundTrips(1, token, createPerspectiveMutation, map[string]any{
+	// SELECT content (visibility check, only when contentID is set), INSERT ... RETURNING
+	data := h.roundTrips(2, token, createPerspectiveMutation, map[string]any{
 		"input": map[string]any{"userID": 0, "contentID": contentID, "quality": 5, "review": "<p>hi</p>"},
 	})
 	got := decode[perspectiveResult](t, data, "createPerspective")
@@ -108,7 +108,7 @@ func TestDeletePerspectiveNotOwner(t *testing.T) {
 }
 
 // frontend LIST_PERSPECTIVES_BY_CONTENT-style selection plus the user and
-// content fields (which used to always be null): one statement for the list,
+// content fields: one statement for the list,
 // one for all users, one for all content — whatever the number of rows.
 func TestPerspectiveUserAndContentBatched(t *testing.T) {
 	h := newHarness(t)

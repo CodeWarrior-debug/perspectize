@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/CodeWarrior-debug/perspectize/backend/internal/core/domain"
 	"github.com/CodeWarrior-debug/perspectize/backend/internal/core/ports/repositories"
@@ -19,6 +20,18 @@ const pgForeignKeyViolation = "23503"
 // perspectivesUserFK is the FK from perspectives.user_id to users.id
 // (migrations 000004/000006).
 const perspectivesUserFK = "perspectives_users_fk"
+
+// perspectivesUserContentPrivacyUnique is the partial UNIQUE index on
+// (user_id, content_id, privacy) WHERE content_id IS NOT NULL (migration 000038):
+// one perspective per user, content and privacy setting.
+const perspectivesUserContentPrivacyUnique = "uq_perspectives_user_content_privacy"
+
+// perspectiveDuplicateError is the readable domain error for a violation of
+// perspectivesUserContentPrivacyUnique. The SQL detail stays out of the message.
+func perspectiveDuplicateError(privacy domain.Privacy) error {
+	return fmt.Errorf("%w: you already have a %s perspective on this content",
+		domain.ErrAlreadyExists, strings.ToLower(string(privacy)))
+}
 
 // GormPerspectiveRepository implements the PerspectiveRepository interface using GORM
 type GormPerspectiveRepository struct {
@@ -45,6 +58,9 @@ func (r *GormPerspectiveRepository) Create(ctx context.Context, p *domain.Perspe
 		var pgErr *pgconn.PgError
 		if errors.As(err, &pgErr) && pgErr.Code == pgForeignKeyViolation && pgErr.ConstraintName == perspectivesUserFK {
 			return nil, fmt.Errorf("%w: user with id %d not found", domain.ErrNotFound, p.UserID)
+		}
+		if errors.As(err, &pgErr) && pgErr.Code == pgUniqueViolation && pgErr.ConstraintName == perspectivesUserContentPrivacyUnique {
+			return nil, perspectiveDuplicateError(p.Privacy)
 		}
 		return nil, fmt.Errorf("failed to insert perspective: %w", err)
 	}
@@ -92,6 +108,10 @@ func (r *GormPerspectiveRepository) Update(ctx context.Context, p *domain.Perspe
 		Omit("id", "user_id", "created_at").
 		Updates(model)
 	if result.Error != nil {
+		var pgErr *pgconn.PgError
+		if errors.As(result.Error, &pgErr) && pgErr.Code == pgUniqueViolation && pgErr.ConstraintName == perspectivesUserContentPrivacyUnique {
+			return nil, perspectiveDuplicateError(p.Privacy)
+		}
 		return nil, fmt.Errorf("failed to update perspective: %w", result.Error)
 	}
 	if result.RowsAffected == 0 {
@@ -160,12 +180,19 @@ func (r *GormPerspectiveRepository) List(ctx context.Context, params domain.Pers
 	// WHERE shape chosen over UNION: benchmark 2026-09-10 (plan Task 6) — WHERE
 	// ~8.9ms vs UNION ~9.3ms unindexed, 0.02ms vs 0.29ms with a (user_id,created_at) index.
 	if params.RestrictToPublicOrOwner {
-		if params.ViewerID != nil {
-			query = query.Where("privacy = ? OR user_id = ?",
-				privacyToDBValue(domain.PrivacyPublic), *params.ViewerID)
-		} else {
-			query = query.Where("privacy = ?", privacyToDBValue(domain.PrivacyPublic))
-		}
+		visible, args := visiblePerspectivePredicate(params.ViewerID)
+		query = query.Where(visible, args...)
+	}
+
+	// Content privacy dominates perspective privacy: a perspective on a private
+	// content row is listed only to that content's owner. One EXISTS in the same
+	// statement, so no extra query.
+	if params.ViewerID != nil {
+		query = query.Where("EXISTS (SELECT 1 FROM content c WHERE c.id = perspectives.content_id AND (c.privacy = ? OR c.added_by_user_id = ?))",
+			privacyToDBValue(domain.PrivacyPublic), *params.ViewerID)
+	} else {
+		query = query.Where("EXISTS (SELECT 1 FROM content c WHERE c.id = perspectives.content_id AND c.privacy = ?)",
+			privacyToDBValue(domain.PrivacyPublic))
 	}
 
 	// Total count (before cursor/limit — respects filters only)
@@ -217,6 +244,9 @@ type aggregateRow struct {
 	Count        int
 	QualityCount int
 	AvgQuality   *float64
+	Privacy      string
+	OwnerID      int
+	ImportJobID  *int
 }
 
 // AggregateByContentIDs computes, per content ID, the count of ALL
@@ -242,7 +272,7 @@ func (r *GormPerspectiveRepository) AggregateByContentIDs(ctx context.Context, c
 	var rows []aggregateRow
 	err := r.db.WithContext(ctx).
 		Table("content AS c").
-		Select("c.id AS content_id, COUNT(p.id) AS count, COUNT(p.quality) AS quality_count, AVG(p.quality) AS avg_quality").
+		Select("c.id AS content_id, COUNT(p.id) AS count, COUNT(p.quality) AS quality_count, AVG(p.quality) AS avg_quality, c.privacy AS privacy, c.added_by_user_id AS owner_id, c.import_job_id").
 		Joins("LEFT JOIN perspectives p ON p.content_id = c.id").
 		Where("c.id = ANY(CAST(? AS bigint[]))", intsToArray(contentIDs)).
 		Group("c.id").
@@ -258,7 +288,43 @@ func (r *GormPerspectiveRepository) AggregateByContentIDs(ctx context.Context, c
 			Count:          row.Count,
 			QualityCount:   row.QualityCount,
 			AverageQuality: row.AvgQuality,
+			ContentPrivacy: contentPrivacyFromDB(row.Privacy),
+			ContentOwnerID: row.OwnerID,
+			ImportJobID:    row.ImportJobID,
 		}
+	}
+	return out, nil
+}
+
+type visibleCountRow struct {
+	ContentID int
+	Count     int
+}
+
+// CountVisibleByContentIDs counts, per content ID, the perspectives the viewer
+// may read: public rows, plus their own when viewerID is set. This is the same
+// predicate List applies (RestrictToPublicOrOwner), so the count matches what
+// the perspectives list returns. Content with none visible has no row.
+func (r *GormPerspectiveRepository) CountVisibleByContentIDs(ctx context.Context, contentIDs []int, viewerID *int) (map[int]int, error) {
+	if len(contentIDs) == 0 {
+		return map[int]int{}, nil
+	}
+
+	visible, args := visiblePerspectivePredicate(viewerID)
+	query := r.db.WithContext(ctx).
+		Table("perspectives").
+		Select("content_id, COUNT(*) AS count").
+		Where("content_id = ANY(CAST(? AS bigint[]))", intsToArray(contentIDs)).
+		Where(visible, args...)
+
+	var rows []visibleCountRow
+	if err := query.Group("content_id").Find(&rows).Error; err != nil {
+		return nil, fmt.Errorf("failed to count visible perspectives by content: %w", err)
+	}
+
+	out := make(map[int]int, len(rows))
+	for _, row := range rows {
+		out[row.ContentID] = row.Count
 	}
 	return out, nil
 }

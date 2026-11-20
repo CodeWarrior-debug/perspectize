@@ -2,7 +2,6 @@
 	import AgGridSvelte5Component from 'ag-grid-svelte5';
 	import LazyLoadError from '$lib/components/LazyLoadError.svelte';
 	import { ClientSideRowModelModule } from '@ag-grid-community/client-side-row-model';
-	import { themeQuartz } from '@ag-grid-community/theming';
 	import type {
 		GridApi,
 		GridOptions,
@@ -12,17 +11,20 @@
 		CellClickedEvent,
 		CellMouseOverEvent,
 	} from '@ag-grid-community/core';
+	import { tick } from 'svelte';
 	import { createQuery, keepPreviousData } from '@tanstack/svelte-query';
 	import { page } from '$app/state';
 	import { goto } from '$app/navigation';
 	import { graphqlRequest } from '$lib/queries/client';
 	import {
-		GET_CONTENT_DETAILS,
+		ACTIVITY_LIST_STALE_TIME_MS,
+		cursorsAfterPage,
 		LIST_CONTENT,
-		type ContentDetailsResponse,
+		activityListRequest,
 		type ContentItem,
 		type ContentResponse,
 	} from '$lib/queries/content';
+	import { useContentDetails } from '$lib/queries/content/useContentDetails';
 	import { OPEN_CONTENT_PARAM } from '$lib/utils/contentLinks';
 	import {
 		LIST_PERSPECTIVES_BY_USER,
@@ -34,8 +36,6 @@
 	import {
 		parseGridParams,
 		serializeGridParams,
-		sortsToGraphQL,
-		urlParamsToGraphQLFilter,
 		urlParamsToFilter,
 		filterToUrlParams,
 		filtersEqual,
@@ -56,11 +56,12 @@
 		percentLikedValueGetter,
 		formatPercentLiked,
 		formatPublishDate,
+		formatClaimDate,
+		formatRatingScore,
 		formatTags,
 		contentTags,
 		truncateDescription,
 		contentRowId,
-		headerMinWidth,
 		castCellRenderer,
 		genreValueGetter,
 		ratedValueGetter,
@@ -84,12 +85,15 @@
 		textOrEmpty,
 		EMPTY_VALUE,
 	} from '$lib/utils/formatting';
+	import { headerMinWidth } from '$lib/utils/grid-header-width';
 	import {
 		capitalizeContentType,
 		durationComparator,
 		unknownLastComparator,
 		releasedComparator,
+		labelComparator,
 		itemColumnHeader,
+		soloTypeFilter,
 		ratedComparator,
 		CLIENT_ONLY_SORT_COLS,
 		sortableColumnsFor,
@@ -100,13 +104,26 @@
 		PERSON_FILTER_KEY,
 		parsePersonFilter,
 		rowMatchesPerson,
+		perspectiveRating,
+		showColumnRelevanceCallout,
+		NUMERIC_COL_IDS,
+		liveGridApi,
 	} from '$lib/utils/grid-config';
-	import { GRID_THEME_PARAMS } from '$lib/utils/grid-theme';
+	import { ACTIVITY_GRID_THEME } from '$lib/utils/grid-theme';
 	import { emptyCellClassRules } from '$lib/utils/grid-empty';
 	import { useCardMode, useResponsiveTier } from '$lib/utils/responsive.svelte';
 	import { useMe } from '$lib/queries/users/useMe.svelte';
 	import { useUsernames } from '$lib/queries/users/useUsernames.svelte';
 	import ColumnPickerDialog from '$lib/components/ColumnPickerDialog.svelte';
+	import ExportMenu from '$lib/components/ExportMenu.svelte';
+	import PrintListView from '$lib/components/PrintListView.svelte';
+	import PrintOptionsDialog from '$lib/components/PrintOptionsDialog.svelte';
+	import type { PrintSpacing } from '$lib/components/PrintOptionsDialog.svelte';
+	import { isExportDisabled, readExportTable, type ExportGridApi } from '$lib/utils/exportGrid';
+	import type { ExportTable } from '$lib/utils/exportTable';
+	import { copyLibraryTable, downloadLibraryCsv } from '$lib/utils/exportActions';
+	import { copyWithToast, downloadWithToast } from '$lib/utils/toast';
+	import { addLandscapePageStyle, removeLandscapePageStyle, runPrint } from '$lib/utils/printing';
 	import {
 		COLUMN_VIEW_LABEL,
 		clearLayout,
@@ -125,15 +142,37 @@
 	import CellPopover, { type PopoverState } from '$lib/components/CellPopover.svelte';
 	import { buildPopoverState, createHoverController } from '$lib/utils/tooltipHover';
 	import { ACTIVITY_TOOLTIP_SPECS } from '$lib/utils/activityTooltipSpecs';
-	import { onDestroy } from 'svelte';
+	import {
+		authorCellRenderer,
+		authorValueGetter,
+		editionsValueGetter,
+		formatBookRating,
+		formatReaders,
+		hasLowRatingCount,
+		pagesValueGetter,
+		publishedValueGetter,
+		ratingValueGetter,
+		readersValueGetter,
+	} from '$lib/utils/bookFormatting';
+	import { onDestroy, untrack } from 'svelte';
 	import ListOrderedIcon from '@lucide/svelte/icons/list-ordered';
 	import DataModeToggle from '$lib/components/DataModeToggle.svelte';
 	import FilterChips from '$lib/components/FilterChips.svelte';
-	import { ContentTypeFilter, AgeRatingFilter } from '$lib/utils/contentTypeFilter';
+	import ColumnRelevanceCallout from '$lib/components/ColumnRelevanceCallout.svelte';
+	import { ContentTypeFilter, AgeRatingFilter, WebRoleFilter } from '$lib/utils/contentTypeFilter';
 	import ActivityDetailsModal from '$lib/components/ActivityDetailsModal.svelte';
 	import ActivityCardList from '$lib/components/ActivityCardList.svelte';
 	import AddToPlanDialog from '$lib/components/plan/AddToPlanDialog.svelte';
 	import { activityItemCellRenderer } from '$lib/utils/activityItemCellRenderer';
+	import {
+		webAuthorCellRenderer,
+		webPublishedFilterValueGetter,
+		webPublishedValueGetter,
+		webRolesCellRenderer,
+		webSiteCellRenderer,
+		formatWebPublished,
+	} from '$lib/utils/webPageFormatting';
+	import { webPageAuthor, webPageSite } from '$lib/utils/webPage';
 	import CategoryTypeahead from '$lib/components/CategoryTypeahead.svelte';
 	import { useSetPrimaryCategory } from '$lib/queries/categories/useSetPrimaryCategory';
 	import type { WikidataSearchResult } from '$lib/queries/categories';
@@ -190,6 +229,12 @@
 		popoverOpen = true;
 	}
 
+	// From the details modal: close it first so the two dialogs never stack, then open the editor.
+	function handleAddPerspectiveFromDetails(content: { id: string; name: string }) {
+		handleCloseDetails();
+		openPerspective(content.id, content.name);
+	}
+
 	function handleAddPerspectiveFromCard(contentId: string) {
 		const row = rowData.find((item) => String(item.id) === contentId);
 		openPerspective(contentId, row?.name ?? '');
@@ -211,7 +256,9 @@
 
 	// Mobile card-list breakpoint (< 860px) — replaces the AG Grid entirely, per design handoff.
 	const card = useCardMode();
-	const cardMode = $derived(card.current);
+	// Export's As-seen print keeps the grid mounted even though a Letter page matches the card query.
+	let printingAsSeen = $state(false);
+	const cardMode = $derived(card.current && !printingAsSeen);
 
 	// Signed-in user — drives the admin-only "Internal" group in the column picker.
 	const meCtx = useMe();
@@ -297,18 +344,10 @@
 
 	// Individual derived fields from URL
 	const mode = $derived(gridParams.mode);
-	// Multi-column sort. The GraphQL `sorts` list carries every sorted column in
-	// priority order; `sortBy`/`sortOrder` (the first entry, or the legacy default)
-	// stay populated too since the server still requires them as its single-sort
-	// fallback for anything that predates multi-sort.
 	const sorts = $derived(gridParams.sorts);
-	const graphqlSorts = $derived(sortsToGraphQL(sorts));
-	const sortBy = $derived(graphqlSorts?.[0]?.field ?? 'UPDATED_AT');
-	const sortOrder = $derived(graphqlSorts?.[0]?.order ?? 'DESC');
 	const pageNum = $derived(gridParams.page); // 1-indexed
 	const pageSize = $derived(gridParams.pageSize);
 	const searchText = $derived(gridParams.q);
-	const searchFields = $derived(gridParams.qFields);
 	const filters = $derived(gridParams.filters);
 	/** Which saved/default column set applies (columnLayouts.ts): Movie, or the general set. */
 	const columnView = $derived(columnViewFor(filters.type));
@@ -399,55 +438,37 @@
 	// Data fetching (mode-conditional)
 	// ---------------------------------------------------------------------------
 
-	// In server-side mode, build GraphQL filter from URL params + search.
-	// In client-side mode, pass search plus the Type filter only (other column filters stay
-	// client-side). Type must go to the server too: "Loaded" fetches just the 100 most recent
-	// rows, so filtering by type only in the grid hides every older row of that type.
-	const graphqlFilter = $derived(
-		mode === 'all'
-			? urlParamsToGraphQLFilter(filters, searchText, searchFields)
-			: urlParamsToGraphQLFilter(filters.type ? { type: filters.type } : {}, searchText, searchFields),
-	);
+	// Key and LIST_CONTENT variables come from one builder (lib/queries/content/activityList.ts),
+	// so the cache key cannot drift from the request. Captured in the options getter so queryFn
+	// sends the variables its key was built from.
+	const activityRequest = $derived(activityListRequest(gridParams, currentCursor));
 
-	const contentQuery = createQuery(() => ({
-		queryKey: queryKeys.content.list({
-			sortBy: mode === 'all' ? sortBy : 'UPDATED_AT',
-			sortOrder: mode === 'all' ? sortOrder : 'DESC',
-			sorts: mode === 'all' ? graphqlSorts : undefined,
-			// Search/filter must always reflect what queryFn actually sends (graphqlFilter is used
-			// unconditionally below, regardless of mode) — hardcoding these to '' / undefined for
-			// 'loaded' mode desyncs the cache key from the real request, so typing or clearing the
-			// search box never invalidates the cache and the grid keeps showing stale results.
-			search: searchText,
-			searchFields,
-			first: pageSize,
-			after: currentCursor,
-			filter: graphqlFilter as Record<string, unknown> | undefined,
-			mode,
-		}),
-		queryFn: async () => {
-			const response = await graphqlRequest<ContentResponse>(LIST_CONTENT, {
-				first: mode === 'all' ? pageSize : 100, // Load more in client mode for client-side filtering
-				after: mode === 'all' ? currentCursor : null,
-				sortBy: mode === 'all' ? sortBy : 'UPDATED_AT',
-				sortOrder: mode === 'all' ? sortOrder : 'DESC',
-				sorts: mode === 'all' ? graphqlSorts : undefined,
-				filter: graphqlFilter,
-				includeTotalCount: true,
-			});
+	const contentQuery = createQuery(() => {
+		const request = activityRequest;
+		return {
+			queryKey: request.queryKey,
+			queryFn: async () => {
+				return graphqlRequest<ContentResponse>(LIST_CONTENT, request.variables);
+			},
+			placeholderData: keepPreviousData,
+			staleTime: ACTIVITY_LIST_STALE_TIME_MS,
+		};
+	});
 
-			// Update cursor stack for page navigation (server-side mode only)
-			if (mode === 'all' && response.content.pageInfo.hasNextPage && response.content.pageInfo.endCursor) {
-				if (cursors.length === pageNum) {
-					cursors = [...cursors, response.content.pageInfo.endCursor];
-				}
-			}
-
-			return response;
-		},
-		placeholderData: keepPreviousData,
-		staleTime: 60 * 1000,
-	}));
+	// Advance the cursor stack from the loaded page, not from inside queryFn: a cache hit (the route
+	// prefetch, or a remount inside staleTime) never runs queryFn, so Next would stall on page 1.
+	// Placeholder data (keepPreviousData: the previous page while this one loads) is skipped.
+	$effect(() => {
+		const data = contentQuery.data;
+		const placeholder = contentQuery.isPlaceholderData;
+		const isAll = mode === 'all';
+		const page = pageNum;
+		if (!data || placeholder || !isAll) return;
+		const pageInfo = data.content.pageInfo;
+		untrack(() => {
+			cursors = cursorsAfterPage(cursors, page, pageInfo);
+		});
+	});
 
 	// Derived values from query
 	// Rows get their adder's username from the cached users list (see useUsernames).
@@ -461,12 +482,10 @@
 	const detailsModalRow = $derived(rowData.find((item) => String(item.id) === detailsModalContentId) ?? null);
 	// A deep-linked item (`?open=<id>`, e.g. from a "Go to" toast or a verse jump) is
 	// often not on the loaded page — fetch just that row so the modal can still open.
-	const detailsFallbackQuery = createQuery(() => ({
-		queryKey: queryKeys.content.row(detailsModalContentId ?? ''),
-		queryFn: () => graphqlRequest<ContentDetailsResponse>(GET_CONTENT_DETAILS, { id: detailsModalContentId }),
-		enabled: detailsModalContentId !== null && detailsModalRow === null && !contentQuery.isPending,
-		staleTime: 60 * 1000,
-	}));
+	const detailsFallbackQuery = useContentDetails(
+		() => detailsModalContentId,
+		() => detailsModalRow === null && !contentQuery.isPending,
+	);
 	const detailsModalContent = $derived(detailsModalRow ?? detailsFallbackQuery.data?.contentByID ?? null);
 
 	// Consume `?open=<id>`: open that item's details, then strip the param (replaceState)
@@ -481,12 +500,10 @@
 		goto(search ? `?${search}` : page.url.pathname, { replaceState: true, keepFocus: true, noScroll: true });
 	});
 	const totalCount = $derived(contentQuery.data?.content.totalCount ?? 0);
-	// Reset the filtered-row count whenever the underlying row data changes
-	// (new fetch, mode switch) so a stale filtered count from the previous
-	// dataset doesn't linger until the next filter interaction.
+	// The grid reports its displayed (post-filter) row count through onModelUpdated, which also
+	// fires when row data is replaced under an active filter; the count is cleared on grid teardown.
 	$effect(() => {
 		rowData;
-		displayedRowCount = null;
 		hover.close(); // AG Grid recycles cell DOM; a stale anchor would mislead
 	});
 	const loadedItemsCount = $derived(displayedRowCount ?? rowData.length);
@@ -524,10 +541,9 @@
 
 	// The mobile card list has no AG Grid instance to sort or filter for it. In "All
 	// Items" mode the server already returned rows in the requested (and filtered)
-	// order; in "Loaded" mode, apply clientSorts and the URL filters by hand — this
-	// used to only sort, so a mobile "Loaded"-mode card view silently ignored every
-	// column filter (see the UI gap audit, gap #5). On desktop, AG Grid does both
-	// itself, so this is a no-op there.
+	// order; in "Loaded" mode, apply clientSorts and the URL filters by hand, or the
+	// mobile card view would silently ignore every column filter. On desktop, AG Grid
+	// does both itself, so this is a no-op there.
 	const sortedRowData = $derived(
 		mode === 'loaded' && cardMode
 			? (() => {
@@ -622,7 +638,7 @@
 
 	const modules = [ClientSideRowModelModule];
 
-	const theme = themeQuartz.withParams(GRID_THEME_PARAMS);
+	const theme = ACTIVITY_GRID_THEME;
 
 	// flex = clamp-like: proportional sizing with min/max constraints
 	// minWidth is auto-derived from headerName unless explicitly set (e.g. Item = 200)
@@ -630,6 +646,8 @@
 		[
 			{
 				colId: 'perspectize',
+				pinned: 'left', // stays visible when the grid scrolls horizontally
+				lockPinned: true,
 				headerName: '',
 				headerComponent: PerspectiveHeaderRenderer,
 				headerTooltip: 'Perspectize — add or edit your perspective',
@@ -646,9 +664,11 @@
 			},
 			{
 				colId: 'item',
+				pinned: 'left', // keeps row identity visible while scrolling right
+				lockPinned: true,
 				headerName: 'Item',
 				flex: 2,
-				minWidth: 185,
+				minWidth: 175, // a floor only: Item is flex 2 and grows; 10px less keeps the YouTube lg set inside 1212px
 
 				filter: 'agTextColumnFilter',
 				filterValueGetter: (params) => params.data?.name ?? '',
@@ -661,9 +681,8 @@
 				colId: 'type',
 				headerName: 'Type',
 				flex: 0.5,
-				// The cell is a single icon; 84 still fits the header text, sort arrow and filter button.
-				minWidth: 84,
-				maxWidth: 100,
+				// The cell is a single icon; minWidth comes from the header (text, sort arrow, funnel).
+				maxWidth: 110,
 
 				filter: ContentTypeFilter,
 				valueGetter: (params) => capitalizeContentType(params.data?.contentType),
@@ -675,22 +694,95 @@
 				headerName: 'Category',
 				headerTooltip: 'Wikidata category',
 				width: 150,
-				sortable: false,
+				// Sortable only in "Loaded" mode: the effect below toggles `sortable` per mode (clientOnlySort).
 				filter: false,
+				valueGetter: (params) => params.data?.primaryCategory?.label ?? null,
+				comparator: labelComparator,
 				cellRenderer: categoryCellRenderer,
 				context: { tooltipSpec: ACTIVITY_TOOLTIP_SPECS.category },
 				hide: true,
 			},
+			// Claim date columns (Content.customFields). Hidden by default; the responsive effect
+			// shows them in the claim view. Sorted client-side (the backend cannot sort on custom fields).
+			{
+				colId: 'effectiveDate',
+				headerName: 'Effective',
+				headerTooltip: 'The date the claim takes effect.',
+				width: 120,
+				sortable: true,
+				filter: 'agDateColumnFilter',
+				filterValueGetter: (params) => {
+					const v = params.data?.customFields?.effectiveDate;
+					return v ? new Date(`${v}T00:00:00`) : null;
+				},
+				comparator: releasedComparator,
+				valueGetter: (params) => params.data?.customFields?.effectiveDate ?? null,
+				valueFormatter: (params) => formatClaimDate(params.value),
+				context: { tooltipSpec: ACTIVITY_TOOLTIP_SPECS.effectiveDate },
+				hide: true,
+			},
+			{
+				colId: 'evaluateBy',
+				headerName: 'Evaluate by',
+				headerTooltip: 'The date by which the claim should be evaluated.',
+				width: 120,
+				sortable: true,
+				filter: 'agDateColumnFilter',
+				filterValueGetter: (params) => {
+					const v = params.data?.customFields?.evaluateBy;
+					return v ? new Date(`${v}T00:00:00`) : null;
+				},
+				comparator: releasedComparator,
+				valueGetter: (params) => params.data?.customFields?.evaluateBy ?? null,
+				valueFormatter: (params) => formatClaimDate(params.value),
+				context: { tooltipSpec: ACTIVITY_TOOLTIP_SPECS.evaluateBy },
+				hide: true,
+			},
+			// The viewer's own ratings (0-100). Read from the perspective map in the grid context;
+			// refreshed with the perspectize column when that map changes.
+			{
+				colId: 'myQuality',
+				headerName: 'My overall',
+				headerTooltip: 'Your overall rating of this claim (0-100).',
+				width: 110,
+				sortable: false,
+				filter: 'agNumberColumnFilter',
+				valueGetter: (params) => perspectiveRating(params.context?.perspectivesByContentId, params.data?.id, 'quality'),
+				valueFormatter: (params) => formatRatingScore(params.value),
+				hide: true,
+			},
+			{
+				colId: 'myImportance',
+				headerName: 'My importance',
+				headerTooltip: 'Your importance rating of this claim (0-100).',
+				width: 120,
+				sortable: false,
+				filter: 'agNumberColumnFilter',
+				valueGetter: (params) =>
+					perspectiveRating(params.context?.perspectivesByContentId, params.data?.id, 'importance'),
+				valueFormatter: (params) => formatRatingScore(params.value),
+				hide: true,
+			},
+			{
+				colId: 'myAgreement',
+				headerName: 'My agreement',
+				headerTooltip: 'Your agreement rating with this claim (0-100).',
+				width: 120,
+				sortable: false,
+				filter: 'agNumberColumnFilter',
+				valueGetter: (params) =>
+					perspectiveRating(params.context?.perspectivesByContentId, params.data?.id, 'agreement'),
+				valueFormatter: (params) => formatRatingScore(params.value),
+				hide: true,
+			},
 			// Movie columns (TMDB). Hidden by default; the responsive effect shows the Movie
-			// default set when the type filter is exactly MOVIE. Minimum widths are tuned so
-			// that set fits the 1212px grid: perspectize 50 + item 185 + genre 82 + rated 82
-			// + cast 125 + duration 111 + released 105 + box office 138 + vs. budget 118
-			// + TMDB score 121 + tags 90 = 1207. Box office keeps room for its sort arrow.
+			// default set when the type filter is exactly MOVIE. Header-only columns take their
+			// minWidth from headerMinWidth (never below the whole heading + sort arrow + funnel);
+			// movieColumns.test.ts checks the default set still fits the 1212px grid.
 			{
 				colId: 'genre',
 				headerName: 'Genre',
 				flex: 1,
-				minWidth: 82,
 				maxWidth: 180,
 				sortable: false,
 				filter: 'agTextColumnFilter',
@@ -703,8 +795,7 @@
 				colId: 'rated',
 				headerName: 'Rated',
 				flex: 0.5,
-				minWidth: 82,
-				maxWidth: 100,
+				maxWidth: 120,
 				filter: AgeRatingFilter,
 				valueGetter: ratedValueGetter,
 				comparator: ratedComparator,
@@ -736,10 +827,7 @@
 				colId: 'duration',
 				headerName: 'Duration',
 				flex: 0.7,
-				// Explicit floor: headerMinWidth('Duration') is 126, which pushed the YouTube lg set
-				// past the 1212px grid and clipped Tags. 111 (what 'Length' used) keeps it at 1211.
-				minWidth: 111,
-				maxWidth: 120,
+				maxWidth: 140,
 
 				filter: 'agNumberColumnFilter',
 				filterParams: {
@@ -752,7 +840,7 @@
 				comparator: durationComparator,
 				context: { tooltipSpec: ACTIVITY_TOOLTIP_SPECS.duration },
 				headerTooltip:
-					'Video duration from YouTube API. For movies this is the runtime in h:mm (TMDB reports whole minutes).',
+					'Length of the item.',
 			},
 			{
 				colId: 'views',
@@ -799,7 +887,6 @@
 				colId: 'released',
 				headerName: 'Released',
 				flex: 1,
-				minWidth: 105,
 				maxWidth: 140,
 				comparator: releasedComparator,
 				filter: 'agDateColumnFilter',
@@ -814,7 +901,6 @@
 				colId: 'boxOffice',
 				headerName: 'Take',
 				flex: 0.8,
-				minWidth: 96, // "Take" + sort arrow + filter button
 				maxWidth: 150,
 				filter: 'agNumberColumnFilter',
 				valueGetter: boxOfficeValueGetter,
@@ -828,7 +914,6 @@
 				colId: 'vsBudget',
 				headerName: 'ROI',
 				flex: 0.8,
-				minWidth: 72, // "ROI" + sort arrow (no filter button)
 				maxWidth: 130,
 				filter: false,
 				valueGetter: vsBudgetValueGetter,
@@ -842,14 +927,17 @@
 				colId: 'tmdbScore',
 				headerName: 'Rating',
 				flex: 0.7,
-				minWidth: 111,
 				maxWidth: 130,
 				filter: 'agNumberColumnFilter',
 				valueGetter: tmdbScoreValueGetter,
 				comparator: unknownLastComparator,
 				valueFormatter: (params) => formatTmdbScore(params.value),
-				// Muted when the score rests on fewer than 50 votes.
-				cellClass: (params) => (hasLowVoteCount({ data: params.data }) ? 'text-muted-foreground' : ''),
+				// Muted when the score rests on fewer than 50 votes. A colDef `cellClass` replaces the one
+				// `type: 'rightAligned'` adds, so the alignment class is repeated here.
+				cellClass: (params) => [
+					'ag-right-aligned-cell',
+					...(hasLowVoteCount({ data: params.data }) ? ['text-muted-foreground'] : []),
+				],
 				context: { tooltipSpec: ACTIVITY_TOOLTIP_SPECS.tmdbScore },
 				headerTooltip: 'TMDB user score out of 10. Muted when fewer than 50 votes.',
 				hide: true,
@@ -894,7 +982,6 @@
 				colId: 'tags',
 				headerName: 'Tags',
 				flex: 1.5,
-				minWidth: 90,
 				maxWidth: 250,
 				sortable: false,
 				filter: 'agTextColumnFilter',
@@ -915,6 +1002,158 @@
 				valueFormatter: (params) => truncateDescription(params.value, 80),
 				context: { tooltipSpec: ACTIVITY_TOOLTIP_SPECS.description },
 				headerTooltip: 'Video description from YouTube API',
+				hide: true,
+			},
+			// Webpage columns. Hidden by default; the responsive effect shows the Webpage default set when
+			// the type filter is exactly WEB_PAGE. Roles is picker-only (never in the default set); its header
+			// filter is server-side only (f.webrole), since Loaded mode cannot filter a multi-valued field.
+			// Site shows from sm up, Published from md up.
+			{
+				colId: 'webSite',
+				headerName: 'Site',
+				flex: 1,
+				maxWidth: 200,
+				filter: 'agTextColumnFilter',
+				valueGetter: (params) => webPageSite({ url: params.data?.url ?? null, webPage: params.data?.webPage }),
+				filterValueGetter: (params) =>
+					webPageSite({ url: params.data?.url ?? null, webPage: params.data?.webPage }) ?? '',
+				cellRenderer: webSiteCellRenderer,
+				context: { tooltipSpec: ACTIVITY_TOOLTIP_SPECS.webSite },
+				headerTooltip: 'Site name the page declares, or its domain',
+				hide: true,
+			},
+			{
+				colId: 'webPublished',
+				headerName: 'Published',
+				flex: 0.8,
+				minWidth: 105,
+				maxWidth: 150,
+				filter: 'agDateColumnFilter',
+				valueGetter: (params) => webPublishedValueGetter({ data: params.data }),
+				filterValueGetter: (params) => webPublishedFilterValueGetter({ data: params.data }),
+				valueFormatter: (params) => formatWebPublished(params.value),
+				context: { tooltipSpec: ACTIVITY_TOOLTIP_SPECS.webPublished },
+				headerTooltip: 'Date the page declares it was published',
+				hide: true,
+			},
+			{
+				colId: 'webRoles',
+				headerName: 'Roles',
+				flex: 1,
+				maxWidth: 220,
+				sortable: false,
+				filter: WebRoleFilter,
+				cellRenderer: webRolesCellRenderer,
+				context: { tooltipSpec: ACTIVITY_TOOLTIP_SPECS.webRoles },
+				headerTooltip: 'What the page is for, as set by whoever added it',
+				hide: true,
+			},
+			{
+				colId: 'webAuthor',
+				headerName: 'Author',
+				flex: 1.2,
+				minWidth: 120,
+				filter: 'agTextColumnFilter',
+				valueGetter: (params) => webPageAuthor({ url: params.data?.url ?? null, webPage: params.data?.webPage }),
+				filterValueGetter: (params) =>
+					webPageAuthor({ url: params.data?.url ?? null, webPage: params.data?.webPage }) ?? '',
+				cellRenderer: webAuthorCellRenderer,
+				context: { tooltipSpec: ACTIVITY_TOOLTIP_SPECS.webAuthor },
+				headerTooltip: 'Author the page declares',
+				hide: true,
+			},
+			// Book columns (Open Library). Hidden by default; the responsive effect shows the Book default
+			// set when the type filter is exactly BOOK. Author sorts on the server (AUTHOR). Published, Pages
+			// and Rating sort in "Loaded" mode only; all three filter on the server (f.published, f.pages, f.bookrating). Editions and Readers are picker-only.
+			{
+				colId: 'author',
+				headerName: 'Author',
+				flex: 2,
+				minWidth: 140,
+				filter: 'agTextColumnFilter',
+				valueGetter: authorValueGetter,
+				filterValueGetter: (params) => authorValueGetter({ data: params.data }) ?? '',
+				cellRenderer: authorCellRenderer,
+				context: { tooltipSpec: ACTIVITY_TOOLTIP_SPECS.author },
+				headerTooltip: 'Author(s) from Open Library',
+				hide: true,
+			},
+			{
+				colId: 'published',
+				headerName: 'Published',
+				flex: 0.8,
+				minWidth: 105,
+				// Raised to fit the header floor ("Published" + sort arrow, order number and funnel).
+				maxWidth: 140,
+				filter: 'agNumberColumnFilter',
+				// A number to sort by, shown as the plain year (never through the thousands-separated formatter).
+				valueGetter: (params) => {
+					const year = publishedValueGetter({ data: params.data });
+					return year === null ? null : Number(year);
+				},
+				comparator: unknownLastComparator,
+				valueFormatter: (params) => (params.value == null ? EMPTY_VALUE : String(params.value)),
+				headerTooltip: 'First published year',
+				hide: true,
+			},
+			{
+				colId: 'pages',
+				headerName: 'Pages',
+				flex: 0.6,
+				minWidth: 70,
+				// Raised to fit the header floor ("Pages" + sort arrow, order number and funnel).
+				maxWidth: 120,
+				filter: 'agNumberColumnFilter',
+				valueGetter: pagesValueGetter,
+				comparator: unknownLastComparator,
+				valueFormatter: (params) => (params.value == null ? EMPTY_VALUE : String(params.value)),
+				headerTooltip: 'Median page count across editions',
+				hide: true,
+			},
+			{
+				colId: 'rating',
+				headerName: 'Book rating',
+				flex: 0.7,
+				minWidth: 128,
+				// Raised to fit the header floor ("Book rating" + sort arrow, order number and funnel).
+				maxWidth: 160,
+				filter: 'agNumberColumnFilter',
+				valueGetter: ratingValueGetter,
+				comparator: unknownLastComparator,
+				valueFormatter: (params) => formatBookRating(params.value),
+				// Muted when the rating rests on fewer than 5 ratings.
+				cellClass: (params) => (hasLowRatingCount({ data: params.data }) ? 'text-muted-foreground' : ''),
+				context: { tooltipSpec: ACTIVITY_TOOLTIP_SPECS.rating },
+				headerTooltip: 'Open Library community rating out of 5. Muted when fewer than 5 ratings.',
+				hide: true,
+			},
+			{
+				colId: 'editions',
+				headerName: 'Editions',
+				flex: 0.6,
+				minWidth: 80,
+				maxWidth: 110,
+				sortable: false,
+				filter: false,
+				valueGetter: editionsValueGetter,
+				valueFormatter: (params) => (params.value == null ? EMPTY_VALUE : String(params.value)),
+				headerTooltip: 'Number of editions',
+				hide: true,
+			},
+			{
+				// Open Library "want to read" count; the hover popover has the full breakdown. Picker-only,
+				// sorts in "Loaded" mode only, no filter (the server has no field for it).
+				colId: 'readers',
+				headerName: 'Readers',
+				flex: 0.6,
+				minWidth: 90,
+				maxWidth: 120,
+				filter: false,
+				valueGetter: readersValueGetter,
+				comparator: unknownLastComparator,
+				valueFormatter: (params) => formatReaders(params.value),
+				context: { tooltipSpec: ACTIVITY_TOOLTIP_SPECS.readers },
+				headerTooltip: 'Open Library members who want to read this. Open Library users only, not readers in general.',
 				hide: true,
 			},
 			// Movie picker-only columns (never in the default set).
@@ -1050,7 +1289,13 @@
 		] as ColDef<ContentItem>[]
 	).map((col) => ({
 		...col,
-		minWidth: col.minWidth ?? headerMinWidth(col.headerName ?? '', col.filter !== false),
+		...(col.colId && NUMERIC_COL_IDS.has(col.colId) ? { type: 'rightAligned' } : {}),
+		// Never narrower than the whole heading + sort arrow + funnel. An explicit minWidth only
+		// raises the floor (for cell content, e.g. Item's thumbnail and title); it can't lower it.
+		minWidth: Math.max(
+			col.minWidth ?? 0,
+			headerMinWidth(col.headerName ?? '', { filter: col.filter !== false, sortable: col.sortable !== false }),
+		),
 	}));
 
 	// ---------------------------------------------------------------------------
@@ -1131,6 +1376,13 @@
 			gridApi = params.api;
 			gridReady = true;
 		},
+		// Fires synchronously before any grid teardown (cardMode, error state, navigation), so
+		// effects flushed afterwards see no grid instead of calling a destroyed Grid API.
+		onGridPreDestroyed: () => {
+			gridApi = null;
+			gridReady = false;
+			displayedRowCount = null;
+		},
 		onSortChanged: (event: SortChangedEvent) => {
 			hover.close();
 			// In "Loaded" mode, AG Grid handles client-side sort (including multi-column
@@ -1172,6 +1424,9 @@
 		// The person filter has no column, so "Loaded" mode applies it here, alongside the column filters.
 		isExternalFilterPresent: () => personFilter != null,
 		doesExternalFilterPass: (node) => (personFilter && node.data ? rowMatchesPerson(node.data, personFilter) : false),
+		onModelUpdated: (event) => {
+			displayedRowCount = event.api.getDisplayedRowCount();
+		},
 		onFilterChanged: (event: FilterChangedEvent) => {
 			hover.close();
 			// Immediate: update chip display
@@ -1248,9 +1503,10 @@
 
 	// Restore AG Grid filter state from URL on mount and mode changes
 	$effect(() => {
-		if (!gridApi || !gridReady) return;
+		const api = liveGridApi(gridApi);
+		if (!api || !gridReady) return;
 		const filterModel = urlParamsToFilter(gridParams.filters);
-		gridApi.setFilterModel(Object.keys(filterModel).length > 0 ? filterModel : null);
+		api.setFilterModel(Object.keys(filterModel).length > 0 ? filterModel : null);
 	});
 
 	// Re-run the grid's filters when the person filter changes (external filters aren't tracked by the model).
@@ -1301,7 +1557,7 @@
 				perspectivesByContentId,
 				onOpenDetails: handleOpenDetails,
 			});
-			gridApi.refreshCells({ columns: ['perspectize'], force: true });
+			gridApi.refreshCells({ columns: ['perspectize', 'myQuality', 'myImportance', 'myAgreement'], force: true });
 		}
 	});
 
@@ -1310,7 +1566,7 @@
 	// sm (445-639): Perspectize, Item, Type, Category, Channel
 	// md (640-899): Perspectize, Item, Type, Category, Channel, Duration, Date
 	// lg (900+):    Perspectize, Item, Type, Category, Channel, Duration, Date, Views, Likes, Tags
-	// With the type filter exactly MOVIE, the Movie set applies instead (defaultColumnVisibility).
+	// With the type filter exactly MOVIE, BOOK or CLAIM, that view's set applies instead (defaultColumnVisibility).
 	// A view with a saved setup (column picker) shows that instead of its defaults, which
 	// also re-applies it after a grid remount (cardMode toggle, error recovery).
 	// Switching view (e.g. to exactly MOVIE) shows a toast offering the previous columns back.
@@ -1326,6 +1582,9 @@
 		// Read synchronously, before the rAF, so this effect re-runs when they change.
 		const tier = responsiveTier;
 		const view = columnView;
+		// Read synchronously too: a change of the one type named (youtube -> bible_passage) keeps the
+		// view but moves Type's visibility, so the effect must re-run on it.
+		const solo = soloTypeFilter(filters.type);
 		const prevView = lastColumnView;
 		lastColumnView = view;
 		const current = prevView !== null && prevView !== view ? currentVisibility() : {};
@@ -1334,19 +1593,89 @@
 			view,
 			current,
 			saved: loadLayout(view),
-			defaults: defaultLayout(tier, view),
+			defaults: defaultLayout(tier, view, solo),
 		});
 		requestAnimationFrame(() => {
-			if (!gridApi) return; // Grid may have been destroyed before rAF fires
+			if (api.isDestroyed()) return; // Grid may have been destroyed before rAF fires
 			applyLayout(api, plan.apply);
 			if (plan.toast) showColumnSwitchToast(view, current);
 		});
 	});
 
+	// Export: the grid is read at click time, so the output matches what the toolbar shows.
+	const exportDisabled = $derived(isExportDisabled({ gridReady, loading, displayedRows: loadedItemsCount }));
+	let printOptionsOpen = $state(false);
+	let printList = $state<{ table: ExportTable; title: string; spacing: PrintSpacing } | null>(null);
+
+	// The grid's resting layout; a print run restores this, not a fixed value.
+	const normalDomLayout = $derived(isMobile ? 'autoHeight' : 'normal');
+
+	function reportPrintFailure(err: unknown) {
+		toast.error(err instanceof Error ? `Could not print: ${err.message}` : 'Could not print');
+	}
+
+	function exportApi(): ExportGridApi | null {
+		return gridApi && !gridApi.isDestroyed() ? (gridApi as unknown as ExportGridApi) : null;
+	}
+
+	function handleDownloadCsv() {
+		const api = exportApi();
+		if (api) downloadWithToast(() => downloadLibraryCsv(api));
+	}
+
+	function handleCopy() {
+		const api = exportApi();
+		if (api) void copyWithToast(() => copyLibraryTable(api));
+	}
+
+	async function handlePrintAsSeen() {
+		const api = gridApi;
+		if (!api) return;
+		try {
+			await runPrint('grid', {
+				before: async () => {
+					printingAsSeen = true;
+					addLandscapePageStyle();
+					api.setGridOption('domLayout', 'print');
+					// AG Grid lays out the rows on a later frame; printing sooner can print a half-rendered grid.
+					await new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));
+					if (api.isDestroyed()) throw new Error('The table was closed before printing');
+				},
+				after: () => {
+					printingAsSeen = false;
+					removeLandscapePageStyle();
+					if (!api.isDestroyed()) api.setGridOption('domLayout', normalDomLayout);
+				},
+			});
+		} catch (err) {
+			reportPrintFailure(err);
+		}
+	}
+
+	async function handlePrintAsList({ title, spacing }: { title: string; spacing: PrintSpacing }) {
+		const api = gridApi;
+		if (!api) return;
+		try {
+			const table = readExportTable(api as unknown as ExportGridApi, 'print');
+			await runPrint('list', {
+				before: async () => {
+					printList = { table, title, spacing };
+					await tick();
+				},
+				after: () => {
+					printList = null;
+				},
+			});
+		} catch (err) {
+			printList = null;
+			reportPrintFailure(err);
+		}
+	}
+
 	// Switch to autoHeight on mobile — eliminates empty gap below last row
 	$effect(() => {
 		if (!gridApi || !gridReady) return;
-		gridApi.setGridOption('domLayout', isMobile ? 'autoHeight' : 'normal');
+		gridApi.setGridOption('domLayout', normalDomLayout);
 	});
 
 	// Re-evaluate flex column widths when the grid container resizes
@@ -1356,7 +1685,7 @@
 		if (!gridContainer || !gridApi || !gridReady) return;
 		const api = gridApi;
 		const observer = new ResizeObserver(() => {
-			if (!gridApi) return; // Grid may have been destroyed before observer fires
+			if (api.isDestroyed()) return; // Grid may have been destroyed before observer fires
 			api.sizeColumnsToFit();
 		});
 		observer.observe(gridContainer);
@@ -1379,7 +1708,22 @@
 			cursors = [null];
 			updateUrl({ filters: {}, page: 1 });
 		}}
+		onClearAllButType={() => {
+			cursors = [null];
+			const { type } = gridParams.filters;
+			updateUrl({ filters: type ? { type } : {}, page: 1 });
+		}}
 	/>
+
+	<!-- Mixed/unfiltered types share one column set, so many cells are blank. The card list
+	     has no filter popup or Columns button to point at, so it skips the callout. -->
+	{#if !cardMode && showColumnRelevanceCallout(filters.type)}
+		<ColumnRelevanceCallout
+			disabled={!gridReady}
+			onPickType={() => gridApi?.showColumnFilter('type')}
+			onChooseColumns={() => (columnPickerOpen = true)}
+		/>
+	{/if}
 
 	<!-- Error State -->
 	{#if contentQuery.isError}
@@ -1414,7 +1758,7 @@
 		<div
 			bind:this={gridContainer}
 			data-testid="ag-grid-container"
-			class="{isMobile ? 'overflow-y-auto' : 'flex-1'} min-h-0"
+			class="activity-grid {isMobile ? 'overflow-y-auto' : 'flex-1'} min-h-0"
 			style="--ag-row-height: 49px; --ag-header-height: 36px;"
 		>
 			<AgGridSvelte5Component {gridOptions} {rowData} {theme} {modules} />
@@ -1472,6 +1816,15 @@
 				<ArrowUpDownIcon class="size-4" />
 				<span class="hidden md:inline">Clear sorts</span>
 			</button>
+			{#if !cardMode}
+				<ExportMenu
+					disabled={exportDisabled}
+					onDownloadCsv={handleDownloadCsv}
+					onCopy={handleCopy}
+					onPrintAsSeen={handlePrintAsSeen}
+					onPrintAsList={() => (printOptionsOpen = true)}
+				/>
+			{/if}
 			{#if mode === 'all'}
 				<div class="hidden md:flex items-center gap-2">
 					<label for="pageSize" class="text-muted-foreground">Page size:</label>
@@ -1540,6 +1893,7 @@
 	open={detailsModalContentId !== null}
 	onClose={handleCloseDetails}
 	onAddToPlan={currentUserId !== null ? handleAddToPlan : undefined}
+	onAddPerspective={handleAddPerspectiveFromDetails}
 />
 
 <!-- "Add to plan" todo dialog. Mounted only while open; the caller is signed in by construction. -->
@@ -1559,6 +1913,16 @@
 		onToggle={handleColumnToggle}
 		onReset={handleColumnsReset}
 	/>
+{/if}
+
+<!-- Print setup for "Print as list": mounted only while open, like the pickers. -->
+{#if printOptionsOpen}
+	<PrintOptionsDialog bind:open={printOptionsOpen} onPrint={handlePrintAsList} />
+{/if}
+
+<!-- The print-only list; it portals itself to <body> and shows only under html[data-print='list']. -->
+{#if printList}
+	<PrintListView table={printList.table} title={printList.title} spacing={printList.spacing} />
 {/if}
 
 <!-- Sort picker — works identically on mobile and desktop, and in both data modes;

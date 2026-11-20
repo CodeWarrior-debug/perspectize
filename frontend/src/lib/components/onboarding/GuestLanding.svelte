@@ -10,10 +10,10 @@
 >
 	<div class="space-y-3">
 		<h1 id="guest-landing-heading" class="text-3xl font-semibold tracking-tight text-foreground sm:text-4xl">
-			Perspectize
+			When 👍 is not enough
 		</h1>
 		<p class="text-base text-muted-foreground sm:text-lg text-balance">
-			Collect perspectives on the media you care about — see what others notice, not just what they rate.
+			Where measured positions get the measures &amp; metadata they deserve.
 		</p>
 	</div>
 

@@ -90,12 +90,27 @@ func (m *mockContentRepository) ReassignByUser(ctx context.Context, fromUserID, 
 	return nil
 }
 
+func (m *mockContentRepository) DeleteOwnedClaim(ctx context.Context, id, ownerID int) error {
+	return nil
+}
+
+func (m *mockContentRepository) AnonymizeOwnedClaim(ctx context.Context, id, ownerID int) error {
+	return nil
+}
+
+func (m *mockContentRepository) UpdateClaim(ctx context.Context, id, ownerID int, text, html string, customFields json.RawMessage, privacy *domain.Privacy) (*domain.Content, error) {
+	return nil, domain.ErrNotFound
+}
+
 // UpdatePrimaryCategoryID emulates UPDATE ... RETURNING against getByIDFn's
 // row: missing content is ErrNotFound, otherwise the row with the new FK.
-func (m *mockContentRepository) UpdatePrimaryCategoryID(ctx context.Context, contentID int, categoryID *int) (*domain.Content, error) {
+func (m *mockContentRepository) UpdatePrimaryCategoryID(ctx context.Context, contentID int, categoryID *int, viewerID int) (*domain.Content, error) {
 	got, err := m.GetByID(ctx, contentID)
 	if err != nil {
 		return nil, err
+	}
+	if !got.VisibleTo(viewerID) {
+		return nil, domain.ErrNotFound
 	}
 	cp := *got
 	cp.PrimaryCategoryID = categoryID
@@ -217,12 +232,13 @@ func (m *mockUserRepository) SetOnboardingDisplayNextSession(ctx context.Context
 
 // mockPerspectiveRepository implements repositories.PerspectiveRepository for testing
 type mockPerspectiveRepository struct {
-	createFn    func(ctx context.Context, p *domain.Perspective) (*domain.Perspective, error)
-	getByIDFn   func(ctx context.Context, id int) (*domain.Perspective, error)
-	updateFn    func(ctx context.Context, p *domain.Perspective, ownerUserID int) (*domain.Perspective, error)
-	deleteFn    func(ctx context.Context, id int, ownerUserID int) error
-	listFn      func(ctx context.Context, params domain.PerspectiveListParams) (*domain.PaginatedPerspectives, error)
-	aggregateFn func(ctx context.Context, contentIDs []int) (map[int]*domain.PerspectiveAggregate, error)
+	createFn       func(ctx context.Context, p *domain.Perspective) (*domain.Perspective, error)
+	getByIDFn      func(ctx context.Context, id int) (*domain.Perspective, error)
+	updateFn       func(ctx context.Context, p *domain.Perspective, ownerUserID int) (*domain.Perspective, error)
+	deleteFn       func(ctx context.Context, id int, ownerUserID int) error
+	listFn         func(ctx context.Context, params domain.PerspectiveListParams) (*domain.PaginatedPerspectives, error)
+	aggregateFn    func(ctx context.Context, contentIDs []int) (map[int]*domain.PerspectiveAggregate, error)
+	visibleCountFn func(ctx context.Context, contentIDs []int, viewerID *int) (map[int]int, error)
 }
 
 func (m *mockPerspectiveRepository) Create(ctx context.Context, p *domain.Perspective) (*domain.Perspective, error) {
@@ -270,6 +286,13 @@ func (m *mockPerspectiveRepository) AggregateByContentIDs(ctx context.Context, c
 		return m.aggregateFn(ctx, contentIDs)
 	}
 	return map[int]*domain.PerspectiveAggregate{}, nil
+}
+
+func (m *mockPerspectiveRepository) CountVisibleByContentIDs(ctx context.Context, contentIDs []int, viewerID *int) (map[int]int, error) {
+	if m.visibleCountFn != nil {
+		return m.visibleCountFn(ctx, contentIDs, viewerID)
+	}
+	return map[int]int{}, nil
 }
 
 func (m *mockPerspectiveRepository) FeelingStats(ctx context.Context, contentID *int, emoji string, label *string) (*domain.FeelingStats, error) {
@@ -473,6 +496,46 @@ func TestContentByID_AggregatesOnly_KnownIDWithoutPerspectivesResolvesNull(t *te
 	assert.Nil(t, data.ContentByID.AverageRating)
 }
 
+// visiblePerspectiveCount is viewer-scoped (public + the caller's own), unlike
+// perspectiveCount which counts every row.
+func TestContentByID_VisiblePerspectiveCount_UsesTheViewerAndDefaultsToZero(t *testing.T) {
+	var gotViewer *int
+	perspectiveRepo := &mockPerspectiveRepository{
+		aggregateFn: func(ctx context.Context, ids []int) (map[int]*domain.PerspectiveAggregate, error) {
+			// 5 perspectives exist in total, 3 of them private to others.
+			return map[int]*domain.PerspectiveAggregate{1: {ContentID: 1, Count: 5}}, nil
+		},
+		visibleCountFn: func(ctx context.Context, ids []int, viewerID *int) (map[int]int, error) {
+			gotViewer = viewerID
+			return map[int]int{1: 2}, nil
+		},
+	}
+	contentRepo := &mockContentRepository{
+		getByIDFn: func(ctx context.Context, id int) (*domain.Content, error) {
+			return &domain.Content{ID: 1, Name: "Test Video"}, nil
+		},
+	}
+	server := setupTestServerWithRepos(contentRepo, &mockYouTubeClient{}, perspectiveRepo, &mockUserRepository{})
+	defer server.Close()
+
+	result := executeGraphQL(t, server, `{ contentByID(id: "1") { id perspectiveCount visiblePerspectiveCount } }`)
+
+	assert.Empty(t, result.Errors)
+	var data struct {
+		ContentByID struct {
+			PerspectiveCount        *int `json:"perspectiveCount"`
+			VisiblePerspectiveCount *int `json:"visiblePerspectiveCount"`
+		} `json:"contentByID"`
+	}
+	require.NoError(t, json.Unmarshal(result.Data, &data))
+	require.NotNil(t, data.ContentByID.PerspectiveCount)
+	assert.Equal(t, 5, *data.ContentByID.PerspectiveCount)
+	require.NotNil(t, data.ContentByID.VisiblePerspectiveCount)
+	assert.Equal(t, 2, *data.ContentByID.VisiblePerspectiveCount)
+	require.NotNil(t, gotViewer, "the signed-in viewer must reach the repository")
+	assert.Equal(t, 1, *gotViewer)
+}
+
 func TestContentQuery_NotFound_ReturnsError(t *testing.T) {
 	repo := &mockContentRepository{
 		getByIDFn: func(ctx context.Context, id int) (*domain.Content, error) {
@@ -485,7 +548,7 @@ func TestContentQuery_NotFound_ReturnsError(t *testing.T) {
 
 	result := executeGraphQL(t, server, `{ contentByID(id: "999") { id name } }`)
 
-	// Issue #18 fix: should return an error, not a silent null
+	// Should return an error, not a silent null
 	require.NotEmpty(t, result.Errors, "Expected an error when content is not found")
 	assert.Contains(t, result.Errors[0].Message, "content not found")
 }
@@ -634,7 +697,7 @@ func TestCreateContentFromYouTube_DerivesUserIDFromSession_WhenZero(t *testing.T
 }
 
 func TestCreateContentFromYouTube_RejectsSpoofedUserID(t *testing.T) {
-	// Issue #246: a non-zero userId that doesn't match the authenticated
+	// A non-zero userId that doesn't match the authenticated
 	// session must be rejected, not trusted verbatim.
 	metadata := &portservices.VideoMetadata{
 		Title:    "Amazing Video",
@@ -1139,6 +1202,28 @@ func TestPaginatedContentQuery_WithAddedByUsernameFilter(t *testing.T) {
 	assert.Empty(t, result.Errors)
 }
 
+func TestPaginatedContentQuery_WithMinPerspectiveCountFilter(t *testing.T) {
+	repo := &mockContentRepository{
+		listFn: func(ctx context.Context, params domain.ContentListParams) (*domain.PaginatedContent, error) {
+			require.NotNil(t, params.Filter)
+			require.NotNil(t, params.Filter.MinPerspectiveCount)
+			assert.Equal(t, 2, *params.Filter.MinPerspectiveCount)
+			// The test server signs every request in as user 1; the resolver must
+			// hand that viewer to the repository so private rows count for them.
+			require.NotNil(t, params.ViewerID)
+			assert.Equal(t, 1, *params.ViewerID)
+			return &domain.PaginatedContent{Items: []*domain.Content{}}, nil
+		},
+	}
+
+	server := setupTestServer(repo, &mockYouTubeClient{})
+	defer server.Close()
+
+	result := executeGraphQL(t, server, `{ content(filter: { minPerspectiveCount: 2 }) { items { id } } }`)
+
+	assert.Empty(t, result.Errors)
+}
+
 func TestPaginatedContentQuery_SortByAddedBy(t *testing.T) {
 	repo := &mockContentRepository{
 		listFn: func(ctx context.Context, params domain.ContentListParams) (*domain.PaginatedContent, error) {
@@ -1397,6 +1482,55 @@ func TestSetPrimaryCategory_ContentNotFound(t *testing.T) {
 	assert.Contains(t, result.Errors[0].Message, "content not found")
 }
 
+// --- RemovePrimaryCategory Mutation Tests ---
+
+func TestRemovePrimaryCategory_Success(t *testing.T) {
+	catID := 42
+	repo := &mockContentRepository{
+		getByIDFn: func(ctx context.Context, id int) (*domain.Content, error) {
+			return &domain.Content{
+				ID:                id,
+				Name:              "Test Video",
+				ContentType:       domain.ContentTypeYouTubeVideo,
+				PrimaryCategoryID: &catID,
+			}, nil
+		},
+	}
+
+	server := setupTestServer(repo, &mockYouTubeClient{})
+	defer server.Close()
+
+	result := executeGraphQL(t, server, `mutation { removePrimaryCategory(contentId: 1) { id name } }`)
+
+	assert.Empty(t, result.Errors)
+
+	var data struct {
+		RemovePrimaryCategory struct {
+			ID   string `json:"id"`
+			Name string `json:"name"`
+		} `json:"removePrimaryCategory"`
+	}
+	require.NoError(t, json.Unmarshal(result.Data, &data))
+	assert.Equal(t, "1", data.RemovePrimaryCategory.ID)
+	assert.Equal(t, "Test Video", data.RemovePrimaryCategory.Name)
+}
+
+func TestRemovePrimaryCategory_ContentNotFound(t *testing.T) {
+	repo := &mockContentRepository{
+		getByIDFn: func(ctx context.Context, id int) (*domain.Content, error) {
+			return nil, domain.ErrNotFound
+		},
+	}
+
+	server := setupTestServer(repo, &mockYouTubeClient{})
+	defer server.Close()
+
+	result := executeGraphQL(t, server, `mutation { removePrimaryCategory(contentId: 999) { id } }`)
+
+	require.NotEmpty(t, result.Errors)
+	assert.Contains(t, result.Errors[0].Message, "content not found")
+}
+
 // --- WikidataSearch Query Tests ---
 
 func TestWikidataSearch_Success(t *testing.T) {
@@ -1539,4 +1673,58 @@ func TestPaginatedContentQuery_WithMovieColumnFilters(t *testing.T) {
 	assert.Equal(t, 6.5, *f.MinTmdbScore)
 	require.NotNil(t, f.MaxTmdbScore)
 	assert.Equal(t, 9.0, *f.MaxTmdbScore)
+}
+
+func TestPaginatedContentQuery_WithAuthorContains(t *testing.T) {
+	var got domain.ContentListParams
+	repo := &mockContentRepository{
+		listFn: func(ctx context.Context, params domain.ContentListParams) (*domain.PaginatedContent, error) {
+			got = params
+			return &domain.PaginatedContent{}, nil
+		},
+	}
+
+	server := setupTestServer(repo, &mockYouTubeClient{})
+	defer server.Close()
+
+	result := executeGraphQL(t, server, `{ content(filter: { authorContains: "steinbeck" }) { items { id } } }`)
+	assert.Empty(t, result.Errors)
+
+	require.NotNil(t, got.Filter)
+	require.NotNil(t, got.Filter.AuthorContains)
+	assert.Equal(t, "steinbeck", *got.Filter.AuthorContains)
+}
+
+func TestPaginatedContentQuery_WithBookRangeFilters(t *testing.T) {
+	var got domain.ContentListParams
+	repo := &mockContentRepository{
+		listFn: func(ctx context.Context, params domain.ContentListParams) (*domain.PaginatedContent, error) {
+			got = params
+			return &domain.PaginatedContent{}, nil
+		},
+	}
+
+	server := setupTestServer(repo, &mockYouTubeClient{})
+	defer server.Close()
+
+	result := executeGraphQL(t, server, `{ content(filter: {
+		minPublishYear: 1950, maxPublishYear: 1960,
+		minPages: 300, maxPages: 500,
+		minBookRating: 3.5, maxBookRating: 4.5
+	}) { items { id } } }`)
+	assert.Empty(t, result.Errors)
+
+	require.NotNil(t, got.Filter)
+	require.NotNil(t, got.Filter.MinPublishYear)
+	assert.Equal(t, 1950, *got.Filter.MinPublishYear)
+	require.NotNil(t, got.Filter.MaxPublishYear)
+	assert.Equal(t, 1960, *got.Filter.MaxPublishYear)
+	require.NotNil(t, got.Filter.MinPages)
+	assert.Equal(t, 300, *got.Filter.MinPages)
+	require.NotNil(t, got.Filter.MaxPages)
+	assert.Equal(t, 500, *got.Filter.MaxPages)
+	require.NotNil(t, got.Filter.MinBookRating)
+	assert.Equal(t, 3.5, *got.Filter.MinBookRating)
+	require.NotNil(t, got.Filter.MaxBookRating)
+	assert.Equal(t, 4.5, *got.Filter.MaxBookRating)
 }

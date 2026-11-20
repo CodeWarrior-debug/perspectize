@@ -13,7 +13,7 @@ from PIL import Image
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 CATALOG = (ROOT / 'src' / 'catalog.ts').read_text()
-URLS = sorted(set(re.findall(r"img: '([^']+)'", CATALOG)))
+URLS = sorted(set(re.findall(r"""img: ['"]([^'"]+)['"]""", CATALOG)))
 
 out = {}
 for url in URLS:

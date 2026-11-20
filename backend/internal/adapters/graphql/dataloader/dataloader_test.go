@@ -72,3 +72,111 @@ func TestCategoryLoader_RepeatedKeyIsFetchedOnce(t *testing.T) {
 
 	assert.EqualValues(t, 1, svc.calls.Load(), "the loader caches per request; the same id must not refetch")
 }
+
+type countingPerspectiveService struct {
+	portservices.PerspectiveService // nil: any other method panics
+	calls                           atomic.Int32
+	mu                              sync.Mutex
+	viewers                         []*int
+}
+
+func (s *countingPerspectiveService) CountVisibleByContentIDs(_ context.Context, ids []int, viewerID *int) (map[int]int, error) {
+	s.calls.Add(1)
+	s.mu.Lock()
+	s.viewers = append(s.viewers, viewerID)
+	s.mu.Unlock()
+	out := make(map[int]int, len(ids))
+	for _, id := range ids {
+		if id%2 == 1 { // even ids have none visible: absent, like the repository
+			out[id] = id
+		}
+	}
+	return out, nil
+}
+
+func TestVisiblePerspectiveCountLoader_BatchesOneViewerIntoOneServiceCall(t *testing.T) {
+	svc := &countingPerspectiveService{}
+	loaders := NewLoaders(Services{Perspective: svc})
+
+	const n = 50
+	var wg sync.WaitGroup
+	for id := 1; id <= n; id++ {
+		wg.Add(1)
+		go func(id int) {
+			defer wg.Done()
+			got, err := loaders.VisiblePerspectiveCount.Load(context.Background(), VisiblePerspectiveKey{ViewerID: 7, ContentID: id})
+			if id%2 == 1 {
+				assert.NoError(t, err)
+				assert.Equal(t, id, got)
+			} else {
+				assert.True(t, IsNotFound(err), "no visible perspectives is absent, got %v", err)
+			}
+		}(id)
+	}
+	wg.Wait()
+
+	assert.EqualValues(t, 1, svc.calls.Load(), "50 concurrent loads for one viewer must be one batched call")
+	require.Len(t, svc.viewers, 1)
+	require.NotNil(t, svc.viewers[0])
+	assert.Equal(t, 7, *svc.viewers[0])
+}
+
+func TestVisiblePerspectiveCountLoader_AnonymousViewerReachesTheServiceAsNil(t *testing.T) {
+	svc := &countingPerspectiveService{}
+	loaders := NewLoaders(Services{Perspective: svc})
+
+	_, err := loaders.VisiblePerspectiveCount.Load(context.Background(), VisiblePerspectiveKey{ViewerID: 0, ContentID: 1})
+	require.NoError(t, err)
+
+	require.Len(t, svc.viewers, 1)
+	assert.Nil(t, svc.viewers[0], "anonymous is nil, never 0")
+}
+
+type countingImportService struct {
+	portservices.ImportService // nil: any other method panics
+	calls                      atomic.Int32
+	mu                         sync.Mutex
+	lastIDs                    []int
+}
+
+func (s *countingImportService) GetImportJobsByIDs(_ context.Context, ids []int) (map[int]*domain.ImportJob, error) {
+	s.calls.Add(1)
+	s.mu.Lock()
+	s.lastIDs = append([]int(nil), ids...)
+	s.mu.Unlock()
+	out := make(map[int]*domain.ImportJob, len(ids))
+	for _, id := range ids {
+		out[id] = &domain.ImportJob{ID: id, Name: "job"}
+	}
+	return out, nil
+}
+
+func TestImportJobLoader_NLoadsOneServiceCall(t *testing.T) {
+	svc := &countingImportService{}
+	loaders := NewLoaders(Services{ImportJob: svc})
+
+	const n = 50
+	var wg sync.WaitGroup
+	for id := 1; id <= n; id++ {
+		wg.Add(1)
+		go func(id int) {
+			defer wg.Done()
+			job, err := loaders.ImportJobByID.Load(context.Background(), id)
+			assert.NoError(t, err)
+			if assert.NotNil(t, job) {
+				assert.Equal(t, id, job.ID)
+			}
+		}(id)
+	}
+	wg.Wait()
+
+	assert.EqualValues(t, 1, svc.calls.Load(), "50 concurrent loads must be one batched call")
+	assert.Len(t, svc.lastIDs, n)
+}
+
+func TestImportJobLoader_NilServiceLoadsAsNotFound(t *testing.T) {
+	loaders := NewLoaders(Services{})
+
+	_, err := loaders.ImportJobByID.Load(context.Background(), 1)
+	assert.True(t, IsNotFound(err), "no import service wired: the key is absent, not a panic")
+}

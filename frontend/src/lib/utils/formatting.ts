@@ -1,4 +1,5 @@
 import { BIBLE_PASSAGE_ICON_SVG } from './icons';
+import { bookSubjects } from './bookFormatting';
 import type { LengthDisplay } from '$lib/queries/content';
 
 /** The one "no value" glyph for grid cells; keep new formatters on it. */
@@ -110,11 +111,27 @@ export function formatIsoDuration(iso: string | null | undefined): string | null
 	return `${minutes}:${seconds.toString().padStart(2, '0')}`;
 }
 
+const DATE_ONLY = /^(\d{4})-(\d{2})-(\d{2})$/;
+
+/**
+ * A date-only `YYYY-MM-DD` is a calendar day, so it is built in local time. `new Date('2017-06-12')`
+ * would be UTC midnight, which reads as the day before in US timezones. Anything else (a full ISO
+ * timestamp) is an instant and parses as before. Returns an Invalid Date for an impossible day.
+ */
+export function parseDateValue(value: string): Date {
+	const m = DATE_ONLY.exec(value);
+	if (!m) return new Date(value);
+	const [year, month, day] = [Number(m[1]), Number(m[2]), Number(m[3])];
+	const date = new Date(year, month - 1, day);
+	const real = date.getFullYear() === year && date.getMonth() === month - 1 && date.getDate() === day;
+	return real ? date : new Date(NaN);
+}
+
 /**
  * Format ISO date string to locale string.
  */
 export function formatDate(isoString: string): string {
-	const date = new Date(isoString);
+	const date = parseDateValue(isoString);
 	if (isNaN(date.getTime())) return EMPTY_VALUE;
 	return date.toLocaleDateString('en-US', {
 		year: 'numeric',
@@ -342,6 +359,34 @@ export function formatPublishDate(isoString: string | null): string {
 }
 
 /**
+ * Format a claim's `YYYY-MM-DD` date (Content.customFields) as "Oct 23, 2026". A bare date has no
+ * time, so it is built as a local calendar day: `new Date('2026-10-23')` would read it as UTC
+ * midnight and show the 22nd west of UTC. Anything that is not a real calendar date is the
+ * grid placeholder.
+ */
+export function formatClaimDate(value: unknown): string {
+	if (typeof value !== 'string') return EMPTY_VALUE;
+	const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value.trim());
+	if (!m) return EMPTY_VALUE;
+	const year = Number(m[1]);
+	const month = Number(m[2]);
+	const day = Number(m[3]);
+	const date = new Date(year, month - 1, day);
+	// Rejects overflow such as 2026-02-31, which the Date constructor would roll into March.
+	if (date.getFullYear() !== year || date.getMonth() !== month - 1 || date.getDate() !== day) return EMPTY_VALUE;
+	return date.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+}
+
+/**
+ * A viewer's perspective rating, stored on the 0-10000 scale, shown as a 0-100
+ * score. Empty when the viewer hasn't rated that field.
+ */
+export function formatRatingScore(value: unknown): string {
+	if (typeof value !== 'number') return EMPTY_VALUE;
+	return String(Math.round(value / 100));
+}
+
+/**
  * Format tags array to comma-separated string.
  */
 export function formatTags(tags: string[] | null): string {
@@ -377,23 +422,6 @@ export function extractVideoIdFromUrl(url: string | null): string | null {
 	} catch {
 		return null;
 	}
-}
-
-/**
- * Compute minimum AG Grid column width (px) so header text + icons never truncate.
- * AG Grid only accepts px — we derive from the grid's font metrics.
- */
-const GRID_FONT_SIZE = 14; // matches AG Grid theme fontSize
-export function headerMinWidth(name: string, hasFilter = true): number {
-	const charWidthEm = 0.55; // approx em per char at font-weight 600
-	const paddingEm = 1.5; // left + right cell padding
-	const sortIconEm = 1.6; // sort indicator — widened so short headers (e.g. "Length") don't truncate once an active sort indicator is actually painted, not just reserved for
-	const filterIconEm = hasFilter ? 1.5 : 0;
-	// No column divider any more (headerColumnBorder is off and the resize handle is an overlay),
-	// so nothing to reserve — keeps the full column set inside the max-w-screen-xl page container.
-	const separatorEm = 0;
-	const totalEm = name.length * charWidthEm + paddingEm + sortIconEm + filterIconEm + separatorEm;
-	return Math.ceil(totalEm * GRID_FONT_SIZE);
 }
 
 /**
@@ -448,6 +476,12 @@ const CLAIM_ICON_PATH =
 const MOVIE_ICON_PATH =
 	'M4 2h16a2 2 0 0 1 2 2v16a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2zM7 2v20M17 2v20M2 12h20M2 7h5M2 17h5M17 17h5M17 7h5';
 
+/**
+ * Closed-book glyph (Lucide "book") for BOOK rows (outline, themed stroke). Deliberately not an
+ * open book: BIBLE_PASSAGE already uses Lucide's "book-open", and the two must read apart in the Type column.
+ */
+const BOOK_ICON_PATH = 'M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H19a1 1 0 0 1 1 1v18a1 1 0 0 1-1 1H6.5a1 1 0 0 1 0-5H20';
+
 export function typeCellRenderer(params: { data?: { contentType: string } }): HTMLElement | string {
 	if (!params.data) return '';
 
@@ -481,6 +515,54 @@ export function typeCellRenderer(params: { data?: { contentType: string } }): HT
 		const label = document.createElement('span');
 		label.className = 'sr-only';
 		label.textContent = 'Movie';
+		container.appendChild(svg);
+		container.appendChild(label);
+		return container;
+	}
+
+	if (params.data.contentType === 'WEB_PAGE') {
+		// Lucide "globe" (outline, themed stroke): a web page is not a video, so no YouTube red.
+		container.title = 'Webpage';
+		const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+		svg.setAttribute('width', '20');
+		svg.setAttribute('height', '20');
+		svg.setAttribute('viewBox', '0 0 24 24');
+		svg.setAttribute('fill', 'none');
+		svg.setAttribute('stroke', 'var(--color-muted-foreground)');
+		svg.setAttribute('stroke-width', '2');
+		svg.setAttribute('stroke-linecap', 'round');
+		svg.setAttribute('stroke-linejoin', 'round');
+		const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+		path.setAttribute(
+			'd',
+			'M12 2a10 10 0 1 0 0 20 10 10 0 1 0 0-20M2 12h20M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20',
+		);
+		svg.appendChild(path);
+		const label = document.createElement('span');
+		label.className = 'sr-only';
+		label.textContent = 'Webpage';
+		container.appendChild(svg);
+		container.appendChild(label);
+		return container;
+	}
+
+	if (params.data.contentType === 'BOOK') {
+		container.title = 'Book';
+		const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+		svg.setAttribute('width', '20');
+		svg.setAttribute('height', '20');
+		svg.setAttribute('viewBox', '0 0 24 24');
+		svg.setAttribute('fill', 'none');
+		svg.setAttribute('stroke', 'var(--color-muted-foreground)');
+		svg.setAttribute('stroke-width', '2');
+		svg.setAttribute('stroke-linecap', 'round');
+		svg.setAttribute('stroke-linejoin', 'round');
+		const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+		path.setAttribute('d', BOOK_ICON_PATH);
+		svg.appendChild(path);
+		const label = document.createElement('span');
+		label.className = 'sr-only';
+		label.textContent = 'Book';
 		container.appendChild(svg);
 		container.appendChild(label);
 		return container;
@@ -546,7 +628,8 @@ export class PerspectiveHeaderRenderer {
 		this.eGui = document.createElement('div');
 		this.eGui.className = 'flex items-center justify-center w-full h-full';
 		this.eGui.innerHTML = GLASSES_SVG;
-		this.eGui.title = 'Perspectize — add or edit your perspective';
+		// No native `title` — the column's `headerTooltip` already shows this text,
+		// and a title on top of it renders two stacked tooltips.
 	}
 
 	getGui(): HTMLElement {
@@ -609,7 +692,8 @@ export function categoryCellRenderer(params: {
 		// cell click handler).
 		const label: HTMLElement = category.wikipediaUrl ? document.createElement('a') : document.createElement('span');
 		label.textContent = category.label;
-		label.title = category.description ?? category.wikidataQid;
+		// No native `title` — the column's context.tooltipSpec hover popover already
+		// covers this cell, and a title on top of it renders two stacked tooltips.
 		label.style.cssText = 'overflow:hidden;text-overflow:ellipsis;white-space:nowrap;';
 		if (category.wikipediaUrl && label instanceof HTMLAnchorElement) {
 			label.href = category.wikipediaUrl;
@@ -690,6 +774,7 @@ export interface MovieResponse {
 export interface MovieRow {
 	contentType?: string;
 	movie?: unknown;
+	book?: unknown;
 	response?: unknown;
 	tags?: string[] | null;
 }
@@ -805,6 +890,11 @@ export function castCellRenderer(params: { data?: MovieRow }): HTMLElement | str
 		lines[lines.length - 1].appendChild(more);
 	}
 	return container;
+}
+
+/** Cast tooltip copy text, parallel to `castTooltipItems`: the person's name only. */
+export function castTooltipCopyValues(row: MovieRow | null | undefined): string[] {
+	return moviePeople(row).map((p) => p.name);
 }
 
 /** Cast tooltip checklist rows: name, role (Director / as <character>) and TMDB person id. */
@@ -952,13 +1042,14 @@ export function tmdbIdValueGetter(params: { data?: MovieRow }): number | null {
 
 /**
  * Tags for a row: the real tags (YouTube) when present, else TMDB keywords for a
- * Movie. Keywords are a source-provided set (see GitHub issue 560 for the planned
- * source vs user tag split; deliberately not modelled here).
+ * Movie, else Open Library subjects for a Book. Keywords and subjects are source-provided
+ * sets; a source vs user tag split is deliberately not modelled here.
  */
 export function contentTags(row: MovieRow | null | undefined): string[] | null {
 	if (row?.tags && row.tags.length > 0) return row.tags;
 	const keywords = movieResponse(row)?.keywords;
-	return keywords && keywords.length > 0 ? keywords : null;
+	if (keywords && keywords.length > 0) return keywords;
+	return bookSubjects(row);
 }
 
 /** Display text for a nullable string cell. */

@@ -4,7 +4,7 @@ import { goto } from '$app/navigation';
 import { graphqlRequest } from '../client';
 import { CREATE_CONTENT_FROM_MOVIE, type CreateContentFromMovieResponse } from './index';
 import { queryKeys } from '../keys';
-import { activityContentHref } from '$lib/utils/contentLinks';
+import { libraryContentHref } from '$lib/utils/contentLinks';
 import { contentNotAllowedMessage } from '$lib/utils/movie';
 
 export function useAddMovie() {
@@ -20,7 +20,7 @@ export function useAddMovie() {
 			// so both cases get a way to jump to it.
 			const id = movie?.id;
 			toast.success(`Added: ${movie?.name ?? 'movie'}`, {
-				action: id ? { label: 'Go to movie', onClick: () => goto(activityContentHref(id)) } : undefined,
+				action: id ? { label: 'Go to movie', onClick: () => goto(libraryContentHref(id)) } : undefined,
 			});
 			// New or pre-existing rows both come back as Content, so refetch lists
 			// instead of blindly prepending (no duplicates). Detail caches are unchanged.

@@ -1,5 +1,6 @@
 import { validateYouTubeUrl } from './youtube';
 import { validateMovieInput } from './movie';
+import { validateBookInput } from './book';
 import { parseReference, type PassageRange } from './passageParserAdapter';
 
 export type { PassageRange };
@@ -10,10 +11,29 @@ export type DetectionResult =
 	| { type: 'BIBLE_PASSAGE'; range: PassageRange; source: 'text' | 'biblegateway' }
 	/** TMDB or IMDb title link (a bare IMDb id is also accepted, silently). */
 	| { type: 'MOVIE'; url: string }
-	| { type: 'CLAIM'; text: string }
+	/** Open Library work or edition link. Author and other Open Library links are never a book. */
+	| { type: 'BOOK'; url: string }
+	/** Any other http(s) URL that no type above claims. The server reads its `<head>` once. */
+	| { type: 'WEB_PAGE'; url: string }
 	| { type: null };
 
 const BIBLE_GATEWAY_HOSTS = new Set(['biblegateway.com', 'www.biblegateway.com']);
+
+/**
+ * Hosts that belong to a claimed source (YouTube, TMDB/IMDb, Bible Gateway). A URL on one of
+ * these is never a webpage, even when it matches no specific type (a channel page, a TV show).
+ */
+const CLAIMED_HOSTS = new Set([
+	'youtube.com',
+	'www.youtube.com',
+	'm.youtube.com',
+	'youtu.be',
+	'themoviedb.org',
+	'www.themoviedb.org',
+	'imdb.com',
+	'www.imdb.com',
+	...BIBLE_GATEWAY_HOSTS,
+]);
 
 function parseUrl(input: string): URL | null {
 	// Only treat as a URL when it carries an explicit http(s) scheme, so "John 3:16" (which
@@ -39,9 +59,12 @@ function parseBibleGatewayUrl(url: URL): PassageRange | null {
  * (AN Q21) so this has at most one entry, but the list shape lets a future ambiguous
  * type be added without a signature change.
  *
- * Precedence: YouTube URL > movie link > Bible Gateway URL > typed Bible reference > free-text claim.
- * Any other URL is never a claim and never guessed: empty candidates. A single bare
- * word is also not guessed as a claim.
+ * Precedence: YouTube URL > movie link > Open Library book link > Bible Gateway URL > other
+ * http(s) URL on an unclaimed host (WEB_PAGE) > typed Bible reference. Free text is no match:
+ * empty candidates, never guessed (claims are declared on the Declare page, not detected here).
+ * A URL on a claimed host (YouTube, TMDB/IMDb, Bible Gateway) that matches no type is empty
+ * candidates, never a webpage. Scheme-less or non-http(s) input is never guessed: a bare
+ * host, `ftp://` or a single bare word gets no candidate.
  */
 export function detectContentCandidates(input: string): DetectionResult[] {
 	const trimmed = input.trim();
@@ -51,19 +74,18 @@ export function detectContentCandidates(input: string): DetectionResult[] {
 
 	if (validateMovieInput(trimmed)) return [{ type: 'MOVIE', url: trimmed }];
 
+	if (validateBookInput(trimmed)) return [{ type: 'BOOK', url: trimmed }];
+
 	const url = parseUrl(trimmed);
 	if (url) {
 		const range = parseBibleGatewayUrl(url);
-		return range ? [{ type: 'BIBLE_PASSAGE', range, source: 'biblegateway' }] : [];
+		if (range) return [{ type: 'BIBLE_PASSAGE', range, source: 'biblegateway' }];
+		if (CLAIMED_HOSTS.has(url.hostname.toLowerCase())) return [];
+		return [{ type: 'WEB_PAGE', url: trimmed }];
 	}
 
 	const range = parseReference(trimmed);
 	if (range) return [{ type: 'BIBLE_PASSAGE', range, source: 'text' }];
-
-	// Free text: needs at least two words and must not look like a bare host or URL.
-	if (/\s/.test(trimmed) && !/^[a-z][a-z0-9+.-]*:\/\//i.test(trimmed)) {
-		return [{ type: 'CLAIM', text: trimmed }];
-	}
 
 	return [];
 }

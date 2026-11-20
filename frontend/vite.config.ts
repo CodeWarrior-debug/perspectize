@@ -1,10 +1,29 @@
 import { execFileSync } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
+import { loadEnv } from 'vite';
 import { sveltekit } from '@sveltejs/kit/vite';
 import { defineConfig } from 'vitest/config';
 import tailwindcss from '@tailwindcss/vite';
 import { SvelteKitPWA } from '@vite-pwa/sveltekit';
 import { faroSourcemapConfig } from './scripts/faro-sourcemaps';
 import { computeTag } from './src/lib/utils/buildTag';
+import { clerkPreloadValues } from './src/lib/utils/clerkScript';
+import { graphqlPreconnectOrigin } from './src/lib/utils/graphqlOrigin';
+
+// app.html preloads clerk-js via %sveltekit.env.PUBLIC_CLERK_*% placeholders, which read
+// the public env at build time. Derive them here from the build env (process.env wins over
+// .env files, as in Vite). Sevalla defines PUBLIC_CLERK_PUBLISHABLE_KEY, not the VITE_ name,
+// so both prefixes are loaded. Empty when there is no key, so the placeholders render "".
+const clerkBuildEnv = loadEnv(process.env.NODE_ENV ?? 'production', fileURLToPath(new URL('.', import.meta.url)), [
+	'VITE_',
+	'PUBLIC_',
+]);
+const clerkPreload = clerkPreloadValues(clerkBuildEnv);
+process.env.PUBLIC_CLERK_ORIGIN = clerkPreload.origin;
+process.env.PUBLIC_CLERK_SCRIPT_URL = clerkPreload.scriptUrl;
+// app.html preconnects to the GraphQL backend origin (%sveltekit.env.PUBLIC_GRAPHQL_ORIGIN%),
+// so the connection opens during the Clerk wait. Empty when the endpoint is unset or relative.
+process.env.PUBLIC_GRAPHQL_ORIGIN = graphqlPreconnectOrigin(clerkBuildEnv);
 
 // Opt-in Faro source-map upload: empty (no sourcemaps, no plugin) unless
 // FARO_SOURCEMAP_API_KEY is set; throws if the key is set without its companion vars.
@@ -124,6 +143,16 @@ export default defineConfig({
 		},
 	},
 	test: {
+		// In CI, also write every result to a file (uploaded by frontend-test.yml), so
+		// when several files fail under load none of them scrolls off the log (#728).
+		// `github-actions` keeps the inline PR annotations that overriding `reporters`
+		// would otherwise drop. Root-level, like coverage: not a per-project option.
+		...(process.env.CI
+			? {
+					reporters: ['default', 'github-actions', 'json'],
+					outputFile: { json: './test-results/vitest-results.json' },
+				}
+			: {}),
 		// Coverage is a root-level (workspace) option, not a per-project one — it
 		// used to live under the 'unit' project's `test` block below, which typechecks
 		// against ProjectConfig and doesn't have a `coverage` key, so `pnpm run check`

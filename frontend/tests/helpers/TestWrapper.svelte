@@ -6,11 +6,11 @@
 		queryClient,
 		component,
 		props = {},
-	} = $props<{
+	}: {
 		queryClient: QueryClient;
-		component: Component;
+		component: Component<any>;
 		props?: any;
-	}>();
+	} = $props();
 
 	// Svelte 5 only treats dotted-member tags (not bare lowercase identifiers) as dynamic
 	// components, so route through a wrapper object rather than `<component {...props} />`.

@@ -5,6 +5,8 @@
 Everything from "Content type spec: Painting" down is the tool's verbatim `buildSpec` + `buildMatrix` output.
 The only hand-written parts are this header and the review notes.
 
+> **Update 2026-10-29:** The Met retired `/public/collection/v1/search` on 2026-10-01. Use `/public/collection/v1.1/search` (paginated with `offset` and `limit`); `/v1/objects/{id}` is unchanged. The designer seed now also has Europeana as a second source, and Painting is one of five independent museum types (Painting, Sculpture, Drawing, Print, Photograph) that share one link rule and are routed after fetch by `objectName`/`classification` (Met) or the `dcType` concept (Europeana). The `medium=` search filter must not be used for routing because it leaks across all five. The tool output below predates this update; see `tools/content-type-designer/src/catalog.ts` for the current seed.
+
 ## Goal
 
 Users can add a **fine-art painting** (not house, decorative or protective painting) and write a perspective on it. They see a thumbnail, click through to the painting's museum page, and see its metadata: artist, date, medium and collection.

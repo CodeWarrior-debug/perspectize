@@ -39,6 +39,10 @@ vi.mock('svelte-sonner', () => ({
 }));
 
 vi.mock('$lib/queries/client', () => ({ graphqlRequest: vi.fn() }));
+// This file's svelte-query mock has no createQuery, so the webpage preview query is stubbed.
+vi.mock('$lib/queries/content/useWebPagePreview', () => ({
+	useWebPagePreview: () => ({ data: undefined, isPending: false, isError: false }),
+}));
 vi.mock('$lib/utils/youtube', () => ({ validateYouTubeUrl: (url: string) => mocks.mockValidate(url) }));
 
 function reset() {

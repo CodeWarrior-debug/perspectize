@@ -8,8 +8,10 @@ import type { ColDef, ICellRendererParams, ValueFormatterParams, ValueGetterPara
 import type { TodoPrivacy, UserTodoItem, UserTodoSortBy, UserTodoStatus } from '$lib/queries/userTodos';
 import { contentTypeLabel, type ResponsiveTier } from './grid-config';
 import { EMPTY_VALUE } from './formatting';
+import { headerMinWidth } from './grid-header-width';
+import { PLAN_HEADER_CHROME } from './grid-theme';
 import { ratingToDisplay } from './ratings';
-import { addPerspectiveDisabledReason } from './plan-todo-helpers';
+import { addPerspectiveDisabledReason, type TodoFocusField } from './plan-todo-helpers';
 import { planItemCellRenderer } from './planItemCellRenderer';
 
 export type PlanColId =
@@ -37,17 +39,22 @@ export interface PlanColumnMeta {
 	flex?: number;
 	/** The tier from which the column shows (xs = every tier). */
 	minTier: ResponsiveTier;
-	/** Whether the header is clickable. Client-only sorts are not offered. */
+	/** Whether the header is clickable outside list mode (list mode is ordered by position, so never sortable). */
 	sortable: boolean;
-	/** The API sort key a server sort sends; present only when the API supports it. */
+	/**
+	 * The API sort key sent when this is the first sorted column. Omitted = sorted client-side by AG Grid,
+	 * over the loaded page only, and the server falls back to its default order (CREATED_AT DESC).
+	 */
 	serverSort?: UserTodoSortBy;
+	/** The Edit Todo field a click on this column's cell focuses; omitted to keep the dialog's default focus. */
+	editField?: TodoFocusField;
 }
 
 /** Column order = header order. Widths sum to ~1.5k px at lg, so the grid scrolls sideways on small screens. */
 export const PLAN_COLUMNS: readonly PlanColumnMeta[] = [
-	{ colId: 'action', label: 'Action', minWidth: 140, minTier: 'xs', sortable: false },
-	{ colId: 'content', label: 'Item', minWidth: 200, flex: 2, minTier: 'xs', sortable: false },
-	{ colId: 'type', label: 'Type', minWidth: 140, minTier: 'md', sortable: false },
+	{ colId: 'action', label: 'Action', minWidth: 140, minTier: 'xs', sortable: true, editField: 'action' },
+	{ colId: 'content', label: 'Item', minWidth: 200, flex: 2, minTier: 'xs', sortable: true, editField: 'name' },
+	{ colId: 'type', label: 'Type', minWidth: 140, minTier: 'md', sortable: true, editField: 'name' },
 	{
 		colId: 'priority',
 		label: 'Priority',
@@ -55,12 +62,28 @@ export const PLAN_COLUMNS: readonly PlanColumnMeta[] = [
 		minTier: 'xs',
 		sortable: true,
 		serverSort: 'PRIORITY',
+		editField: 'priority',
 	},
-	{ colId: 'status', label: 'Status', minWidth: 110, minTier: 'sm', sortable: false },
-	{ colId: 'percentComplete', label: '% Complete', minWidth: 100, minTier: 'md', sortable: false },
-	{ colId: 'startDate', label: 'Start', minWidth: 100, minTier: 'lg', sortable: false },
-	{ colId: 'endDate', label: 'End', minWidth: 100, minTier: 'lg', sortable: false },
-	{ colId: 'dueDate', label: 'Due', minWidth: 100, minTier: 'md', sortable: true, serverSort: 'DUE_DATE' },
+	{ colId: 'status', label: 'Status', minWidth: 110, minTier: 'sm', sortable: false, editField: 'status' },
+	{
+		colId: 'percentComplete',
+		label: '% Complete',
+		minWidth: 100,
+		minTier: 'md',
+		sortable: true,
+		editField: 'percentComplete',
+	},
+	{ colId: 'startDate', label: 'Start', minWidth: 100, minTier: 'lg', sortable: true, editField: 'startDate' },
+	{ colId: 'endDate', label: 'End', minWidth: 100, minTier: 'lg', sortable: true, editField: 'endDate' },
+	{
+		colId: 'dueDate',
+		label: 'Due',
+		minWidth: 100,
+		minTier: 'md',
+		sortable: true,
+		serverSort: 'DUE_DATE',
+		editField: 'dueDate',
+	},
 	{
 		colId: 'list',
 		label: 'List',
@@ -68,9 +91,18 @@ export const PLAN_COLUMNS: readonly PlanColumnMeta[] = [
 		minTier: 'md',
 		sortable: true,
 		serverSort: 'LIST_POSITION',
+		editField: 'list',
 	},
-	{ colId: 'privacy', label: 'Privacy', minWidth: 90, minTier: 'lg', sortable: false },
-	{ colId: 'comments', label: 'Comments', minWidth: 160, flex: 1, minTier: 'lg', sortable: false },
+	{ colId: 'privacy', label: 'Privacy', minWidth: 90, minTier: 'lg', sortable: false, editField: 'privacy' },
+	{
+		colId: 'comments',
+		label: 'Comments',
+		minWidth: 160,
+		flex: 1,
+		minTier: 'lg',
+		sortable: true,
+		editField: 'comments',
+	},
 	{ colId: 'addPerspective', label: 'Perspective', minWidth: 120, minTier: 'sm', sortable: false },
 ];
 
@@ -87,6 +119,32 @@ export const PLAN_COL_IDS: readonly PlanColId[] = PLAN_COLUMNS.map((c) => c.colI
 /** The API sort for a sortable column, or null when the column has no server sort. */
 export function serverSortFor(colId: string): UserTodoSortBy | null {
 	return PLAN_COLUMNS.find((c) => c.colId === colId)?.serverSort ?? null;
+}
+
+/** One column's sort as AG Grid's column state reports it (`sort` null/absent = unsorted). */
+export interface ColumnSortState {
+	colId: string;
+	sort?: 'asc' | 'desc' | null;
+	sortIndex?: number | null;
+}
+
+/**
+ * The server sort for a grid's column state: the first sorted column (lowest `sortIndex`, so the
+ * primary sort of a multi-sort) when that column has a server key, else null. A client-only first
+ * sort gives null, so the server falls back to its default order and AG Grid sorts the page itself.
+ */
+export function serverSortFromColumnState(
+	state: readonly ColumnSortState[],
+): { sortBy: UserTodoSortBy; sortOrder: 'ASC' | 'DESC' } | null {
+	const first = state.filter((c) => c.sort).sort((a, b) => (a.sortIndex ?? 0) - (b.sortIndex ?? 0))[0];
+	if (!first?.sort) return null;
+	const sortBy = serverSortFor(first.colId);
+	return sortBy ? { sortBy, sortOrder: first.sort === 'asc' ? 'ASC' : 'DESC' } : null;
+}
+
+/** The Edit Todo field to focus for a click on a column's cell, or null for the dialog's default. */
+export function editFieldFor(colId: string | undefined): TodoFocusField | null {
+	return PLAN_COLUMNS.find((c) => c.colId === colId)?.editField ?? null;
 }
 
 // ---------------------------------------------------------------------------
@@ -187,9 +245,13 @@ export function buildPlanColumnDefs(listMode: boolean, tier: ResponsiveTier = 'l
 
 	const sizing = (colId: PlanColId): Partial<ColDef<UserTodoItem>> => {
 		const meta = metaFor(colId);
-		return meta.flex !== undefined
-			? { flex: meta.flex, minWidth: meta.minWidth }
-			: { width: meta.minWidth, minWidth: meta.minWidth };
+		// Never narrower than the whole heading + sort arrow, as on the Activity grid. Uses the
+		// column's own sortability, not list mode's, so widths don't change when list mode toggles.
+		const minWidth = Math.max(
+			meta.minWidth,
+			headerMinWidth(meta.label, { filter: false, sortable: meta.sortable }, PLAN_HEADER_CHROME),
+		);
+		return meta.flex !== undefined ? { flex: meta.flex, minWidth } : { width: minWidth, minWidth };
 	};
 
 	const common = (colId: PlanColId): ColDef<UserTodoItem> => {

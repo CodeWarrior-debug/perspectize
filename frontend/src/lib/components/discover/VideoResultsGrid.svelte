@@ -1,7 +1,7 @@
 <script lang="ts">
+	import type { LibraryItem } from './libraryItem';
 	import type { VideoItem } from '$lib/services/youtubeApi';
 	import { toWatchUrl } from '$lib/services/youtubeApi';
-	import type { ContentItem } from '$lib/queries/content';
 	import { Button } from '$lib/components/shadcn';
 	import VideoCard from './VideoCard.svelte';
 
@@ -9,20 +9,18 @@
 		items,
 		nextPageToken,
 		onLoadMore,
-		libraryUrls,
+		library,
 		label,
 		onAdd,
 		pendingId = null,
 		isLoading = false,
 		isLoadingMore = false,
 		query = '',
-		addedContentByVideoId = new Map(),
-		userId = null,
 	}: {
 		items: VideoItem[];
 		nextPageToken?: string;
 		onLoadMore: () => void;
-		libraryUrls: Set<string>;
+		library: ReadonlyMap<string, LibraryItem>;
 		label?: string;
 		onAdd: (videoId: string) => void;
 		pendingId?: string | null;
@@ -30,10 +28,6 @@
 		isLoadingMore?: boolean;
 		/** The active search query, if any — used to tailor the empty-state message. */
 		query?: string;
-		/** Full content metadata for videos added THIS session, keyed by video id. */
-		addedContentByVideoId?: Map<string, ContentItem>;
-		/** Numeric Clerk-derived user id, threaded down to PerspectivePopover via VideoCard. */
-		userId?: number | null;
 	} = $props();
 </script>
 
@@ -77,11 +71,9 @@
 				<VideoCard
 					{video}
 					{index}
-					isInLibrary={libraryUrls.has(toWatchUrl(video.id))}
+					libraryItem={library.get(toWatchUrl(video.id)) ?? null}
 					isPending={pendingId === video.id}
 					{onAdd}
-					addedContent={addedContentByVideoId.get(video.id) ?? null}
-					{userId}
 				/>
 			{/each}
 

@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { NO_AUTOFILL } from '$lib/utils/noAutofill';
 	import XIcon from '@lucide/svelte/icons/x';
 	import SearchIcon from '@lucide/svelte/icons/search';
 	import RatingInput from '$lib/components/RatingInput.svelte';
@@ -42,11 +43,18 @@
 		value = [...value, { emoji, label, intensity: 5000, note: null }];
 	}
 
+	// A newly picked feeling is stored at the neutral 5000, but its stepper must
+	// look unset (grey 5.000, like every other untouched rating) until the user
+	// actually sets an intensity. Feelings that arrive already saved count as set.
+	let touched = $state<string[]>(value.map((f) => f.emoji));
+
 	function removeFeeling(emoji: string) {
 		value = value.filter((f) => f.emoji !== emoji);
+		touched = touched.filter((e) => e !== emoji);
 	}
 
 	function updateIntensity(emoji: string, intensity: number | null) {
+		touched = intensity === null ? touched.filter((e) => e !== emoji) : [...new Set([...touched, emoji])];
 		value = value.map((f) => (f.emoji === emoji ? { ...f, intensity: intensity ?? 5000 } : f));
 	}
 
@@ -59,7 +67,10 @@
 	// around one ring would collide arc-to-arc, so every other item sits on
 	// an outer ring — halves the angular density each ring has to absorb
 	// (36° apart instead of 18°) without shrinking the wheel to fit text.
-	const CENTER = 160;
+	// Coordinates are in a 320-unit square, placed as percentages so the wheel
+	// can shrink to a narrow phone drawer without its outer items overflowing.
+	const SIZE = 320;
+	const CENTER = SIZE / 2;
 	const RADIUS_INNER = 82;
 	const RADIUS_OUTER = 138;
 
@@ -68,14 +79,14 @@
 		const rad = ((angleDeg - 90) * Math.PI) / 180; // -90 so 0deg = top
 		const x = CENTER + radius * Math.cos(rad);
 		const y = CENTER + radius * Math.sin(rad);
-		return `left: ${x}px; top: ${y}px;`;
+		return `left: ${(x / SIZE) * 100}%; top: ${(y / SIZE) * 100}%;`;
 	}
 </script>
 
 <div class="flex flex-col gap-4">
 	<!-- The wheel itself: 20 emoji positioned by angle, alternating inner/outer
 	     ring so each item's always-visible label has room to breathe. -->
-	<div class="relative mx-auto" style="width: 320px; height: 320px;">
+	<div class="relative mx-auto w-full max-w-[320px] aspect-square">
 		{#each FEEL_WHEEL as f, i (f.angle)}
 			{@const selected = isSelected(f.emoji)}
 			<button
@@ -102,6 +113,7 @@
 	<div class="relative">
 		<SearchIcon class="absolute left-2.5 top-1/2 -translate-y-1/2 size-3.5 text-muted-foreground" />
 		<input
+			{...NO_AUTOFILL}
 			type="text"
 			bind:value={searchQuery}
 			placeholder="Search more feelings — e.g. nervous"
@@ -164,11 +176,12 @@
 					<RatingInput
 						label="Intensity"
 						name="feeling-{f.emoji}-intensity"
-						bind:value={() => f.intensity, (v) => updateIntensity(f.emoji, v)}
+						bind:value={() => (touched.includes(f.emoji) ? f.intensity : null), (v) => updateIntensity(f.emoji, v)}
 						compact
 						trackWidth={110}
 					/>
 					<textarea
+						{...NO_AUTOFILL}
 						value={f.note ?? ''}
 						oninput={(e) => updateNote(f.emoji, e.currentTarget.value)}
 						placeholder="Why / nuance / observations…"

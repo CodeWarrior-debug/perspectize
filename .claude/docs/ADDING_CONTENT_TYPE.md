@@ -2,6 +2,8 @@
 
 Decision guide for adding a new content type (e.g., Article, Podcast, Book) to Perspectize end-to-end.
 
+**PR label:** label the spec PR and every PR of the first implementation `new-content-type` ([PR_WORKFLOW.md](../../.docs/PR_WORKFLOW.md#new-content-type-label)).
+
 ## Architecture Context
 
 Content types use a **discriminator pattern** — a single `Content` table/type with a `contentType` field. Type-specific metadata is stored in a `response` JSONB column. This means **no new tables are needed** for most content types.
@@ -37,6 +39,27 @@ Content types use a **discriminator pattern** — a single `Content` table/type 
 | Queries | `frontend/tests/unit/queries-content.test.ts` | GraphQL query definitions, TS type exports |
 | Component | `frontend/tests/components/ActivityTable.test.ts` | AG Grid component rendering |
 
+## Per-type surface checklist
+
+The Movie type (PR #565) shipped without column filters even though the designer marked them filterable, plus several other misses. Rows marked ✱ were missed on Movie (see [Movie retrospective](#movie-retrospective)).
+
+**Rule:** every row below must be answered in the type's spec before implementation starts — with an answer, or "n/a because …". An unanswered row is a blocker. The content-type designer (`tools/content-type-designer`) lists unanswered rows under "Undecided surfaces".
+
+| Surface | Questions to answer (answer, or n/a because …) | Test that pins it |
+|---|---|---|
+| **Grid columns** ✱ | Per-type header label in the single-type view (e.g. "Item" becomes "Film")? Does it fit the 1212px min-width budget? Do unknown/null values sort last in both directions? Do long values truncate with a tooltip? | `grid-config` / `formatting` unit tests; ActivityTable component test for the header swap |
+| **Sort** ✱ | Server sort key, or client-only (then disable it in All Items mode)? Are computed sort keys scanned so cursor pagination encodes the real value, not the zero value (C-02: page 2 repeated page 1)? | Resolver/repo test paging across 2+ pages in both directions; query-count test |
+| **Filters** ✱ | Per filterable column: filter kind (text / number / date / set), `ContentFilter` field(s), identical results in Loaded (client) and All Items (server) modes, URL key, chip label, index needed? Derived columns with no backend field: say "no filter" — do not ship a Loaded-only filter. | Repo condition test, resolver mapping test, `filterContentRows` parity test, `gridUrlState` round-trip, FilterChips label test |
+| **Data modes** ✱ | In Loaded mode (100-row cap) does the Type filter reach the server, and does the footer total reflect it? | Component/unit test on the Loaded-mode request filter and footer total |
+| **Search** | Which fields does the search box cover for this type? Does the scope picker need new options? | `ContentSearchField` repo test + scope-picker test |
+| **Details modal** ✱ | Type-specific layout; no YouTube-only controls (embed, channel link, etc.). | ActivityDetailsModal test per type state |
+| **Mobile card list** ✱ | Which facts replace views / likes / channel? | Card-list component test for this type |
+| **Add form** ✱ | A new type joins the existing Add Content window (`AddContentPopover`); **never a new header button or popover.** How does `detectContentType` recognise this type's input (link patterns / reference syntax)? What label does it get in the type select? Which extra fields or notices appear only for this type (e.g. attribution)? Accepted inputs, and which ones the description/placeholder names (common forms only; don't advertise niche ones such as bare ids)? Duplicate-add feedback (surface the `already existed` flag, not a silent success)? Specific error messages per failure? Does the window close on success? | `detectContentType` unit cases; `AddContentPopover` states: autodetect ("Detected: <type>"), manual select via "Change type", submit calls the type's mutation, success closes, each error, type-only notice shown only for this type |
+| **Content policy** ✱ | Adult / rating gate and the exact message (Movie: NC-17 and TMDB `adult: true` are rejected with `CONTENT_NOT_ALLOWED`). | Service tests per rejected input; frontend test showing the server message |
+| **Licensing / attribution** | Required attribution text, logo, API terms of use? | Details-modal attribution test |
+| **Formatting edge values** ✱ | null, 0, huge ($1T, not $1000B), tiny (<1%, not 0%). | `formatting.test.ts` cases for each |
+| **Rollout** | API token per environment? Deploy backend before frontend? Migration number collisions with other branches? Indexes? Evidence on a throwaway Neon branch with a recorded clip. | Checklist in the PR body; never run `make migrate-*` against the shared DB |
+
 ---
 
 ## Decision 1: How Is Content Ingested?
@@ -63,7 +86,7 @@ Define type-specific fields and categorize them:
 | **Type-specific sortable** | publishedAt, duration, rating | JSONB + SQL extraction path in `helpers.go` | No |
 | **Shared across 2+ types** | e.g., "author" used by articles AND podcasts | Consider promoting to dedicated column | Yes |
 
-**Key question**: Which fields need to be **sortable or filterable**? Each one needs a SQL extraction path in `helpers.go`.
+**Key question**: Which fields need to be **sortable or filterable**? Each one needs a SQL extraction path in `helpers.go`. Sorting and filtering are separate work: a sortable field needs a sort enum and rule (Step E); a filterable field needs a `ContentFilter` field, repo condition, resolver mapping and frontend filter wiring (Step E2). Record both in the checklist above.
 
 ---
 
@@ -97,8 +120,11 @@ Is the field unique to this content type?
 
 ## Decision 5: Frontend Form Approach
 
-| Approach | When | Example |
-|----------|------|---------|
+**Rule:** extend `AddContentPopover.svelte` (one input, `detectContentType` autodetect, "Change type" select, per-type fields and notices). Never add a new header button or popover for a type.
+
+Why: one entry point for every type; header buttons don't scale as types are added.
+
+----------|------|---------|
 | **New component** (`AddArticlePopover.svelte`) | Different form fields than YouTube | Article needs title + author fields |
 | **Extend existing** (generic `AddContentPopover`) | Same form shape (just a URL input) | Podcast URL works same as YouTube |
 | **Unified with type selector** | User picks type, form adapts | Dropdown: YouTube / Article / Podcast |
@@ -120,9 +146,55 @@ Every type gets an explicit answer, even when the answer is "not on Discover". D
 - **Placement:** search and a feed, feed only, search only, or not on Discover. Say why: is this type usually *browsed* (it belongs on Discover) or *pasted/typed* (the Add Content card covers it)?
 - **Feed:** what the page shows for this type when the search box is empty. If it is called "trending", name the number it ranks by. A source with no popularity data is "featured" or "curated", not trending.
 - **Search:** in-app, or handed off to the source's own site? Hand off when the search API is scarce or costly: YouTube's `search.list` allows 100 calls a day for the whole project, so Discover opens youtube.com in a new tab and adds a pasted link directly. For in-app search: does a result carry title and image, or only an id that needs a second request per card? Which filters make sense for this type?
+- **Already-in-library state:** don't build one. Give the card a `libraryItem` prop (the page's URL → library row map, `library`, supplies it) and render `LibraryStatus` (`frontend/src/lib/components/discover/`) in place of the Add button, so every type shows the same "In Library" badge with Add perspective, Compare and Go to item. Only the type-specific facts (poster, ratings, subjects) belong on the card.
 - **Feed fetched from:** browser (the API must send CORS headers, and its host goes in `connect-src` in `frontend/src/app.html`) or backend (no CORS, heavy ranking work, or an undocumented feed worth caching).
 
 Worked examples live in `tools/content-type-designer` (section 7): YouTube (search hands off to youtube.com; Trending chart served from the backend cache), Bible passage (proposed: Verse of the day only, from Bible Gateway's feed, fetched and cached by the backend), Painting (proposed: Met search + highlights ranked by Wikipedia pageviews).
+
+---
+
+## Decision 8: Import Preview — Enough for an Informed Decision
+
+**Principle:** any view where someone chooses whether to bring an item into Perspectize (an import staging sheet, a bulk-add list, a Discover result, a search picker) shows **enough about each item to decide without leaving the page**. A title and a link are not enough. If the person has to open the source site to judge an item, the preview has failed.
+
+For each type, answer these five questions with real fields and note each one's source:
+
+| Question | YouTube video | Movie (TMDB) | Blog post (WordPress) |
+|---|---|---|---|
+| **What is it?** Title plus a one-line summary that skips source boilerplate | title, description's first non-promo line | title, tagline / overview | title, excerpt |
+| **How big?** The time it asks of the person | length | duration (runtime) | word count / reading time |
+| **How current?** | published date, age | release date | published date |
+| **How well received?** Raw counts plus one rate normalised for reach | views, likes, comments, **like rate**, **views/day** | TMDB score + **vote count** | comment count (`X-WP-Total` from `/wp/v2/comments?post=`; core WordPress has no views or likes) |
+| **What's in it?** Full detail on demand, not in every row | description, chapters, tags | synopsis, cast, keywords | categories, tags, author |
+
+Rules that hold for every type:
+
+- **Missing is not zero.** A hidden or unavailable figure (YouTube likes hidden by the channel, comments turned off) shows as "hidden" or blank, never 0, and sorts last. Derived rates become n/a.
+- **Say what doesn't exist.** If the source can't supply a fact people expect (YouTube dislikes since 2021; WordPress popularity without a plugin), say so once in the view rather than showing an empty column.
+- **Low-sample figures are muted.** A rating from a handful of votes (Movie: `vote_count < 50`) is shown dimmer, so it isn't mistaken for a reliable one.
+- **Show what's already in the library.** Items already imported are visible, marked, and unselectable, with a link to the existing content.
+- **Summary in the row, full detail on click.** Long text (descriptions, synopses) is fetched lazily for the detail panel, never sent with every row ([QUERY_BUDGET.md](../../.docs/QUERY_BUDGET.md)).
+- **Counts are a snapshot.** Store when they were fetched and show "as of". The actual import re-fetches fresh metadata.
+- **Decide vs all columns.** Default to the columns that answer the five questions; bookkeeping columns (IDs, source type, recency index) sit behind an "All columns" set.
+- **Record the origin.** An importable type's `Create*` must read `importJobIDFrom(ctx)` (`backend/internal/core/services`) and set `Content.ImportJobID`, or `importedFrom` is silently null for its rows.
+
+Worked example: `docs/superpowers/specs/2026-10-27-youtube-channel-import-design.md` ("The decision row"), which documents each YouTube column with its API source, cost and edge cases. Any spec or preview for a new type's import or picker view includes the same table for that type.
+
+---
+
+## Decision 9: Source Terms and Liability
+
+Before Decision 1, check what the source's terms let you **store**, not just fetch. A working API may still forbid it: Meta's oEmbed is "front-end views only", and its `robots.txt` and Automated Data Collection Terms ban scraping. In that case the fields are user-entered and the type has no thumbnail. Also check:
+
+- Does the source license embedding? YouTube does; Meta doesn't.
+- Does the player need a click-to-load consent gate? Any social-plugin player does.
+- Which CSP hosts does the player need?
+
+Worked example: `docs/superpowers/specs/2026-10-19-facebook-video-content-type-design.md` §2 and §6.
+
+**A new enum value needs no migration:** `content.content_type` has no CHECK constraint.
+
+**Probing a source from a cloud session:** shared public keys (e.g. data.gov `DEMO_KEY`) are usually already rate-limited from the cloud IP. Verify field paths with a keyless endpoint or a recorded fixture, and mark anything unprobed as "to verify" in the spec.
 
 ## Implementation Steps
 
@@ -208,6 +280,19 @@ Add virtual field to GORM model in `gorm_models.go`:
 Author string `gorm:"-"`
 ```
 
+### Step E2: Filters (for every filterable column)
+
+Skipping this step is how Movie shipped without filters. Per filterable column:
+
+1. Backend: add the field(s) to `ContentFilter` in `backend/schema.graphql` (e.g. `genreContains: String`, `minX`/`maxX`, `xAfter`/`xBefore`, or `x: [String!]`) and to `ContentFilter` in `backend/internal/core/domain/pagination.go`; run `make graphql-gen`.
+2. Repository: add the condition in `backend/internal/adapters/repositories/postgres/gorm_content_repository.go` (where `MinViewCount` etc. are applied); add an index migration if the query would scan JSONB (write only; never apply to the shared DB).
+3. Resolver: map the GraphQL input to the domain filter in `backend/internal/adapters/graphql/resolvers/content.resolvers.go`.
+4. Frontend grid config: in `frontend/src/lib/utils/grid-config.ts` add `filterKey`, `filterValue` and, as applicable, `filterRange: 'number' | 'date'` or `filterSet: true` to the column in `COLUMNS` (this also derives `COL_TO_FILTER_KEY` and `COLUMN_LABELS`).
+5. URL/GraphQL mapping: `frontend/src/lib/utils/gridUrlState.ts` (`filterToUrlParams`, `urlParamsToFilter`, `ContentFilterInput`, `urlParamsToGraphQLFilter`) must carry the new key to the server filter.
+6. Client parity: extend `filterContentRows` in `grid-config.ts` so Loaded mode returns the same rows as the server does in All Items mode.
+7. Chip: confirm the label in `frontend/src/lib/components/FilterChips.svelte` (via `COLUMN_LABELS`).
+8. A derived column with no backend field gets no filter (set no `filterKey`) — never ship a Loaded-only filter.
+
 ### Step F: Resolver
 
 Implement mutation resolver in `schema.resolvers.go`:
@@ -245,7 +330,14 @@ export function validateArticleUrl(url: string): boolean {
 
 ### Step J: Frontend — Add Content Form
 
-Create component and mutation hook (e.g., `AddArticlePopover.svelte` + `useAddArticle.ts`).
+Extend `AddContentPopover.svelte`; do not create a new popover or header button.
+
+- Teach `detectContentType` to recognise the type's input and give it a label in the type select.
+- Add the per-type fields, submit path and any type-only notice (e.g. attribution) inside `AddContentPopover`.
+- Add a mutation hook (e.g., `useAddArticle.ts`) using the authenticated `graphqlRequest()` wrapper.
+- Copy names only the common input forms.
+
+Tests: `detectContentType` unit cases; `AddContentPopover` states (autodetect, manual select, submit calls the type's mutation, success closes, each error, type-only notice).
 
 ### Step K: Frontend — Table Renderers
 
@@ -297,6 +389,10 @@ If the type introduces new columns, see [ADDING_AG_GRID_COLUMN.md](./ADDING_AG_G
   - Add test filtering by new `ContentType` enum value
 - If new sort fields added:
   - Add sorting test case for each new sortable field
+  - Add a pagination test that fetches page 1 and page 2 (both directions) and asserts page 2 differs from page 1 (cursor encodes the real sort value)
+- If new filterable fields added:
+  - Add a filter test per `ContentFilter` field (match, no match, boundaries, null values)
+  - Add a query-count test if the filter adds a join or subquery
 
 ### Frontend tests to add/update
 
@@ -316,6 +412,9 @@ If the type introduces new columns, see [ADDING_AG_GRID_COLUMN.md](./ADDING_AG_G
 **New test file** (e.g., `frontend/tests/unit/{type}.test.ts`):
 - URL validation function tests (valid URLs, invalid URLs, edge cases)
 - Follow pattern from existing YouTube validation if applicable
+
+**`frontend/tests/unit/grid-config.test.ts` / `gridUrlState.test.ts`**:
+- For each filterable column: URL round-trip (`filterToUrlParams` / `urlParamsToFilter`), `urlParamsToGraphQLFilter` mapping, `filterContentRows` returns the same rows the server filter would (Loaded/All parity), chip label
 
 **`frontend/tests/components/ActivityTable.test.ts`**:
 - Currently limited by JSDOM — update if new props or state logic introduced
@@ -341,12 +440,16 @@ If the type introduces new columns, see [ADDING_AG_GRID_COLUMN.md](./ADDING_AG_G
 | Ingestion method | API / scrape / manual / URL-only | Adapter complexity |
 | Metadata fields | What to store and expose | JSONB structure, resolvers |
 | Sortable fields | Which ones | SQL paths, backend enums, sort rules |
+| Filterable fields | Which ones, and what kind | `ContentFilter` fields, repo conditions, grid-config filter keys, client parity |
+| Per-type surfaces | Every row of the surface checklist | Spec blockers if unanswered |
 | New DB columns | Yes / No | Migration required |
 | URL required | Yes / No | Validation, form design |
 | Cross-type URL uniqueness | Keep / Relax | Migration to alter constraint |
 | Frontend form | New / Extend / Unified | Component architecture |
 | Table display | Icon, thumbnail, new columns | Renderer updates, see AG Grid guide |
 | Discover page | Search + feed / feed / search / not on Discover — with a reason | Card component, source client or backend feed job, CSP |
+| Import preview | The five decision questions answered with real fields (Decision 8) | Staging columns, detail panel, lazy detail query |
+| Source terms | May store / front-end only / no access (Decision 9) | Whether fields are fetched or user-entered; consent gate; launch prerequisites |
 
 ---
 
@@ -358,9 +461,31 @@ After adding a content type:
 3. `pnpm run test:run` in `frontend/` — all tests pass (including new tests)
 4. Manual test: create content via new mutation (GraphQL playground or UI)
 5. Verify it appears in the table with correct icon and formatting
-6. Verify sorting/filtering works for new sortable fields
-7. Verify mobile responsiveness
+6. Verify sorting works for new sortable fields, including paging to page 2+ in both directions
+7. Verify every filter in both modes: All Items (server) and Loaded (client) return the same rows; the URL round-trips; the chip label reads correctly; the Type filter reaches the server in Loaded mode and the footer total reflects it
+8. Verify mobile responsiveness (card list shows the type's own facts)
+9. Re-walk the Per-type surface checklist and confirm every row has an answer and a pinning test
 
 ## Worked example: Movie
 
 `MOVIE` was added end to end following this guide. See the design in `docs/superpowers/specs/2026-10-07-movie-content-type-design.md` and what is built, unverified and left over in `docs/superpowers/plans/2026-10-07-movie-content-type-STATUS.md`.
+
+---
+
+## Movie retrospective
+
+What went wrong on each ✱ row in PR #565 (Movie), and how it was fixed. See the PR for the code.
+
+| Row | What went wrong | How PR #565 fixed it |
+|---|---|---|
+| Filters | The designer marked columns filterable but the guide had no filter step, so Movie shipped with none. | Added `ContentFilter` fields, repo conditions and resolver mapping (server), plus grid-config filter keys and `filterContentRows` parity (client). |
+| Sort: computed keys | Cursor pagination encoded a zero value for a computed sort key (C-02): page 2 repeated page 1. | Fixed so the scanned key carries the real value; pinned with a multi-page test. |
+| Data modes | In Loaded mode the Type filter stayed client-side inside the 100-row cap, so Movie rows were missing and the footer total was wrong. | The Type filter is now sent to the server in Loaded mode and the total reflects it. |
+| Grid columns | The single-type view still headed the Item column "Item". | Per-type header: "Film". |
+| Mobile card list | The cards showed YouTube facts (views / likes / channel). | Cards show movie facts (year, rating, runtime, TMDB score). |
+| Details modal | The modal carried YouTube-only controls. | Movie-specific layout without them. |
+| Add form | The popover did not close after a successful add; the effect re-ran and reopened state. | Fixed by reading the reactive state inside `untrack`. |
+| Content policy | No adult gate, so NC-17 and TMDB `adult: true` titles could be added. | Rejected with `CONTENT_NOT_ALLOWED`; the form shows the server's message. |
+| Formatting edge values | $1T rendered as "$1000B"; values under 1% rendered "0%". | Fixed units and a "<1%" form; covered in `formatting.test.ts`. |
+| Add form: entry point | Shipped a separate Add Movie header button and advertised bare IMDb ids in the copy. | Folded into Add Content (autodetects TMDB/IMDb links, Movie in the type select, TMDB notice only for Movie); copy names links only. |
+| Add form: duplicate | Adding an existing movie gives no feedback. | **Still open:** a duplicate-add toast using the already-existed flag. |

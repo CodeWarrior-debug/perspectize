@@ -17,6 +17,7 @@
 		statusPrompt,
 		todayIso,
 		type CompletionPrompt,
+		type TodoFocusField,
 		type TodoFormValues,
 	} from '$lib/utils/plan-todo-helpers';
 	import type { TodoPrivacy, UserTodoItem, UserTodoListItem, UserTodoStatus } from '$lib/queries/userTodos';
@@ -37,6 +38,8 @@
 		lists = [],
 		defaultListId = null,
 		defaultActionId = null,
+		focusField = null,
+		onViewContent,
 		onSaved,
 	}: {
 		open?: boolean;
@@ -48,6 +51,10 @@
 		defaultListId?: number | null;
 		/** Action preselected in create mode until the user picks another. Read live, so it can arrive after mount. */
 		defaultActionId?: number | null;
+		/** The field to focus on open (the clicked Plan cell's). Null, or a field not shown, keeps the default focus. */
+		focusField?: TodoFocusField | null;
+		/** Shows "View content" beside a linked item. The caller closes this dialog and opens the details view. */
+		onViewContent?: (content: { id: string; name: string }) => void;
 		onSaved?: () => void;
 	} = $props();
 
@@ -135,9 +142,38 @@
 		form.name = '';
 	}
 
-	// Comments stay collapsed behind a button unless there is already something to show.
+	// Comments stay collapsed behind a button unless there is already something to show,
+	// or the dialog was opened to edit them.
 	// svelte-ignore state_referenced_locally
-	let commentsOpen = $state(Boolean(todo?.comments));
+	let commentsOpen = $state(Boolean(todo?.comments) || focusField === 'comments');
+
+	// ---- Initial focus -------------------------------------------------------
+
+	const FOCUS_SELECTORS: Record<TodoFocusField, string> = {
+		action: '#todo-action',
+		name: '#todo-name:not(:disabled)',
+		priority: '#todo-priority',
+		status: '#todo-status',
+		percentComplete: '#todo-percent',
+		startDate: '#todo-start',
+		endDate: '#todo-end',
+		dueDate: '#todo-due',
+		list: '#todo-list',
+		privacy: '#todo-privacy',
+		comments: '[data-testid="todo-comments"] [contenteditable="true"], [data-testid="todo-comments"] textarea',
+	};
+
+	let contentEl = $state<HTMLElement | null>(null);
+
+	/** Focus `focusField` instead of the first control; a field that isn't shown (e.g. Name on content) keeps the default. */
+	function focusRequestedField(e: Event) {
+		if (!focusField) return;
+		// The dialog is the only TodoDialog on the page, so the document is the fallback if the ref isn't bound yet.
+		const target = (contentEl ?? document).querySelector<HTMLElement>(FOCUS_SELECTORS[focusField]);
+		if (!target) return;
+		e.preventDefault();
+		target.focus();
+	}
 	// The user's pick wins; until then the default (e.g. `consume` from Add to plan) applies.
 	const actionId = $derived(form.actionId ?? defaultActionId);
 
@@ -225,8 +261,10 @@
 <Dialog bind:open>
 	<!-- Flex column: header and footer stay put, only the form body scrolls (dvh: the phone browser toolbar eats vh). -->
 	<DialogContent
+		bind:ref={contentEl}
 		class="flex max-h-[90dvh] flex-col gap-0 overflow-hidden p-0 sm:max-w-[560px]"
 		overlayClass="bg-black/45"
+		onOpenAutoFocus={focusRequestedField}
 		onInteractOutside={(e) => {
 			// The prompt toasts render outside the modal: clicking one must not dismiss this dialog.
 			if (isInsideToast(e.target)) e.preventDefault();
@@ -258,7 +296,22 @@
 				{:else if contentName !== null}
 					<div class="flex flex-col gap-1">
 						<span class="text-sm font-medium">Item</span>
-						<p class="text-sm text-muted-foreground" data-testid="todo-content-name">{contentName}</p>
+						<div class="flex items-center justify-between gap-2">
+							<p class="text-muted-foreground min-w-0 truncate text-sm" data-testid="todo-content-name">
+								{contentName}
+							</p>
+							{#if todo?.content && onViewContent}
+								{@const linked = todo.content}
+								<Button
+									type="button"
+									variant="outline"
+									size="sm"
+									onclick={() => onViewContent({ id: linked.id, name: linked.name })}
+								>
+									View content
+								</Button>
+							{/if}
+						</div>
 					</div>
 				{/if}
 
@@ -285,7 +338,7 @@
 
 				<RatingInput
 					label="Priority"
-					name="priority"
+					name="todo-priority"
 					compact
 					bind:value={form.priority}
 					onRemove={() => (form.priority = null)}
@@ -368,7 +421,7 @@
 				</div>
 
 				{#if commentsOpen}
-					<div class="flex flex-col gap-1">
+					<div class="flex flex-col gap-1" data-testid="todo-comments">
 						<Label>Comments</Label>
 						<CommentsEditor
 							toolbar="basic"

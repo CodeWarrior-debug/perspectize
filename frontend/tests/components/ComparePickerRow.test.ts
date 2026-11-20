@@ -8,9 +8,9 @@ function avatarColor(select: HTMLElement): string | undefined {
 }
 
 const options = [
-	{ id: '1', name: 'You' },
-	{ id: '2', name: 'Jamie Lee' },
-	{ id: '3', name: 'Alex Kim' },
+	{ id: '1', userId: '1', name: 'You', label: 'You' },
+	{ id: '2', userId: '2', name: 'Jamie Lee', label: 'Jamie Lee' },
+	{ id: '3', userId: '3', name: 'Alex Kim', label: 'Alex Kim' },
 ];
 
 describe('ComparePickerRow', () => {

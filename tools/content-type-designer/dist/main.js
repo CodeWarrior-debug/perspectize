@@ -1,15 +1,15 @@
-import { COLUMNS, GROUP_LABELS, TMDB_TYPES, TYPES } from './catalog.js';
+import { COLUMNS, GROUP_LABELS, MUSEUM_TYPES, TMDB_TYPES, TYPES } from './catalog.js';
 import { detailsFor } from './details.js';
 import { detect } from './detect.js';
 import { el } from './dom.js';
 import { buildMatrix, buildSoloViews, buildSpec } from './emit.js';
 import { openDetails } from './modal.js';
 import { THUMBS } from './thumbs.js';
-import { bindingFor, cellSortValue, cellText, gapText, previewRowsFor, profileFor, resolveGrid, samplesFor, sortConflict, typeLabel, unitsFor } from './model.js';
+import { bindingFor, cellSortValue, cellText, gapText, previewRowsFor, profileFor, resolveGrid, mixedPrimary, samplesFor, typeLabel, unitKey, unitKeysFor } from './model.js';
 import { attachTip, cellTipContent } from './tip.js';
 const STORAGE_KEY = 'perspectize.content-type-designer.v1';
 /** Seed the type currently being designed, so a fresh open / reset lands on a filled-in form. */
-const DEFAULT_SEED = 'painting';
+const DEFAULT_SEED = 'food';
 function seededState(typeId) {
     const state = blankState();
     const t = TYPES.find((x) => x.id === typeId);
@@ -42,7 +42,12 @@ function blankState() {
             icon: '',
             accent: '#3B6FD4',
             sharesUrlSpace: true,
-            thumbnail: ''
+            thumbnail: '',
+            contentPolicy: '',
+            duplicateFeedback: '',
+            addContentEntry: '',
+            mobileCardFields: '',
+            searchFields: ''
         },
         decisions: {},
         selected: ['youtube'],
@@ -177,6 +182,13 @@ function renderIngestion() {
                 d.detect = { hosts: d.detect?.hosts ?? [], path: v, examples: d.detect?.examples ?? [] };
             }, '^/art/collection/search/(\\d+)/?$'), 'Regular expression over the URL path. Group 1 is the external id. Try it in section 6.')
         ]),
+        grid2([
+            field('Content policy', input(d.contentPolicy ?? '', (v) => (d.contentPolicy = v), 'Reject NC-17 and adult titles (CONTENT_NOT_ALLOWED)'), 'Adult / rating gate and the exact rejection message. Empty = undecided.'),
+            field('Duplicate-add feedback', input(d.duplicateFeedback ?? '', (v) => (d.duplicateFeedback = v), 'toast: "Already in Perspectize"'), 'What the form shows when the item already exists. Empty = undecided.'),
+            field('Add Content entry', input(d.addContentEntry ?? '', (v) => (d.addContentEntry = v), 'Autodetect <site> links; select label <Type>; notice only for this type'), 'How the type enters the single Add Content window: detection pattern, select label, extra fields or notices. Never a new header button. Empty = undecided.'),
+            field('Mobile card facts', input(d.mobileCardFields ?? '', (v) => (d.mobileCardFields = v), 'year, rating, runtime'), 'Replaces views / likes / channel on the card list. Empty = undecided.'),
+            field('Search fields', input(d.searchFields ?? '', (v) => (d.searchFields = v), 'title, cast, director'), 'Which fields the search box covers (scope picker). Empty = undecided.')
+        ]),
         checkbox(d.urlRequired, (v) => (d.urlRequired = v), 'A URL is required to create this type'),
         checkbox(d.sharesUrlSpace, (v) => (d.sharesUrlSpace = v), 'The same URL may exist under another content type (relaxes the global UNIQUE(url) constraint — migration)')
     ]);
@@ -249,7 +261,9 @@ function accentFor(typeId) {
     return profileFor(typeId, state.draft)?.accent || '#3B6FD4';
 }
 function showDetails(typeId, row) {
+    const img = typeof row.item === 'object' ? row.item.img : undefined;
     openDetails({
+        image: img ? THUMBS[img] ?? img : undefined,
         layout: layoutFor(typeId),
         row,
         typeLabel: typeLabel(typeId, state.draft),
@@ -287,19 +301,21 @@ function headerTip(rc, current) {
     else if (rc.aliases.length > 1) {
         for (const a of rc.aliases)
             meta.push(`${typeLabel(a.typeId, current.draft)} → ${a.label}${a.unit ? ` (${a.unit})` : ''}`);
-        const units = unitsFor(rc);
+        const units = unitKeysFor(rc);
         if (units.length > 1)
-            meta.push(`Mixed units: ${units.join(' · ')} — sorting it alone raises the alert`);
+            meta.push(`Mixed units: ${units.join(' · ')} — sorting it groups rows by unit`);
     }
     if (rc.unbound.length)
         meta.push(`Gap (${rc.col.gapFallback}) for ${rc.unbound.map((t) => typeLabel(t, current.draft)).join(', ')}`);
     return { title: rc.header || 'Perspectize', body: [rc.tooltip], meta };
 }
-/** Tiny media tile in the Item cell: poster (2:3), still/thumb (16:9) or nothing. */
+/** Tiny media tile in the Item cell: poster (2:3), still/thumb (16:9), the artwork itself (contain) or nothing. */
 function miniMedia(typeId, row) {
     const kind = layoutFor(typeId).media;
     if (kind === 'none' || kind === 'icon')
         return null;
+    if (kind === 'artwork')
+        return thumbBox(typeId, row.item, 'cell', true);
     const tile = el('span', { class: `media mini media-${kind}` });
     tile.style.setProperty('--type-accent', accentFor(typeId));
     const url = cellText(row.tmdbUrl ?? row.url);
@@ -358,8 +374,19 @@ function bodyCell(rc, typeId, row, current) {
     }), { pinOnClick: true });
     return td;
 }
-function sortRows(rows, keys, valueOf) {
+/**
+ * Sorts by the keys in priority order. When `groupOf` is given, rows are first
+ * grouped by its key, in the primary key's direction, so a mixed-unit column
+ * only ever compares numbers that share a unit.
+ */
+function sortRows(rows, keys, valueOf, groupOf) {
     rows.sort((a, b) => {
+        if (groupOf) {
+            const ga = groupOf(a);
+            const gb = groupOf(b);
+            if (ga !== gb)
+                return (ga < gb ? -1 : 1) * (keys[0].dir === 'asc' ? 1 : -1);
+        }
         for (const k of keys) {
             const va = cellSortValue(valueOf(a, k.colId));
             const vb = cellSortValue(valueOf(b, k.colId));
@@ -387,8 +414,9 @@ function renderSolo() {
     const tabs = el('div', { class: 'solo-tabs' });
     const groups = [
         ['TMDB', TMDB_TYPES],
+        ['Museum', MUSEUM_TYPES],
         ['Draft', [state.draft.id]],
-        ['Other types', TYPES.map((t) => t.id).filter((id) => !TMDB_TYPES.includes(id))]
+        ['Other types', TYPES.map((t) => t.id).filter((id) => !TMDB_TYPES.includes(id) && !MUSEUM_TYPES.includes(id))]
     ];
     for (const [name, ids] of groups) {
         const group = el('div', { class: 'tab-group' }, [el('span', { class: 'tab-group-label' }, [name])]);
@@ -517,6 +545,13 @@ function renderPreview() {
         save();
         render();
     });
+    const museum = el('button', { type: 'button' }, ['Select the museum family']);
+    museum.addEventListener('click', () => {
+        state.selected = [...MUSEUM_TYPES];
+        state.sort = [];
+        save();
+        render();
+    });
     const mixed = el('button', { type: 'button' }, ['TMDB + YouTube + Bible']);
     mixed.addEventListener('click', () => {
         state.selected = [...TMDB_TYPES, 'youtube', 'bible'];
@@ -549,7 +584,7 @@ function renderPreview() {
     ]);
     return section('4 · Cross-type grid preview', 'Select the types a user might have in view at once and check the header row still reads as one table.', [
         picks,
-        el('div', { class: 'row' }, [family, mixed]),
+        el('div', { class: 'row' }, [family, museum, mixed]),
         field('Default-visibility rule', select(state.rule, ['any', 'majority', 'all'], (v) => (state.rule = v), {
             any: 'any selected type wants it',
             majority: 'a majority want it',
@@ -572,51 +607,35 @@ function toggleSort(colId) {
         next = keys.map((k) => (k.colId === colId ? { colId, dir: 'desc' } : k));
     else
         next = keys.filter((k) => k.colId !== colId);
+    if (next[0]?.colId !== keys[0]?.colId)
+        state.sortNoteDismissed = false;
     state.sort = next;
     save();
     render();
 }
-/** The alert raised when a sort would order numbers that mean different things. */
-function renderSortAlert(current, grid) {
-    const conflicted = sortConflict(current.sort, grid);
-    if (!conflicted)
+/** Non-blocking explanation shown while a mixed-unit column leads the sort. */
+function renderSortNote(current, mixed) {
+    if (!mixed || current.sortNoteDismissed)
         return null;
-    const header = conflicted.header || conflicted.col.generic;
-    const units = unitsFor(conflicted);
-    const key = current.sort[0];
-    const actions = [];
-    const typeCol = grid.visible.find((rc) => rc.col.id === 'type');
-    if (typeCol) {
-        const multi = el('button', { type: 'button', class: 'primary' }, [`Sort by Type, then ${header}`]);
-        multi.addEventListener('click', () => {
-            state.sort = [{ colId: 'type', dir: 'asc' }, key];
-            save();
-            render();
-        });
-        actions.push(multi);
-    }
-    for (const typeId of conflicted.bound) {
-        const unit = conflicted.aliases.find((a) => a.typeId === typeId)?.unit;
-        const only = el('button', { type: 'button' }, [`Only ${typeLabel(typeId, current.draft)}${unit ? ` (${unit})` : ''}`]);
+    const header = mixed.header || mixed.col.generic;
+    const actions = mixed.bound.map((typeId) => {
+        const only = el('button', { type: 'button' }, [`Show only ${typeLabel(typeId, current.draft)}`]);
         only.addEventListener('click', () => {
             state.selected = [typeId];
             save();
             render();
         });
-        actions.push(only);
-    }
-    const cancel = el('button', { type: 'button' }, ['Cancel sort']);
-    cancel.addEventListener('click', () => {
-        state.sort = [];
+        return only;
+    });
+    const dismiss = el('button', { type: 'button', class: 'link' }, ['Dismiss']);
+    dismiss.addEventListener('click', () => {
+        state.sortNoteDismissed = true;
         save();
         render();
     });
-    actions.push(cancel);
-    return el('div', { class: 'sort-alert', role: 'alert' }, [
-        el('strong', {}, [`"${header}" mixes units: ${units.join(' · ')}.`]),
-        el('span', {}, [
-            ' Sorting it on its own would put 453 words next to 453 seconds as if they were the same number. Rows stay unsorted until you pick one:'
-        ]),
+    actions.push(dismiss);
+    return el('div', { class: 'sort-note', role: 'status' }, [
+        el('span', {}, [`"${header}" mixes units, so it is sorted within each unit (${unitKeysFor(mixed).join(', ')}). A divider marks each group.`]),
         el('div', { class: 'row' }, actions)
     ]);
 }
@@ -636,13 +655,16 @@ function renderSamples(current, grid) {
         return pc && (pc.state === 'value' || pc.state === 'placeholder') ? cellText(pc.cell) : undefined;
     };
     const keys = (current.sort ?? []).filter((k) => visible.some((rc) => rc.col.id === k.colId && rc.col.sortable));
-    const alert = renderSortAlert(current, grid);
-    if (keys.length && !alert)
-        sortRows(rows, keys, valueOf);
+    const mixed = mixedPrimary(keys, grid);
+    const note = renderSortNote(current, mixed);
+    // Grouping by unit key first means only numbers that share a unit are compared.
+    const groupOf = (row) => (mixed ? unitKey(bindingFor(mixed.col, row.typeId, current)?.unit) ?? '~' : '');
+    if (keys.length)
+        sortRows(rows, keys, valueOf, mixed ? groupOf : undefined);
     const head = el('tr', {}, visible.map((rc) => {
         const idx = keys.findIndex((k) => k.colId === rc.col.id);
         const key = keys[idx];
-        const units = unitsFor(rc);
+        const units = unitKeysFor(rc);
         const label = [
             rc.header || '◎',
             ...(key ? [` ${key.dir === 'asc' ? '▲' : '▼'}`] : []),
@@ -659,7 +681,7 @@ function renderSamples(current, grid) {
         return th;
     }));
     const focus = current.focus;
-    const body = rows.map((row) => {
+    const rowEls = rows.map((row) => {
         const tr = el('tr', {}, visible.map((rc) => {
             if (rc.col.id === 'perspectize') {
                 const btn = el('button', { type: 'button', class: 'cell-btn', title: 'Add perspective — shows the form in section 5' }, ['◎']);
@@ -681,6 +703,26 @@ function renderSamples(current, grid) {
         if (focus && focus.typeId === row.typeId && focus.index === row.index)
             tr.classList.add('focused');
         return tr;
+    });
+    const body = [];
+    let lastGroup;
+    rows.forEach((row, i) => {
+        if (mixed) {
+            const group = groupOf(row);
+            if (group !== lastGroup) {
+                lastGroup = group;
+                const members = rows.filter((r) => groupOf(r) === group);
+                const labels = [...new Set(members.map((r) => bindingFor(mixed.col, r.typeId, current)?.label ?? ''))].filter(Boolean);
+                const types = [...new Set(members.map((r) => typeLabel(r.typeId, current.draft)))];
+                body.push(el('tr', { class: 'group-divider' }, [
+                    el('td', { colSpan: visible.length }, [
+                        el('strong', {}, [group === '~' ? 'No unit' : group]),
+                        ` · ${labels.join(' / ')} · ${types.join(', ')} · ${members.length} row${members.length === 1 ? '' : 's'}`
+                    ])
+                ]));
+            }
+        }
+        body.push(rowEls[i]);
     });
     const modes = [
         ['full', 'Full'],
@@ -720,7 +762,7 @@ function renderSamples(current, grid) {
         el('p', { class: 'muted small' }, [
             'Click a title to see its details view and the add-perspective form below. The thumbnail opens the source page. Hover any cell for its tooltip; click a header to sort (again to reverse, a third time to clear). A dashed header mixes units.'
         ]),
-        ...(alert ? [alert] : []),
+        ...(note ? [note] : []),
         el('div', { class: 'sample-scroll app-grid' }, [el('table', {}, [el('thead', {}, [head]), el('tbody', {}, body)])])
     ]);
 }
@@ -728,7 +770,12 @@ function renderSamples(current, grid) {
 const ICONS = {
     'play-badge': '<svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><polygon points="7 4 20 12 7 20"/></svg>',
     'book-cross': '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M5 4h11a3 3 0 0 1 3 3v13H8a3 3 0 0 1-3-3z"/><path d="M12 8v6M9.5 10.5h5"/></svg>',
+    food: '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 7c-1.5-2-5-2.5-6.5 0S4 14 6 17.5 10 21 12 20c2 1 4 1 6-2.5S20.5 9.5 18.5 7 13.5 5 12 7z"/><path d="M12 7c0-2 1-3.5 3-4"/></svg>',
     palette: '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 3a9 9 0 1 0 0 18c1.2 0 1.8-.9 1.4-1.9-.5-1.2.3-2.3 1.6-2.3H17a4 4 0 0 0 4-4c0-5.2-4-9.8-9-9.8z"/><circle cx="7.5" cy="11" r="1.2" fill="currentColor"/><circle cx="10" cy="7" r="1.2" fill="currentColor"/><circle cx="15" cy="7.5" r="1.2" fill="currentColor"/></svg>',
+    statue: '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="5" r="2.2"/><path d="M9.5 21V11.5a2.5 2.5 0 0 1 5 0V21M7 21h10M8.5 13.5 6.5 10M15.5 13.5l2-3.5"/></svg>',
+    pencil: '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 20l1.2-4.5L16 4.7a2 2 0 0 1 2.8 0l.5.5a2 2 0 0 1 0 2.8L8.5 18.8z"/><path d="M14 6.5l3.5 3.5"/></svg>',
+    print: '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="5" y="3" width="14" height="18" rx="1"/><path d="M8 8h8M8 12h8M8 16h5"/></svg>',
+    camera: '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 8h3l2-2.5h6L17 8h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg>',
     default: '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="4" y="4" width="16" height="16" rx="2"/></svg>'
 };
 function iconFor(typeId) {

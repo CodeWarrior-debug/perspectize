@@ -9,6 +9,8 @@ export interface TooltipSpec {
 	text?: (c: CellCtx) => string;
 	copyValue?: (c: CellCtx) => string | number | null | undefined;
 	items?: (c: CellCtx) => string[];
+	/** Per-item text to copy, parallel to `items`; defaults to the item label itself. */
+	itemCopyValues?: (c: CellCtx) => string[];
 	/** Shown (no copy) when the cell has no content; if unset, no popover opens. */
 	emptyText?: string;
 }
@@ -36,7 +38,13 @@ export function copyText(spec: TooltipSpec, c: CellCtx): string | null {
 	return String(v);
 }
 
-export function itemsCopyText(items: string[], selected: ReadonlySet<string> | null): string {
-	const picked = selected === null ? items : items.filter((i) => selected.has(i));
-	return picked.join(', ');
+export function itemsCopyText(
+	items: string[],
+	selected: ReadonlySet<string> | null,
+	copyValues?: readonly string[],
+): string {
+	const picked = items
+		.map((label, i) => ({ label, value: copyValues?.[i] ?? label }))
+		.filter((it) => selected === null || selected.has(it.label));
+	return picked.map((it) => it.value).join(', ');
 }

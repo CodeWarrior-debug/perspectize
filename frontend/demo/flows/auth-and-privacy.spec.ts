@@ -36,7 +36,7 @@ async function contentIdByName(request: APIRequestContext, name: string): Promis
 test.describe('auth', () => {
 	test('signed-out visitors get the guest landing, not data', async ({ page, tour }) => {
 		await tour.start({ persona: null });
-		await expect(page.getByRole('region', { name: 'Perspectize' })).toBeVisible();
+		await expect(page.getByRole('region', { name: 'When 👍 is not enough' })).toBeVisible();
 		await expect(page.locator('.ag-row')).toHaveCount(0);
 	});
 
@@ -52,7 +52,7 @@ test.describe('auth', () => {
 
 		await page.getByTestId('demo-user-menu').click();
 		await page.getByTestId('demo-sign-out').click();
-		await expect(page.getByRole('region', { name: 'Perspectize' })).toBeVisible();
+		await expect(page.getByRole('region', { name: 'When 👍 is not enough' })).toBeVisible();
 	});
 
 	test('the API rejects anonymous and unknown-persona callers for me', async ({ request }) => {
