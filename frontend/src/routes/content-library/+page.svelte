@@ -100,13 +100,18 @@
 <div class="flex flex-col h-[calc(100vh-4rem)]">
 	<!-- Page Header: Title + Search -->
 	<div class="w-full max-w-screen-xl mx-auto px-4 md:px-6 lg:px-8 py-4">
-		<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+		<div class="flex flex-col sm:flex-row sm:flex-wrap sm:items-center sm:justify-between gap-3">
 			<div>
 				<h1 class="text-2xl font-semibold text-foreground">Library</h1>
 				<p class="text-sm text-muted-foreground mt-1">Everything Perspectize members have added.</p>
 			</div>
-			<!-- FilterChips (inside the grid card) moves itself here on desktop to save a row of height. -->
-			<div id="activity-chips-slot" class="hidden md:flex flex-1 min-w-0 items-center"></div>
+			<!-- Other-type pills sit above the active filter chips. FilterChips (inside the grid card) moves
+			     itself into the slot on desktop to save a row of height. Wide screens have room for this
+			     in the header's middle; below that it takes its own full-width row, after the search. -->
+			<div class="order-last sm:basis-full flex flex-col gap-2 min-w-0 xl:order-none xl:basis-0 xl:flex-1 xl:items-end">
+				<TypePills filters={gridParams.filters} onSelect={selectType} />
+				<div id="activity-chips-slot" class="hidden md:flex min-w-0 max-w-full items-center"></div>
+			</div>
 			<div class="flex items-center gap-2">
 				{#if myUsername}
 					<button
@@ -159,8 +164,6 @@
 			</div>
 		</div>
 	</div>
-
-	<TypePills filters={gridParams.filters} onSelect={selectType} />
 
 	<!-- ColumnRelevanceCallout (rendered by ActivityTable) moves itself here: above the card's top-right
 	     corner, outside the table frame. Collapses to nothing when empty. -->
