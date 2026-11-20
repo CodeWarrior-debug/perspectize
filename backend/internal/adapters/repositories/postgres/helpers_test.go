@@ -149,9 +149,10 @@ func TestBuildContentSortRules(t *testing.T) {
 			sortBy: domain.ContentSortByLikeCount,
 			order:  domain.SortOrderDesc,
 			wantPrimary: paginator.Rule{
-				Key:             "LikeCount",
-				Order:           paginator.DESC,
-				SQLRepr:         "(response->'items'->0->'statistics'->>'likeCount')::BIGINT",
+				Key:   "LikeCount",
+				Order: paginator.DESC,
+				SQLRepr: "CASE WHEN (response->'items'->0->'statistics'->>'likeCount') ~ '^[0-9]+$' " +
+					"THEN (response->'items'->0->'statistics'->>'likeCount')::BIGINT ELSE NULL END",
 				NULLReplacement: int64(0),
 			},
 			wantTieOrder: paginator.DESC,

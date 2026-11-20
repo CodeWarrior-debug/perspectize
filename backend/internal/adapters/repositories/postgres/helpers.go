@@ -203,9 +203,12 @@ func contentSortRule(sortBy domain.ContentSortBy, order domain.SortOrder) pagina
 		}
 	case domain.ContentSortByLikeCount:
 		return paginator.Rule{
-			Key:             "LikeCount",
-			Order:           paginatorOrder,
-			SQLRepr:         "(response->'items'->0->'statistics'->>'likeCount')::BIGINT",
+			Key:   "LikeCount",
+			Order: paginatorOrder,
+			// YouTube can store an empty likeCount for hidden likes; a bare ::BIGINT cast
+			// fails the whole query on it. Non-numeric values sort like unknowns (0).
+			SQLRepr: "CASE WHEN (response->'items'->0->'statistics'->>'likeCount') ~ '^[0-9]+$' " +
+				"THEN (response->'items'->0->'statistics'->>'likeCount')::BIGINT ELSE NULL END",
 			NULLReplacement: int64(0),
 		}
 	case domain.ContentSortByPercentLiked:

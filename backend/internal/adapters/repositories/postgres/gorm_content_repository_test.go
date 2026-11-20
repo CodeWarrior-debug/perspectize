@@ -419,6 +419,22 @@ func TestGormContentRepository_UpdateClaim(t *testing.T) {
 func TestGormContentRepository_List(t *testing.T) {
 	ctx := context.Background()
 
+	t.Run("LIKE_COUNT sort is one page query with the cast guarded", func(t *testing.T) {
+		db, mock := newMockDB(t)
+		mock.ExpectQuery(`CASE WHEN \(response->'items'->0->'statistics'->>'likeCount'\) ~ '\^\[0-9\]\+\$' THEN`).
+			WillReturnRows(contentRows().AddRow(11, "A", "https://a", "youtube_video", 4, nil, nil, nil, nil, contentRepoTime, contentRepoTime))
+
+		c := querycount.Attach(t, db)
+		got, err := NewGormContentRepository(db).List(ctx, domain.ContentListParams{
+			SortBy:    domain.ContentSortByLikeCount,
+			SortOrder: domain.SortOrderAsc,
+		})
+		require.NoError(t, err)
+		c.AssertExactly(t, 1)
+		require.Len(t, got.Items, 1)
+		assertAllExpectationsMet(t, mock)
+	})
+
 	t.Run("no filter, default limit, maps rows to domain", func(t *testing.T) {
 		db, mock := newMockDB(t)
 		mock.ExpectQuery(`SELECT \* FROM "content"`).
