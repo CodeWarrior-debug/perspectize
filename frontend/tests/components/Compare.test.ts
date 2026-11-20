@@ -433,7 +433,8 @@ describe('Compare', () => {
 		const leftSelect = screen.getByTestId('picker-left') as HTMLSelectElement;
 		expect(leftSelect.value).toBe('p1');
 		const leftAvatar = leftSelect.parentElement?.querySelector('span[style*="background-color"]');
-		expect(leftAvatar).toHaveStyle({ backgroundColor: 'var(--color-primary)' });
+		// Inline value, not toHaveStyle: jsdom 31's getComputedStyle resolves var() to the initial colour.
+		expect((leftAvatar as HTMLElement).style.backgroundColor).toBe('var(--color-primary)');
 	});
 
 	it("prompts the signed-in viewer to add their own perspective when they haven't shared one", async () => {
