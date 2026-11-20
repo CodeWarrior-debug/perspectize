@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { NO_AUTOFILL } from '$lib/utils/noAutofill';
 	import type { LengthDisplay, WebPageListMeta } from '$lib/queries/content';
 	import ExternalLinkIcon from '@lucide/svelte/icons/external-link';
 	import XIcon from '@lucide/svelte/icons/x';
@@ -221,6 +222,7 @@
 					{#if !content.displayTitle}
 						<form class="mt-3.5 flex items-center gap-2" onsubmit={handleSaveTitle}>
 							<input
+								{...NO_AUTOFILL}
 								type="text"
 								bind:value={titleDraft}
 								maxlength="120"

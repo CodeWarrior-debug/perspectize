@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { NO_AUTOFILL } from '$lib/utils/noAutofill';
 	import { toast } from 'svelte-sonner';
 	import { Button } from '$lib/components/shadcn';
 	import type { ImportJobSummary } from '$lib/queries/imports';
@@ -54,6 +55,7 @@
 		{#if job.requestStatus === 'REQUESTED'}
 			{#if declining}
 				<input
+					{...NO_AUTOFILL}
 					type="text"
 					bind:value={reason}
 					maxlength={500}

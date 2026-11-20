@@ -56,6 +56,7 @@
 				bind:value={username}
 				disabled={mutation.isPending}
 				autocomplete="off"
+				allowAutofill
 			/>
 		</div>
 	{/snippet}

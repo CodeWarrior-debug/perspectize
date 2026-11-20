@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { NO_AUTOFILL } from '$lib/utils/noAutofill';
 	import XIcon from '@lucide/svelte/icons/x';
 	import SearchIcon from '@lucide/svelte/icons/search';
 	import RatingInput from '$lib/components/RatingInput.svelte';
@@ -109,6 +110,7 @@
 	<div class="relative">
 		<SearchIcon class="absolute left-2.5 top-1/2 -translate-y-1/2 size-3.5 text-muted-foreground" />
 		<input
+			{...NO_AUTOFILL}
 			type="text"
 			bind:value={searchQuery}
 			placeholder="Search more feelings — e.g. nervous"
@@ -176,6 +178,7 @@
 						trackWidth={110}
 					/>
 					<textarea
+						{...NO_AUTOFILL}
 						value={f.note ?? ''}
 						oninput={(e) => updateNote(f.emoji, e.currentTarget.value)}
 						placeholder="Why / nuance / observations…"

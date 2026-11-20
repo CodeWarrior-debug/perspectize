@@ -16,6 +16,7 @@
 </script>
 
 <script lang="ts">
+	import { NO_AUTOFILL } from '$lib/utils/noAutofill';
 	import XIcon from '@lucide/svelte/icons/x';
 	import SearchIcon from '@lucide/svelte/icons/search';
 	import PlusIcon from '@lucide/svelte/icons/plus';
@@ -125,6 +126,7 @@
 	>
 		<SearchIcon class="size-3.5 text-muted-foreground flex-shrink-0" />
 		<input
+			{...NO_AUTOFILL}
 			type="text"
 			bind:value={query}
 			oninput={() => {

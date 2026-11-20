@@ -220,8 +220,8 @@
 			<div class="flex flex-col gap-2 border-t border-border pt-4">
 				{#if showSaveInput}
 					<div class="flex gap-2">
-						<Label for="theme-name" class="sr-only">Theme name</Label>
-						<Input id="theme-name" bind:value={saveName} placeholder="Name your theme" />
+						<Label for="theme-name" class="sr-only">Theme title</Label>
+						<Input id="theme-name" bind:value={saveName} placeholder="Give your theme a title" />
 						<Button onclick={saveTheme}>Save</Button>
 					</div>
 				{:else}

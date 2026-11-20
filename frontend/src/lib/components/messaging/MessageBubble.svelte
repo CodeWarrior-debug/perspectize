@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { NO_AUTOFILL } from '$lib/utils/noAutofill';
 	import type { Message, MessagingUser } from '$lib/queries/messaging';
 	import { isOptimistic } from '$lib/messaging/optimistic';
 	import { messageClockTime } from '$lib/messaging/format';
@@ -86,6 +87,7 @@
 		{:else if editing}
 			<div class="flex flex-col gap-1">
 				<textarea
+					{...NO_AUTOFILL}
 					class="w-full resize-none rounded border border-border bg-background px-2 py-1 text-sm text-foreground focus:outline-none"
 					rows={2}
 					bind:value={editBody}

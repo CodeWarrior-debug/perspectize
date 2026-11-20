@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { NO_AUTOFILL } from '$lib/utils/noAutofill';
 	import { toast } from 'svelte-sonner';
 	import { Button } from '$lib/components/shadcn';
 	import CommentsEditor from '$lib/components/CommentsEditor.svelte';
@@ -70,6 +71,7 @@
 	<label class="flex flex-col gap-1.5 text-sm font-medium">
 		Name
 		<input
+			{...NO_AUTOFILL}
 			type="text"
 			bind:value={name}
 			maxlength={120}

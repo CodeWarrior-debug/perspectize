@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { NO_AUTOFILL } from '$lib/utils/noAutofill';
 	import ChevronDownIcon from '@lucide/svelte/icons/chevron-down';
 	import {
 		CATEGORY_LABEL,
@@ -159,6 +160,7 @@
 		<input
 			{id}
 			type="text"
+			{...NO_AUTOFILL}
 			role="combobox"
 			aria-expanded={open}
 			aria-controls="{id}-list"
