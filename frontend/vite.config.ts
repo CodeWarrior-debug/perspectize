@@ -7,7 +7,7 @@ import { defineConfig } from 'vitest/config';
 import tailwindcss from '@tailwindcss/vite';
 import { faroSourcemapConfig } from './scripts/faro-sourcemaps.ts';
 import { computeTag } from './src/lib/utils/buildTag.ts';
-import { clerkPreloadValues } from './src/lib/utils/clerkScript.ts';
+import { clerkPreloadValues, clerkPublishableKey } from './src/lib/utils/clerkScript.ts';
 import { graphqlPreconnectOrigin } from './src/lib/utils/graphqlOrigin.ts';
 
 // app.html preloads clerk-js via %sveltekit.env.PUBLIC_CLERK_*% placeholders, which read
@@ -18,6 +18,10 @@ const clerkBuildEnv = loadEnv(process.env.NODE_ENV ?? 'production', fileURLToPat
 	'VITE_',
 	'PUBLIC_',
 ]);
+// A static site has no runtime env, so the layout's `import.meta.env.VITE_CLERK_PUBLISHABLE_KEY`
+// must be filled at build time from either name (see `define` below), or the deployed app
+// throws "Missing publishableKey".
+const clerkKey = clerkPublishableKey(clerkBuildEnv);
 const clerkPreload = clerkPreloadValues(clerkBuildEnv);
 process.env.PUBLIC_CLERK_ORIGIN = clerkPreload.origin;
 process.env.PUBLIC_CLERK_SCRIPT_URL = clerkPreload.scriptUrl;
@@ -65,6 +69,8 @@ export default defineConfig({
 	// The vitest 'unit' project below `extends` this file, so it inherits these too.
 	define: {
 		__BUILD_INFO__: JSON.stringify(buildInfo),
+		// Only when a key resolved, so a plain VITE_ key or an unset one behaves as Vite does by default.
+		...(clerkKey ? { 'import.meta.env.VITE_CLERK_PUBLISHABLE_KEY': JSON.stringify(clerkKey) } : {}),
 	},
 	// Fail if the port is taken rather than drifting to the next one: the Clerk sign-in
 	// is per origin, and the agent registry's verification slots assume fixed ports.
