@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/svelte';
-import ContentSearchInput from '$lib/components/ContentSearchInput.svelte';
+import ContentSearchInput from '#lib/components/ContentSearchInput.svelte';
 import ContentSearchInputHost from './fixtures/ContentSearchInputHost.svelte';
 import { warmUpRender } from '../helpers/warmUp';
 

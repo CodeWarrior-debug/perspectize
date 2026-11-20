@@ -15,11 +15,11 @@ vi.mock('@tanstack/svelte-query', () => ({
 	createMutation: vi.fn(() => ({ mutate: mocks.mockMutate, isPending: false })),
 	useQueryClient: vi.fn(() => ({ invalidateQueries: vi.fn() })),
 }));
-vi.mock('$lib/queries/client', () => ({ graphqlRequest: vi.fn() }));
+vi.mock('#lib/queries/client.js', () => ({ graphqlRequest: vi.fn() }));
 vi.mock('$app/navigation', () => ({ goto: vi.fn() }));
 vi.mock('svelte-sonner', () => ({ toast: { error: vi.fn(), success: vi.fn() } }));
 
-import NewThreadDialog from '$lib/components/messaging/NewThreadDialog.svelte';
+import NewThreadDialog from '#lib/components/messaging/NewThreadDialog.svelte';
 
 describe('NewThreadDialog', () => {
 	beforeEach(() => vi.clearAllMocks());

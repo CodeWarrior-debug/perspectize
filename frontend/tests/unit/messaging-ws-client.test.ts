@@ -11,7 +11,7 @@ vi.mock('graphql-ws', () => ({
 	createClient: mockCreateClient,
 }));
 
-vi.mock('$lib/queries/client', () => ({
+vi.mock('#lib/queries/client.js', () => ({
 	getAuthToken: mockGetAuthToken,
 }));
 
@@ -40,7 +40,7 @@ beforeEach(() => {
 
 describe('httpUrlToWs', () => {
 	it('maps http/https to ws/wss and leaves ws untouched', async () => {
-		const { httpUrlToWs } = await import('$lib/messaging/ws-client.svelte');
+		const { httpUrlToWs } = await import('#lib/messaging/ws-client.svelte.js');
 		expect(httpUrlToWs('http://localhost:8080/graphql')).toBe('ws://localhost:8080/graphql');
 		expect(httpUrlToWs('https://api.example.com/graphql')).toBe('wss://api.example.com/graphql');
 		expect(httpUrlToWs('wss://api.example.com/graphql')).toBe('wss://api.example.com/graphql');
@@ -49,7 +49,7 @@ describe('httpUrlToWs', () => {
 
 describe('getWsClient', () => {
 	it('creates the client once (singleton) with lazy + infinite retry', async () => {
-		const mod = await import('$lib/messaging/ws-client.svelte');
+		const mod = await import('#lib/messaging/ws-client.svelte.js');
 		const a = mod.getWsClient();
 		const b = mod.getWsClient();
 		expect(a).toBe(b);
@@ -59,8 +59,8 @@ describe('getWsClient', () => {
 	});
 
 	it('connectionParams resolves the Clerk token under authToken plus client info', async () => {
-		const mod = await import('$lib/messaging/ws-client.svelte');
-		const { APP_VERSION } = await import('$lib/buildInfo');
+		const mod = await import('#lib/messaging/ws-client.svelte.js');
+		const { APP_VERSION } = await import('#lib/buildInfo.js');
 		mod.getWsClient();
 		const params = await capturedOptions.connectionParams();
 		expect(params).toEqual({ authToken: 'jwt-abc', clientVersion: APP_VERSION, clientPlatform: 'ios' });
@@ -69,7 +69,7 @@ describe('getWsClient', () => {
 
 	it('connectionParams sends an empty string when there is no token', async () => {
 		mockGetAuthToken.mockResolvedValue(null);
-		const mod = await import('$lib/messaging/ws-client.svelte');
+		const mod = await import('#lib/messaging/ws-client.svelte.js');
 		mod.getWsClient();
 		expect(await capturedOptions.connectionParams()).toEqual(
 			expect.objectContaining({ authToken: '', clientPlatform: 'ios' }),
@@ -77,7 +77,7 @@ describe('getWsClient', () => {
 	});
 
 	it('on.connected / on.closed drive wsStatus', async () => {
-		const mod = await import('$lib/messaging/ws-client.svelte');
+		const mod = await import('#lib/messaging/ws-client.svelte.js');
 		mod.getWsClient();
 		capturedOptions.on.connecting();
 		expect(mod.wsStatus.value).toBe('connecting');
@@ -90,7 +90,7 @@ describe('getWsClient', () => {
 
 describe('subscribeGraphql', () => {
 	it('passes the payload straight through and unwraps result.data', async () => {
-		const mod = await import('$lib/messaging/ws-client.svelte');
+		const mod = await import('#lib/messaging/ws-client.svelte.js');
 		const next = vi.fn();
 		mod.subscribeGraphql({ query: 'sub X', variables: { a: 1 } }, { next });
 
@@ -108,7 +108,7 @@ describe('subscribeGraphql', () => {
 	it('returns the disposer from client.subscribe', async () => {
 		const disposer = vi.fn();
 		mockSubscribe.mockReturnValue(disposer);
-		const mod = await import('$lib/messaging/ws-client.svelte');
+		const mod = await import('#lib/messaging/ws-client.svelte.js');
 		const off = mod.subscribeGraphql({ query: 'sub' }, { next: vi.fn() });
 		off();
 		expect(disposer).toHaveBeenCalled();
@@ -117,7 +117,7 @@ describe('subscribeGraphql', () => {
 
 describe('disposeWsClient', () => {
 	it('disposes and lets the next getWsClient build a fresh client', async () => {
-		const mod = await import('$lib/messaging/ws-client.svelte');
+		const mod = await import('#lib/messaging/ws-client.svelte.js');
 		mod.getWsClient();
 		mod.disposeWsClient();
 		expect(mockDispose).toHaveBeenCalled();

@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/svelte';
-import InterlinearPassage from '$lib/components/interlinear/InterlinearPassage.svelte';
-import type { InterlinearVerse } from '$lib/queries/bible';
+import InterlinearPassage from '#lib/components/interlinear/InterlinearPassage.svelte';
+import type { InterlinearVerse } from '#lib/queries/bible/index.js';
 
 const word = (id: number, strongs: string, gloss: string, segment: number | null, source = `s${id}`) => ({
 	id,

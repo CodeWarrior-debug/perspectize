@@ -1,7 +1,7 @@
 <script lang="ts">
-	import SignInTrigger from '$lib/components/auth/SignInTrigger.svelte';
-	import OnboardingVideo from '$lib/components/onboarding/OnboardingVideo.svelte';
-	import { ONBOARDING_VIDEOS } from '$lib/onboarding/config';
+	import SignInTrigger from '#lib/components/auth/SignInTrigger.svelte';
+	import OnboardingVideo from '#lib/components/onboarding/OnboardingVideo.svelte';
+	import { ONBOARDING_VIDEOS } from '#lib/onboarding/config.js';
 </script>
 
 <section

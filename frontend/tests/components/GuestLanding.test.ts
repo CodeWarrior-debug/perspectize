@@ -6,7 +6,7 @@ vi.mock('svelte-clerk', async () => {
 	return { SignInButton: mod.default };
 });
 
-vi.mock('$lib/onboarding/config', () => ({
+vi.mock('#lib/onboarding/config.js', () => ({
 	ONBOARDING_VIDEOS: {
 		guestProduct: undefined,
 		howAddVideo: undefined,
@@ -15,15 +15,13 @@ vi.mock('$lib/onboarding/config', () => ({
 	CURRENT_INTRO_VERSION: 1,
 }));
 
-import GuestLanding from '$lib/components/onboarding/GuestLanding.svelte';
+import GuestLanding from '#lib/components/onboarding/GuestLanding.svelte';
 
 describe('GuestLanding', () => {
 	it('renders value line and Sign in affordance', () => {
 		render(GuestLanding);
 		expect(screen.getByRole('heading', { name: 'When 👍 is not enough' })).toBeInTheDocument();
-		expect(
-			screen.getByText('Where measured positions get the measures & metadata they deserve.')
-		).toBeInTheDocument();
+		expect(screen.getByText('Where measured positions get the measures & metadata they deserve.')).toBeInTheDocument();
 		expect(screen.getByRole('button', { name: /sign in/i })).toBeInTheDocument();
 	});
 

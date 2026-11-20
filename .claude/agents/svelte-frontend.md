@@ -55,7 +55,7 @@ wins.
   `isPending`, not `isLoading`.
 - **Deep modules:** components call a domain hook. They never call
   `graphqlClient.request` or invalidate the cache inline. Import from
-  `$lib/queries/<domain>`, not its internals.
+  `#lib/queries/<domain>`, not its internals.
 - **Auth:** use the facade (`useAuthState`, `getAuthToken`, `components/auth/*`).
   Never import `svelte-clerk` in new code, because it breaks demo mode.
 - **Styling:**

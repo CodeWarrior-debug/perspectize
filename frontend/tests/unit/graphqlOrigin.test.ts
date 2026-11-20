@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { graphqlPreconnectOrigin } from '$lib/utils/graphqlOrigin';
+import { graphqlPreconnectOrigin } from '#lib/utils/graphqlOrigin.js';
 
 describe('graphqlPreconnectOrigin', () => {
 	it('returns the origin of an absolute https endpoint, with the path stripped', () => {

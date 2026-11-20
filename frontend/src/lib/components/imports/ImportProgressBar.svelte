@@ -1,6 +1,6 @@
 <script lang="ts">
-	import { useImportProgress } from '$lib/queries/imports/useImportProgress.svelte';
-	import { progressLabel } from '$lib/utils/import-sheet';
+	import { useImportProgress } from '#lib/queries/imports/useImportProgress.svelte.js';
+	import { progressLabel } from '#lib/utils/import-sheet.js';
 
 	/**
 	 * Live progress of this import's running batch, for everyone watching the

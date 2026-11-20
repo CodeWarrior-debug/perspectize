@@ -3,10 +3,10 @@ import { render, screen, fireEvent } from '@testing-library/svelte';
 import { QueryClient } from '@tanstack/svelte-query';
 import type { Component } from 'svelte';
 import TestWrapper from '../helpers/TestWrapper.svelte';
-import CategoryTypeahead from '$lib/components/CategoryTypeahead.svelte';
+import CategoryTypeahead from '#lib/components/CategoryTypeahead.svelte';
 import CategoryTypeaheadHost from './fixtures/CategoryTypeaheadHost.svelte';
 
-vi.mock('$lib/queries/client', () => ({
+vi.mock('#lib/queries/client.js', () => ({
 	graphqlClient: { request: vi.fn().mockResolvedValue({ wikidataSearch: [] }) },
 }));
 

@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { render, screen } from '@testing-library/svelte';
-import WebPageBody from '$lib/components/WebPageBody.svelte';
-import WebPageTiles from '$lib/components/WebPageTiles.svelte';
+import WebPageBody from '#lib/components/WebPageBody.svelte';
+import WebPageTiles from '#lib/components/WebPageTiles.svelte';
 
 describe('WebPageBody states', () => {
 	it('loading (no description yet): says it is loading, never "no description"', () => {

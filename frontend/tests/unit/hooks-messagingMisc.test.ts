@@ -20,15 +20,15 @@ vi.mock('@tanstack/svelte-query', () => ({
 		invalidateQueries: mocks.mockInvalidate,
 	})),
 }));
-vi.mock('$lib/queries/client', () => ({ graphqlRequest: (...a: unknown[]) => mocks.mockGraphql(...a) }));
+vi.mock('#lib/queries/client.js', () => ({ graphqlRequest: (...a: unknown[]) => mocks.mockGraphql(...a) }));
 vi.mock('$app/navigation', () => ({ goto: mocks.mockGoto }));
 vi.mock('svelte-sonner', () => ({ toast: { success: mocks.mockToastSuccess, error: mocks.mockToastError } }));
 
-import { useSetTyping } from '$lib/queries/messaging/useSetTyping';
-import { useAddThreadParticipants } from '$lib/queries/messaging/useAddThreadParticipants';
-import { useLeaveThread } from '$lib/queries/messaging/useLeaveThread';
-import { SET_TYPING, ADD_THREAD_PARTICIPANTS, LEAVE_THREAD } from '$lib/queries/messaging';
-import { queryKeys } from '$lib/queries/keys';
+import { useSetTyping } from '#lib/queries/messaging/useSetTyping.js';
+import { useAddThreadParticipants } from '#lib/queries/messaging/useAddThreadParticipants.js';
+import { useLeaveThread } from '#lib/queries/messaging/useLeaveThread.js';
+import { SET_TYPING, ADD_THREAD_PARTICIPANTS, LEAVE_THREAD } from '#lib/queries/messaging/index.js';
+import { queryKeys } from '#lib/queries/keys.js';
 
 describe('thin messaging mutation hooks', () => {
 	beforeEach(() => {

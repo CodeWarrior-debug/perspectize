@@ -1,5 +1,5 @@
-import type { Message, MessagingUser } from '$lib/queries/messaging';
-import { applyMessagePosted, type ThreadMessagesCache } from '$lib/messaging/threadCache';
+import type { Message, MessagingUser } from '#lib/queries/messaging/index.js';
+import { applyMessagePosted, type ThreadMessagesCache } from '#lib/messaging/threadCache.js';
 
 export function makeClientNonce(): string {
 	const c = globalThis.crypto as Crypto | undefined;

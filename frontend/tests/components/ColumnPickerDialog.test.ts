@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, cleanup } from '@testing-library/svelte';
-import ColumnPickerDialog from '$lib/components/ColumnPickerDialog.svelte';
-import { DATA_COLUMNS, INTERNAL_COLUMNS } from '$lib/utils/grid-config';
+import ColumnPickerDialog from '#lib/components/ColumnPickerDialog.svelte';
+import { DATA_COLUMNS, INTERNAL_COLUMNS } from '#lib/utils/grid-config.js';
 import { warmUpRender } from '../helpers/warmUp';
 
 const noop = () => {};

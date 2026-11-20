@@ -18,7 +18,7 @@ import {
 	type Message,
 	type MessageConnection,
 	type InboxEvent,
-} from '$lib/queries/messaging';
+} from '#lib/queries/messaging/index.js';
 
 describe('messaging GraphQL documents', () => {
 	it('thread list query names its operation and selects unreadCount', () => {

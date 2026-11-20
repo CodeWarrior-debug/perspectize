@@ -1,9 +1,7 @@
 /**
- * Avatar badge helpers shared across the Compare page — previously
- * copy-pasted identically in ComparePickerRow.svelte and
- * CompareTakeColumn.svelte, with Compare.svelte inlining the color logic a
- * third time. One place to fix instead of three (compare-page-enhancements
- * #10).
+ * Avatar badge helpers shared across the Compare page (ComparePickerRow,
+ * CompareTakeColumn and Compare.svelte), so the badge logic has one place to
+ * fix.
  */
 
 /** Two-letter initials from a full display name, e.g. "Jamie Lee" -> "JL". */

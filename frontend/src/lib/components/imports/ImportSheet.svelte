@@ -1,19 +1,20 @@
 <script lang="ts">
+	import { NO_AUTOFILL } from '#lib/utils/noAutofill.js';
 	import { untrack } from 'svelte';
 	import AgGridSvelte5Component from 'ag-grid-svelte5';
 	import { ClientSideRowModelModule } from '@ag-grid-community/client-side-row-model';
 	import { themeQuartz } from '@ag-grid-community/theming';
 	import type { CellClickedEvent, GridApi, GridOptions, IRowNode } from '@ag-grid-community/core';
 	import { toast } from 'svelte-sonner';
-	import { Button } from '$lib/components/shadcn';
+	import { Button } from '#lib/components/shadcn/index.js';
 	import XIcon from '@lucide/svelte/icons/x';
 	import ImportDetailPanel from './ImportDetailPanel.svelte';
 	import ImportProgressBar from './ImportProgressBar.svelte';
-	import type { ImportJob } from '$lib/queries/imports';
-	import { useImportItems } from '$lib/queries/imports/useImportItems';
-	import { useSetImportItemsExcluded } from '$lib/queries/imports/useSetImportItemsExcluded';
-	import { GRID_THEME_PARAMS } from '$lib/utils/grid-theme';
-	import { emptyCellClassRules } from '$lib/utils/grid-empty';
+	import type { ImportJob } from '#lib/queries/imports/index.js';
+	import { useImportItems } from '#lib/queries/imports/useImportItems.js';
+	import { useSetImportItemsExcluded } from '#lib/queries/imports/useSetImportItemsExcluded.js';
+	import { GRID_THEME_PARAMS } from '#lib/utils/grid-theme.js';
+	import { emptyCellClassRules } from '#lib/utils/grid-empty.js';
 	import {
 		buildImportColumnDefs,
 		factKeys,
@@ -30,7 +31,7 @@
 		type ImportRow,
 		type LibraryFilter,
 		type SheetFilter,
-	} from '$lib/utils/import-sheet';
+	} from '#lib/utils/import-sheet.js';
 
 	/**
 	 * ImportSheet: one import's staging sheet. A spreadsheet of every candidate
@@ -239,6 +240,7 @@
 			{/each}
 		</div>
 		<input
+			{...NO_AUTOFILL}
 			type="search"
 			bind:value={search}
 			placeholder="Search titles, summaries, sources, cast"

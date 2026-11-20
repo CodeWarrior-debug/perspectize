@@ -144,8 +144,7 @@ func TestRemovePrimaryCategory(t *testing.T) {
 	require.Nil(t, got.PrimaryCategory, "the primary category must be cleared")
 }
 
-// Upsert refreshes wikipedia_url (it used to be left out of DO UPDATE, so a
-// URL was never updated), but a blank one — a failed or empty Wikidata
+// Upsert refreshes wikipedia_url, but a blank one — a failed or empty Wikidata
 // lookup — keeps what's stored.
 func TestCategoryUpsertWikipediaURL(t *testing.T) {
 	h := newHarness(t)

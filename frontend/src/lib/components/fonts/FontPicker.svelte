@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { NO_AUTOFILL } from '#lib/utils/noAutofill.js';
 	import ChevronDownIcon from '@lucide/svelte/icons/chevron-down';
 	import {
 		CATEGORY_LABEL,
@@ -8,9 +9,9 @@
 		type FontCategory,
 		type FontChoice,
 		type FontEntry,
-	} from '$lib/fonts/googleFonts';
-	import { fontPreview } from '$lib/fonts/previewFonts';
-	import type { FontSlotInfo } from '$lib/fonts/slots';
+	} from '#lib/fonts/googleFonts.js';
+	import { fontPreview } from '#lib/fonts/previewFonts.js';
+	import type { FontSlotInfo } from '#lib/fonts/slots.js';
 
 	/**
 	 * Type-ahead font combobox for one slot. Arrow keys and hover preview a font on the live
@@ -159,6 +160,7 @@
 		<input
 			{id}
 			type="text"
+			{...NO_AUTOFILL}
 			role="combobox"
 			aria-expanded={open}
 			aria-controls="{id}-list"

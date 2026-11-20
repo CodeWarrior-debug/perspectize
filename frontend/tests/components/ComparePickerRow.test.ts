@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/svelte';
-import ComparePickerRow from '$lib/components/ComparePickerRow.svelte';
+import ComparePickerRow from '#lib/components/ComparePickerRow.svelte';
 
 function avatarColor(select: HTMLElement): string | undefined {
 	const avatar = select.parentElement?.querySelector('span[style*="background-color"]') as HTMLElement | null;
@@ -96,6 +96,32 @@ describe('ComparePickerRow', () => {
 		});
 		expect(screen.getByRole('combobox', { name: 'Left perspective' })).toBeInTheDocument();
 		expect(screen.getByRole('combobox', { name: 'Right perspective' })).toBeInTheDocument();
+	});
+
+	it('shows the privacy marker as text inside the option label (native options cannot hold an icon)', () => {
+		const withPrivate = [
+			{ id: '1', userId: '1', name: 'You', label: 'You · Private' },
+			{ id: '2', userId: '2', name: 'Jamie Lee', label: 'Jamie Lee' },
+		];
+		render(ComparePickerRow, {
+			props: {
+				options: withPrivate,
+				leftId: '1',
+				rightId: '2',
+				onLeftChange: vi.fn(),
+				onRightChange: vi.fn(),
+				onSwap: vi.fn(),
+			},
+		});
+		const leftOptionTexts = Array.from((screen.getByTestId('picker-left') as HTMLSelectElement).options).map(
+			(o) => o.textContent,
+		);
+		expect(leftOptionTexts).toEqual(['You · Private']);
+		const rightOptionTexts = Array.from((screen.getByTestId('picker-right') as HTMLSelectElement).options).map(
+			(o) => o.textContent,
+		);
+		// Right excludes the left selection (1), so only the unmarked row remains here.
+		expect(rightOptionTexts).toEqual(['Jamie Lee']);
 	});
 
 	// Regression guard for compare-page-enhancements #10: stacks to a single

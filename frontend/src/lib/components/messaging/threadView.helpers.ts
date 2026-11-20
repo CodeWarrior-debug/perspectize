@@ -1,4 +1,4 @@
-import type { Message, MessageThread } from '$lib/queries/messaging';
+import type { Message, MessageThread } from '#lib/queries/messaging/index.js';
 
 export function showSenderForIndex(items: Message[], index: number): boolean {
 	if (index <= 0) return true;

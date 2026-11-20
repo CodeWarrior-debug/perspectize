@@ -1,6 +1,6 @@
 import type { QueryClient } from '@tanstack/svelte-query';
-import { createIdleDetector, type IdleDetectorOptions } from '$lib/utils/idleDetector';
-import { queryKeys } from '$lib/queries/keys';
+import { createIdleDetector, type IdleDetectorOptions } from '#lib/utils/idleDetector.js';
+import { queryKeys } from '#lib/queries/keys.js';
 
 /**
  * Shared flag: true while the user is idle and the realtime streams should be

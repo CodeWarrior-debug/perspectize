@@ -1,18 +1,18 @@
 <script lang="ts">
 	import { toast } from 'svelte-sonner';
-	import { Button } from '$lib/components/shadcn';
-	import LazyLoadError from '$lib/components/LazyLoadError.svelte';
-	import PlanTable from '$lib/components/plan/PlanTable.svelte';
-	import ListSwitcher from '$lib/components/plan/ListSwitcher.svelte';
-	import TodoDialog from '$lib/components/plan/TodoDialog.svelte';
-	import { useContentDetails } from '$lib/queries/content/useContentDetails';
-	import { useUserTodos } from '$lib/queries/userTodos/useUserTodos';
-	import { useUserTodoLists } from '$lib/queries/userTodos/useUserTodoLists';
-	import { useReorderUserTodoList } from '$lib/queries/userTodos/useReorderUserTodoList';
-	import { useMyPerspectives } from '$lib/queries/perspectives/useMyPerspectives';
-	import type { PerspectiveItem } from '$lib/queries/perspectives';
-	import type { UserTodoItem, UserTodoSortBy } from '$lib/queries/userTodos';
-	import { filterForSelection, type ListSelection, type TodoFocusField } from '$lib/utils/plan-todo-helpers';
+	import { Button } from '#lib/components/shadcn/index.js';
+	import LazyLoadError from '#lib/components/LazyLoadError.svelte';
+	import PlanTable from '#lib/components/plan/PlanTable.svelte';
+	import ListSwitcher from '#lib/components/plan/ListSwitcher.svelte';
+	import TodoDialog from '#lib/components/plan/TodoDialog.svelte';
+	import { useContentDetails } from '#lib/queries/content/useContentDetails.js';
+	import { useUserTodos } from '#lib/queries/userTodos/useUserTodos.js';
+	import { useUserTodoLists } from '#lib/queries/userTodos/useUserTodoLists.js';
+	import { useReorderUserTodoList } from '#lib/queries/userTodos/useReorderUserTodoList.js';
+	import { useMyPerspectives } from '#lib/queries/perspectives/useMyPerspectives.js';
+	import type { PerspectiveItem } from '#lib/queries/perspectives/index.js';
+	import type { UserTodoItem, UserTodoSortBy } from '#lib/queries/userTodos/index.js';
+	import { filterForSelection, type ListSelection, type TodoFocusField } from '#lib/utils/plan-todo-helpers.js';
 
 	/**
 	 * PlanBoard: the signed-in user's plan. Owns the query, the list selection and
@@ -154,7 +154,7 @@
 
 <!-- The same details view as Activity, loaded only when "View content" is used. -->
 {#if detailsContentId !== null}
-	{#await import('$lib/components/ActivityDetailsModal.svelte') then { default: ActivityDetailsModal }}
+	{#await import('#lib/components/ActivityDetailsModal.svelte') then { default: ActivityDetailsModal }}
 		<ActivityDetailsModal
 			content={detailsQuery.data?.contentByID ?? null}
 			open
@@ -167,7 +167,7 @@
 
 <!-- Lazy, like ActivityTable: the Tiptap-based editor only loads when a perspective is opened. -->
 {#if popoverOpen && popoverContent !== null}
-	{#await import('$lib/components/PerspectivePopover.svelte') then { default: PerspectivePopover }}
+	{#await import('#lib/components/PerspectivePopover.svelte') then { default: PerspectivePopover }}
 		<PerspectivePopover
 			contentId={popoverContent.id}
 			contentName={popoverContent.name}

@@ -1,6 +1,6 @@
 import { COLUMNS, GROUP_LABELS, TYPES } from './catalog.js';
 import { detailsFor } from './details.js';
-import { bindingFor, gapText, resolveGrid, samplesFor, typeLabel, unitsFor } from './model.js';
+import { bindingFor, gapText, resolveGrid, samplesFor, typeLabel, unitKeysFor } from './model.js';
 const YES = 'yes';
 const NO = 'no';
 function esc(v) {
@@ -40,6 +40,84 @@ const DISCOVER_LABELS = {
     'search-only': 'Search only',
     'not-on-discover': 'Not on Discover'
 };
+function filterKindFor(col) {
+    switch (col.valueType) {
+        case 'number':
+        case 'money':
+        case 'duration':
+        case 'rating':
+        case 'percent':
+            return 'number';
+        case 'date':
+            return 'date';
+        case 'enum':
+        case 'boolean':
+            return 'set';
+        default:
+            return 'text';
+    }
+}
+function cap(id) {
+    return id[0].toUpperCase() + id.slice(1);
+}
+/** Proposed ContentFilter field name(s) for a column of the given kind. */
+function filterFieldsFor(col, kind) {
+    const id = col.id;
+    switch (kind) {
+        case 'number':
+            return `\`min${cap(id)}\`, \`max${cap(id)}\` (Int/Float)`;
+        case 'date':
+            return `\`${id}After\`, \`${id}Before\` (ISO 8601 String)`;
+        case 'set':
+            return `\`${id}: [String!]\``;
+        case 'text':
+            return `\`${id}Contains: String\``;
+    }
+}
+function filterRows(state, chosen) {
+    const rows = [];
+    const none = [];
+    for (const col of chosen) {
+        if (!col.filterable)
+            continue;
+        const b = state.decisions[col.id];
+        if (col.storage === 'derived') {
+            none.push(col.id);
+            continue;
+        }
+        const kind = filterKindFor(col);
+        rows.push([
+            col.id,
+            b.label || col.generic,
+            kind,
+            col.storage === 'universal-column' ? `existing field if any (verify); else ${filterFieldsFor(col, kind)}` : filterFieldsFor(col, kind),
+            `\`${col.id}\``,
+            b.label || col.generic,
+            col.storage === 'jsonb' ? 'JSONB expression — consider an index' : 'dedicated column'
+        ]);
+    }
+    return { rows, none };
+}
+/** Checklist rows (see .claude/docs/ADDING_CONTENT_TYPE.md) that the form state does not answer. */
+function undecidedSurfaces(state) {
+    const d = state.draft;
+    const out = [];
+    const empty = (v) => !v || !v.trim() || v.trim().toUpperCase() === 'TBD';
+    if (empty(d.searchFields))
+        out.push({ surface: 'Search', question: 'Which fields does the search box cover for this type (scope picker)?' });
+    if (empty(d.mobileCardFields))
+        out.push({ surface: 'Mobile card list', question: 'Which facts replace views / likes / channel on the card?' });
+    if (empty(d.duplicateFeedback))
+        out.push({ surface: 'Add form: duplicate feedback', question: 'What does the form show when the item already exists (already-existed flag)?' });
+    if (empty(d.addContentEntry))
+        out.push({ surface: 'Add form: Add Content entry', question: 'How does detectContentType recognise this type (link patterns / reference syntax), what is its select label, and which extra fields or notices appear only for it?' });
+    if (empty(d.contentPolicy))
+        out.push({ surface: 'Content policy', question: 'Is there an adult / rating gate, and what is the exact rejection message?' });
+    if (!layoutOf(state, d.id).attribution)
+        out.push({ surface: 'Licensing / attribution', question: 'Required attribution text, logo and API terms?' });
+    out.push({ surface: 'Sort: computed keys', question: 'Are computed sort keys scanned so cursor pagination encodes the real value (page 2 must differ from page 1)?' }, { surface: 'Data modes', question: 'Does the Type filter reach the server in Loaded mode (100-row cap), and does the footer total reflect it?' }, { surface: 'Add form: errors and close', question: 'Specific error messages per failure, and does the popover close on success?' }, { surface: 'Formatting edge values', question: 'null, 0, huge ($1T, not $1000B) and tiny (<1%, not 0%) values?' }, { surface: 'Rollout', question: 'API token per environment, backend before frontend, migration number collisions, indexes, evidence on a throwaway Neon branch with a clip?' });
+    return out;
+}
 export function buildSpec(state) {
     const d = state.draft;
     const grid = resolveGrid(state);
@@ -168,6 +246,18 @@ export function buildSpec(state) {
         out.push('');
         out.push(table(['Field', 'Value path'], d.detailOnly.map((f) => [f.label, f.path])));
     }
+    const filt = filterRows(state, chosen);
+    out.push('### Filters');
+    out.push('');
+    out.push('Every filterable column needs server and client filtering with identical results: All Items mode sends the `ContentFilter` fields to the backend; Loaded mode runs `filterContentRows` over the loaded rows. Kind comes from the column value type (number and date are ranges; set is a checkbox list; text is contains).');
+    out.push('');
+    out.push(table(['Column', 'Label', 'Kind', 'Proposed ContentFilter field(s)', 'URL key (`f.<key>=`)', 'Chip label', 'Index'], filt.rows));
+    out.push('Loaded / All parity: for each row above, `filterContentRows` (client) and the repository condition (server) must return the same rows for the same input, and a test must pin that.');
+    out.push('');
+    if (filt.none.length) {
+        out.push(`No filter (derived, no backend field): ${filt.none.map((c) => `\`${c}\``).join(', ')} — do not ship a Loaded-only filter.`);
+        out.push('');
+    }
     out.push('## 4. Fields deliberately not carried');
     out.push('');
     out.push(table(['Column', 'Meaning elsewhere', 'Why not here'], rejected.map((col) => [
@@ -197,16 +287,18 @@ export function buildSpec(state) {
         rc.unbound.length ? rc.col.gapFallback : '—',
         rc.tooltip
     ])));
-    const mixedSorts = grid.visible.filter((rc) => rc.col.sortable && unitsFor(rc).length > 1);
+    const mixedSorts = grid.visible.filter((rc) => rc.col.sortable && unitKeysFor(rc).length > 1);
     if (mixedSorts.length) {
         out.push('### Mixed-unit sort policy');
         out.push('');
-        out.push('Sorting any of these columns on its own would order numbers that mean different things. The grid must not do it silently: when one becomes the *primary* sort key, show an alert and leave the order unchanged until the user picks one of:');
+        out.push('These columns carry different units in this selection. Sorting one is never blocked. It is applied grouped by unit first, then ordered within each group, so only numbers that share a unit are ever compared:');
         out.push('');
-        out.push('1. **Filter to one type** — one button per type, each named with its unit; the sort then applies within one unit.');
-        out.push('2. **Sort by Type, then the column** — a multi-column sort with the unit-consistent Type column as priority 1, so each type is ordered within its own unit.');
+        out.push('1. **Group by unit.** Order by the unit key, then the value, in the requested direction. Groups follow the same direction.');
+        out.push('2. **Divider row per group.** A full-width row names the unit, the per-type labels and the types in it, e.g. "WORDS · Words - BSB · Bible passage · 10 rows".');
+        out.push('3. **Non-blocking note.** A dismissible one-line note explains the grouping, with one "Show only <type>" shortcut per type. It returns when the primary sort column changes.');
+        out.push('4. **Single unit, no change.** When every loaded row shares a unit (e.g. one type filtered in), there is one group: no divider and no note.');
         out.push('');
-        out.push(table(['Column', 'Units in this selection'], mixedSorts.map((rc) => [rc.header || rc.col.generic, unitsFor(rc).join(' · ')])));
+        out.push(table(['Column', 'Units in this selection'], mixedSorts.map((rc) => [rc.header || rc.col.generic, unitKeysFor(rc).join(' · ')])));
     }
     const multi = state.selected.length > 1;
     if (multi) {
@@ -279,6 +371,12 @@ export function buildSpec(state) {
         out.push(state.deviations.trim());
         out.push('');
     }
+    const undecided = undecidedSurfaces(state);
+    out.push('## Undecided surfaces');
+    out.push('');
+    out.push('Rows of the per-type surface checklist in `.claude/docs/ADDING_CONTENT_TYPE.md` that this form does not answer. Each is a blocker: answer it in the spec (or write "n/a because …") before implementation.');
+    out.push('');
+    out.push(table(['Surface', 'Question'], undecided.map((u) => [u.surface, u.question])));
     out.push('## Implementation checklist');
     out.push('');
     const steps = [
@@ -290,18 +388,38 @@ export function buildSpec(state) {
             ? `Adapter: \`backend/internal/adapters/${adapterPackage(d.enumValue)}/\` against ${d.enrichment}.`
             : 'Adapter: none.',
         `Schema: add \`${d.enumValue}\` to the ContentType enum and a \`createContentFrom${d.label.replace(/[^A-Za-z0-9]/g, '')}\` mutation + input in \`backend/schema.graphql\`, then \`make graphql-gen\`.`,
+        'Add form: extend AddContentPopover (detectContentType + type select); never add a header button.',
         `Service: \`CreateFrom${d.label.replace(/[^A-Za-z0-9]/g, '')}\` in \`content_service.go\` — dedupe on ${d.identity}, validate, enrich, persist.`,
         migrations.length
             ? `Migration: promote ${migrations.map((c) => c.id).join(', ')} to columns (check \`ls backend/migrations/ | tail -5\` for the next number).`
             : 'Migration: none.',
         d.sharesUrlSpace ? 'Migration: relax `UNIQUE(url)` to be type-scoped.' : 'Constraint: `UNIQUE(url)` unchanged.',
         'Repository: sort rules in `helpers.go`, virtual fields in `gorm_models.go`.',
+        ...(filt.rows.length
+            ? [
+                `Filters (backend): add ${filt.rows.map((r) => r[3]).join('; ')} to \`ContentFilter\` in \`schema.graphql\` and \`domain/pagination.go\`, the repository conditions in \`gorm_content_repository.go\`, and the mapping in \`content.resolvers.go\`; \`make graphql-gen\`.`,
+                `Filters (frontend): \`filterKey\`/\`filterValue\`/\`filterRange\`/\`filterSet\` for ${filt.rows.map((r) => r[0]).join(', ')} in \`grid-config.ts\` COLUMNS, \`gridUrlState.ts\` mapping, \`filterContentRows\` client parity, FilterChips label.`
+            ]
+            : ['Filters: none.']),
         ...(mixedSorts.length
             ? [
-                'Domain + repository: add `ContentSortByContentType` (`CONTENT_TYPE`) so `buildContentSortRulesMulti` can take Type as priority 1 ahead of a mixed-unit column.',
-                `Frontend: in \`ActivityTable.svelte\` \`onSortChanged\`, when the primary sort column mixes units across the loaded types (${mixedSorts
+                ...(mixedSorts.some((rc) => rc.col.id === 'length')
+                    ? [
+                        'Repository: in `helpers.go`, make `ContentSortByLength` emit two paginator rules, `length_units` then `length`, both in the requested order, so server-side Length sorts group by unit. No new sort enum.',
+                        'Frontend: in `ActivityTable.svelte`, `compareContentBySorts` compares `lengthUnits` before `length`.'
+                    ]
+                    : []),
+                ...(mixedSorts.some((rc) => rc.col.id !== 'length')
+                    ? [
+                        `Backend: the server-side sort for ${mixedSorts
+                            .filter((rc) => rc.col.id !== 'length')
+                            .map((rc) => rc.header || rc.col.generic)
+                            .join(', ')} has no unit-grouping rule yet. Decide one before that column is sorted server-side.`
+                    ]
+                    : []),
+                `Frontend: in \`ActivityTable.svelte\`, when the primary sort column mixes units across the loaded rows (${mixedSorts
                     .map((rc) => rc.header || rc.col.generic)
-                    .join(', ')}), hold the sort and show the alert: filter to one type, or apply Type ▲ then the column via \`applyColumnState\` with \`sortIndex\` 0/1.`
+                    .join(', ')}), group rows by unit before comparing values. Insert a synthetic divider row per unit into \`sortedRowData\`, rendered via \`isFullWidthRow\` + \`fullWidthCellRenderer\`, and show the dismissible sort note with "Show only <type>" shortcuts.`
             ]
             : []),
         'Resolver: mutation handler in `schema.resolvers.go`.',
@@ -319,7 +437,7 @@ export function buildSpec(state) {
             ? [`Frontend: \`ActivityDetailsModal.svelte\` — a ${d.label} branch with the bound fields as tiles and ${d.detailOnly.map((f) => f.label).join(', ')} in a details list.`]
             : []),
         `Frontend: column defs + tooltips in \`ActivityTable.svelte\` per section 5, with the alias swap from the per-type header table.`,
-        'Tests: domain enum, service create paths, resolver mutation + filter-by-type, formatting renderers, query definitions.',
+        'Tests: domain enum, service create paths, resolver mutation + filter-by-type, per-filter repo/resolver tests with Loaded/All parity, 2-page cursor pagination, formatting renderers, query definitions.',
         'Verify: `go build ./...`, `go test ./...`, `pnpm run test:run`.'
     ];
     for (const s of steps)

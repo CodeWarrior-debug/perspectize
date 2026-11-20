@@ -10,9 +10,9 @@ import {
 	type FontCatalogRow,
 	type FontChoice,
 	type FontSearchOptions,
-} from '$lib/fonts/googleFonts';
-import catalogRows from '$lib/fonts/google-fonts-catalog.json';
-import { FONT_PAIRINGS, FONT_SLOT_INFO, FONT_SLOTS } from '$lib/fonts/slots';
+} from '#lib/fonts/googleFonts.js';
+import catalogRows from '#lib/fonts/google-fonts-catalog.json';
+import { FONT_PAIRINGS, FONT_SLOT_INFO, FONT_SLOTS } from '#lib/fonts/slots.js';
 
 const ROWS: FontCatalogRow[] = [
 	['Inter', 'a', [100, 200, 300, 400, 500, 600, 700, 800, 900], 1, 1],

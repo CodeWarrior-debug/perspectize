@@ -1,16 +1,16 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/svelte';
 import { tick, type Component } from 'svelte';
-import BookTrendingFeed from '$lib/components/discover/BookTrendingFeed.svelte';
+import BookTrendingFeed from '#lib/components/discover/BookTrendingFeed.svelte';
 import TestWrapper from '../helpers/TestWrapper.svelte';
 import { makeClient } from '../helpers/queryBudget';
-import { BOOK_TRENDING, type BookSearchPage, type BookSearchResult } from '$lib/services/openLibraryApi';
+import { BOOK_TRENDING, type BookSearchPage, type BookSearchResult } from '#lib/services/openLibraryApi.js';
 import { warmUp } from '../helpers/warmUp';
 
-vi.mock('$lib/queries/users/useMe.svelte', () => ({ useMe: () => ({ me: null }) }));
+vi.mock('#lib/queries/users/useMe.svelte.js', () => ({ useMe: () => ({ me: null }) }));
 
 const mocks = vi.hoisted(() => ({ graphqlRequest: vi.fn() }));
-vi.mock('$lib/queries/client', () => ({ graphqlRequest: mocks.graphqlRequest }));
+vi.mock('#lib/queries/client.js', () => ({ graphqlRequest: mocks.graphqlRequest }));
 
 const TRENDING_NOTE = "What's being looked up on Open Library right now — skews toward current nonfiction";
 

@@ -1,5 +1,5 @@
 import type { QueryClient } from '@tanstack/svelte-query';
-import { graphqlRequestAnonymous } from '$lib/queries/client';
+import { graphqlRequestAnonymous } from '#lib/queries/client.js';
 import { LIST_CONTENT, type ContentResponse } from './index';
 import { ACTIVITY_LIST_STALE_TIME_MS, type activityListRequest } from './activityList';
 
@@ -7,7 +7,7 @@ type ActivityListRequest = ReturnType<typeof activityListRequest>;
 
 /**
  * Start the Activity list at route load, before Clerk is ready, under the SAME key ActivityTable
- * reads, so the table mounts onto cached data (#636).
+ * reads, so the table mounts onto cached data.
  *
  * Anonymous on purpose: LIST_CONTENT's result depends on the viewer only through
  * filter.minPerspectiveCount (ComparePicker sets it; the URL never does). Without it the signed-out

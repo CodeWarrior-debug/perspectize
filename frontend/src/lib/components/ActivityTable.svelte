@@ -1,6 +1,6 @@
 <script lang="ts">
 	import AgGridSvelte5Component from 'ag-grid-svelte5';
-	import LazyLoadError from '$lib/components/LazyLoadError.svelte';
+	import LazyLoadError from '#lib/components/LazyLoadError.svelte';
 	import { ClientSideRowModelModule } from '@ag-grid-community/client-side-row-model';
 	import type {
 		GridApi,
@@ -11,10 +11,11 @@
 		CellClickedEvent,
 		CellMouseOverEvent,
 	} from '@ag-grid-community/core';
-	import { createQuery, keepPreviousData } from '@tanstack/svelte-query';
+	import { tick } from 'svelte';
+	import { createQuery, hashKey, keepPreviousData } from '@tanstack/svelte-query';
 	import { page } from '$app/state';
 	import { goto } from '$app/navigation';
-	import { graphqlRequest } from '$lib/queries/client';
+	import { graphqlRequest } from '#lib/queries/client.js';
 	import {
 		ACTIVITY_LIST_STALE_TIME_MS,
 		cursorsAfterPage,
@@ -22,16 +23,17 @@
 		activityListRequest,
 		type ContentItem,
 		type ContentResponse,
-	} from '$lib/queries/content';
-	import { useContentDetails } from '$lib/queries/content/useContentDetails';
-	import { OPEN_CONTENT_PARAM } from '$lib/utils/contentLinks';
+	} from '#lib/queries/content/index.js';
+	import { useContentDetails } from '#lib/queries/content/useContentDetails.js';
+	import { OPEN_CONTENT_PARAM } from '#lib/utils/contentLinks.js';
+	import { createRowOrderMemory } from '#lib/utils/rowOrder.js';
 	import {
 		LIST_PERSPECTIVES_BY_USER,
 		MAX_PERSPECTIVES_PER_LIST,
 		type ListPerspectivesByUserResponse,
 		type PerspectiveItem,
-	} from '$lib/queries/perspectives';
-	import { queryKeys } from '$lib/queries/keys';
+	} from '#lib/queries/perspectives/index.js';
+	import { queryKeys } from '#lib/queries/keys.js';
 	import {
 		parseGridParams,
 		serializeGridParams,
@@ -39,8 +41,8 @@
 		filterToUrlParams,
 		filtersEqual,
 		nonGridFilters,
-	} from '$lib/utils/gridUrlState';
-	import type { DataMode, GridParams, SortSpec } from '$lib/utils/gridUrlState';
+	} from '#lib/utils/gridUrlState.js';
+	import type { DataMode, GridParams, SortSpec } from '#lib/utils/gridUrlState.js';
 	import {
 		typeCellRenderer,
 		categoryCellRenderer,
@@ -84,8 +86,8 @@
 		tmdbIdValueGetter,
 		textOrEmpty,
 		EMPTY_VALUE,
-	} from '$lib/utils/formatting';
-	import { headerMinWidth } from '$lib/utils/grid-header-width';
+	} from '#lib/utils/formatting.js';
+	import { headerMinWidth } from '#lib/utils/grid-header-width.js';
 	import {
 		capitalizeContentType,
 		durationComparator,
@@ -108,17 +110,26 @@
 		showColumnRelevanceCallout,
 		NUMERIC_COL_IDS,
 		liveGridApi,
-	} from '$lib/utils/grid-config';
-	import { ACTIVITY_GRID_THEME } from '$lib/utils/grid-theme';
-	import { emptyCellClassRules } from '$lib/utils/grid-empty';
-	import { useCardMode, useResponsiveTier } from '$lib/utils/responsive.svelte';
-	import { useMe } from '$lib/queries/users/useMe.svelte';
-	import { useUsernames } from '$lib/queries/users/useUsernames.svelte';
-	import ColumnPickerDialog from '$lib/components/ColumnPickerDialog.svelte';
-	import ColumnChartPopover from '$lib/components/charts/ColumnChartPopover.svelte';
-	import { CHART_ELIGIBLE_COLS, isChartEligible } from '$lib/utils/columnCharts';
-	import { isChartOn, loadChartFlags, setChartFlag } from '$lib/utils/columnChartSettings';
-	import { topBottom, type TopBottom } from '$lib/utils/columnStats';
+	} from '#lib/utils/grid-config.js';
+	import { ACTIVITY_GRID_THEME } from '#lib/utils/grid-theme.js';
+	import { emptyCellClassRules } from '#lib/utils/grid-empty.js';
+	import { useCardMode, useResponsiveTier } from '#lib/utils/responsive.svelte.js';
+	import { useMe } from '#lib/queries/users/useMe.svelte.js';
+	import { useUsernames } from '#lib/queries/users/useUsernames.svelte.js';
+	import ColumnPickerDialog from '#lib/components/ColumnPickerDialog.svelte';
+	import ExportMenu from '#lib/components/ExportMenu.svelte';
+	import PrintListView from '#lib/components/PrintListView.svelte';
+	import PrintOptionsDialog from '#lib/components/PrintOptionsDialog.svelte';
+	import type { PrintSpacing } from '#lib/components/PrintOptionsDialog.svelte';
+	import { isExportDisabled, readExportTable, type ExportGridApi } from '#lib/utils/exportGrid.js';
+	import type { ExportTable } from '#lib/utils/exportTable.js';
+	import { copyLibraryTable, downloadLibraryCsv } from '#lib/utils/exportActions.js';
+	import { copyWithToast, downloadWithToast } from '#lib/utils/toast.js';
+	import { addLandscapePageStyle, removeLandscapePageStyle, runPrint } from '#lib/utils/printing.js';
+	import ColumnChartPopover from '#lib/components/charts/ColumnChartPopover.svelte';
+	import { CHART_ELIGIBLE_COLS, isChartEligible } from '#lib/utils/columnCharts.js';
+	import { isChartOn, loadChartFlags, setChartFlag } from '#lib/utils/columnChartSettings.js';
+	import { topBottom, type TopBottom } from '#lib/utils/columnStats.js';
 	import {
 		COLUMN_VIEW_LABEL,
 		clearLayout,
@@ -129,14 +140,14 @@
 		saveLayout,
 		type ColumnLayout,
 		type ColumnView,
-	} from '$lib/utils/columnLayouts';
+	} from '#lib/utils/columnLayouts.js';
 	import { toast } from 'svelte-sonner';
-	import SortPickerDialog from '$lib/components/SortPickerDialog.svelte';
+	import SortPickerDialog from '#lib/components/SortPickerDialog.svelte';
 	import SlidersHorizontalIcon from '@lucide/svelte/icons/sliders-horizontal';
 	import ArrowUpDownIcon from '@lucide/svelte/icons/arrow-up-down';
-	import CellPopover, { type PopoverState } from '$lib/components/CellPopover.svelte';
-	import { buildPopoverState, createHoverController } from '$lib/utils/tooltipHover';
-	import { ACTIVITY_TOOLTIP_SPECS } from '$lib/utils/activityTooltipSpecs';
+	import CellPopover, { type PopoverState } from '#lib/components/CellPopover.svelte';
+	import { buildPopoverState, createHoverController } from '#lib/utils/tooltipHover.js';
+	import { ACTIVITY_TOOLTIP_SPECS } from '#lib/utils/activityTooltipSpecs.js';
 	import {
 		authorCellRenderer,
 		authorValueGetter,
@@ -148,17 +159,17 @@
 		publishedValueGetter,
 		ratingValueGetter,
 		readersValueGetter,
-	} from '$lib/utils/bookFormatting';
+	} from '#lib/utils/bookFormatting.js';
 	import { onDestroy, untrack } from 'svelte';
 	import ListOrderedIcon from '@lucide/svelte/icons/list-ordered';
-	import DataModeToggle from '$lib/components/DataModeToggle.svelte';
-	import FilterChips from '$lib/components/FilterChips.svelte';
-	import ColumnRelevanceCallout from '$lib/components/ColumnRelevanceCallout.svelte';
-	import { ContentTypeFilter, AgeRatingFilter, WebRoleFilter } from '$lib/utils/contentTypeFilter';
-	import ActivityDetailsModal from '$lib/components/ActivityDetailsModal.svelte';
-	import ActivityCardList from '$lib/components/ActivityCardList.svelte';
-	import AddToPlanDialog from '$lib/components/plan/AddToPlanDialog.svelte';
-	import { activityItemCellRenderer } from '$lib/utils/activityItemCellRenderer';
+	import DataModeToggle from '#lib/components/DataModeToggle.svelte';
+	import FilterChips from '#lib/components/FilterChips.svelte';
+	import ColumnRelevanceCallout from '#lib/components/ColumnRelevanceCallout.svelte';
+	import { ContentTypeFilter, AgeRatingFilter, WebRoleFilter } from '#lib/utils/contentTypeFilter.js';
+	import ActivityDetailsModal from '#lib/components/ActivityDetailsModal.svelte';
+	import ActivityCardList from '#lib/components/ActivityCardList.svelte';
+	import AddToPlanDialog from '#lib/components/plan/AddToPlanDialog.svelte';
+	import { activityItemCellRenderer } from '#lib/utils/activityItemCellRenderer.js';
 	import {
 		webAuthorCellRenderer,
 		webPublishedFilterValueGetter,
@@ -166,11 +177,11 @@
 		webRolesCellRenderer,
 		webSiteCellRenderer,
 		formatWebPublished,
-	} from '$lib/utils/webPageFormatting';
-	import { webPageAuthor, webPageSite } from '$lib/utils/webPage';
-	import CategoryTypeahead from '$lib/components/CategoryTypeahead.svelte';
-	import { useSetPrimaryCategory } from '$lib/queries/categories/useSetPrimaryCategory';
-	import type { WikidataSearchResult } from '$lib/queries/categories';
+	} from '#lib/utils/webPageFormatting.js';
+	import { webPageAuthor, webPageSite } from '#lib/utils/webPage.js';
+	import CategoryTypeahead from '#lib/components/CategoryTypeahead.svelte';
+	import { useSetPrimaryCategory } from '#lib/queries/categories/useSetPrimaryCategory.js';
+	import type { WikidataSearchResult } from '#lib/queries/categories/index.js';
 
 	// Popover state for Perspectize column
 	let popoverOpen = $state(false);
@@ -224,6 +235,12 @@
 		popoverOpen = true;
 	}
 
+	// From the details modal: close it first so the two dialogs never stack, then open the editor.
+	function handleAddPerspectiveFromDetails(content: { id: string; name: string }) {
+		handleCloseDetails();
+		openPerspective(content.id, content.name);
+	}
+
 	function handleAddPerspectiveFromCard(contentId: string) {
 		const row = rowData.find((item) => String(item.id) === contentId);
 		openPerspective(contentId, row?.name ?? '');
@@ -245,7 +262,9 @@
 
 	// Mobile card-list breakpoint (< 860px) — replaces the AG Grid entirely, per design handoff.
 	const card = useCardMode();
-	const cardMode = $derived(card.current);
+	// Export's As-seen print keeps the grid mounted even though a Letter page matches the card query.
+	let printingAsSeen = $state(false);
+	const cardMode = $derived(card.current && !printingAsSeen);
 
 	// Signed-in user — drives the admin-only "Internal" group in the column picker.
 	const meCtx = useMe();
@@ -441,7 +460,7 @@
 	// ---------------------------------------------------------------------------
 
 	// Derive grid params from current URL (reactive to URL changes)
-	const gridParams = $derived(parseGridParams(page.url.searchParams));
+	const gridParams = $derived(parseGridParams(new URLSearchParams(page.url.search)));
 
 	// Individual derived fields from URL
 	const mode = $derived(gridParams.mode);
@@ -474,7 +493,7 @@
 		const updated = { ...gridParams, ...changes };
 		const search = serializeGridParams(updated);
 		const url = search ? `?${search}` : page.url.pathname;
-		goto(url, { replaceState: replace, keepFocus: true, noScroll: true });
+		goto(url, { replace, reset: false });
 	}
 
 	// ---------------------------------------------------------------------------
@@ -578,11 +597,18 @@
 	// Derived values from query
 	// Rows get their adder's username from the cached users list (see useUsernames).
 	const usernames = useUsernames();
+	// The default server order (updatedAt desc) can put an edited row first on a refetch, so the row
+	// jumps out of view. Keep rows where they were while the list (its query key) stays the same.
+	const rowOrder = createRowOrderMemory();
 	const rowData = $derived(
-		(contentQuery.data?.content.items ?? []).map((item) => ({
-			...item,
-			addedByUsername: usernames.byId.get(item.addedByUserID) ?? null,
-		})),
+		rowOrder.apply(
+			hashKey(activityRequest.queryKey),
+			(contentQuery.data?.content.items ?? []).map((item) => ({
+				...item,
+				addedByUsername: usernames.byId.get(item.addedByUserID) ?? null,
+			})),
+			contentQuery.isPlaceholderData,
+		),
 	);
 	const detailsModalRow = $derived(rowData.find((item) => String(item.id) === detailsModalContentId) ?? null);
 	// A deep-linked item (`?open=<id>`, e.g. from a "Go to" toast or a verse jump) is
@@ -599,18 +625,16 @@
 		const id = page.url.searchParams.get(OPEN_CONTENT_PARAM);
 		if (!id) return;
 		detailsModalContentId = id;
-		const params = new URLSearchParams(page.url.searchParams);
+		const params = new URLSearchParams(page.url.search);
 		params.delete(OPEN_CONTENT_PARAM);
 		const search = params.toString();
-		goto(search ? `?${search}` : page.url.pathname, { replaceState: true, keepFocus: true, noScroll: true });
+		goto(search ? `?${search}` : page.url.pathname, { replace: true, reset: false });
 	});
 	const totalCount = $derived(contentQuery.data?.content.totalCount ?? 0);
-	// Reset the filtered-row count whenever the underlying row data changes
-	// (new fetch, mode switch) so a stale filtered count from the previous
-	// dataset doesn't linger until the next filter interaction.
+	// The grid reports its displayed (post-filter) row count through onModelUpdated, which also
+	// fires when row data is replaced under an active filter; the count is cleared on grid teardown.
 	$effect(() => {
 		rowData;
-		displayedRowCount = null;
 		hover.close(); // AG Grid recycles cell DOM; a stale anchor would mislead
 	});
 	const loadedItemsCount = $derived(displayedRowCount ?? rowData.length);
@@ -648,10 +672,9 @@
 
 	// The mobile card list has no AG Grid instance to sort or filter for it. In "All
 	// Items" mode the server already returned rows in the requested (and filtered)
-	// order; in "Loaded" mode, apply clientSorts and the URL filters by hand — this
-	// used to only sort, so a mobile "Loaded"-mode card view silently ignored every
-	// column filter (see the UI gap audit, gap #5). On desktop, AG Grid does both
-	// itself, so this is a no-op there.
+	// order; in "Loaded" mode, apply clientSorts and the URL filters by hand, or the
+	// mobile card view would silently ignore every column filter. On desktop, AG Grid
+	// does both itself, so this is a no-op there.
 	const sortedRowData = $derived(
 		mode === 'loaded' && cardMode
 			? (() => {
@@ -947,8 +970,7 @@
 				filterValueGetter: durationFilterValueGetter,
 				comparator: durationComparator,
 				context: { tooltipSpec: ACTIVITY_TOOLTIP_SPECS.duration },
-				headerTooltip:
-					'Video duration from YouTube API. For movies this is the runtime in h:mm (TMDB reports whole minutes).',
+				headerTooltip: 'Length of the item.',
 			},
 			{
 				colId: 'views',
@@ -1498,6 +1520,7 @@
 		onGridPreDestroyed: () => {
 			gridApi = null;
 			gridReady = false;
+			displayedRowCount = null;
 		},
 		onSortChanged: (event: SortChangedEvent) => {
 			hover.close();
@@ -1540,6 +1563,9 @@
 		// The person filter has no column, so "Loaded" mode applies it here, alongside the column filters.
 		isExternalFilterPresent: () => personFilter != null,
 		doesExternalFilterPass: (node) => (personFilter && node.data ? rowMatchesPerson(node.data, personFilter) : false),
+		onModelUpdated: (event) => {
+			displayedRowCount = event.api.getDisplayedRowCount();
+		},
 		onFilterChanged: (event: FilterChangedEvent) => {
 			hover.close();
 			// Immediate: update chip display
@@ -1715,10 +1741,80 @@
 		});
 	});
 
+	// Export: the grid is read at click time, so the output matches what the toolbar shows.
+	const exportDisabled = $derived(isExportDisabled({ gridReady, loading, displayedRows: loadedItemsCount }));
+	let printOptionsOpen = $state(false);
+	let printList = $state<{ table: ExportTable; title: string; spacing: PrintSpacing } | null>(null);
+
+	// The grid's resting layout; a print run restores this, not a fixed value.
+	const normalDomLayout = $derived(isMobile ? 'autoHeight' : 'normal');
+
+	function reportPrintFailure(err: unknown) {
+		toast.error(err instanceof Error ? `Could not print: ${err.message}` : 'Could not print');
+	}
+
+	function exportApi(): ExportGridApi | null {
+		return gridApi && !gridApi.isDestroyed() ? (gridApi as unknown as ExportGridApi) : null;
+	}
+
+	function handleDownloadCsv() {
+		const api = exportApi();
+		if (api) downloadWithToast(() => downloadLibraryCsv(api));
+	}
+
+	function handleCopy() {
+		const api = exportApi();
+		if (api) void copyWithToast(() => copyLibraryTable(api));
+	}
+
+	async function handlePrintAsSeen() {
+		const api = gridApi;
+		if (!api) return;
+		try {
+			await runPrint('grid', {
+				before: async () => {
+					printingAsSeen = true;
+					addLandscapePageStyle();
+					api.setGridOption('domLayout', 'print');
+					// AG Grid lays out the rows on a later frame; printing sooner can print a half-rendered grid.
+					await new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));
+					if (api.isDestroyed()) throw new Error('The table was closed before printing');
+				},
+				after: () => {
+					printingAsSeen = false;
+					removeLandscapePageStyle();
+					if (!api.isDestroyed()) api.setGridOption('domLayout', normalDomLayout);
+				},
+			});
+		} catch (err) {
+			reportPrintFailure(err);
+		}
+	}
+
+	async function handlePrintAsList({ title, spacing }: { title: string; spacing: PrintSpacing }) {
+		const api = gridApi;
+		if (!api) return;
+		try {
+			const table = readExportTable(api as unknown as ExportGridApi, 'print');
+			await runPrint('list', {
+				before: async () => {
+					printList = { table, title, spacing };
+					await tick();
+				},
+				after: () => {
+					printList = null;
+				},
+			});
+		} catch (err) {
+			printList = null;
+			reportPrintFailure(err);
+		}
+	}
+
 	// Switch to autoHeight on mobile — eliminates empty gap below last row
 	$effect(() => {
 		if (!gridApi || !gridReady) return;
-		gridApi.setGridOption('domLayout', isMobile ? 'autoHeight' : 'normal');
+		gridApi.setGridOption('domLayout', normalDomLayout);
 	});
 
 	// Re-evaluate flex column widths when the grid container resizes
@@ -1801,6 +1897,11 @@
 		onClearAll={() => {
 			cursors = [null];
 			updateUrl({ filters: {}, page: 1 });
+		}}
+		onClearAllButType={() => {
+			cursors = [null];
+			const { type } = gridParams.filters;
+			updateUrl({ filters: type ? { type } : {}, page: 1 });
 		}}
 	/>
 
@@ -1905,6 +2006,15 @@
 				<ArrowUpDownIcon class="size-4" />
 				<span class="hidden md:inline">Clear sorts</span>
 			</button>
+			{#if !cardMode}
+				<ExportMenu
+					disabled={exportDisabled}
+					onDownloadCsv={handleDownloadCsv}
+					onCopy={handleCopy}
+					onPrintAsSeen={handlePrintAsSeen}
+					onPrintAsList={() => (printOptionsOpen = true)}
+				/>
+			{/if}
 			{#if mode === 'all'}
 				<div class="hidden md:flex items-center gap-2">
 					<label for="pageSize" class="text-muted-foreground">Page size:</label>
@@ -1951,7 +2061,7 @@
      (~170KB gzipped), which would otherwise load eagerly on every visit to this page
      even for users who never open the editor. -->
 {#if popoverOpen && popoverContentId !== null}
-	{#await import('$lib/components/PerspectivePopover.svelte') then { default: PerspectivePopover }}
+	{#await import('#lib/components/PerspectivePopover.svelte') then { default: PerspectivePopover }}
 		<PerspectivePopover
 			contentId={popoverContentId}
 			contentName={popoverContentName}
@@ -1973,6 +2083,7 @@
 	open={detailsModalContentId !== null}
 	onClose={handleCloseDetails}
 	onAddToPlan={currentUserId !== null ? handleAddToPlan : undefined}
+	onAddPerspective={handleAddPerspectiveFromDetails}
 />
 
 <!-- "Add to plan" todo dialog. Mounted only while open; the caller is signed in by construction. -->
@@ -2013,6 +2124,16 @@
 			focusOnOpen={chartTarget.keyboard}
 		/>
 	{/key}
+{/if}
+
+<!-- Print setup for "Print as list": mounted only while open, like the pickers. -->
+{#if printOptionsOpen}
+	<PrintOptionsDialog bind:open={printOptionsOpen} onPrint={handlePrintAsList} />
+{/if}
+
+<!-- The print-only list; it portals itself to <body> and shows only under html[data-print='list']. -->
+{#if printList}
+	<PrintListView table={printList.table} title={printList.title} spacing={printList.spacing} />
 {/if}
 
 <!-- Sort picker — works identically on mobile and desktop, and in both data modes;

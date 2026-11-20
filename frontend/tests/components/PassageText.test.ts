@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/svelte';
-import PassageText from '$lib/components/PassageText.svelte';
+import PassageText from '#lib/components/PassageText.svelte';
+import { verseOrdinal } from '#lib/utils/bible.js';
 
 const mocks = vi.hoisted(() => ({
 	mockQueryState: { data: null as unknown, isLoading: false, isError: false },
@@ -17,8 +18,8 @@ vi.mock('@tanstack/svelte-query', () => ({
 	createMutation: () => ({ mutate: mocks.mutate, isPending: false }),
 	useQueryClient: () => ({ invalidateQueries: vi.fn() }),
 }));
-vi.mock('$lib/queries/client', () => ({ graphqlRequest: vi.fn() }));
-vi.mock('$lib/components/interlinear/OriginalLanguage.svelte', async () => {
+vi.mock('#lib/queries/client.js', () => ({ graphqlRequest: vi.fn() }));
+vi.mock('#lib/components/interlinear/OriginalLanguage.svelte', async () => {
 	const { default: Stub } = await import('../helpers/OriginalLanguageStub.svelte');
 	return { default: Stub };
 });
@@ -197,6 +198,51 @@ describe('PassageText', () => {
 			const { container } = render(PassageText, { props: { startVerseId: 1, endVerseId: 1 } });
 			expect(screen.queryByRole('button', { name: /^Verse/ })).not.toBeInTheDocument();
 			expect(container.querySelector('sup')?.textContent).toBe('1');
+		});
+	});
+
+	describe('verses the BSB omits (empty text)', () => {
+		const matthew1721 = verseOrdinal(40, 17, 21)!;
+
+		beforeEach(() => {
+			mocks.mutate.mockReset();
+		});
+
+		it('keeps an omitted verse number inside a passage and explains the gap in place of its text', () => {
+			mocks.mockQueryState.data = {
+				passageText: {
+					translation: 'BSB',
+					copyright: COPYRIGHT,
+					verses: [
+						{ verseId: 1, chapter: 1, verse: 1, text: 'Verse text 1' },
+						{ verseId: 2, chapter: 1, verse: 2, text: '' },
+						{ verseId: 3, chapter: 1, verse: 3, text: 'Verse text 3' },
+					],
+				},
+			};
+			const { container } = render(PassageText, { props: { startVerseId: 1, endVerseId: 3 } });
+			expect(screen.getByText('omitted in the BSB')).toBeInTheDocument();
+			expect(screen.getByRole('button', { name: 'Verse 2' })).toBeInTheDocument();
+			expect(container.textContent).toContain('Verse text 1');
+			expect(container.textContent).toContain('Verse text 3');
+			expect(screen.queryByRole('link')).not.toBeInTheDocument();
+		});
+
+		it('replaces a passage that is only omitted verses with an explicit state and a Bible Gateway link', () => {
+			mocks.mockQueryState.data = {
+				passageText: {
+					translation: 'BSB',
+					copyright: COPYRIGHT,
+					verses: [{ verseId: matthew1721, chapter: 17, verse: 21, text: '' }],
+				},
+			};
+			render(PassageText, { props: { startVerseId: matthew1721, endVerseId: matthew1721 } });
+			expect(screen.getByText(/omits this verse/i)).toBeInTheDocument();
+			const link = screen.getByRole('link', { name: /read it on bible gateway/i });
+			expect(link.getAttribute('href')).toContain('biblegateway.com');
+			expect(link.getAttribute('href')).toContain('search=Matthew+17%3A21');
+			expect(screen.getByText(/public domain/i)).toBeInTheDocument();
+			expect(screen.queryByRole('button', { name: /show original language/i })).not.toBeInTheDocument();
 		});
 	});
 });

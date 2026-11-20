@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { formatColorForUnit, parseColorInput } from '$lib/theme/format';
+import { formatColorForUnit, parseColorInput } from '#lib/theme/format.js';
 
 describe('formatColorForUnit', () => {
 	const navy = '#1a365d';

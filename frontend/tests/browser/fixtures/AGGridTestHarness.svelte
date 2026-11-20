@@ -13,8 +13,8 @@
 		formatCount,
 		formatPublishDate,
 		formatTags,
-	} from '$lib/utils/formatting';
-	import { capitalizeContentType, durationComparator } from '$lib/utils/grid-config';
+	} from '#lib/utils/formatting.js';
+	import { capitalizeContentType, durationComparator } from '#lib/utils/grid-config.js';
 
 	let {
 		testRowData = [],

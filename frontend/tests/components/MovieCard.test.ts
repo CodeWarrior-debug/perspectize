@@ -1,9 +1,9 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/svelte';
-import MovieCard from '$lib/components/discover/MovieCard.svelte';
-import type { MovieSearchResult } from '$lib/services/tmdbApi';
+import MovieCard from '#lib/components/discover/MovieCard.svelte';
+import type { MovieSearchResult } from '#lib/services/tmdbApi.js';
 
-vi.mock('$lib/queries/users/useMe.svelte', () => ({ useMe: () => ({ me: null }) }));
+vi.mock('#lib/queries/users/useMe.svelte.js', () => ({ useMe: () => ({ me: null }) }));
 
 const matrix: MovieSearchResult = {
 	tmdbId: 603,

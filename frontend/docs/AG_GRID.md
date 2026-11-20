@@ -33,7 +33,7 @@ AG Grid requires a real browser for integration testing — jsdom doesn't suppor
 
 ### Unit Tests (jsdom)
 
-Test pure logic extracted into `$lib/utils/grid-config.ts`:
+Test pure logic extracted into `#lib/utils/grid-config.ts`:
 
 ```bash
 pnpm run test:run          # Runs unit tests only (jsdom)
@@ -85,5 +85,5 @@ tests/
 ## Do NOT
 
 - Import from `ag-grid-community` (use `@ag-grid-community/*`)
-- Import AG Grid CSS (use `withParams()` on a theme: Activity uses `ACTIVITY_GRID_THEME` from `$lib/utils/grid-theme`; Plan uses `themeBalham` with `GRID_THEME_PARAMS`)
+- Import AG Grid CSS (use `withParams()` on a theme: Activity uses `ACTIVITY_GRID_THEME` from `#lib/utils/grid-theme`; Plan uses `themeBalham` with `GRID_THEME_PARAMS`)
 - Use `AgGridSvelte` (use `AgGridSvelte5Component`)

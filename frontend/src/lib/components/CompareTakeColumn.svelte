@@ -1,17 +1,22 @@
 <script lang="ts">
 	import SafeHtml from './SafeHtml.svelte';
-	import { nameInitials } from '$lib/utils/compareIdentity';
+	import LockIcon from '@lucide/svelte/icons/lock';
+	import { nameInitials } from '#lib/utils/compareIdentity.js';
 
 	let {
 		name,
 		avatarColor,
 		review,
 		uniqueFeelings,
+		isPrivate = false,
 	}: {
 		name: string;
 		avatarColor: string;
 		review: string | null;
 		uniqueFeelings: { emoji: string; label: string | null }[];
+		// Public is the default and carries no marker (the app's convention:
+		// only private is labelled, as in PerspectivePopover's Private switch).
+		isPrivate?: boolean;
 	} = $props();
 </script>
 
@@ -25,6 +30,15 @@
 			{nameInitials(name)}
 		</span>
 		<span class="text-[13px] font-semibold text-foreground">{name}</span>
+		{#if isPrivate}
+			<span
+				class="ml-auto flex items-center gap-1 text-[11.5px] font-medium text-muted-foreground"
+				data-testid="take-private"
+			>
+				<LockIcon class="size-3" aria-hidden="true" />
+				Private
+			</span>
+		{/if}
 	</div>
 	<div
 		class="font-slot-longform font-[family-name:var(--font-family-serif)] text-[13.5px] leading-snug text-foreground"

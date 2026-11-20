@@ -1,5 +1,5 @@
 import { Capacitor } from '@capacitor/core';
-import type { FrontendBuildInfo } from '$lib/utils/versionInfo';
+import type { FrontendBuildInfo } from '#lib/utils/versionInfo.js';
 
 // typeof guard keeps this importable from configs that lack the `define` (e.g. the
 // standalone vitest browser project) instead of throwing a ReferenceError.

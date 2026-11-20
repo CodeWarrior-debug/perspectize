@@ -1,4 +1,4 @@
-import booksData from '$lib/data/bible-books.json';
+import booksData from '#lib/data/bible-books.json';
 
 export interface BibleBook {
 	id: number;

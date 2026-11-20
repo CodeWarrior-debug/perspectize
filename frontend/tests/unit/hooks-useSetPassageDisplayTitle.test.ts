@@ -26,24 +26,24 @@ vi.mock('svelte-sonner', () => ({
 	toast: { success: mocks.mockToastSuccess, info: mocks.mockToastInfo, error: mocks.mockToastError },
 }));
 
-vi.mock('$lib/queries/client', () => ({ graphqlRequest: vi.fn() }));
+vi.mock('#lib/queries/client.js', () => ({ graphqlRequest: vi.fn() }));
 
 // The tests import these inside their bodies; load them once up front so the first
 // test doesn't pay the module transform, which balloons under full-suite load (#728).
 preloadLazy(
-	() => import('$lib/queries/bible/useSetPassageDisplayTitle'),
-	() => import('$lib/queries/client'),
+	() => import('#lib/queries/bible/useSetPassageDisplayTitle.js'),
+	() => import('#lib/queries/client.js'),
 );
 
 describe('useSetPassageDisplayTitle', () => {
 	beforeEach(async () => {
 		vi.clearAllMocks();
-		const { useSetPassageDisplayTitle } = await import('$lib/queries/bible/useSetPassageDisplayTitle');
+		const { useSetPassageDisplayTitle } = await import('#lib/queries/bible/useSetPassageDisplayTitle.js');
 		useSetPassageDisplayTitle();
 	});
 
 	it('sends the input through the authenticated graphqlRequest wrapper', async () => {
-		const { graphqlRequest } = await import('$lib/queries/client');
+		const { graphqlRequest } = await import('#lib/queries/client.js');
 		(graphqlRequest as any).mockResolvedValue({ setPassageDisplayTitle: { id: '7', displayTitle: 'Creation' } });
 
 		const input = { contentID: '7', title: 'Creation' };
@@ -78,7 +78,7 @@ describe('useSetPassageDisplayTitle', () => {
 	});
 
 	it('withDisplayTitle patches lists and rows, and leaves other shapes untouched', async () => {
-		const { withDisplayTitle } = await import('$lib/queries/bible/useSetPassageDisplayTitle');
+		const { withDisplayTitle } = await import('#lib/queries/bible/useSetPassageDisplayTitle.js');
 		const list = {
 			content: {
 				items: [

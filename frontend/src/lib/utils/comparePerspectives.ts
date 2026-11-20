@@ -4,8 +4,8 @@
  * comparisons, "filled in differently" rows, feelings overlap, and overall
  * (thumbs) agreement. No I/O, no Svelte — unit tested directly.
  */
-import type { PerspectiveItem, FeelingEntry } from '$lib/queries/perspectives';
-import { ratingToDisplay } from '$lib/utils/ratings';
+import type { PerspectiveItem, FeelingEntry } from '#lib/queries/perspectives/index.js';
+import { ratingToDisplay } from '#lib/utils/ratings.js';
 
 export type RatingStatus = 'similar' | 'diverges' | 'conflict';
 
@@ -68,8 +68,7 @@ export const DIVERGES_THRESHOLD = 3.0;
  * The four standard rating dimensions and their labels. This is the single
  * source of truth `getFieldLabel` (below) reads from, and that
  * AddFieldSearch.svelte and PerspectivePopover.svelte also import from, so a
- * renamed/relabeled dimension can't drift between the three files (see the UI
- * gap audit, gap #17).
+ * renamed/relabeled dimension can't drift between the three files.
  */
 export const STANDARD_DIMENSIONS: { key: 'quality' | 'agreement' | 'importance' | 'confidence'; label: string }[] = [
 	{ key: 'quality', label: 'Quality' },
@@ -172,9 +171,8 @@ export function filledInDifferently(left: PerspectiveItem, right: PerspectiveIte
 	}
 
 	// Same numeric-only custom field handling as compareRatings — a custom
-	// field only one side filled in was previously dropped entirely here,
-	// even though the matching "both filled it in" case already surfaces in
-	// compareRatings (compare-page-enhancements #3).
+	// field only one side filled in is included here too, matching the
+	// "both filled it in" case that compareRatings surfaces.
 	const leftCustom = numericCustomFields(left.customFields);
 	const rightCustom = numericCustomFields(right.customFields);
 	for (const [key, leftRaw] of leftCustom) {
@@ -232,7 +230,7 @@ export function compareOverall(left: PerspectiveItem, right: PerspectiveItem): O
 /**
  * Single headline "how aligned are these two takes" number, in percent —
  * the counterpart to the similar/diverges/conflict breakdown that has no
- * one-number verdict of its own (compare-page-enhancements #5). Averages
+ * one-number verdict of its own. Averages
  * each shared dimension's pctDiff (already 0-100, see compareRatings) and
  * inverts it, so 0% average difference reads as 100% aligned. Null when
  * there are no shared rating dimensions to average — nothing to report.

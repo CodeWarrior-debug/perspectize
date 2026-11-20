@@ -3,9 +3,9 @@
  * Each state is named so a change to the rule fails on the state it breaks.
  */
 import { describe, it, expect } from 'vitest';
-import { queryKeys } from '$lib/queries/keys';
-import { sortOnlyPlaceholder } from '$lib/queries/userTodos/useUserTodos';
-import type { UserTodosArgs, UserTodosResponse } from '$lib/queries/userTodos';
+import { queryKeys } from '#lib/queries/keys.js';
+import { sortOnlyPlaceholder } from '#lib/queries/userTodos/useUserTodos.js';
+import type { UserTodosArgs, UserTodosResponse } from '#lib/queries/userTodos/index.js';
 
 const PAGE: UserTodosResponse = {
 	userTodos: {

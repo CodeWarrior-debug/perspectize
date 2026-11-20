@@ -1,9 +1,9 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/svelte';
-import BookCard from '$lib/components/discover/BookCard.svelte';
-import type { BookSearchResult } from '$lib/services/openLibraryApi';
+import BookCard from '#lib/components/discover/BookCard.svelte';
+import type { BookSearchResult } from '#lib/services/openLibraryApi.js';
 
-vi.mock('$lib/queries/users/useMe.svelte', () => ({ useMe: () => ({ me: null }) }));
+vi.mock('#lib/queries/users/useMe.svelte.js', () => ({ useMe: () => ({ me: null }) }));
 
 const EAST_OF_EDEN_URL = 'https://openlibrary.org/works/OL23166W';
 

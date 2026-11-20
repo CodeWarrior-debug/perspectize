@@ -19,12 +19,12 @@ vi.mock('@tanstack/svelte-query', () => ({
 	})),
 }));
 
-vi.mock('$lib/queries/client', () => ({
+vi.mock('#lib/queries/client.js', () => ({
 	graphqlRequest: (...args: unknown[]) => mocks.mockGraphql(...args),
 }));
 
-import { useSetOnboardingDisplayNextSession } from '$lib/queries/users/useSetOnboardingDisplayNextSession';
-import { SET_ONBOARDING_DISPLAY_NEXT_SESSION } from '$lib/queries/users';
+import { useSetOnboardingDisplayNextSession } from '#lib/queries/users/useSetOnboardingDisplayNextSession.js';
+import { SET_ONBOARDING_DISPLAY_NEXT_SESSION } from '#lib/queries/users/index.js';
 
 describe('useSetOnboardingDisplayNextSession', () => {
 	beforeEach(() => {

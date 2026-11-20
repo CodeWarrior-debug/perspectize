@@ -10,8 +10,8 @@ import {
 	placePopover,
 	connectorLine,
 	englishOrderWords,
-} from '$lib/utils/interlinear';
-import type { InterlinearVerse, InterlinearWord } from '$lib/queries/bible';
+} from '#lib/utils/interlinear.js';
+import type { InterlinearVerse, InterlinearWord } from '#lib/queries/bible/index.js';
 
 const verse: InterlinearVerse = {
 	verseId: 1,

@@ -2,8 +2,7 @@
 	/**
 	 * Empty-state picker for /compare with no ?contentId — lets a visitor
 	 * search for content and jump straight into a comparison, instead of the
-	 * page being a dead end that only explains "open it from Library"
-	 * (compare-page-enhancements #1).
+	 * page being a dead end that only explains "open it from Library".
 	 *
 	 * Only surfaces content with 2+ perspectives visible to the viewer
 	 * (comparison needs two takes), filtered server-side via
@@ -14,13 +13,13 @@
 	 */
 	import { createQuery } from '@tanstack/svelte-query';
 	import { goto } from '$app/navigation';
-	import { graphqlRequest } from '$lib/queries/client';
-	import { LIST_COMPARABLE_CONTENT, type ListComparableContentResponse } from '$lib/queries/content';
-	import { queryKeys } from '$lib/queries/keys';
-	import ContentSearchInput from '$lib/components/ContentSearchInput.svelte';
-	import { Button } from '$lib/components/shadcn';
-	import { extractVideoIdFromUrl } from '$lib/utils/formatting';
-	import { LIBRARY_PATH } from '$lib/utils/contentLinks';
+	import { graphqlRequest } from '#lib/queries/client.js';
+	import { LIST_COMPARABLE_CONTENT, type ListComparableContentResponse } from '#lib/queries/content/index.js';
+	import { queryKeys } from '#lib/queries/keys.js';
+	import ContentSearchInput from '#lib/components/ContentSearchInput.svelte';
+	import { Button } from '#lib/components/shadcn/index.js';
+	import { extractVideoIdFromUrl } from '#lib/utils/formatting.js';
+	import { LIBRARY_PATH } from '#lib/utils/contentLinks.js';
 
 	let searchValue = $state('');
 	let debouncedQuery = $state('');

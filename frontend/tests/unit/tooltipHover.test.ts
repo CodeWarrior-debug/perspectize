@@ -1,8 +1,8 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { buildPopoverState, createHoverController } from '$lib/utils/tooltipHover';
-import { formatCountExact, percentLikedTooltip, percentLikedValueGetter } from '$lib/utils/formatting';
-import { ACTIVITY_TOOLTIP_SPECS } from '$lib/utils/activityTooltipSpecs';
-import type { PopoverState } from '$lib/components/CellPopover.svelte';
+import { buildPopoverState, createHoverController } from '#lib/utils/tooltipHover.js';
+import { formatCountExact, percentLikedTooltip, percentLikedValueGetter } from '#lib/utils/formatting.js';
+import { ACTIVITY_TOOLTIP_SPECS } from '#lib/utils/activityTooltipSpecs.js';
+import type { PopoverState } from '#lib/components/CellPopover.svelte';
 
 const cellEl = document.createElement('div');
 

@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { onMount, onDestroy } from 'svelte';
-	import LazyLoadError from '$lib/components/LazyLoadError.svelte';
+	import LazyLoadError from '#lib/components/LazyLoadError.svelte';
 
 	interface Props {
 		value: string; // hex

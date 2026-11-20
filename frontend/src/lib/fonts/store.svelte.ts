@@ -1,4 +1,4 @@
-import { browser } from '$app/environment';
+import { browser } from '$app/env';
 import { fontStack, stylesheetHref, type FontChoice } from './googleFonts';
 import { FONT_SLOTS, type FontSlot } from './slots';
 

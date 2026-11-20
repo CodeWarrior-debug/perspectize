@@ -9,8 +9,8 @@
  */
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { hashKey } from '@tanstack/svelte-query';
-import { BOOK_SEARCH_STALE_TIME, BOOK_TRENDING_STALE_TIME, openLibraryKeys } from '$lib/services/openLibraryApi';
-import { tmdbKeys } from '$lib/services/tmdbApi';
+import { BOOK_SEARCH_STALE_TIME, BOOK_TRENDING_STALE_TIME, openLibraryKeys } from '#lib/services/openLibraryApi.js';
+import { tmdbKeys } from '#lib/services/tmdbApi.js';
 import { countingFetch, makeClient, mountConsumers } from '../helpers/queryBudget';
 import { preloadLazy } from '../helpers/warmUp';
 
@@ -20,7 +20,7 @@ afterEach(() => {
 
 // The tests import these inside their bodies; load them once up front so the first
 // test doesn't pay the module transform, which balloons under full-suite load (#728).
-preloadLazy(() => import('$lib/services/openLibraryApi'));
+preloadLazy(() => import('#lib/services/openLibraryApi.js'));
 
 describe('book search key hygiene', () => {
 	it('is stable for the same query and page', () => {
@@ -166,7 +166,7 @@ describe('book ISBN lookup key hygiene', () => {
 
 describe('reading-log counts add no network call', () => {
 	it('every book query selects the four counts on its one call', async () => {
-		const { BOOK_SEARCH, BOOK_TRENDING, BOOK_BY_ISBN } = await import('$lib/services/openLibraryApi');
+		const { BOOK_SEARCH, BOOK_TRENDING, BOOK_BY_ISBN } = await import('#lib/services/openLibraryApi.js');
 		for (const doc of [BOOK_SEARCH, BOOK_TRENDING, BOOK_BY_ISBN]) {
 			for (const field of ['wantToReadCount', 'currentlyReadingCount', 'alreadyReadCount', 'readingLogCount']) {
 				expect(doc, field).toContain(field);

@@ -31,7 +31,7 @@ real logic. A test that passes because nothing rendered is worse than no test.
 
 ## When to invoke
 
-- **Tests for new or changed code.** A component, `useX` hook or `$lib/utils`
+- **Tests for new or changed code.** A component, `useX` hook or `#lib/utils`
   function.
 - **Regression test.** Reproduce a UI bug with a failing test, and confirm it
   fails for the stated reason before any fix.
@@ -54,7 +54,7 @@ real logic. A test that passes because nothing rendered is worse than no test.
 - **`TestWrapper.svelte`:** render the passed component as
   `<wrapped.Comp {...props} />`. Any other form silently renders nothing.
 - **AG Grid does not render in jsdom.** Test grid logic through
-  `$lib/utils/grid-config.ts` and `formatting.ts`; use `tests/browser/` for
+  `#lib/utils/grid-config.ts` and `formatting.ts`; use `tests/browser/` for
   real grid behaviour. In browser tests, wait for cells with
   `expect.poll(...)`, not for rows.
 - **Detached DOM:** mount a vanilla component's `getGui()` into

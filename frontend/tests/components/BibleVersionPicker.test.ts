@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/svelte';
-import BibleVersionPicker from '$lib/components/BibleVersionPicker.svelte';
-import { createBibleVersionStore, BIBLE_VERSION_KEY } from '$lib/utils/bibleVersion.svelte';
+import BibleVersionPicker from '#lib/components/BibleVersionPicker.svelte';
+import { createBibleVersionStore, BIBLE_VERSION_KEY } from '#lib/utils/bibleVersion.svelte.js';
 
 describe('BibleVersionPicker', () => {
 	beforeEach(() => localStorage.clear());

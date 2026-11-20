@@ -1,12 +1,12 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import { Button, Input, Label } from '$lib/components/shadcn';
+	import { Button, Input, Label } from '#lib/components/shadcn/index.js';
 	import ColorWheel from './ColorWheel.svelte';
-	import { THEME_PRESETS, THEME_PRESET_TOKENS } from '$lib/theme/presets';
-	import { downloadThemeCss } from '$lib/theme/export';
-	import { deriveTheme, type BaseThemeTokens } from '$lib/theme/derive';
-	import { formatColorForUnit, parseColorInput, type ColorUnit } from '$lib/theme/format';
-	import type { ThemeStore } from '$lib/theme/store.svelte';
+	import { THEME_PRESETS, THEME_PRESET_TOKENS } from '#lib/theme/presets.js';
+	import { downloadThemeCss } from '#lib/theme/export.js';
+	import { deriveTheme, type BaseThemeTokens } from '#lib/theme/derive.js';
+	import { formatColorForUnit, parseColorInput, type ColorUnit } from '#lib/theme/format.js';
+	import type { ThemeStore } from '#lib/theme/store.svelte.js';
 
 	let { store }: { store: ThemeStore } = $props();
 
@@ -220,8 +220,8 @@
 			<div class="flex flex-col gap-2 border-t border-border pt-4">
 				{#if showSaveInput}
 					<div class="flex gap-2">
-						<Label for="theme-name" class="sr-only">Theme name</Label>
-						<Input id="theme-name" bind:value={saveName} placeholder="Name your theme" />
+						<Label for="theme-name" class="sr-only">Theme title</Label>
+						<Input id="theme-name" bind:value={saveName} placeholder="Give your theme a title" />
 						<Button onclick={saveTheme}>Save</Button>
 					</div>
 				{:else}

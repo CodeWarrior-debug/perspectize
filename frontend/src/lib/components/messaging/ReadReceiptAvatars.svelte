@@ -1,5 +1,5 @@
 <script lang="ts">
-	import type { ThreadParticipant } from '$lib/queries/messaging';
+	import type { ThreadParticipant } from '#lib/queries/messaging/index.js';
 	import Avatar from './Avatar.svelte';
 
 	let { participants, seq, myUserId }: { participants: ThreadParticipant[]; seq: number; myUserId: string } = $props();

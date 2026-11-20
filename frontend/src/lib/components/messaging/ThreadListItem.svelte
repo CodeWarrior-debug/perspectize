@@ -1,11 +1,11 @@
 <script lang="ts">
-	import type { MessageThread } from '$lib/queries/messaging';
-	import { threadTitle } from '$lib/messaging/format';
-	import { formatDateCompact } from '$lib/utils/formatting';
+	import type { MessageThread } from '#lib/queries/messaging/index.js';
+	import { threadTitle } from '#lib/messaging/format.js';
+	import { formatDateCompact } from '#lib/utils/formatting.js';
 	import Avatar from './Avatar.svelte';
 	import BellIcon from '@lucide/svelte/icons/bell';
 	import BellOffIcon from '@lucide/svelte/icons/bell-off';
-	import { useMuteThread } from '$lib/queries/messaging/useMuteThread';
+	import { useMuteThread } from '#lib/queries/messaging/useMuteThread.js';
 
 	let {
 		thread,

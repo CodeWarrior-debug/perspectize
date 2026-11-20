@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { commentaryLinks } from '$lib/utils/bibleCommentary';
-import type { PassageRange } from '$lib/utils/bible';
+import { commentaryLinks } from '#lib/utils/bibleCommentary.js';
+import type { PassageRange } from '#lib/utils/bible.js';
 
 const range = (bookId: number, ch: number, v: number, endCh = ch, endV = v): PassageRange => ({
 	bookId,

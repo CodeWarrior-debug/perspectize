@@ -1,8 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/svelte';
 import { createRawSnippet } from 'svelte';
-import OriginalLanguage from '$lib/components/interlinear/OriginalLanguage.svelte';
-import { queryKeys } from '$lib/queries/keys';
+import OriginalLanguage from '#lib/components/interlinear/OriginalLanguage.svelte';
+import { queryKeys } from '#lib/queries/keys.js';
 
 const mocks = vi.hoisted(() => ({
 	state: { data: undefined as unknown, isPending: false, isLoading: false, isError: false, refetch: vi.fn() },
@@ -15,7 +15,7 @@ vi.mock('@tanstack/svelte-query', () => ({
 		return mocks.state;
 	},
 }));
-vi.mock('$lib/queries/client', () => ({ graphqlRequest: vi.fn() }));
+vi.mock('#lib/queries/client.js', () => ({ graphqlRequest: vi.fn() }));
 
 const plainSnippet = createRawSnippet(() => ({ render: () => '<div data-testid="plain">plain verses</div>' }));
 const verses = [{ verseId: 1, chapter: 1, verse: 1, text: 'In the beginning' }];

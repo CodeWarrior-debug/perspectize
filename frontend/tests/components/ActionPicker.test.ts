@@ -1,14 +1,14 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/svelte';
-import ActionPicker from '$lib/components/plan/ActionPicker.svelte';
-import type { TodoActionItem } from '$lib/queries/userTodos';
+import ActionPicker from '#lib/components/plan/ActionPicker.svelte';
+import type { TodoActionItem } from '#lib/queries/userTodos/index.js';
 
 const mocks = vi.hoisted(() => ({
 	actions: [] as TodoActionItem[],
 	createMutateAsync: vi.fn(),
 }));
 
-vi.mock('$lib/queries/userTodos/useTodoActions', () => ({
+vi.mock('#lib/queries/userTodos/useTodoActions.js', () => ({
 	useTodoActions: vi.fn(() => ({
 		get data() {
 			return { todoActions: mocks.actions };
@@ -17,7 +17,7 @@ vi.mock('$lib/queries/userTodos/useTodoActions', () => ({
 	})),
 }));
 
-vi.mock('$lib/queries/userTodos/useCreateTodoAction', () => ({
+vi.mock('#lib/queries/userTodos/useCreateTodoAction.js', () => ({
 	useCreateTodoAction: vi.fn(() => ({
 		mutateAsync: mocks.createMutateAsync,
 		isPending: false,

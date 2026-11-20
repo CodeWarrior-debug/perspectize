@@ -1,9 +1,9 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/svelte';
-import VideoCard from '$lib/components/discover/VideoCard.svelte';
-import type { VideoItem } from '$lib/services/youtubeApi';
+import VideoCard from '#lib/components/discover/VideoCard.svelte';
+import type { VideoItem } from '#lib/services/youtubeApi.js';
 
-vi.mock('$lib/queries/users/useMe.svelte', () => ({ useMe: () => ({ me: null }) }));
+vi.mock('#lib/queries/users/useMe.svelte.js', () => ({ useMe: () => ({ me: null }) }));
 
 const video: VideoItem = {
 	id: 'abc123',

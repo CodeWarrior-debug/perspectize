@@ -1,5 +1,5 @@
 <script lang="ts">
-	import CategoryTypeahead from '$lib/components/CategoryTypeahead.svelte';
+	import CategoryTypeahead from '#lib/components/CategoryTypeahead.svelte';
 
 	// Host wrapper for testing CategoryTypeahead's debounce. A plain render()
 	// can't observe the internal debounced term; this owns the bound state and

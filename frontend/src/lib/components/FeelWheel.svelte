@@ -1,8 +1,9 @@
 <script lang="ts">
+	import { NO_AUTOFILL } from '#lib/utils/noAutofill.js';
 	import XIcon from '@lucide/svelte/icons/x';
 	import SearchIcon from '@lucide/svelte/icons/search';
-	import RatingInput from '$lib/components/RatingInput.svelte';
-	import { FEEL_WHEEL, FAMILY_ORDER, searchExtendedFeelings, type ExtendedFeeling } from '$lib/data/feelings';
+	import RatingInput from '#lib/components/RatingInput.svelte';
+	import { FEEL_WHEEL, FAMILY_ORDER, searchExtendedFeelings, type ExtendedFeeling } from '#lib/data/feelings.js';
 
 	export interface Feeling {
 		emoji: string;
@@ -66,7 +67,10 @@
 	// around one ring would collide arc-to-arc, so every other item sits on
 	// an outer ring — halves the angular density each ring has to absorb
 	// (36° apart instead of 18°) without shrinking the wheel to fit text.
-	const CENTER = 160;
+	// Coordinates are in a 320-unit square, placed as percentages so the wheel
+	// can shrink to a narrow phone drawer without its outer items overflowing.
+	const SIZE = 320;
+	const CENTER = SIZE / 2;
 	const RADIUS_INNER = 82;
 	const RADIUS_OUTER = 138;
 
@@ -75,14 +79,14 @@
 		const rad = ((angleDeg - 90) * Math.PI) / 180; // -90 so 0deg = top
 		const x = CENTER + radius * Math.cos(rad);
 		const y = CENTER + radius * Math.sin(rad);
-		return `left: ${x}px; top: ${y}px;`;
+		return `left: ${(x / SIZE) * 100}%; top: ${(y / SIZE) * 100}%;`;
 	}
 </script>
 
 <div class="flex flex-col gap-4">
 	<!-- The wheel itself: 20 emoji positioned by angle, alternating inner/outer
 	     ring so each item's always-visible label has room to breathe. -->
-	<div class="relative mx-auto" style="width: 320px; height: 320px;">
+	<div class="relative mx-auto w-full max-w-[320px] aspect-square">
 		{#each FEEL_WHEEL as f, i (f.angle)}
 			{@const selected = isSelected(f.emoji)}
 			<button
@@ -109,6 +113,7 @@
 	<div class="relative">
 		<SearchIcon class="absolute left-2.5 top-1/2 -translate-y-1/2 size-3.5 text-muted-foreground" />
 		<input
+			{...NO_AUTOFILL}
 			type="text"
 			bind:value={searchQuery}
 			placeholder="Search more feelings — e.g. nervous"
@@ -176,6 +181,7 @@
 						trackWidth={110}
 					/>
 					<textarea
+						{...NO_AUTOFILL}
 						value={f.note ?? ''}
 						oninput={(e) => updateNote(f.emoji, e.currentTarget.value)}
 						placeholder="Why / nuance / observations…"

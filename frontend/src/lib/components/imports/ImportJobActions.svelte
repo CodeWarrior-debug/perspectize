@@ -1,9 +1,10 @@
 <script lang="ts">
+	import { NO_AUTOFILL } from '#lib/utils/noAutofill.js';
 	import { toast } from 'svelte-sonner';
-	import { Button } from '$lib/components/shadcn';
-	import type { ImportJobSummary } from '$lib/queries/imports';
-	import { useCloseImportJob, useReviewImportJob } from '$lib/queries/imports/useImportJobMutations';
-	import { importErrorMessage } from '$lib/utils/import-sheet';
+	import { Button } from '#lib/components/shadcn/index.js';
+	import type { ImportJobSummary } from '#lib/queries/imports/index.js';
+	import { useCloseImportJob, useReviewImportJob } from '#lib/queries/imports/useImportJobMutations.js';
+	import { importErrorMessage } from '#lib/utils/import-sheet.js';
 
 	/**
 	 * Admin controls for one import: approve or decline a request (a decline
@@ -54,6 +55,7 @@
 		{#if job.requestStatus === 'REQUESTED'}
 			{#if declining}
 				<input
+					{...NO_AUTOFILL}
 					type="text"
 					bind:value={reason}
 					maxlength={500}

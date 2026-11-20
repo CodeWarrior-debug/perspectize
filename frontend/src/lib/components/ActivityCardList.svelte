@@ -1,6 +1,12 @@
 <script lang="ts">
-	import type { LengthDisplay, WebPageListMeta } from '$lib/queries/content';
-	import { webPageAuthor, webPagePublished, webPageRoleLabel, webPageRolesOf, webPageSite } from '$lib/utils/webPage';
+	import type { LengthDisplay, WebPageListMeta } from '#lib/queries/content/index.js';
+	import {
+		webPageAuthor,
+		webPagePublished,
+		webPageRoleLabel,
+		webPageRolesOf,
+		webPageSite,
+	} from '#lib/utils/webPage.js';
 	import PlayIcon from '@lucide/svelte/icons/play';
 	import PlusIcon from '@lucide/svelte/icons/plus';
 	import GlassesIcon from '@lucide/svelte/icons/glasses';
@@ -13,8 +19,8 @@
 		tmdbScoreValueGetter,
 		formatTmdbScore,
 		movieResponse,
-	} from '$lib/utils/formatting';
-	import { passageIconLabels } from '$lib/utils/bible';
+	} from '#lib/utils/formatting.js';
+	import { passageIconLabels } from '#lib/utils/bible.js';
 	import {
 		authorCellText,
 		bookResponse,
@@ -23,9 +29,9 @@
 		pagesValueGetter,
 		publishedValueGetter,
 		ratingValueGetter,
-	} from '$lib/utils/bookFormatting';
-	import BiblePassageIcon from '$lib/components/BiblePassageIcon.svelte';
-	import AddToPlanButton from '$lib/components/plan/AddToPlanButton.svelte';
+	} from '#lib/utils/bookFormatting.js';
+	import BiblePassageIcon from '#lib/components/BiblePassageIcon.svelte';
+	import AddToPlanButton from '#lib/components/plan/AddToPlanButton.svelte';
 
 	interface CardRow {
 		id: string | number;
@@ -35,10 +41,9 @@
 		length: number | null;
 		lengthUnits: string | null;
 		lengthDisplay?: LengthDisplay | null;
-		// Gap #13 in the UI gap audit: the mobile card used to show only name/
-		// channel/duration — 2 of the grid's 9 DATA_COLUMNS. Category, views and
-		// likes are the three most-used of the rest; the remaining columns
-		// (% liked, publish date, tags, description) are still grid/details-modal
+		// Beyond name/channel/duration, the mobile card shows category, views and
+		// likes — the three most-used of the grid's other columns; the remaining
+		// columns (% liked, publish date, tags, description) are grid/details-modal
 		// only on mobile.
 		primaryCategory?: { label: string } | null;
 		viewCount?: number | null;

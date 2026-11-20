@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { draftKey, saveDraft, loadDraft, clearDraft } from '$lib/utils/perspectiveDraft';
+import { draftKey, saveDraft, loadDraft, clearDraft } from '#lib/utils/perspectiveDraft.js';
 
 describe('perspectiveDraft', () => {
 	beforeEach(() => {

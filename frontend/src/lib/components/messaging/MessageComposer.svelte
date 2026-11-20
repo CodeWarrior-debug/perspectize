@@ -1,6 +1,7 @@
 <script lang="ts">
-	import { createTypingController } from '$lib/messaging/typing';
-	import { Button } from '$lib/components/shadcn';
+	import { NO_AUTOFILL } from '#lib/utils/noAutofill.js';
+	import { createTypingController } from '#lib/messaging/typing.js';
+	import { Button } from '#lib/components/shadcn/index.js';
 	import SendIcon from '@lucide/svelte/icons/send';
 
 	let {
@@ -36,6 +37,7 @@
 
 <div class="flex items-end gap-2 border-t border-border p-3">
 	<textarea
+		{...NO_AUTOFILL}
 		data-testid="composer-input"
 		bind:value={draft}
 		{disabled}

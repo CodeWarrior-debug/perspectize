@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { normalizeIsbn, isValidIsbn, checkIsbn } from '$lib/utils/isbn';
+import { normalizeIsbn, isValidIsbn, checkIsbn } from '#lib/utils/isbn.js';
 
 describe('normalizeIsbn', () => {
 	it('strips hyphens and spaces', () => {

@@ -9,8 +9,8 @@ export interface ThemePreset {
 
 /**
  * 5 curated presets per .impeccable.md's "Theme System" section. Only Reading
- * Room was previously designed anywhere (it's the app's current, unchanged
- * palette) — the other 4 base palettes are original to this feature.
+ * Room is the app's original palette; the other 4 base palettes are original
+ * to the theme system.
  */
 export const THEME_PRESETS: ThemePreset[] = [
 	{

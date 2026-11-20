@@ -2,7 +2,7 @@
  * Webpage cell renderers and value getters for the Activity grid. Pure DOM builders, no reactive
  * state. The shaped row helpers (site, published, roles, author) live in ./webPage.ts.
  */
-import type { ContentItem, WebPageRole } from '$lib/queries/content';
+import type { ContentItem, WebPageRole } from '#lib/queries/content/index.js';
 import { EMPTY_VALUE, formatPublishDate, parseDateValue } from './formatting';
 import { webPageAuthor, webPagePublished, webPageRoleLabel, webPageRolesOf, webPageSite } from './webPage';
 

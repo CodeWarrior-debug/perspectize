@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/svelte';
-import WebPageImportPreview from '$lib/components/webpage/WebPageImportPreview.svelte';
-import type { WebPageFetch, WebPagePreview } from '$lib/queries/content';
+import WebPageImportPreview from '#lib/components/webpage/WebPageImportPreview.svelte';
+import type { WebPageFetch, WebPagePreview } from '#lib/queries/content/index.js';
 
 const URL = 'https://arxiv.org/abs/1706.03762';
 

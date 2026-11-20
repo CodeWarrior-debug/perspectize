@@ -5,9 +5,6 @@
 -- (see migration 000023): ordinal = verses in earlier books + verses in earlier
 -- chapters of this book + verse.
 --
--- Numbering note: 000022 is claimed by in-flight PR #394 (youtube_video rename);
--- 000023 is PR A (bible_book). Re-check at merge time.
---
 -- Manual application required: this repo does not auto-run migrations.
 
 ALTER TABLE content ADD COLUMN IF NOT EXISTS verse_start_id integer NULL;

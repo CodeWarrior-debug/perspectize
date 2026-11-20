@@ -1,12 +1,16 @@
 <script lang="ts">
 	import type { HTMLInputAttributes, HTMLInputTypeAttribute } from 'svelte/elements';
-	import { cn, type WithElementRef } from '$lib/utils.js';
+	import { cn, type WithElementRef } from '#lib/utils.js';
+	import { NO_AUTOFILL } from '#lib/utils/noAutofill.js';
 
 	type InputType = Exclude<HTMLInputTypeAttribute, 'file'>;
 
 	type Props = WithElementRef<
 		Omit<HTMLInputAttributes, 'type'> & ({ type: 'file'; files?: FileList } | { type?: InputType; files?: undefined })
-	>;
+	> & {
+		/** Set only on real identity fields (sign-up, profile). Every other input opts out of password-manager fill. */
+		allowAutofill?: boolean;
+	};
 
 	let {
 		ref = $bindable(null),
@@ -15,6 +19,7 @@
 		files = $bindable(),
 		class: className,
 		'data-slot': dataSlot = 'input',
+		allowAutofill = false,
 		...restProps
 	}: Props = $props();
 </script>
@@ -46,6 +51,7 @@
 		)}
 		{type}
 		bind:value
+		{...allowAutofill ? {} : NO_AUTOFILL}
 		{...restProps}
 	/>
 {/if}

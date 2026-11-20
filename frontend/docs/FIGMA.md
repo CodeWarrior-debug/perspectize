@@ -198,15 +198,15 @@ Maps Svelte components to their Figma counterparts. Updated as components are bu
 
 | Svelte Component                        | Figma Component          | File     | Figma Node ID | Notes            |
 | --------------------------------------- | ------------------------ | -------- | ------------- | ---------------- |
-| `$lib/components/shadcn/button`         | Button                   | Design 1 | —             | Step 3 (pending) |
-| `$lib/components/shadcn/input`          | Input                    | Design 1 | —             | Step 4 (pending) |
-| `$lib/components/shadcn/label`          | Label                    | Design 1 | —             | Step 4 (pending) |
-| `$lib/components/shadcn/dialog`         | Dialog                   | Design 1 | —             | Step 6 (pending) |
-| `$lib/components/Header.svelte`         | Header                   | Design 1 | —             | Step 7 (pending) |
-| `$lib/components/AddVideoDialog.svelte` | Add Video Dialog         | Design 1 | —             | Step 9 (pending) |
-| `$lib/components/ActivityTable.svelte`  | Activity Table / AG Grid | Design 1 | —             | —                |
-| `$lib/components/UserSelector.svelte`   | User Selector            | Design 1 | —             | —                |
-| `$lib/components/PageWrapper.svelte`    | Page Wrapper             | Design 1 | —             | —                |
+| `#lib/components/shadcn/button`         | Button                   | Design 1 | —             | Step 3 (pending) |
+| `#lib/components/shadcn/input`          | Input                    | Design 1 | —             | Step 4 (pending) |
+| `#lib/components/shadcn/label`          | Label                    | Design 1 | —             | Step 4 (pending) |
+| `#lib/components/shadcn/dialog`         | Dialog                   | Design 1 | —             | Step 6 (pending) |
+| `#lib/components/Header.svelte`         | Header                   | Design 1 | —             | Step 7 (pending) |
+| `#lib/components/AddVideoDialog.svelte` | Add Video Dialog         | Design 1 | —             | Step 9 (pending) |
+| `#lib/components/ActivityTable.svelte`  | Activity Table / AG Grid | Design 1 | —             | —                |
+| `#lib/components/UserSelector.svelte`   | User Selector            | Design 1 | —             | —                |
+| `#lib/components/PageWrapper.svelte`    | Page Wrapper             | Design 1 | —             | —                |
 
 ---
 

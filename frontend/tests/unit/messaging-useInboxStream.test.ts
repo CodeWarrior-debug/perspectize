@@ -6,7 +6,7 @@ const mocks = vi.hoisted(() => ({
 	dispose: vi.fn(),
 }));
 
-vi.mock('$lib/messaging/ws-client.svelte', () => ({
+vi.mock('#lib/messaging/ws-client.svelte.js', () => ({
 	subscribeGraphql: (payload: any, handlers: any) => {
 		mocks.capturedHandlers = handlers;
 		mocks.mockSubscribe(payload);
@@ -14,9 +14,9 @@ vi.mock('$lib/messaging/ws-client.svelte', () => ({
 	},
 }));
 
-import { createInboxStream } from '$lib/messaging/useInboxStream.svelte';
-import { INBOX_EVENTS_SUBSCRIPTION } from '$lib/queries/messaging';
-import { queryKeys } from '$lib/queries/keys';
+import { createInboxStream } from '#lib/messaging/useInboxStream.svelte.js';
+import { INBOX_EVENTS_SUBSCRIPTION } from '#lib/queries/messaging/index.js';
+import { queryKeys } from '#lib/queries/keys.js';
 
 function fakeQueryClient(initialList: any) {
 	let data = initialList;

@@ -6,7 +6,7 @@ import {
 	type WikidataSearchResponse,
 	type CategoryItem,
 	type SetPrimaryCategoryResponse,
-} from '$lib/queries/categories';
+} from '#lib/queries/categories/index.js';
 
 describe('Category GraphQL query definitions', () => {
 	describe('Type exports', () => {

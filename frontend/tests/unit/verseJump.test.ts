@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
-import { rangeToVerseIds } from '$lib/utils/bible';
-import { singleVerseRange, singleVerseReference } from '$lib/utils/verseJump';
-import { libraryContentHref } from '$lib/utils/contentLinks';
+import { rangeToVerseIds } from '#lib/utils/bible.js';
+import { singleVerseRange, singleVerseReference } from '#lib/utils/verseJump.js';
+import { libraryContentHref } from '#lib/utils/contentLinks.js';
 
 const john316 = rangeToVerseIds({ bookId: 43, startChapter: 3, startVerse: 16, endChapter: 3, endVerse: 16 })!.startId;
 

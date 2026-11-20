@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/svelte';
-import FilterChips from '$lib/components/FilterChips.svelte';
+import FilterChips from '#lib/components/FilterChips.svelte';
 
 const mockSetFilterModel = vi.fn();
 const mockGetFilterModel = vi.fn();
@@ -241,6 +241,61 @@ describe('FilterChips', () => {
 			render(FilterChips, { props: { gridApi: mockGridApi(), filterModel: person, onClearAll } });
 			await fireEvent.click(screen.getByText('Clear all'));
 			expect(onClearAll).toHaveBeenCalled();
+			expect(mockSetFilterModel).not.toHaveBeenCalled();
+		});
+	});
+
+	describe('Clear all but type button', () => {
+		const typeChip = { type: { filterType: 'set', values: ['youtube_video'] } };
+		const channelChip = { channel: { filterType: 'text', type: 'contains', filter: 'Fireship' } };
+
+		it('is hidden when there is no type chip', () => {
+			renderChips(channelChip);
+			expect(screen.queryByText('Clear all but type')).not.toBeInTheDocument();
+		});
+
+		it('is hidden when the type chip is the only chip (nothing else to clear)', () => {
+			renderChips(typeChip);
+			expect(screen.queryByText('Clear all but type')).not.toBeInTheDocument();
+		});
+
+		it('is shown when a type chip sits beside another chip', () => {
+			renderChips({ ...typeChip, ...channelChip });
+			expect(screen.getByText('Clear all but type')).toBeInTheDocument();
+			expect(screen.getByText('Clear all')).toBeInTheDocument();
+		});
+
+		it('on the grid, keeps only the type filter and clears the rest', async () => {
+			mockGetFilterModel.mockReturnValue({ ...typeChip, ...channelChip });
+			renderChips({ ...typeChip, ...channelChip }, mockGridApi());
+
+			await fireEvent.click(screen.getByText('Clear all but type'));
+			expect(mockSetFilterModel).toHaveBeenCalledWith({ type: typeChip.type });
+		});
+
+		it('on the grid, clears everything when the grid holds no type filter', async () => {
+			mockGetFilterModel.mockReturnValue(channelChip);
+			renderChips({ ...typeChip, ...channelChip }, mockGridApi());
+
+			await fireEvent.click(screen.getByText('Clear all but type'));
+			expect(mockSetFilterModel).toHaveBeenCalledWith(null);
+		});
+
+		it('with a person filter, leaves the grid alone and calls onClearAllButType', async () => {
+			const onClearAllButType = vi.fn();
+			render(FilterChips, {
+				props: {
+					gridApi: mockGridApi(),
+					filterModel: {
+						...typeChip,
+						person: { filterType: 'person', filter: 'Christopher Nolan' },
+					},
+					onClearAllButType,
+				},
+			});
+
+			await fireEvent.click(screen.getByText('Clear all but type'));
+			expect(onClearAllButType).toHaveBeenCalledTimes(1);
 			expect(mockSetFilterModel).not.toHaveBeenCalled();
 		});
 	});

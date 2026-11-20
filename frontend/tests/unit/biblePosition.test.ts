@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { passagePosition } from '$lib/utils/biblePosition';
-import { TOTAL_VERSES, rangeToVerseIds } from '$lib/utils/bible';
+import { passagePosition } from '#lib/utils/biblePosition.js';
+import { TOTAL_VERSES, rangeToVerseIds } from '#lib/utils/bible.js';
 
 describe('passagePosition', () => {
 	it('labels Genesis 1:1-5 with ordinals, total and book position', () => {

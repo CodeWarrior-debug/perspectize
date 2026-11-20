@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { gatewayLink, DEFAULT_VERSION } from '$lib/utils/bibleLinks';
-import type { PassageRange } from '$lib/utils/bible';
+import { gatewayLink, DEFAULT_VERSION } from '#lib/utils/bibleLinks.js';
+import type { PassageRange } from '#lib/utils/bible.js';
 
 const gen1_1_5: PassageRange = { bookId: 1, startChapter: 1, startVerse: 1, endChapter: 1, endVerse: 5 };
 const psalm51_10: PassageRange = { bookId: 19, startChapter: 51, startVerse: 10, endChapter: 51, endVerse: 10 };

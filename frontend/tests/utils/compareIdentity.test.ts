@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { nameInitials, identityColor } from '$lib/utils/compareIdentity';
+import { nameInitials, identityColor } from '#lib/utils/compareIdentity.js';
 
 describe('nameInitials', () => {
 	it('takes the first letter of the first two words, upper-cased', () => {

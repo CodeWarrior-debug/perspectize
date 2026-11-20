@@ -16,10 +16,10 @@ vi.mock('@tanstack/svelte-query', () => ({
 	useQueryClient: () => ({ invalidateQueries: mocks.invalidate }),
 }));
 vi.mock('svelte-sonner', () => ({ toast: { success: mocks.success, error: mocks.error } }));
-vi.mock('$lib/queries/client', () => ({ graphqlRequest: mocks.graphqlRequest }));
+vi.mock('#lib/queries/client.js', () => ({ graphqlRequest: mocks.graphqlRequest }));
 
 import { goto } from '$app/navigation';
-import { useOpenPassage } from '$lib/queries/content/useOpenPassage';
+import { useOpenPassage } from '#lib/queries/content/useOpenPassage.js';
 
 const range = { bookId: 43, startChapter: 3, startVerse: 16, endChapter: 3, endVerse: 16 };
 

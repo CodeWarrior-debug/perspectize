@@ -1,26 +1,32 @@
 <script module lang="ts">
 	// Start fetching the table (and AG Grid, ~244KB gzipped) the moment this route module
 	// evaluates, in parallel with Clerk's script. The root layout renders nothing until
-	// `ClerkLoaded`, so awaiting the import from the template only began the AG Grid
-	// download after Clerk finished: two serial network steps on the LCP path (#636).
+	// `ClerkLoaded`, so awaiting the import from the template would start the AG Grid
+	// download only after Clerk finished: two serial network steps on the LCP path.
 	// The page still handles failure below via `{:catch}`.
-	const activityTableImport = import('$lib/components/ActivityTable.svelte');
+	const activityTableImport = import('#lib/components/ActivityTable.svelte');
 	activityTableImport.catch(() => {}); // avoid an unhandled-rejection reload before the template awaits it
 </script>
 
 <script lang="ts">
-	import { Input, Popover, PopoverContent, PopoverTrigger, buttonVariants } from '$lib/components/shadcn';
-	import LazyLoadError from '$lib/components/LazyLoadError.svelte';
+	import { Input, Popover, PopoverContent, PopoverTrigger, buttonVariants } from '#lib/components/shadcn/index.js';
+	import LazyLoadError from '#lib/components/LazyLoadError.svelte';
+	import TypePills from '#lib/components/TypePills.svelte';
 	import SearchIcon from '@lucide/svelte/icons/search';
 	import SlidersHorizontalIcon from '@lucide/svelte/icons/sliders-horizontal';
 	import { page } from '$app/state';
 	import { goto } from '$app/navigation';
-	import { parseGridParams, serializeGridParams, searchScopesFor, type SearchScopeKey } from '$lib/utils/gridUrlState';
-	import { useMe } from '$lib/queries/users/useMe.svelte';
-	import { LIBRARY_PATH } from '$lib/utils/contentLinks';
+	import {
+		parseGridParams,
+		serializeGridParams,
+		searchScopesFor,
+		type SearchScopeKey,
+	} from '#lib/utils/gridUrlState.js';
+	import { useMe } from '#lib/queries/users/useMe.svelte.js';
+	import { LIBRARY_PATH } from '#lib/utils/contentLinks.js';
 
 	// Derive current grid params from URL
-	const gridParams = $derived(parseGridParams(page.url.searchParams));
+	const gridParams = $derived(parseGridParams(new URLSearchParams(page.url.search)));
 
 	// "Mine" is just a shortcut for the User column's text filter (`f.user=<my username>`) —
 	// the same filter the column menu sets, so it shows as a chip and survives a reload.
@@ -35,7 +41,14 @@
 		const { user: _previous, ...rest } = gridParams.filters;
 		const filters = mineActive ? rest : { ...rest, user: myUsername };
 		const search = serializeGridParams({ ...gridParams, filters, page: 1 });
-		goto(search ? `?${search}` : LIBRARY_PATH, { replaceState: true, keepFocus: true, noScroll: true });
+		goto(search ? `?${search}` : LIBRARY_PATH, { replace: true, reset: false });
+	}
+
+	// Switching to one type replaces the Type filter only; other filters stay as they are.
+	function selectType(value: string) {
+		const filters = { ...gridParams.filters, type: value };
+		const search = serializeGridParams({ ...gridParams, filters, page: 1 });
+		goto(search ? `?${search}` : LIBRARY_PATH, { replace: true, reset: false });
 	}
 
 	// Local search input state (tracks what user has typed)
@@ -62,7 +75,7 @@
 		searchTimer = setTimeout(() => {
 			const updated = { ...gridParams, q: value, page: 1 };
 			const search = serializeGridParams(updated);
-			goto(search ? `?${search}` : LIBRARY_PATH, { replaceState: true, keepFocus: true, noScroll: true });
+			goto(search ? `?${search}` : LIBRARY_PATH, { replace: true, reset: false });
 		}, 300);
 	}
 
@@ -74,7 +87,7 @@
 		const nextFields = isSelected ? current.filter((s) => s !== scope) : [...current, scope];
 		const updated = { ...gridParams, qFields: nextFields, page: 1 };
 		const search = serializeGridParams(updated);
-		goto(search ? `?${search}` : LIBRARY_PATH, { replaceState: true, keepFocus: true, noScroll: true });
+		goto(search ? `?${search}` : LIBRARY_PATH, { replace: true, reset: false });
 	}
 
 	const scopeSummary = $derived(
@@ -90,9 +103,7 @@
 		<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
 			<div>
 				<h1 class="text-2xl font-semibold text-foreground">Library</h1>
-				<p class="text-sm text-muted-foreground mt-1">
-					Everything Perspectize members have added, and how they've measured it.
-				</p>
+				<p class="text-sm text-muted-foreground mt-1">Everything Perspectize members have added.</p>
 			</div>
 			<!-- FilterChips (inside the grid card) moves itself here on desktop to save a row of height. -->
 			<div id="activity-chips-slot" class="hidden md:flex flex-1 min-w-0 items-center"></div>
@@ -148,6 +159,8 @@
 			</div>
 		</div>
 	</div>
+
+	<TypePills filters={gridParams.filters} onSelect={selectType} />
 
 	<!-- ColumnRelevanceCallout (rendered by ActivityTable) moves itself here: above the card's top-right
 	     corner, outside the table frame. Collapses to nothing when empty. -->

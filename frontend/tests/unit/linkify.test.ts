@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { linkify, isInternalHref, internalPath, isModifiedClick } from '$lib/components/messaging/linkify';
+import { linkify, isInternalHref, internalPath, isModifiedClick } from '#lib/components/messaging/linkify.js';
 
 const links = (s: string) => linkify(s).flatMap((x) => (x.type === 'link' ? [x.href] : []));
 const rejoin = (s: string) =>

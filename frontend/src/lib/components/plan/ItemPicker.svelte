@@ -1,7 +1,7 @@
 <script lang="ts">
-	import ContentSearchInput from '$lib/components/ContentSearchInput.svelte';
-	import { useContentPicker } from '$lib/queries/content/useContentPicker';
-	import { CONTENT_TYPE_OPTIONS, contentTypeLabel } from '$lib/utils/grid-config';
+	import ContentSearchInput from '#lib/components/ContentSearchInput.svelte';
+	import { useContentPicker } from '#lib/queries/content/useContentPicker.js';
+	import { CONTENT_TYPE_OPTIONS, contentTypeLabel } from '#lib/utils/grid-config.js';
 
 	/**
 	 * ItemPicker: search the content already in Perspectize, optionally narrowed

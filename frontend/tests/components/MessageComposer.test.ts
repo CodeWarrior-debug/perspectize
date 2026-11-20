@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/svelte';
-import MessageComposer from '$lib/components/messaging/MessageComposer.svelte';
+import MessageComposer from '#lib/components/messaging/MessageComposer.svelte';
 
 function setup() {
 	const onSend = vi.fn();

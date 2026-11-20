@@ -5,14 +5,14 @@ import TestWrapper from '../helpers/TestWrapper.svelte';
 
 const { mockRequest } = vi.hoisted(() => ({ mockRequest: vi.fn() }));
 
-vi.mock('$lib/queries/client', () => ({
+vi.mock('#lib/queries/client.js', () => ({
 	graphqlRequest: mockRequest,
 }));
 
 const { gotoMock } = vi.hoisted(() => ({ gotoMock: vi.fn() }));
 vi.mock('$app/navigation', () => ({ goto: gotoMock }));
 
-import ComparePicker from '$lib/components/ComparePicker.svelte';
+import ComparePicker from '#lib/components/ComparePicker.svelte';
 
 function renderPicker() {
 	return render(TestWrapper, {

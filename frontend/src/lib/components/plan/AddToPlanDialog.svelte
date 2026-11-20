@@ -1,7 +1,7 @@
 <script lang="ts">
-	import LazyLoadError from '$lib/components/LazyLoadError.svelte';
-	import { useTodoActions } from '$lib/queries/userTodos/useTodoActions';
-	import { useUserTodoLists } from '$lib/queries/userTodos/useUserTodoLists';
+	import LazyLoadError from '#lib/components/LazyLoadError.svelte';
+	import { useTodoActions } from '#lib/queries/userTodos/useTodoActions.js';
+	import { useUserTodoLists } from '#lib/queries/userTodos/useUserTodoLists.js';
 
 	/**
 	 * The "Add to plan" flow: TodoDialog in create mode, prefilled with the content
@@ -32,7 +32,7 @@
 	});
 </script>
 
-{#await import('$lib/components/plan/TodoDialog.svelte') then { default: TodoDialog }}
+{#await import('#lib/components/plan/TodoDialog.svelte') then { default: TodoDialog }}
 	<TodoDialog
 		bind:open={
 			() => true,

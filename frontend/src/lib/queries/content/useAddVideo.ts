@@ -4,7 +4,7 @@ import { goto } from '$app/navigation';
 import { graphqlRequest } from '../client';
 import { CREATE_CONTENT_FROM_YOUTUBE, type CreateContentResponse, type ContentResponse } from './index';
 import { queryKeys } from '../keys';
-import { libraryContentHref } from '$lib/utils/contentLinks';
+import { libraryContentHref } from '#lib/utils/contentLinks.js';
 
 export function useAddVideo() {
 	const queryClient = useQueryClient();

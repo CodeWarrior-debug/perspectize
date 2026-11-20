@@ -15,7 +15,7 @@
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { hashKey, type QueryClient } from '@tanstack/svelte-query';
-import { queryKeys } from '$lib/queries/keys';
+import { queryKeys } from '#lib/queries/keys.js';
 import { countingFetch, invalidationOutcome, makeClient, mountConsumers, seed } from '../helpers/queryBudget';
 import { preloadLazy } from '../helpers/warmUp';
 
@@ -34,7 +34,7 @@ vi.mock('@tanstack/svelte-query', async (importOriginal) => {
 	};
 });
 vi.mock('svelte-sonner', () => ({ toast: { success: vi.fn(), error: vi.fn(), info: vi.fn() } }));
-vi.mock('$lib/queries/client', () => ({ graphqlRequest: vi.fn() }));
+vi.mock('#lib/queries/client.js', () => ({ graphqlRequest: vi.fn() }));
 
 beforeEach(() => {
 	client = makeClient();
@@ -44,9 +44,9 @@ beforeEach(() => {
 // The tests import these inside their bodies; load them once up front so the first
 // test doesn't pay the module transform, which balloons under full-suite load (#728).
 preloadLazy(
-	() => import('$lib/queries/bible/useSetPassageDisplayTitle'),
-	() => import('$lib/queries/content/useAddMovie'),
-	() => import('$lib/queries/perspectives/useDeletePerspective'),
+	() => import('#lib/queries/bible/useSetPassageDisplayTitle.js'),
+	() => import('#lib/queries/content/useAddMovie.js'),
+	() => import('#lib/queries/perspectives/useDeletePerspective.js'),
 );
 
 describe('de-duplication and freshness', () => {
@@ -158,7 +158,7 @@ describe('eviction: useDeletePerspective.onSuccess evicts exactly what changed',
 		];
 		for (const k of [...affected, ...unrelated]) seed(client, k);
 
-		const { useDeletePerspective } = await import('$lib/queries/perspectives/useDeletePerspective');
+		const { useDeletePerspective } = await import('#lib/queries/perspectives/useDeletePerspective.js');
 		useDeletePerspective();
 		capturedDeleteOptions.onSuccess({ deletePerspective: true }, { id: '7', contentID: '3' });
 
@@ -194,7 +194,7 @@ describe('eviction: useSetPassageDisplayTitle.onSuccess patches in place, evicts
 		seed(client, otherRowKey, otherRow);
 		for (const k of unrelated) seed(client, k);
 
-		const { useSetPassageDisplayTitle } = await import('$lib/queries/bible/useSetPassageDisplayTitle');
+		const { useSetPassageDisplayTitle } = await import('#lib/queries/bible/useSetPassageDisplayTitle.js');
 		useSetPassageDisplayTitle();
 		capturedDeleteOptions.onSuccess(
 			{ setPassageDisplayTitle: { id: '3', displayTitle: 'Creation' } },
@@ -227,7 +227,7 @@ describe('eviction: useAddMovie.onSuccess invalidates content lists only', () =>
 		];
 		for (const k of [...affected, ...unrelated]) seed(client, k);
 
-		const { useAddMovie } = await import('$lib/queries/content/useAddMovie');
+		const { useAddMovie } = await import('#lib/queries/content/useAddMovie.js');
 		useAddMovie();
 		capturedDeleteOptions.onSuccess({ createContentFromMovie: { id: '9', name: 'The Matrix', contentType: 'MOVIE' } });
 

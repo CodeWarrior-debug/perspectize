@@ -1,10 +1,10 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/svelte';
-import VideoResultsGrid from '$lib/components/discover/VideoResultsGrid.svelte';
-import { toWatchUrl, type VideoItem } from '$lib/services/youtubeApi';
+import VideoResultsGrid from '#lib/components/discover/VideoResultsGrid.svelte';
+import { toWatchUrl, type VideoItem } from '#lib/services/youtubeApi.js';
 import { warmUpRender } from '../helpers/warmUp';
 
-vi.mock('$lib/queries/users/useMe.svelte', () => ({ useMe: () => ({ me: null }) }));
+vi.mock('#lib/queries/users/useMe.svelte.js', () => ({ useMe: () => ({ me: null }) }));
 
 function makeVideo(id: string): VideoItem {
 	return {

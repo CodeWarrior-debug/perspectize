@@ -24,7 +24,7 @@ import {
 	ageRatingRank,
 	typeCellRenderer,
 	EMPTY_VALUE,
-} from '$lib/utils/formatting';
+} from '#lib/utils/formatting.js';
 import {
 	COLUMNS,
 	COL_TO_SORT,
@@ -35,17 +35,17 @@ import {
 	compareContentBySorts,
 	unknownLastComparator,
 	ratedComparator,
-} from '$lib/utils/grid-config';
-import activityTableSource from '$lib/components/ActivityTable.svelte?raw';
-import { headerMinWidth } from '$lib/utils/grid-header-width';
-import { activityItemCellRenderer } from '$lib/utils/activityItemCellRenderer';
+} from '#lib/utils/grid-config.js';
+import activityTableSource from '#lib/components/ActivityTable.svelte?raw';
+import { headerMinWidth } from '#lib/utils/grid-header-width.js';
+import { activityItemCellRenderer } from '#lib/utils/activityItemCellRenderer.js';
 import {
 	sortsToGraphQL,
 	urlParamsToGraphQLFilter,
 	parseGridParams,
 	serializeGridParams,
-} from '$lib/utils/gridUrlState';
-import type { ContentItem } from '$lib/queries/content';
+} from '#lib/utils/gridUrlState.js';
+import type { ContentItem } from '#lib/queries/content/index.js';
 
 const DIRECTORS = [{ id: 525, name: 'Christopher Nolan' }];
 const CAST = [

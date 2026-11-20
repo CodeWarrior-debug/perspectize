@@ -12,10 +12,10 @@ vi.mock('@tanstack/svelte-query', () => ({
 		invalidateQueries: vi.fn(),
 	})),
 }));
-vi.mock('$lib/queries/client', () => ({ graphqlRequest: vi.fn() }));
+vi.mock('#lib/queries/client.js', () => ({ graphqlRequest: vi.fn() }));
 vi.mock('svelte-sonner', () => ({ toast: { error: vi.fn(), success: vi.fn() } }));
 
-import ThreadListItem from '$lib/components/messaging/ThreadListItem.svelte';
+import ThreadListItem from '#lib/components/messaging/ThreadListItem.svelte';
 import { warmUpRender } from '../helpers/warmUp';
 
 const thread = (over = {}) => ({

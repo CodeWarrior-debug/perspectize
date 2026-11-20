@@ -13,9 +13,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { page } from 'vitest/browser';
 
 import DemoSignedInHarness from './fixtures/DemoSignedInHarness.svelte';
-import { demoSession } from '$lib/auth/demo.svelte';
+import { demoSession } from '#lib/auth/demo.svelte.js';
 
-// Demo mode is a build-time flag read when $lib/auth loads. Hoisted so it is set
+// Demo mode is a build-time flag read when #lib/auth loads. Hoisted so it is set
 // before the imports above evaluate; each browser test file gets its own page, so
 // it doesn't leak into other files. (Not a config `define`: that would leak into
 // the unit project too.)

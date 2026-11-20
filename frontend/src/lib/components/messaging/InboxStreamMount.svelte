@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { useQueryClient } from '@tanstack/svelte-query';
-	import { createInboxStream } from '$lib/messaging/useInboxStream.svelte';
-	import { streamIdle, watchStreamIdle } from '$lib/messaging/streamIdle.svelte';
+	import { createInboxStream } from '#lib/messaging/useInboxStream.svelte.js';
+	import { streamIdle, watchStreamIdle } from '#lib/messaging/streamIdle.svelte.js';
 
 	const queryClient = useQueryClient();
 	const stream = createInboxStream(queryClient);

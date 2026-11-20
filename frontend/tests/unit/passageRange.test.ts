@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { defaultRange, isRangeInBounds, isRangeOrdered } from '$lib/utils/passageRange';
-import type { PassageRange } from '$lib/utils/bible';
+import { defaultRange, isRangeInBounds, isRangeOrdered } from '#lib/utils/passageRange.js';
+import type { PassageRange } from '#lib/utils/bible.js';
 
 // Real shapes from bible-books.json: Genesis (id 1) has 50 chapters, ch.1 = 31 verses,
 // ch.2 = 25 verses, ch.3 = 24 verses. Obadiah (id 31) is a single chapter of 21 verses.

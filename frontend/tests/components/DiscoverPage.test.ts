@@ -4,10 +4,10 @@ import { tick } from 'svelte';
 import Page from '../../src/routes/discover/+page.svelte';
 import TestWrapper from '../helpers/TestWrapper.svelte';
 import { makeClient } from '../helpers/queryBudget';
-import { MOVIE_SEARCH, MOVIE_TRENDING } from '$lib/services/tmdbApi';
-import { BOOK_SEARCH, BOOK_TRENDING } from '$lib/services/openLibraryApi';
-import { YOUTUBE_TRENDING } from '$lib/services/youtubeApi';
-import { LIST_CONTENT } from '$lib/queries/content';
+import { MOVIE_SEARCH, MOVIE_TRENDING } from '#lib/services/tmdbApi.js';
+import { BOOK_SEARCH, BOOK_TRENDING } from '#lib/services/openLibraryApi.js';
+import { YOUTUBE_TRENDING } from '#lib/services/youtubeApi.js';
+import { LIST_CONTENT } from '#lib/queries/content/index.js';
 import { warmUp } from '../helpers/warmUp';
 
 const mocks = vi.hoisted(() => ({
@@ -21,11 +21,11 @@ vi.mock('$app/state', () => ({
 		return { url: mocks.pageUrl.current };
 	},
 }));
-vi.mock('$lib/queries/client', () => ({ graphqlRequest: mocks.graphqlRequest }));
-vi.mock('$lib/queries/content/useAddMovie', () => ({ useAddMovie: () => ({ mutate: vi.fn(), isPending: false }) }));
-vi.mock('$lib/queries/content/useAddVideo', () => ({ useAddVideo: () => ({ mutate: vi.fn(), isPending: false }) }));
-vi.mock('$lib/queries/content/useAddBook', () => ({ useAddBook: () => ({ mutate: vi.fn(), isPending: false }) }));
-vi.mock('$lib/queries/users/useMe.svelte', () => ({ useMe: () => ({ me: null }) }));
+vi.mock('#lib/queries/client.js', () => ({ graphqlRequest: mocks.graphqlRequest }));
+vi.mock('#lib/queries/content/useAddMovie.js', () => ({ useAddMovie: () => ({ mutate: vi.fn(), isPending: false }) }));
+vi.mock('#lib/queries/content/useAddVideo.js', () => ({ useAddVideo: () => ({ mutate: vi.fn(), isPending: false }) }));
+vi.mock('#lib/queries/content/useAddBook.js', () => ({ useAddBook: () => ({ mutate: vi.fn(), isPending: false }) }));
+vi.mock('#lib/queries/users/useMe.svelte.js', () => ({ useMe: () => ({ me: null }) }));
 
 function respond(doc: string) {
 	if (doc === YOUTUBE_TRENDING) return { youtubeTrending: { items: [], nextPageToken: null } };
@@ -90,9 +90,8 @@ describe('Discover page source switch', () => {
 		await fireEvent.click(screen.getByRole('tab', { name: 'Movies' }));
 
 		expect(goto).toHaveBeenCalledWith('/discover?source=movies', {
-			replaceState: true,
-			keepFocus: true,
-			noScroll: true,
+			replace: true,
+			reset: false,
 		});
 	});
 
@@ -104,7 +103,7 @@ describe('Discover page source switch', () => {
 
 		await fireEvent.click(screen.getByRole('tab', { name: 'YouTube' }));
 
-		expect(goto).toHaveBeenCalledWith('/discover?x=1', { replaceState: true, keepFocus: true, noScroll: true });
+		expect(goto).toHaveBeenCalledWith('/discover?x=1', { replace: true, reset: false });
 	});
 
 	it('clicking the already-selected tab does not navigate', async () => {
@@ -163,9 +162,8 @@ describe('Discover page Books source', () => {
 		await fireEvent.click(screen.getByRole('tab', { name: 'Books' }));
 
 		expect(goto).toHaveBeenCalledWith('/discover?source=books', {
-			replaceState: true,
-			keepFocus: true,
-			noScroll: true,
+			replace: true,
+			reset: false,
 		});
 	});
 
@@ -178,9 +176,8 @@ describe('Discover page Books source', () => {
 		await fireEvent.click(screen.getByRole('tab', { name: 'Trending' }));
 
 		expect(goto).toHaveBeenCalledWith('/discover?source=books&tab=trending', {
-			replaceState: true,
-			keepFocus: true,
-			noScroll: true,
+			replace: true,
+			reset: false,
 		});
 	});
 
@@ -192,6 +189,6 @@ describe('Discover page Books source', () => {
 
 		await fireEvent.click(screen.getByRole('tab', { name: 'YouTube' }));
 
-		expect(goto).toHaveBeenCalledWith('/discover', { replaceState: true, keepFocus: true, noScroll: true });
+		expect(goto).toHaveBeenCalledWith('/discover', { replace: true, reset: false });
 	});
 });

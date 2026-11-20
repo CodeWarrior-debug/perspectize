@@ -15,12 +15,12 @@ vi.mock('@tanstack/svelte-query', () => ({
 	}),
 	useQueryClient: vi.fn(() => ({ setQueryData: mocks.mockSetQueryData, getQueryData: mocks.mockGetQueryData })),
 }));
-vi.mock('$lib/queries/client', () => ({ graphqlRequest: (...a: unknown[]) => mocks.mockGraphql(...a) }));
+vi.mock('#lib/queries/client.js', () => ({ graphqlRequest: (...a: unknown[]) => mocks.mockGraphql(...a) }));
 vi.mock('svelte-sonner', () => ({ toast: { error: mocks.mockToastError, success: vi.fn() } }));
 
-import { useEditMessage } from '$lib/queries/messaging/useEditMessage';
-import { EDIT_MESSAGE } from '$lib/queries/messaging';
-import { queryKeys } from '$lib/queries/keys';
+import { useEditMessage } from '#lib/queries/messaging/useEditMessage.js';
+import { EDIT_MESSAGE } from '#lib/queries/messaging/index.js';
+import { queryKeys } from '#lib/queries/keys.js';
 
 const sender = { id: 'u1', username: 'me' };
 const existingMsg = { id: 'm7', threadId: 't1', sender, seq: 7, body: 'old', editedAt: null, createdAt: 'x' };

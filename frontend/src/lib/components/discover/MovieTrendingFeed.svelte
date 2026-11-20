@@ -1,7 +1,7 @@
 <script lang="ts">
 	import type { LibraryItem } from './libraryItem';
 	import { createQuery, useQueryClient } from '@tanstack/svelte-query';
-	import { Button } from '$lib/components/shadcn';
+	import { Button } from '#lib/components/shadcn/index.js';
 	import MovieCard from './MovieCard.svelte';
 	import {
 		fetchTrendingMovies,
@@ -9,7 +9,7 @@
 		tmdbKeys,
 		type MovieSearchPage,
 		type TrendingWindow,
-	} from '$lib/services/tmdbApi';
+	} from '#lib/services/tmdbApi.js';
 
 	// Trending movies, shown on the Movies source while the search box has fewer
 	// than 2 characters. The panel mounts it only while idle, so no trending call

@@ -1,6 +1,6 @@
 <script lang="ts">
 	import ChevronDownIcon from '@lucide/svelte/icons/chevron-down';
-	import type { RatingRow, FilledInDifferentlyRow, FeelingComparison } from '$lib/utils/comparePerspectives';
+	import type { RatingRow, FilledInDifferentlyRow, FeelingComparison } from '#lib/utils/comparePerspectives.js';
 
 	let {
 		rows,
@@ -18,8 +18,8 @@
 		onToggleSort: () => void;
 		// Whose take filled in a dimension, for the "Filled in differently" rows
 		// below — named ("Alice"/"You") instead of raw "left"/"right", which
-		// only means anything relative to a picker column no longer visible in
-		// that sublist (compare-page-enhancements #4).
+		// only means anything relative to a picker column not visible in
+		// that sublist.
 		leftName: string;
 		rightName: string;
 	} = $props();
@@ -39,7 +39,7 @@
 		return n.toFixed(1);
 	}
 
-	// Visual 0-10 scale per row (compare-page-enhancements #2) — a filled dot
+	// Visual 0-10 scale per row — a filled dot
 	// for the left value, a hollow ring for the right, joined by a bar
 	// spanning the gap between them, all colored by the row's status.
 	function pct(value: number): number {

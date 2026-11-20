@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { resolveSpec, displayText, copyText, itemsCopyText } from '$lib/utils/tooltipSpec';
+import { resolveSpec, displayText, copyText, itemsCopyText } from '#lib/utils/tooltipSpec.js';
 
 describe('resolveSpec', () => {
 	it('gives every column the default single-mode spec', () => {

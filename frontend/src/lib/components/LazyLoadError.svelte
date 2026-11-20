@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { Button } from '$lib/components/shadcn';
+	import { Button } from '#lib/components/shadcn/index.js';
 
 	// Reload rather than retry: after a deploy the old chunk no longer exists, so
 	// re-importing fails the same way; a reload fetches the new index.html.

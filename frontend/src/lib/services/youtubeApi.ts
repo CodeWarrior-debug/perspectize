@@ -11,7 +11,7 @@
  * (youtubeSearchUrl) and the user brings a video back by pasting its link.
  */
 import { gql } from 'graphql-request';
-import { graphqlRequest } from '$lib/queries/client';
+import { graphqlRequest } from '#lib/queries/client.js';
 
 export interface YouTubeThumbnail {
 	url: string;

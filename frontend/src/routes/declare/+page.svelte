@@ -1,12 +1,12 @@
 <script lang="ts">
-	import PageWrapper from '$lib/components/PageWrapper.svelte';
-	import SignInTrigger from '$lib/components/auth/SignInTrigger.svelte';
-	import ClaimDeleteDialog from '$lib/components/declare/ClaimDeleteDialog.svelte';
-	import ClaimForm from '$lib/components/declare/ClaimForm.svelte';
-	import { Button } from '$lib/components/shadcn';
-	import { useAuthState } from '$lib/auth/useAuthState';
-	import { useMe } from '$lib/queries/users/useMe.svelte';
-	import { useMyClaims } from '$lib/queries/content/useMyClaims';
+	import PageWrapper from '#lib/components/PageWrapper.svelte';
+	import SignInTrigger from '#lib/components/auth/SignInTrigger.svelte';
+	import ClaimDeleteDialog from '#lib/components/declare/ClaimDeleteDialog.svelte';
+	import ClaimForm from '#lib/components/declare/ClaimForm.svelte';
+	import { Button } from '#lib/components/shadcn/index.js';
+	import { useAuthState } from '#lib/auth/useAuthState.js';
+	import { useMe } from '#lib/queries/users/useMe.svelte.js';
+	import { useMyClaims } from '#lib/queries/content/useMyClaims.js';
 
 	// Signed-out visitors get a sign-in prompt; claims load only once the user is signed in.
 	const auth = useAuthState();

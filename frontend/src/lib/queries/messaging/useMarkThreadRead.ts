@@ -2,7 +2,7 @@ import { createMutation, useQueryClient } from '@tanstack/svelte-query';
 import { graphqlRequest } from '../client';
 import { MARK_THREAD_READ, type MarkThreadReadResponse } from './index';
 import { queryKeys } from '../keys';
-import { patchThreadInList } from '$lib/messaging/inboxCache';
+import { patchThreadInList } from '#lib/messaging/inboxCache.js';
 
 export function useMarkThreadRead() {
 	const queryClient = useQueryClient();

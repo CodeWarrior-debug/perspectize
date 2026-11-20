@@ -2,7 +2,7 @@ import { createMutation, useQueryClient } from '@tanstack/svelte-query';
 import { graphqlRequest } from '../client';
 import { EDIT_MESSAGE, type EditMessageResponse } from './index';
 import { queryKeys } from '../keys';
-import { applyMessageEdited, type ThreadMessagesCache } from '$lib/messaging/threadCache';
+import { applyMessageEdited, type ThreadMessagesCache } from '#lib/messaging/threadCache.js';
 import { toast } from 'svelte-sonner';
 
 export function useEditMessage() {

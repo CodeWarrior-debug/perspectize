@@ -1,4 +1,4 @@
-import type { FrontendBuildInfo } from '$lib/utils/versionInfo';
+import type { FrontendBuildInfo } from '#lib/utils/versionInfo.js';
 
 // Injected by vite.config.ts's `define`, computed from the local git
 // checkout at build time (or "unknown" for every field when git isn't

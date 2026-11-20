@@ -32,7 +32,7 @@ vi.mock('ag-grid-svelte5', () => ({
 }));
 
 // Mock graphqlRequest
-vi.mock('$lib/queries/client', () => ({
+vi.mock('#lib/queries/client.js', () => ({
 	graphqlRequest: mockRequest,
 }));
 
@@ -45,7 +45,7 @@ vi.mock('svelte-clerk', () => ({
 
 // queryKeys is used directly, no need to mock since it's a simple object
 
-import ActivityTable from '$lib/components/ActivityTable.svelte';
+import ActivityTable from '#lib/components/ActivityTable.svelte';
 import { preloadLazy, warmUp } from '../helpers/warmUp';
 
 const mockEmptyResponse = {
@@ -115,7 +115,7 @@ function renderWithQuery(queryClient?: QueryClient) {
 
 // The component renders this through {#await import(...)}: load it up front so a
 // findBy* waits on the UI, not on Vite's first transform of the module (#728).
-preloadLazy(() => import('$lib/components/PerspectivePopover.svelte'));
+preloadLazy(() => import('#lib/components/PerspectivePopover.svelte'));
 
 // Pay the component's first-render cost before any test, not inside the first
 // one: under full-suite load it alone can pass the 5 s testTimeout (#728).
@@ -241,7 +241,7 @@ describe('ActivityTable', () => {
 		await waitFor(() => {
 			expect(mockRequest).toHaveBeenCalledWith(expect.stringContaining('GetContentDetails'), { id: '99' });
 		});
-		expect(goto).toHaveBeenCalledWith('?q=sowell', expect.objectContaining({ replaceState: true }));
+		expect(goto).toHaveBeenCalledWith('?q=sowell', expect.objectContaining({ replace: true }));
 		expect(await screen.findByText('Deep Linked Video')).toBeInTheDocument();
 	});
 
@@ -268,7 +268,7 @@ describe('ActivityTable', () => {
 		window.matchMedia = vi.fn(
 			(query: string) =>
 				({
-					matches: query === '(max-width: 859px)',
+					matches: query.includes('max-width: 859px'),
 					media: query,
 					onchange: null,
 					addListener: vi.fn(),
@@ -295,7 +295,7 @@ describe('ActivityTable', () => {
 		window.matchMedia = vi.fn(
 			(query: string) =>
 				({
-					matches: query === '(max-width: 859px)',
+					matches: query.includes('max-width: 859px'),
 					media: query,
 					onchange: null,
 					addListener: vi.fn(),
@@ -333,6 +333,57 @@ describe('ActivityTable', () => {
 		await waitFor(() => {
 			expect(container.querySelector('button[aria-label="Choose columns"]')).toBeTruthy();
 		});
+	});
+
+	it('renders the Export trigger disabled while the grid is not ready', async () => {
+		mockRequest.mockResolvedValue(mockDataResponse);
+		const { container } = renderWithQuery();
+
+		await waitFor(() => {
+			const exportButton = container.querySelector<HTMLButtonElement>('button[aria-label="Export"]');
+			expect(exportButton).toBeTruthy();
+			// The mocked AG Grid never fires onGridReady, so gridReady stays false.
+			expect(exportButton?.disabled).toBe(true);
+		});
+	});
+
+	// The menu stays disabled under the mocked grid, so its items can't be opened here; ExportMenu.test.ts
+	// covers the items, and this pins that ActivityTable hands the menu its CSV and Copy handlers.
+	it('passes the CSV and Copy handlers to the Export menu', async () => {
+		const { readFileSync } = await import('node:fs');
+		const source = readFileSync('src/lib/components/ActivityTable.svelte', 'utf8');
+		const tag = source.match(/<ExportMenu[\s\S]*?\n\s*\/>/)?.[0] ?? '';
+		expect(tag).toContain('onDownloadCsv={handleDownloadCsv}');
+		expect(tag).toContain('onCopy={handleCopy}');
+	});
+
+	it('omits the Export trigger in card mode', async () => {
+		mockRequest.mockResolvedValue(mockDataResponse);
+		const originalMatchMedia = window.matchMedia;
+		window.matchMedia = vi.fn(
+			(query: string) =>
+				({
+					matches: query.includes('max-width: 859px'),
+					media: query,
+					onchange: null,
+					addListener: vi.fn(),
+					removeListener: vi.fn(),
+					addEventListener: vi.fn(),
+					removeEventListener: vi.fn(),
+					dispatchEvent: vi.fn(),
+				}) as unknown as MediaQueryList,
+		);
+
+		try {
+			const { container } = renderWithQuery();
+
+			await waitFor(() => {
+				expect(container.querySelector('[data-testid="activity-card-list"]')).toBeTruthy();
+			});
+			expect(container.querySelector('button[aria-label="Export"]')).toBeFalsy();
+		} finally {
+			window.matchMedia = originalMatchMedia;
+		}
 	});
 
 	// Regression: the +/glasses affordance is driven by a per-user perspectives

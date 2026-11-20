@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { NO_AUTOFILL } from '$lib/utils/noAutofill';
+import { NO_AUTOFILL } from '#lib/utils/noAutofill.js';
 
 describe('NO_AUTOFILL', () => {
 	it('asks LastPass, 1Password and Bitwarden not to offer to fill a field, besides autocomplete=off (which they ignore)', () => {

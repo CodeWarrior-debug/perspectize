@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen } from '@testing-library/svelte';
-import ColorWheel from '$lib/components/theme/ColorWheel.svelte';
+import ColorWheel from '#lib/components/theme/ColorWheel.svelte';
 
 // Only the load-failure state is tested: the happy path is the third-party
 // canvas widget, which jsdom can't render.

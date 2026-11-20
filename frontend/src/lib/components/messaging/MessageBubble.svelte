@@ -1,7 +1,8 @@
 <script lang="ts">
-	import type { Message, MessagingUser } from '$lib/queries/messaging';
-	import { isOptimistic } from '$lib/messaging/optimistic';
-	import { messageClockTime } from '$lib/messaging/format';
+	import { NO_AUTOFILL } from '#lib/utils/noAutofill.js';
+	import type { Message, MessagingUser } from '#lib/queries/messaging/index.js';
+	import { isOptimistic } from '#lib/messaging/optimistic.js';
+	import { messageClockTime } from '#lib/messaging/format.js';
 	import Avatar from './Avatar.svelte';
 	import MessageLink from './MessageLink.svelte';
 	import { linkify } from './linkify';
@@ -86,6 +87,7 @@
 		{:else if editing}
 			<div class="flex flex-col gap-1">
 				<textarea
+					{...NO_AUTOFILL}
 					class="w-full resize-none rounded border border-border bg-background px-2 py-1 text-sm text-foreground focus:outline-none"
 					rows={2}
 					bind:value={editBody}

@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { differenceEuclidean, wcagContrast } from 'culori';
-import { deriveTheme, toCssVarMap, type BaseThemeTokens } from '$lib/theme/derive';
-import { THEME_PRESETS } from '$lib/theme/presets';
+import { deriveTheme, toCssVarMap, type BaseThemeTokens } from '#lib/theme/derive.js';
+import { THEME_PRESETS } from '#lib/theme/presets.js';
 
 const READING_ROOM_BASE: BaseThemeTokens = THEME_PRESETS[0].base;
 

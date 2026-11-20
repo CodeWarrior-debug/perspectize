@@ -12,7 +12,7 @@ import type {
 	UserTodoFilter,
 	UserTodoItem,
 	UserTodoStatus,
-} from '$lib/queries/userTodos';
+} from '#lib/queries/userTodos/index.js';
 
 // ---------------------------------------------------------------------------
 // Actions

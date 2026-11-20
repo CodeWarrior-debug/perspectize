@@ -8,10 +8,10 @@ vi.mock('@tanstack/svelte-query', () => ({
 		invalidateQueries: vi.fn(),
 	})),
 }));
-vi.mock('$lib/queries/client', () => ({ graphqlRequest: vi.fn() }));
+vi.mock('#lib/queries/client.js', () => ({ graphqlRequest: vi.fn() }));
 vi.mock('svelte-sonner', () => ({ toast: { error: vi.fn(), success: vi.fn() } }));
 
-import ThreadList from '$lib/components/messaging/ThreadList.svelte';
+import ThreadList from '#lib/components/messaging/ThreadList.svelte';
 
 const thread = (id: string) => ({
 	id,

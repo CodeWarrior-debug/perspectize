@@ -1,8 +1,8 @@
 <script lang="ts">
 	import ListPlusIcon from '@lucide/svelte/icons/list-plus';
-	import { useAuthState } from '$lib/auth/useAuthState';
-	import { MODAL_ACTION_CLASS } from '$lib/components/modal-action';
-	import { cn } from '$lib/utils';
+	import { useAuthState } from '#lib/auth/useAuthState.js';
+	import { MODAL_ACTION_CLASS } from '#lib/components/modal-action.js';
+	import { cn } from '#lib/utils.js';
 
 	/**
 	 * "Add to plan" entry point on Activity rows and the details modal. Renders

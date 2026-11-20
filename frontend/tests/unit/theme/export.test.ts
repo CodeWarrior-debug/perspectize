@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { themeToCssText, themeFileName, downloadThemeCss } from '$lib/theme/export';
-import { deriveTheme } from '$lib/theme/derive';
-import { THEME_PRESETS } from '$lib/theme/presets';
+import { themeToCssText, themeFileName, downloadThemeCss } from '#lib/theme/export.js';
+import { deriveTheme } from '#lib/theme/derive.js';
+import { THEME_PRESETS } from '#lib/theme/presets.js';
 
 describe('themeFileName', () => {
 	it('kebab-cases an arbitrary theme name', () => {

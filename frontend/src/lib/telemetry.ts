@@ -1,5 +1,5 @@
-import { APP_VERSION, GIT_SHA, clientPlatform } from '$lib/buildInfo';
-import { GRAPHQL_ENDPOINT } from '$lib/queries/client';
+import { APP_VERSION, GIT_SHA, clientPlatform } from '#lib/buildInfo.js';
+import { GRAPHQL_ENDPOINT } from '#lib/queries/client.js';
 
 /**
  * Grafana Faro RUM: uncaught errors, web vitals (CLS/INP/LCP/FCP/TTFB), and fetch/XHR

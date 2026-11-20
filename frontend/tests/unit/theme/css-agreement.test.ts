@@ -1,8 +1,8 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, it, expect } from 'vitest';
-import { toCssVarMap } from '$lib/theme/derive';
-import { DEFAULT_THEME_ID, THEME_PRESETS, THEME_PRESET_TOKENS } from '$lib/theme/presets';
+import { toCssVarMap } from '#lib/theme/derive.js';
+import { DEFAULT_THEME_ID, THEME_PRESETS, THEME_PRESET_TOKENS } from '#lib/theme/presets.js';
 
 /**
  * presets.ts is the source of truth; app.css carries generated copies so the first paint has the

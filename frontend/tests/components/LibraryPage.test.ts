@@ -11,14 +11,14 @@ import { tick } from 'svelte';
 import { goto } from '$app/navigation';
 import { mockPageState } from '../setup';
 
-vi.mock('$lib/components/ActivityTable.svelte', () => ({
+vi.mock('#lib/components/ActivityTable.svelte', () => ({
 	default: vi.fn(() => ({ $$: {}, $set: vi.fn(), $on: vi.fn(), $destroy: vi.fn() })),
 }));
 
 // The "Mine" toggle reads the signed-in user through useMe, which needs Clerk + a
 // QueryClient — stub it with a mutable `me` so each test can sign in or out.
 const meState = vi.hoisted(() => ({ me: null as { id: string; username: string } | null }));
-vi.mock('$lib/queries/users/useMe.svelte', () => ({
+vi.mock('#lib/queries/users/useMe.svelte.js', () => ({
 	useMe: () => ({
 		get me() {
 			return meState.me;
@@ -44,9 +44,7 @@ describe('Library page search scope picker', () => {
 	it('titles the page Library, as the shared library for all members', () => {
 		render(Page);
 		expect(screen.getByRole('heading', { level: 1, name: 'Library' })).toBeInTheDocument();
-		expect(
-			screen.getByText("Everything Perspectize members have added, and how they've measured it."),
-		).toBeInTheDocument();
+		expect(screen.getByText('Everything Perspectize members have added.')).toBeInTheDocument();
 	});
 
 	it('stays on /content-library when the search box is cleared', async () => {

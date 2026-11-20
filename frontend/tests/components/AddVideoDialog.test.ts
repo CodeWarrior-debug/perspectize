@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render } from '@testing-library/svelte';
-import AddVideoDialog from '$lib/components/AddVideoDialog.svelte';
+import AddVideoDialog from '#lib/components/AddVideoDialog.svelte';
 import { warmUpRender } from '../helpers/warmUp';
 
 // Hoisted mocks — shared pattern for useAddVideo components
@@ -31,8 +31,8 @@ vi.mock('svelte-sonner', () => ({
 	toast: { success: mocks.mockToastSuccess, error: mocks.mockToastError },
 }));
 
-vi.mock('$lib/queries/client', () => ({ graphqlRequest: vi.fn() }));
-vi.mock('$lib/utils/youtube', () => ({ validateYouTubeUrl: (url: string) => mocks.mockValidate(url) }));
+vi.mock('#lib/queries/client.js', () => ({ graphqlRequest: vi.fn() }));
+vi.mock('#lib/utils/youtube.js', () => ({ validateYouTubeUrl: (url: string) => mocks.mockValidate(url) }));
 
 function reset() {
 	vi.clearAllMocks();
@@ -84,7 +84,7 @@ describe('AddVideoDialog mutation setup', () => {
 	});
 
 	it('mutationFn calls graphqlRequest with correct args', async () => {
-		const { graphqlRequest } = await import('$lib/queries/client');
+		const { graphqlRequest } = await import('#lib/queries/client.js');
 		(graphqlRequest as any).mockResolvedValue({
 			createContentFromYouTube: { content: { name: 'Test' }, alreadyExisted: false },
 		});

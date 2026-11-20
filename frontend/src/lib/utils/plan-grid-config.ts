@@ -5,9 +5,11 @@
  * the Activity grid. Nothing here touches the DOM.
  */
 import type { ColDef, ICellRendererParams, ValueFormatterParams, ValueGetterParams } from '@ag-grid-community/core';
-import type { TodoPrivacy, UserTodoItem, UserTodoSortBy, UserTodoStatus } from '$lib/queries/userTodos';
+import type { TodoPrivacy, UserTodoItem, UserTodoSortBy, UserTodoStatus } from '#lib/queries/userTodos/index.js';
 import { contentTypeLabel, type ResponsiveTier } from './grid-config';
 import { EMPTY_VALUE } from './formatting';
+import { headerMinWidth } from './grid-header-width';
+import { PLAN_HEADER_CHROME } from './grid-theme';
 import { ratingToDisplay } from './ratings';
 import { addPerspectiveDisabledReason, type TodoFocusField } from './plan-todo-helpers';
 import { planItemCellRenderer } from './planItemCellRenderer';
@@ -243,9 +245,13 @@ export function buildPlanColumnDefs(listMode: boolean, tier: ResponsiveTier = 'l
 
 	const sizing = (colId: PlanColId): Partial<ColDef<UserTodoItem>> => {
 		const meta = metaFor(colId);
-		return meta.flex !== undefined
-			? { flex: meta.flex, minWidth: meta.minWidth }
-			: { width: meta.minWidth, minWidth: meta.minWidth };
+		// Never narrower than the whole heading + sort arrow, as on the Activity grid. Uses the
+		// column's own sortability, not list mode's, so widths don't change when list mode toggles.
+		const minWidth = Math.max(
+			meta.minWidth,
+			headerMinWidth(meta.label, { filter: false, sortable: meta.sortable }, PLAN_HEADER_CHROME),
+		);
+		return meta.flex !== undefined ? { flex: meta.flex, minWidth } : { width: minWidth, minWidth };
 	};
 
 	const common = (colId: PlanColId): ColDef<UserTodoItem> => {

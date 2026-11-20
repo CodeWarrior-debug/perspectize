@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { Button, buttonVariants } from '$lib/components/shadcn';
+import { Button, buttonVariants } from '#lib/components/shadcn/index.js';
 
 describe('shadcn barrel exports', () => {
 	it('exports Button component', () => {

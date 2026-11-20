@@ -8,7 +8,7 @@ const { mockRequest, clerkState } = vi.hoisted(() => ({
 	clerkState: { isLoaded: true, auth: { userId: '1' as string | null } },
 }));
 
-vi.mock('$lib/queries/client', () => ({
+vi.mock('#lib/queries/client.js', () => ({
 	graphqlRequest: mockRequest,
 }));
 
@@ -18,7 +18,7 @@ vi.mock('svelte-clerk', () => ({
 
 vi.mock('$app/navigation', () => ({ goto: vi.fn() }));
 
-import Compare from '$lib/components/Compare.svelte';
+import Compare from '#lib/components/Compare.svelte';
 import { goto } from '$app/navigation';
 
 const meResponse = {
@@ -324,7 +324,7 @@ describe('Compare', () => {
 
 		expect(vi.mocked(goto)).toHaveBeenCalledWith(
 			expect.stringContaining('left=p3'),
-			expect.objectContaining({ replaceState: true }),
+			expect.objectContaining({ replace: true }),
 		);
 		const [calledUrl] = vi.mocked(goto).mock.calls[0];
 		expect(calledUrl).toContain('left=p3');
@@ -848,6 +848,112 @@ describe('Compare', () => {
 
 			expect(await screen.findByText(/no one has shared a perspective/i)).toBeInTheDocument();
 			expect(screen.queryByTestId('picker-left')).not.toBeInTheDocument();
+		});
+	});
+
+	// Privacy markers: "Private" is the only labelled state (public has no
+	// marker). Option labels are text (native <select>), and each Take column
+	// header carries the lock icon plus the visible word, so the state is never
+	// conveyed by colour alone.
+	describe('privacy markers', () => {
+		type PrivacyRow = { id: string; userID: string; username: string; privacy: string; updatedAt: string };
+
+		function privacyRow({ id, userID, username, privacy, updatedAt }: PrivacyRow) {
+			return {
+				id,
+				userID,
+				user: { id: userID, username },
+				contentID: '10',
+				quality: 5000,
+				agreement: null,
+				importance: null,
+				confidence: null,
+				like: null,
+				review: 'x',
+				privacy,
+				description: null,
+				primaryPerspectiveID: null,
+				relatedPerspectiveIDs: null,
+				customFields: null,
+				feelings: null,
+				createdAt: '2026-01-01T00:00:00Z',
+				updatedAt,
+			};
+		}
+
+		function mockPrivacyRows(rows: PrivacyRow[]) {
+			mockRequest.mockImplementation((query: string) => {
+				if (query.includes('ListPerspectivesByContent'))
+					return Promise.resolve({ perspectives: { items: rows.map(privacyRow) } });
+				if (query.includes('GetContent')) return Promise.resolve(contentResponse);
+				if (query.includes('query Me')) return Promise.resolve(meResponse);
+				return Promise.resolve({});
+			});
+		}
+
+		function optionTexts(testId: string): (string | null)[] {
+			return Array.from((screen.getByTestId(testId) as HTMLSelectElement).options).map((o) => o.textContent);
+		}
+
+		it('public only: no Private marker on the cards or in any option label', async () => {
+			mockPrivacyRows([
+				{ id: 'p1', userID: '1', username: 'me', privacy: 'PUBLIC', updatedAt: '2026-01-02T12:00:00Z' },
+				{ id: 'p2', userID: '2', username: 'Jamie Lee', privacy: 'PUBLIC', updatedAt: '2026-01-01T12:00:00Z' },
+			]);
+			renderCompare({ contentId: '10', initialLeftId: null, initialRightId: null });
+
+			await waitFor(() => {
+				expect(screen.getByTestId('picker-left')).toBeInTheDocument();
+			});
+			expect(screen.queryByTestId('take-private')).not.toBeInTheDocument();
+			expect(screen.queryByText('Private')).not.toBeInTheDocument();
+			expect([...optionTexts('picker-left'), ...optionTexts('picker-right')].some((t) => t?.includes('Private'))).toBe(
+				false,
+			);
+		});
+
+		it('private only: both cards show the Private marker and both option labels carry it', async () => {
+			mockPrivacyRows([
+				{ id: 'p1', userID: '1', username: 'me', privacy: 'PRIVATE', updatedAt: '2026-01-02T12:00:00Z' },
+				{ id: 'p2', userID: '2', username: 'Jamie Lee', privacy: 'PRIVATE', updatedAt: '2026-01-01T12:00:00Z' },
+			]);
+			renderCompare({ contentId: '10', initialLeftId: null, initialRightId: null });
+
+			await waitFor(() => {
+				expect(screen.getByTestId('picker-left')).toBeInTheDocument();
+			});
+			expect(screen.getAllByTestId('take-private')).toHaveLength(2);
+			// Left is the viewer's own take, right the other author's; each select
+			// offers only the opposite side's row, and both carry the marker.
+			expect(optionTexts('picker-left')).toEqual(['You · Private']);
+			expect(optionTexts('picker-right')).toEqual(['Jamie Lee · Private']);
+		});
+
+		it('one author, one public and one private: labels differ, both are shown, the marker sits on the private take only', async () => {
+			mockPrivacyRows([
+				{ id: 'a1', userID: '1', username: 'me', privacy: 'PRIVATE', updatedAt: '2026-01-02T12:00:00Z' },
+				{ id: 'a2', userID: '1', username: 'me', privacy: 'PUBLIC', updatedAt: '2026-01-01T12:00:00Z' },
+			]);
+			renderCompare({ contentId: '10', initialLeftId: null, initialRightId: null });
+
+			await waitFor(() => {
+				expect(screen.getByTestId('picker-left')).toBeInTheDocument();
+			});
+			// Left defaults to the latest (the private one), right to the public one.
+			expect((screen.getByTestId('picker-left') as HTMLSelectElement).value).toBe('a1');
+			expect((screen.getByTestId('picker-right') as HTMLSelectElement).value).toBe('a2');
+
+			const privateLabel = optionTexts('picker-left')[0] ?? '';
+			const publicLabel = optionTexts('picker-right')[0] ?? '';
+			expect(privateLabel).toContain('Private');
+			expect(publicLabel).not.toContain('Private');
+			expect(privateLabel).not.toBe(publicLabel);
+			expect(privateLabel.startsWith('You · ')).toBe(true);
+			expect(publicLabel.startsWith('You · ')).toBe(true);
+
+			// Only the private take's column header carries the marker.
+			expect(screen.getAllByTestId('take-private')).toHaveLength(1);
+			expect(screen.getByTestId('take-private')).toHaveTextContent('Private');
 		});
 	});
 });

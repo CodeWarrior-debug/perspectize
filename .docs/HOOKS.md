@@ -31,6 +31,17 @@ Two independent hook systems. The root [CLAUDE.md](../CLAUDE.md) keeps only what
 
 `.hooks/pre-commit`, a real `core.hooksPath` hook — not a Claude Code hook. It auto-formats staged `backend/*.go` (gofmt) and `frontend/src/*.{svelte,ts,js}` (prettier) files and re-stages them on every `git commit`, regardless of what tool/human is committing. It also **blocks** (does not auto-fix) new raw hex/rgb colour literals in frontend components — see [frontend/CLAUDE.md](../frontend/CLAUDE.md).
 
+### Pre-push comment hygiene
+
+`.hooks/pre-push` keeps comments that cite a ticket or narrate a past implementation out of pushed commits. A comment explains the code as it stands and why; the story of a change belongs in the commit message. The hook scans only the lines the pushed commits **add** (`.hooks/comment-history-scan.sh`), in Go, TS/JS/Svelte, shell and SQL, skipping generated code.
+
+- **HARD hits** (ticket, PR, issue, `INI-n` or phase numbers) always block the push.
+- **SOFT hits** (history wording: "previously", "no longer", "used to be", "now uses") are often fine, so a headless `claude -p` run judges them against the rubric in [`.claude/skills/comment-hygiene/SKILL.md`](../.claude/skills/comment-hygiene/SKILL.md). A line the model leaves alone is its verdict: the push goes ahead, and the verdict is cached in `.git/comment-hygiene-judged` so the same lines are not re-sent.
+- **The fix:** when the model edits comments, the hook checks that only comment text changed in the flagged files (any code change discards the edits and blocks), then **amends** the tip commit if that commit alone introduced every hit, or adds a separate `chore: drop ticket and history references from comments` commit. It then **aborts this push**: review with `git show`, run `git push` again. A commit group never goes out ending on flagged comments.
+- **No auto-fix:** without the `claude` CLI, with a dirty working tree, or when the pushed branch is not the checked-out one, HARD hits block and SOFT hits only warn.
+- **Escape hatches:** a same-line `history-ok: <reason>` comment (like `hex-ok:`), or `git push --no-verify`.
+- Tuning: `COMMENT_HYGIENE_MODEL` (default `sonnet`) and `COMMENT_HYGIENE_TIMEOUT` in seconds (default 240). Test: `sh .hooks/test-pre-push-comment-hygiene.sh` (throwaway repo, stub `claude`, no API calls).
+
 Not active by default — activate once per checkout with `make install-hooks` (from `backend/`, sets `core.hooksPath` to `.hooks`). This is what actually prevents the CI `Build` job's `gofmt -l .` check from failing (as it did on PR #366); the `gofmt-precommit.sh` PreToolUse reminder above is only a fallback for a checkout where this hasn't been activated yet.
 
 **Cloud/CI sessions start with `core.hooksPath` unset** — a fresh container checkout has never run `make install-hooks`, so commits made there get no gofmt/prettier auto-fix at all (the PreToolUse reminders only fire on a matching Bash command, and there's no frontend-side reminder). Either run `make install-hooks` once per session, or manually run `gofmt -l .` (backend) / `pnpm exec prettier --check <files>` (frontend) before every commit and fix flagged files with `--write` before pushing.

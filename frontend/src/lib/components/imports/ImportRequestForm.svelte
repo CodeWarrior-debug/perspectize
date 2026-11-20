@@ -1,9 +1,10 @@
 <script lang="ts">
+	import { NO_AUTOFILL } from '#lib/utils/noAutofill.js';
 	import { toast } from 'svelte-sonner';
-	import { Button } from '$lib/components/shadcn';
-	import CommentsEditor from '$lib/components/CommentsEditor.svelte';
-	import ImportSourceRows from '$lib/components/imports/ImportSourceRows.svelte';
-	import { useCreateImportJob } from '$lib/queries/imports/useImportJobMutations';
+	import { Button } from '#lib/components/shadcn/index.js';
+	import CommentsEditor from '#lib/components/CommentsEditor.svelte';
+	import ImportSourceRows from '#lib/components/imports/ImportSourceRows.svelte';
+	import { useCreateImportJob } from '#lib/queries/imports/useImportJobMutations.js';
 	import {
 		hasDescriptionText,
 		importErrorMessage,
@@ -11,7 +12,7 @@
 		newSourceRow,
 		toSourceInputs,
 		type SourceRow,
-	} from '$lib/utils/import-sheet';
+	} from '#lib/utils/import-sheet.js';
 
 	/**
 	 * Request an import: a name, and a description and/or one or more sources (a
@@ -70,6 +71,7 @@
 	<label class="flex flex-col gap-1.5 text-sm font-medium">
 		Name
 		<input
+			{...NO_AUTOFILL}
 			type="text"
 			bind:value={name}
 			maxlength={120}

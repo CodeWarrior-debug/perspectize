@@ -1,8 +1,8 @@
 <script lang="ts">
 	import type { LibraryItem } from './libraryItem';
-	import type { VideoItem } from '$lib/services/youtubeApi';
-	import { toWatchUrl } from '$lib/services/youtubeApi';
-	import { Button } from '$lib/components/shadcn';
+	import type { VideoItem } from '#lib/services/youtubeApi.js';
+	import { toWatchUrl } from '#lib/services/youtubeApi.js';
+	import { Button } from '#lib/components/shadcn/index.js';
 	import VideoCard from './VideoCard.svelte';
 
 	let {

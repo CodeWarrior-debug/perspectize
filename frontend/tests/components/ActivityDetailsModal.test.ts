@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/svelte';
-import ActivityDetailsModal from '$lib/components/ActivityDetailsModal.svelte';
-import { MODAL_ACTION_CLASS } from '$lib/components/modal-action';
+import ActivityDetailsModal from '#lib/components/ActivityDetailsModal.svelte';
+import { MODAL_ACTION_CLASS } from '#lib/components/modal-action.js';
 import { warmUpRender } from '../helpers/warmUp';
 
 // Hoisted mocks — shared pattern for useUpdateSourceData components (see AddVideoPopover.test.ts)
@@ -35,11 +35,11 @@ vi.mock('svelte-sonner', () => ({
 	toast: { success: mocks.mockToastSuccess, error: mocks.mockToastError },
 }));
 
-vi.mock('$lib/queries/client', () => ({ graphqlRequest: vi.fn() }));
+vi.mock('#lib/queries/client.js', () => ({ graphqlRequest: vi.fn() }));
 
 // The "Add to plan" button reads the auth facade; the real module needs Clerk, so stub it.
 const authState = vi.hoisted(() => ({ userId: null as string | null }));
-vi.mock('$lib/auth/useAuthState', () => ({
+vi.mock('#lib/auth/useAuthState.js', () => ({
 	useAuthState: () => ({
 		get isLoaded() {
 			return true;
@@ -679,6 +679,24 @@ describe('ActivityDetailsModal', () => {
 			await fireEvent.click(screen.getByRole('button', { name: 'Add to plan' }));
 			expect(onAddToPlan).toHaveBeenCalledTimes(1);
 			expect(onAddToPlan).toHaveBeenCalledWith(content);
+		});
+
+		it.each(['YOUTUBE_VIDEO', 'MOVIE', 'BOOK', 'WEB_PAGE', 'BIBLE_PASSAGE', 'CLAIM'])(
+			'shows Add perspective for %s and passes the content to onAddPerspective',
+			async (contentType) => {
+				const onAddPerspective = vi.fn();
+				const row = { ...content, contentType };
+				render(ActivityDetailsModal, { props: { content: row, open: true, onClose: vi.fn(), onAddPerspective } });
+
+				await fireEvent.click(screen.getByRole('button', { name: 'Add perspective' }));
+				expect(onAddPerspective).toHaveBeenCalledTimes(1);
+				expect(onAddPerspective).toHaveBeenCalledWith(row);
+			},
+		);
+
+		it('hides Add perspective when no handler is provided', () => {
+			render(ActivityDetailsModal, { props: { content, open: true, onClose: vi.fn() } });
+			expect(screen.queryByRole('button', { name: 'Add perspective' })).toBeNull();
 		});
 
 		it('hides Add to plan for a signed-out user', () => {

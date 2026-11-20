@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { sanitizeHtml } from '$lib/utils/sanitize';
+	import { sanitizeHtml } from '#lib/utils/sanitize.js';
 
 	/**
 	 * SafeHtml — renders user-generated HTML (e.g., Tiptap review content)

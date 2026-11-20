@@ -9,9 +9,9 @@
 		Button,
 		Input,
 		Label,
-	} from '$lib/components/shadcn';
-	import { useAddVideo } from '$lib/queries/content/useAddVideo';
-	import { validateYouTubeUrl } from '$lib/utils/youtube';
+	} from '#lib/components/shadcn/index.js';
+	import { useAddVideo } from '#lib/queries/content/useAddVideo.js';
+	import { validateYouTubeUrl } from '#lib/utils/youtube.js';
 
 	// Props
 	let {

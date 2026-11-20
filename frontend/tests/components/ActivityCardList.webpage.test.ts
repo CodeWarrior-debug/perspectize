@@ -1,9 +1,9 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen } from '@testing-library/svelte';
-import ActivityCardList from '$lib/components/ActivityCardList.svelte';
+import ActivityCardList from '#lib/components/ActivityCardList.svelte';
 import { warmUpRender } from '../helpers/warmUp';
 
-vi.mock('$lib/auth/useAuthState', () => ({
+vi.mock('#lib/auth/useAuthState.js', () => ({
 	useAuthState: () => ({
 		get isLoaded() {
 			return true;

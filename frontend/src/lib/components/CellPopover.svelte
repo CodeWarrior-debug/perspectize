@@ -14,7 +14,7 @@
 	import { Popover } from 'bits-ui';
 	import { toast } from 'svelte-sonner';
 	import CopyIcon from '@lucide/svelte/icons/copy';
-	import { itemsCopyText } from '$lib/utils/tooltipSpec';
+	import { itemsCopyText } from '#lib/utils/tooltipSpec.js';
 
 	let {
 		state: popover,
@@ -53,6 +53,18 @@
 		if (next.has(item)) next.delete(item);
 		else next.add(item);
 		selected = next;
+	}
+
+	// Select-all and clear are the two ends of the selection range; each is disabled
+	// at its own end so the bar always shows the one move that changes something.
+	const allSelected = $derived(popover !== null && popover.items.every((item) => selected.has(item)));
+
+	function selectAll() {
+		if (popover) selected = new Set(popover.items);
+	}
+
+	function clearSelection() {
+		selected = new Set();
 	}
 </script>
 
@@ -99,14 +111,20 @@
 						{/each}
 					</div>
 					<div class="tip-actions">
+						<button type="button" data-testid="tip-select-all" disabled={allSelected} onclick={selectAll}
+							>Select all</button
+						>
+						<button
+							type="button"
+							data-testid="tip-clear-selection"
+							disabled={selected.size === 0}
+							onclick={clearSelection}>Clear</button
+						>
 						<button
 							type="button"
 							data-testid="tip-copy-selected"
 							disabled={selected.size === 0}
 							onclick={() => copy(itemsCopyText(popover.items, selected, popover.copyValues))}>Copy selected</button
-						>
-						<button type="button" data-testid="tip-copy-all" onclick={() => copy(itemsCopyText(popover.items, null, popover.copyValues))}
-							>Copy all</button
 						>
 					</div>
 				{/if}

@@ -1,8 +1,8 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { QueryClient } from '@tanstack/svelte-query';
-import { IDLE_TIMEOUT_MS } from '$lib/utils/idleDetector';
-import { streamIdle, watchStreamIdle } from '$lib/messaging/streamIdle.svelte';
-import { queryKeys } from '$lib/queries/keys';
+import { IDLE_TIMEOUT_MS } from '#lib/utils/idleDetector.js';
+import { streamIdle, watchStreamIdle } from '#lib/messaging/streamIdle.svelte.js';
+import { queryKeys } from '#lib/queries/keys.js';
 
 const MIN = 60 * 1000;
 

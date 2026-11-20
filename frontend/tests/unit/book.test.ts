@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { validateBookInput, descriptionText, safeRelatedWorks } from '$lib/utils/book';
+import { validateBookInput, descriptionText, safeRelatedWorks } from '#lib/utils/book.js';
 
 describe('validateBookInput', () => {
 	it('accepts an Open Library work link with or without scheme', () => {

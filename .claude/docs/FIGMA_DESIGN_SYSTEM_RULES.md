@@ -26,14 +26,14 @@ Rules for translating Figma designs into Perspectize Svelte code via the Figma M
 - **Page routes:** `frontend/src/routes/+page.svelte`
 - **Barrel export:** `frontend/src/lib/components/shadcn/index.ts` — all shadcn components re-exported
 
-IMPORTANT: Always check existing components before creating new ones. Import shadcn primitives from `$lib/components/shadcn`.
+IMPORTANT: Always check existing components before creating new ones. Import shadcn primitives from `#lib/components/shadcn`.
 
 ## Framework & Patterns
 
 - **Framework:** SvelteKit with Svelte 5 runes (`$state`, `$derived`, `$props`, `$effect`)
 - **Styling:** Tailwind v4 utility classes via `@theme` in `app.css`
 - **Variant system:** `tailwind-variants` (`tv()`) for component variants (see Button pattern)
-- **Class merging:** `cn()` from `$lib/utils.js` (clsx + tailwind-merge)
+- **Class merging:** `cn()` from `#lib/utils.js` (clsx + tailwind-merge)
 - **Props pattern:** `let { class: className, ...restProps }: Props = $props()` — all components accept `class` prop
 - **Children:** `{@render children?.()}` (Svelte 5, NOT `<slot />`)
 

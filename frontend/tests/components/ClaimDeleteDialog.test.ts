@@ -1,10 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/svelte';
-import ClaimDeleteDialog from '$lib/components/declare/ClaimDeleteDialog.svelte';
+import ClaimDeleteDialog from '#lib/components/declare/ClaimDeleteDialog.svelte';
 
 const { mutateAsync } = vi.hoisted(() => ({ mutateAsync: vi.fn() }));
 
-vi.mock('$lib/queries/content/useDeleteClaim', () => ({
+vi.mock('#lib/queries/content/useDeleteClaim.js', () => ({
 	useDeleteClaim: () => ({ mutateAsync, isPending: false }),
 }));
 

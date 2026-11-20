@@ -15,12 +15,12 @@ vi.mock('@tanstack/svelte-query', () => ({
 	}),
 	useQueryClient: vi.fn(() => ({ setQueryData: mocks.mockSetQueryData, invalidateQueries: mocks.mockInvalidate })),
 }));
-vi.mock('$lib/queries/client', () => ({ graphqlRequest: (...a: unknown[]) => mocks.mockGraphql(...a) }));
+vi.mock('#lib/queries/client.js', () => ({ graphqlRequest: (...a: unknown[]) => mocks.mockGraphql(...a) }));
 vi.mock('svelte-sonner', () => ({ toast: { error: mocks.mockToastError, success: vi.fn() } }));
 
-import { useDeleteMessage } from '$lib/queries/messaging/useDeleteMessage';
-import { DELETE_MESSAGE } from '$lib/queries/messaging';
-import { queryKeys } from '$lib/queries/keys';
+import { useDeleteMessage } from '#lib/queries/messaging/useDeleteMessage.js';
+import { DELETE_MESSAGE } from '#lib/queries/messaging/index.js';
+import { queryKeys } from '#lib/queries/keys.js';
 
 describe('useDeleteMessage', () => {
 	beforeEach(() => vi.clearAllMocks());

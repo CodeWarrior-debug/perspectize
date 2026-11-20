@@ -2,8 +2,8 @@
 	import XIcon from '@lucide/svelte/icons/x';
 	import ListXIcon from '@lucide/svelte/icons/list-x';
 	import type { GridApi } from '@ag-grid-community/core';
-	import { formatDurationSeconds, formatBoxOffice } from '$lib/utils/formatting';
-	import { COLUMN_LABELS, liveGridApi, setFilterValueLabel } from '$lib/utils/grid-config';
+	import { formatDurationSeconds, formatBoxOffice } from '#lib/utils/formatting.js';
+	import { COLUMN_LABELS, liveGridApi, setFilterValueLabel } from '#lib/utils/grid-config.js';
 
 	interface FilterChip {
 		colId: string;
@@ -16,12 +16,15 @@
 		filterModel,
 		onRemove,
 		onClearAll,
+		onClearAllButType,
 	}: {
 		gridApi: GridApi | null;
 		filterModel: Record<string, any>;
 		/** Used when no grid is mounted (mobile card mode): the caller edits URL filters directly. */
 		onRemove?: (colId: string) => void;
 		onClearAll?: () => void;
+		/** URL-path twin of "Clear all but type", used when the grid cannot clear the person filter. */
+		onClearAllButType?: () => void;
 	} = $props();
 
 	const TEXT_OPERATORS: Record<string, string> = {
@@ -143,6 +146,14 @@
 		api.setFilterModel(null);
 	}
 
+	/** Keeps the type filter and drops every other chip. */
+	function removeAllButType() {
+		const api = liveGridApi(gridApi);
+		if (!api || 'person' in filterModel) return onClearAllButType?.();
+		const typeFilter = api.getFilterModel()?.type;
+		api.setFilterModel(typeFilter ? { type: typeFilter } : null);
+	}
+
 	/** On desktop, relocate the chip row into the page header's empty middle (#activity-chips-slot)
 	 * so it costs no vertical space above the grid. Mobile keeps it inside the card. */
 	function moveToHeaderSlot(node: HTMLElement) {
@@ -182,5 +193,15 @@
 			<ListXIcon class="size-3.5" />
 			Clear all
 		</button>
+
+		{#if 'type' in filterModel && chips.length > 1}
+			<button
+				onclick={removeAllButType}
+				class="inline-flex items-center gap-1 px-2 py-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
+			>
+				<ListXIcon class="size-3.5" />
+				Clear all but type
+			</button>
+		{/if}
 	</div>
 {/if}

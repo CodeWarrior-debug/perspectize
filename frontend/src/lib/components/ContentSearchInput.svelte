@@ -1,11 +1,11 @@
 <script lang="ts">
-	import { Input } from '$lib/components/shadcn';
-	import { NO_AUTOFILL } from '$lib/utils/noAutofill';
+	import { Input } from '#lib/components/shadcn/index.js';
+	import { NO_AUTOFILL } from '#lib/utils/noAutofill.js';
 	import SearchIcon from '@lucide/svelte/icons/search';
 	import XIcon from '@lucide/svelte/icons/x';
 
 	// Debounced in-app content search (Compare picker). Discover's SearchBar
-	// hands off to youtube.com instead, so it no longer debounces.
+	// hands off to youtube.com instead, so it doesn't debounce.
 
 	let {
 		value = $bindable(''),

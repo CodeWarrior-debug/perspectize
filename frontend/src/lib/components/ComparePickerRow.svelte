@@ -1,6 +1,6 @@
 <script lang="ts">
 	import ArrowLeftRightIcon from '@lucide/svelte/icons/arrow-left-right';
-	import { identityColor, nameInitials } from '$lib/utils/compareIdentity';
+	import { identityColor, nameInitials } from '#lib/utils/compareIdentity.js';
 
 	let {
 		options,
@@ -12,8 +12,8 @@
 		onSwap,
 	}: {
 		// id is the perspective (the unit being compared); userId drives the
-		// avatar colour, and label is the select text (name plus a date when one
-		// person has several perspectives).
+		// avatar colour, and label is the select text (name, a date when one
+		// person has several perspectives, and a "Private" suffix when private).
 		options: { id: string; userId: string; name: string; label: string }[];
 		leftId: string;
 		rightId: string;

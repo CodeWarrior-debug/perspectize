@@ -1,14 +1,14 @@
 <script lang="ts">
-	import AuthShow from '$lib/components/auth/AuthShow.svelte';
-	import SignInTrigger from '$lib/components/auth/SignInTrigger.svelte';
-	import UserMenu from '$lib/components/auth/UserMenu.svelte';
-	import AddContentPopover from '$lib/components/AddContentPopover.svelte';
-	import SettingsDialog from '$lib/components/SettingsDialog.svelte';
+	import AuthShow from '#lib/components/auth/AuthShow.svelte';
+	import SignInTrigger from '#lib/components/auth/SignInTrigger.svelte';
+	import UserMenu from '#lib/components/auth/UserMenu.svelte';
+	import AddContentPopover from '#lib/components/AddContentPopover.svelte';
+	import SettingsDialog from '#lib/components/SettingsDialog.svelte';
 	import SettingsIcon from '@lucide/svelte/icons/settings';
 	import { page } from '$app/state';
-	import { createThemeStore } from '$lib/theme/store.svelte';
-	import { createFontStore } from '$lib/fonts/store.svelte';
-	import { LIBRARY_PATH } from '$lib/utils/contentLinks';
+	import { createThemeStore } from '#lib/theme/store.svelte.js';
+	import { createFontStore } from '#lib/fonts/store.svelte.js';
+	import { LIBRARY_PATH } from '#lib/utils/contentLinks.js';
 
 	const themeStore = createThemeStore();
 	const fontStore = createFontStore();
@@ -42,7 +42,8 @@
 			>
 				Perspectize
 			</a>
-			<nav class="flex items-center gap-0.5 sm:gap-2 shrink-0">
+			<!-- min-w-0 + overflow-x-auto: at phone width the links scroll inside the nav instead of running under the right-hand buttons. py/px padding keeps the focus ring from being clipped. -->
+			<nav class="flex items-center gap-0.5 sm:gap-2 min-w-0 overflow-x-auto py-1 -my-1 px-1 -mx-1">
 				{#each navLinks as link (link.href)}
 					<a
 						href={link.href}

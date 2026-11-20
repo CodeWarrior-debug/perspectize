@@ -2,8 +2,8 @@
 <script lang="ts">
 	import ArrowRightIcon from '@lucide/svelte/icons/arrow-right';
 	import LoaderCircleIcon from '@lucide/svelte/icons/loader-circle';
-	import { useOpenPassage } from '$lib/queries/content/useOpenPassage';
-	import { singleVerseRange, singleVerseReference } from '$lib/utils/verseJump';
+	import { useOpenPassage } from '#lib/queries/content/useOpenPassage.js';
+	import { singleVerseRange, singleVerseReference } from '#lib/utils/verseJump.js';
 
 	let {
 		verseId,

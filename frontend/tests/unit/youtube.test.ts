@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { validateYouTubeUrl } from '$lib/utils/youtube';
+import { validateYouTubeUrl } from '#lib/utils/youtube.js';
 
 describe('validateYouTubeUrl', () => {
 	describe('valid URLs', () => {

@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/svelte';
-import WebPageRolesPicker from '$lib/components/webpage/WebPageRolesPicker.svelte';
-import type { WebPageRole } from '$lib/queries/content';
+import WebPageRolesPicker from '#lib/components/webpage/WebPageRolesPicker.svelte';
+import type { WebPageRole } from '#lib/queries/content/index.js';
 
 function renderPicker(roles: WebPageRole[], disabled = false) {
 	const onChange = vi.fn();

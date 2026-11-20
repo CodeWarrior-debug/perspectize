@@ -309,6 +309,62 @@ func TestImportJobIntegration_QueueAndOutcomes(t *testing.T) {
 	assert.Equal(t, []int{items[1].ID}, requeued)
 }
 
+// A batch that runs out of time fails the rows it never reached. Only rows of
+// that job, among the ids given, that are still queued change; a row that
+// finished (or another batch's row) keeps its outcome.
+func TestImportJobIntegration_FailQueuedItems(t *testing.T) {
+	f := newImportJobFixture(t)
+	ctx := context.Background()
+	job := f.newJob(t)
+	other := f.newJob(t)
+	require.NoError(t, f.repo.UpsertItems(ctx, []*domain.ImportItemWithDetails{f.videoItem(job, 1), f.videoItem(job, 2), f.videoItem(job, 3)}))
+	require.NoError(t, f.repo.UpsertItems(ctx, []*domain.ImportItemWithDetails{f.videoItem(other, 4)}))
+	items, err := f.repo.ListItems(ctx, job.ID)
+	require.NoError(t, err)
+	otherItems, err := f.repo.ListItems(ctx, other.ID)
+	require.NoError(t, err)
+	_, err = f.repo.MarkQueued(ctx, job.ID, []int{items[0].ID, items[1].ID, items[2].ID})
+	require.NoError(t, err)
+	_, err = f.repo.MarkQueued(ctx, other.ID, []int{otherItems[0].ID})
+	require.NoError(t, err)
+	require.NoError(t, f.repo.RecordOutcome(ctx, items[2].ID, domain.ImportItemStatusImported, nil, nil)) // finished before the timeout
+
+	// Row 2 is queued but not named, and the other job's row is named but not this job's.
+	named := []int{items[0].ID, items[2].ID, otherItems[0].ID}
+	c := querycount.Attach(t, f.db)
+	failed, err := f.repo.FailQueuedItems(ctx, job.ID, named, "cut short")
+	require.NoError(t, err)
+	c.AssertExactly(t, 1)
+	assert.Equal(t, 1, failed, "only row 1: named, this job's, still queued")
+
+	listed, err := f.repo.ListItems(ctx, job.ID)
+	require.NoError(t, err)
+	assert.Equal(t, domain.ImportItemStatusFailed, *listed[0].ImportStatus)
+	require.NotNil(t, listed[0].ImportError)
+	assert.Equal(t, "cut short", *listed[0].ImportError)
+	assert.Equal(t, domain.ImportItemStatusQueued, *listed[1].ImportStatus, "a row not named stays queued")
+	assert.Equal(t, domain.ImportItemStatusImported, *listed[2].ImportStatus, "a finished row keeps its outcome")
+	assert.Nil(t, listed[2].ImportError)
+	otherListed, err := f.repo.ListItems(ctx, other.ID)
+	require.NoError(t, err)
+	assert.Equal(t, domain.ImportItemStatusQueued, *otherListed[0].ImportStatus, "another job's row is untouched")
+
+	c.Reset()
+	none, err := f.repo.FailQueuedItems(ctx, job.ID, nil, "cut short")
+	require.NoError(t, err)
+	assert.Zero(t, none)
+	c.AssertExactly(t, 0)
+
+	again, err := f.repo.FailQueuedItems(ctx, job.ID, named, "cut short")
+	require.NoError(t, err)
+	assert.Zero(t, again, "a row already failed is not counted twice")
+
+	// The point of failing them: the user can queue them again.
+	requeued, err := f.repo.MarkQueued(ctx, job.ID, []int{items[0].ID})
+	require.NoError(t, err)
+	assert.Equal(t, []int{items[0].ID}, requeued)
+}
+
 func TestImportJobIntegration_UpdateSourceAndReassign(t *testing.T) {
 	f := newImportJobFixture(t)
 	ctx := context.Background()

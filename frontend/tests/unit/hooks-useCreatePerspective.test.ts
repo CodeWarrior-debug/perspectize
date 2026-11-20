@@ -47,29 +47,29 @@ vi.mock('svelte-sonner', () => ({
 	},
 }));
 
-vi.mock('$lib/queries/client', () => ({
+vi.mock('#lib/queries/client.js', () => ({
 	graphqlRequest: vi.fn(),
 }));
 
 // The tests import these inside their bodies; load them once up front so the first
 // test doesn't pay the module transform, which balloons under full-suite load (#728).
 preloadLazy(
-	() => import('$lib/queries/client'),
-	() => import('$lib/queries/perspectives'),
-	() => import('$lib/queries/perspectives/useCreatePerspective'),
+	() => import('#lib/queries/client.js'),
+	() => import('#lib/queries/perspectives/index.js'),
+	() => import('#lib/queries/perspectives/useCreatePerspective.js'),
 );
 
 describe('useCreatePerspective hook', () => {
 	beforeEach(async () => {
 		vi.clearAllMocks();
 		capturedMutationOptions = undefined;
-		const { useCreatePerspective } = await import('$lib/queries/perspectives/useCreatePerspective');
+		const { useCreatePerspective } = await import('#lib/queries/perspectives/useCreatePerspective.js');
 		useCreatePerspective();
 	});
 
 	describe('hook initialization', () => {
 		it('returns a mutation object with mutate method', async () => {
-			const { useCreatePerspective } = await import('$lib/queries/perspectives/useCreatePerspective');
+			const { useCreatePerspective } = await import('#lib/queries/perspectives/useCreatePerspective.js');
 			const mutation = useCreatePerspective();
 			expect(mutation).toBeDefined();
 			expect(mutation.mutate).toBeDefined();
@@ -83,8 +83,8 @@ describe('useCreatePerspective hook', () => {
 		});
 
 		it('calls graphqlRequest with CREATE_PERSPECTIVE and input', async () => {
-			const { graphqlRequest } = await import('$lib/queries/client');
-			const { CREATE_PERSPECTIVE } = await import('$lib/queries/perspectives');
+			const { graphqlRequest } = await import('#lib/queries/client.js');
+			const { CREATE_PERSPECTIVE } = await import('#lib/queries/perspectives/index.js');
 			(graphqlRequest as any).mockResolvedValue({
 				createPerspective: { id: '1', userID: '42', quality: 7500, privacy: 'PUBLIC', createdAt: '', updatedAt: '' },
 			});
@@ -96,7 +96,7 @@ describe('useCreatePerspective hook', () => {
 		});
 
 		it('passes partial input (only quality)', async () => {
-			const { graphqlRequest } = await import('$lib/queries/client');
+			const { graphqlRequest } = await import('#lib/queries/client.js');
 			(graphqlRequest as any).mockResolvedValue({
 				createPerspective: { id: '1', userID: '42', quality: 5000, privacy: 'PUBLIC', createdAt: '', updatedAt: '' },
 			});
@@ -159,8 +159,8 @@ describe('useCreatePerspective hook', () => {
 
 	describe('privacy', () => {
 		it('forwards privacy to the mutation and the optimistic row', async () => {
-			const { graphqlRequest } = await import('$lib/queries/client');
-			const { CREATE_PERSPECTIVE } = await import('$lib/queries/perspectives');
+			const { graphqlRequest } = await import('#lib/queries/client.js');
+			const { CREATE_PERSPECTIVE } = await import('#lib/queries/perspectives/index.js');
 			(graphqlRequest as any).mockResolvedValue({
 				createPerspective: { id: '1', userID: '42', quality: 9000, privacy: 'PRIVATE', createdAt: '', updatedAt: '' },
 			});

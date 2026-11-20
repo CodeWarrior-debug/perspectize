@@ -1,10 +1,10 @@
 <script lang="ts">
 	import type { LibraryItem } from './libraryItem';
 	import { createQuery } from '@tanstack/svelte-query';
-	import { Button, Input } from '$lib/components/shadcn';
+	import { Button, Input } from '#lib/components/shadcn/index.js';
 	import BookCard from './BookCard.svelte';
-	import { BOOK_SEARCH_STALE_TIME, lookupBookByIsbn, openLibraryKeys } from '$lib/services/openLibraryApi';
-	import { checkIsbn, normalizeIsbn } from '$lib/utils/isbn';
+	import { BOOK_SEARCH_STALE_TIME, lookupBookByIsbn, openLibraryKeys } from '#lib/services/openLibraryApi.js';
+	import { checkIsbn, normalizeIsbn } from '#lib/utils/isbn.js';
 
 	// Add one book by its ISBN. Nothing is requested until the number is complete and its check digit
 	// matches: a typo never reaches Open Library, which can resolve a bad checksum to an unrelated record.

@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { EMPTY_VALUE } from '$lib/utils/formatting';
+	import { EMPTY_VALUE } from '#lib/utils/formatting.js';
 	import {
 		bookResponse,
 		editionsValueGetter,
@@ -13,7 +13,7 @@
 		readingLogOf,
 		hasReadingLog,
 		type BookRow,
-	} from '$lib/utils/bookFormatting';
+	} from '#lib/utils/bookFormatting.js';
 
 	// Open Library stat tiles, rendered as children of the modal's tile grid. Unknown is a dash,
 	// never 0: a rating nobody has given, or a missing year or page count. The shared Perspectives
@@ -39,7 +39,9 @@
 {#each tiles as tile (tile.label)}
 	<div class="rounded-lg border border-border bg-muted px-3 py-2.5">
 		<div class="text-[11px] tracking-wide text-muted-foreground uppercase">{tile.label}</div>
-		<div class="mt-0.5 font-slot-cell font-[family-name:var(--font-family-serif)] text-[15px] font-bold text-foreground">
+		<div
+			class="mt-0.5 font-slot-cell font-[family-name:var(--font-family-serif)] text-[15px] font-bold text-foreground"
+		>
 			{tile.value}
 		</div>
 	</div>

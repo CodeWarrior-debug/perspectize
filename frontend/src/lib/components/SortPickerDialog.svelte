@@ -11,9 +11,9 @@
 		SelectTrigger,
 		SelectContent,
 		SelectItem,
-	} from '$lib/components/shadcn';
-	import { SORTABLE_COLUMNS, type TogglableColumn } from '$lib/utils/grid-config';
-	import type { SortSpec } from '$lib/utils/gridUrlState';
+	} from '#lib/components/shadcn/index.js';
+	import { SORTABLE_COLUMNS, type TogglableColumn } from '#lib/utils/grid-config.js';
+	import type { SortSpec } from '#lib/utils/gridUrlState.js';
 	import ChevronUpIcon from '@lucide/svelte/icons/chevron-up';
 	import ChevronDownIcon from '@lucide/svelte/icons/chevron-down';
 	import XIcon from '@lucide/svelte/icons/x';
