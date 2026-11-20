@@ -94,17 +94,6 @@ const SCENARIOS = [
         after: (ctx) => ctx.drill(1),
     },
     {
-        label: 'Two slots, one vote',
-        what: 'Scope “+ opted-in private”: kofi has a public and an opted-in private perspective on Remote work; only the public one counts (one vote per person).',
-        apply: (s) => {
-            s.page = 'content';
-            s.scope = 'optin';
-            s.sorts = [{ col: 'perspectives', dir: 'desc' }];
-            if (!s.cols.includes('perspectives'))
-                s.cols = [...s.cols, 'perspectives'];
-        },
-    },
-    {
         label: 'Gather all (tooltip)',
         what: 'Every aggregator is fetched; the extras appear only in the cell tooltip. Columns still show and sort by one aggregator each.',
         apply: (s) => {
@@ -283,17 +272,16 @@ export const DECISIONS = [
         q: 'What n counts',
         source: 'ADR 0002 §7, migration 000038 (owner decision)',
         proposal: 'People: one vote per user per content, the public perspective wins. Labelled “n” in cells, “people” in tooltips. Fixed rule, not a switch.',
-        why: 'A user holds at most one public and one private perspective per content (migration 000038); only a scope that admits private rows can see two, and then the public one counts.',
+        why: 'A user holds at most one public and one private perspective per content (migration 000038). Everyone (public) sees at most one per person anyway; in Mine, where your own public and private rows can both appear, the public one counts.',
     },
     {
         q: 'Whose perspectives (population)',
         source: 'Open question 4, owner decision',
-        proposal: 'The viewer’s choice, on desktop and mobile. By content: Everyone (public) by default; Mine (your own, nothing masked); “+ opted-in private” once the ADR’s “Allow in aggregates” exists. Private perspectives never enter the shared number by default; your own value always shows as “Mine” in the cell tooltip and detail sheet. Perspectives page: Mine by default, Public widens to everyone’s public rows plus yours (owner-or-public rule).',
+        proposal: 'The viewer’s choice, on desktop and mobile. By content: Everyone (public) by default; Mine (your own, nothing masked). Private perspectives never enter the shared number; your own value always shows as “Mine” in the cell tooltip and detail sheet. Perspectives page: Mine by default, Public widens to everyone’s public rows plus yours (owner-or-public rule).',
         why: 'Who to listen to is the reader’s question, not a site-wide rule; the default keeps private rows out.',
         control: (ctx) => toggle(ctx.s.scope, [
             { value: 'public', label: 'Everyone (public)' },
             { value: 'mine', label: 'Mine' },
-            { value: 'optin', label: '+ opted-in private (later)' },
         ], (v) => ctx.set((x) => void (x.scope = v))),
     },
     {
@@ -367,14 +355,15 @@ export function decisions(ctx) {
     ]);
 }
 export const CONTRACT = [
-    'contentMetrics(scope: PUBLIC | MINE | PUBLIC_AND_OPTED_IN, gatherAll: Boolean, filter: ContentFilter, metrics: [MetricRequest!]!, metricFilters: [MetricRange!], sortBy: [MetricSort!], first, after): a cursor-paginated content list costing a fixed number of statements for any number of metrics.',
+    'contentMetrics(scope: PUBLIC | MINE, gatherAll: Boolean, filter: ContentFilter, metrics: [MetricRequest!]!, metricFilters: [MetricRange!], sortBy: [MetricSort!], first, after): a cursor-paginated content list costing a fixed number of statements for any number of metrics.',
     'MetricRequest = { metric: { kind: STANDARD | CUSTOM | FEELING, key }, aggregator: AVG | COUNT | MIN | MAX | SUM | STDDEV }. STANDARD keys are an enum (QUALITY, AGREEMENT, IMPORTANCE, CONFIDENCE); CUSTOM and FEELING keys are strings bound as parameters and checked against keys that exist.',
     'One aggregator per metric column: metrics, metricFilters and sortBy each name the column’s single aggregator; the server sorts and filters by that one only.',
     'gatherAll (default false): each cell also returns every other aggregator for its metric, each masked by its own minN, for the tooltip only; they never drive sort or filter.',
     'Each returned cell: { metric, aggregator, value (stored 0–10,000 scale; COUNT a whole number; null when empty or hidden), n, hidden, minN }. The UI divides by 1,000 and formats STDDEV to two decimals.',
     'Each cell also returns a masked summary { mean, stddev, min, max } for the tooltip and the spread bar; every field is null unless its own threshold is met (mean and stddev at 3, min and max at 5), so the bar never reveals what the chip hides.',
     'n counts rated values after the scope rule and one vote per user per content, the public row winning (ADR 0002 §7; a user holds at most one public and one private perspective per content, migration 000038). COUNT = n; a measure nobody rated has COUNT 0 and every other aggregate null.',
-    'Scope is the viewer’s choice. PUBLIC (default): public rows only. MINE: the viewer’s own rows, public and private, no masking. PUBLIC_AND_OPTED_IN (later, needs the “Allow in aggregates” opt-in): public plus opted-in private rows. Private rows never enter a shared number by default.',
+    'Scope is the viewer’s choice. PUBLIC (default): public rows only. MINE: the viewer’s own rows, public and private, no masking. Private rows never enter a shared number.',
+    'The backend reserves a third scope value for a later opt-in feature (private rows the owner allows into aggregates); the UI adds that option only when the feature ships.',
     'Each content row returns the viewer’s own value per metric (“mine”: their public row, else their private one), shown beside the shared number but never part of it.',
     'Masking happens before ORDER BY and HAVING: hidden values are NULL, NULLS LAST in both directions, and a range filter never matches NULL.',
     'STDDEV is stddev_samp (null for one value). Thresholds are server constants (COUNT 1; AVG, SUM, STDDEV 3; MIN, MAX 5) returned per cell as minN, so the UI never hard-codes them.',

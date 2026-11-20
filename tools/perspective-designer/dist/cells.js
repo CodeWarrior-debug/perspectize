@@ -72,7 +72,6 @@ function unitWord(policy, scope) {
 export const SCOPE_LABEL = {
     public: 'everyone’s public perspectives',
     mine: 'your own perspectives',
-    optin: 'public plus opted-in private perspectives',
 };
 export function headerTip(id, policy, scope, aggId = aggregator('avg').id) {
     const m = metric(id);

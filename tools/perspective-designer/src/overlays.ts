@@ -346,7 +346,7 @@ function perspectiveModal(ctx: Ctx, o: Overlay & { kind: 'perspective' }): HTMLE
       el('div', { class: 'sheet-sub' }, [c.title]),
       el('blockquote', { class: 'claim big' }, [p.claim]),
       el('div', { class: 'muted small' }, [
-        `${p.owner === VIEWER ? 'You' : p.owner} · ${p.privacy === 'PUBLIC' ? 'Public' : p.allowInAggregates ? 'Private, allowed in aggregates' : 'Private'} · created ${fmtDate(p.createdAt)} · updated ${fmtDate(p.updatedAt)}`,
+        `${p.owner === VIEWER ? 'You' : p.owner} · ${p.privacy === 'PUBLIC' ? 'Public' : 'Private'} · created ${fmtDate(p.createdAt)} · updated ${fmtDate(p.updatedAt)}`,
       ]),
       el('div', { class: 'tiles three' }, ratings),
       p.feelings.length ? el('div', { class: 'feel-list' }, p.feelings.map((f) => el('span', { class: 'mchip' }, [`${f.emoji} ${f.label} · ${fmtRating(f.intensity)}`]))) : null,

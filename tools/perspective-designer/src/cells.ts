@@ -92,7 +92,6 @@ function unitWord(policy: Policy, scope: Scope): string {
 export const SCOPE_LABEL: Record<Scope, string> = {
   public: 'everyone’s public perspectives',
   mine: 'your own perspectives',
-  optin: 'public plus opted-in private perspectives',
 };
 
 export function headerTip(id: MetricId, policy: Policy, scope: Scope, aggId = aggregator('avg').id): TipContent {

@@ -295,7 +295,7 @@ export function requestFor(s: State): { query: string; variables: unknown; query
         ? { metric: metricRef(x.col as MetricId), aggregator: aggregator(s.aggs[x.col as MetricId]).gql, order: x.dir.toUpperCase() }
         : { field: x.col.toUpperCase(), order: x.dir.toUpperCase() }
     );
-    const scope = { public: 'PUBLIC', mine: 'MINE', optin: 'PUBLIC_AND_OPTED_IN' }[s.scope];
+    const scope = { public: 'PUBLIC', mine: 'MINE' }[s.scope];
     // gatherAll widens what each cell returns (every aggregator, for the tooltip); sort and filter keep the column's one.
     const variables = { scope, gatherAll: s.policy.gatherAll, metrics, metricFilters, sortBy: s.mode === 'all' ? sortBy : [], first: 25, after: null };
     return {

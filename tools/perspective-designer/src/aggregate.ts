@@ -28,12 +28,10 @@ import {
  * Whose perspectives feed the number: the viewer's choice.
  * - public (default): everyone's public perspectives.
  * - mine: the viewer's own (public and private), nothing masked.
- * - optin: public plus private perspectives whose owner ticked "Allow in aggregates" (ADR 0002 §6;
- *   that opt-in does not exist yet).
  * Every scope counts one vote per user per content, the public row winning (ADR 0002 §7); a user
  * holds at most one public and one private perspective per content (migration 000038).
  */
-export type Scope = 'public' | 'mine' | 'optin';
+export type Scope = 'public' | 'mine';
 
 export type CellState = 'value' | 'empty' | 'hidden' | 'coarse' | 'needs2';
 
@@ -77,8 +75,7 @@ export interface ContentRow {
 
 function eligible(rows: Perspective[], scope: Scope): Perspective[] {
   if (scope === 'mine') return rows.filter((p) => p.owner === VIEWER);
-  if (scope === 'public') return rows.filter((p) => p.privacy === 'PUBLIC');
-  return rows.filter((p) => p.privacy === 'PUBLIC' || p.allowInAggregates);
+  return rows.filter((p) => p.privacy === 'PUBLIC');
 }
 
 /** ADR 0002 section 7: at most one vote per user per content; the public row wins, else the newest. */

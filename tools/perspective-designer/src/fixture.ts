@@ -8,9 +8,8 @@
  * - Contested: Remote work (Agreement), Social media (Agreement + Importance), Tree of Life (Quality).
  * - Missing ratings: nobody rated Importance on "How SQLite Is Tested" (AVG empty, COUNT 0).
  * - Real zeros: an Agreement of 0 on the social media claim (MIN shows 0.0, not empty).
- * - Private perspectives: allowed in aggregates (hana on Arrival, kofi on Remote work) and not
- *   (ivo on Arrival, lena on Oppenheimer, gus on Four-day week), plus the viewer's own private
- *   perspective on Gilead.
+ * - Private perspectives, never in a shared number: hana and ivo on Arrival, kofi on Remote work,
+ *   lena on Oppenheimer, gus on Four-day week, plus the viewer's own private perspective on Gilead.
  * - Two slots, one person: gus (public + private) on the four-day week claim and kofi (public +
  *   private) on remote work, for the one-vote-per-user rule (ADR 0002 section 7).
  * - No perspectives at all: "Simulating an epidemic" and "Falsehoods Programmers Believe About Names".
@@ -40,8 +39,6 @@ export interface Perspective {
   contentId: number;
   owner: string;
   privacy: 'PUBLIC' | 'PRIVATE';
-  /** ADR 0002 "Allow in aggregates" on a private perspective. Always true for public rows. */
-  allowInAggregates: boolean;
   claim: string;
   quality: number | null;
   agreement: number | null;
@@ -97,7 +94,7 @@ export const CONTENT: Content[] = [
 /** Compact row: content, owner, Q, A, I, C (displayed scale, null = not rated), then options. */
 type Row = [number, string, number | null, number | null, number | null, number | null, Opts?];
 interface Opts {
-  priv?: 'agg' | 'owner';
+  priv?: boolean;
   clarity?: number;
   hopeful?: number;
   feel?: string;
@@ -121,13 +118,13 @@ const FEELINGS: Record<string, { emoji: string; label: string }> = {
 };
 
 const ROWS: Row[] = [
-  // Arrival: 6 rows, two private (one allowed in aggregates).
+  // Arrival: 6 rows, two private.
   [1, 'alice', 9, 8, 7.5, 8, { feel: 'blown:8', clarity: 8.5, day: 12 }],
   [1, 'ben', 8.5, 7, 6, 7, { feel: 'sad:6', day: 20 }],
   [1, 'chidi', 9.5, 9, 8, null, { feel: 'blown:9', clarity: 9, day: 31 }],
   [1, 'dara', 7, 6, 5, 6.5, { day: 44 }],
-  [1, 'hana', 8, 7.5, 7, 7, { priv: 'agg', feel: 'peace:5', day: 61 }],
-  [1, 'ivo', 6, 4, 4.5, 5, { priv: 'owner', day: 70 }],
+  [1, 'hana', 8, 7.5, 7, 7, { priv: true, feel: 'peace:5', day: 61 }],
+  [1, 'ivo', 6, 4, 4.5, 5, { priv: true, day: 70 }],
   // East of Eden: 5.
   [2, 'ben', 9, 8.5, 8, 9, { feel: 'love:7', day: 8 }],
   [2, 'eli', 8, 7, 7.5, 6, { day: 19 }],
@@ -138,13 +135,13 @@ const ROWS: Row[] = [
   [3, 'chidi', 9, 8, 7, 8, { clarity: 9.5, feel: 'blown:7', day: 5 }],
   [3, 'kofi', 8.5, 8, 6.5, 7, { clarity: 9, day: 38 }],
   [3, 'mo', 7, 7, 5, 6, { clarity: 7.5, day: 97 }],
-  // Remote work: 6 rows, kofi has a public and a private row (private allowed in aggregates).
+  // Remote work: 6 rows, kofi has a public and a private row.
   [4, 'alice', 6, 7, 8, 5, { feel: 'hope:6', hopeful: 6, day: 3 }],
   [4, 'ben', 5, 1.5, 7.5, 7, { feel: 'anxious:6', day: 15 }],
   [4, 'dara', 7, 9.5, 8, 8, { hopeful: 8, feel: 'hope:8', day: 22 }],
   [4, 'gus', 4.5, 1, 9, 9, { day: 40 }],
   [4, 'kofi', 6.5, 9, 7, 6, { day: 47 }],
-  [4, 'kofi', 6, 3, 7, 4, { priv: 'agg', day: 101 }],
+  [4, 'kofi', 6, 3, 7, 4, { priv: true, day: 101 }],
   // Romans 8: 5.
   [5, 'eli', 9.5, 9.5, 10, 9, { hopeful: 9, feel: 'hope:9', day: 2 }],
   [5, 'farah', 9, 9, 9.5, 8.5, { hopeful: 8.5, feel: 'peace:7', day: 18 }],
@@ -179,10 +176,10 @@ const ROWS: Row[] = [
   // Choose Boring Technology: 2.
   [12, 'gus', 8.5, 9, 6, 8, { day: 24 }],
   [12, 'alice', 8, 8, 6.5, 7, { day: 77 }],
-  // Oppenheimer: 3 (one private, not in aggregates).
+  // Oppenheimer: 3 (one private).
   [13, 'dara', 8.5, 7, 8, 7, { feel: 'anxious:7', day: 17 }],
   [13, 'jun', 7.5, 6.5, 8.5, 6, { day: 51 }],
-  [13, 'lena', 5, 4, 7, 6.5, { priv: 'owner', day: 95 }],
+  [13, 'lena', 5, 4, 7, 6.5, { priv: true, day: 95 }],
   // Brothers Karamazov: 1.
   [14, 'farah', 10, 9, 9.5, 9, { feel: 'blown:9', day: 39 }],
   // Inventing on Principle: 2.
@@ -199,11 +196,11 @@ const ROWS: Row[] = [
   // Paddington 2: 2.
   [19, 'lena', 9.5, 9, 4, 9, { feel: 'joy:9', day: 35 }],
   [19, 'ivo', 9, 8.5, 3.5, 8, { feel: 'love:7', day: 60 }],
-  // Gilead: only the viewer's own private perspective (aggregates off).
-  [20, 'alice', 9, 8.5, 8, 7.5, { priv: 'owner', feel: 'peace:8', day: 103 }],
+  // Gilead: only the viewer's own private perspective.
+  [20, 'alice', 9, 8.5, 8, 7.5, { priv: true, feel: 'peace:8', day: 103 }],
   // Four-day week: gus holds a public and a private perspective that contradict each other.
   [22, 'gus', 8, 9, 7, 6, { day: 41 }],
-  [22, 'gus', 5, 4, 6, 6, { priv: 'owner', day: 105 }],
+  [22, 'gus', 5, 4, 6, 6, { priv: true, day: 105 }],
   // John 1: 2.
   [24, 'eli', 9.5, 9.5, 10, 8, { hopeful: 9, feel: 'trust:9', day: 7 }],
   [24, 'farah', 9, 9, 9.5, null, { hopeful: 8, day: 69 }],
@@ -234,7 +231,6 @@ export const PERSPECTIVES: Perspective[] = ROWS.map(([contentId, owner, q, a, i,
     contentId,
     owner,
     privacy: o.priv ? 'PRIVATE' : 'PUBLIC',
-    allowInAggregates: o.priv !== 'owner',
     claim: a !== null && a >= 5 ? content.pro : content.con,
     quality: stored(q),
     agreement: stored(a),

@@ -33,7 +33,7 @@ Any TypeScript 5+ works; the frontend's copy does too (`node ../../frontend/node
 
 - **Header chip:** click a rating header's chip to switch that column's aggregator. The column then shows, sorts and filters by that one aggregator; the header tooltip says so.
 - **Gather all:** the "Gather all (tooltip)" scenario, or the Decisions switch, fetches every aggregator. The extra values appear only in the cell tooltip and mobile detail sheet. They are never extra columns and never sortable.
-- **Scope:** the scope control (Everyone (public) / Mine / + opted-in private) is on both desktop and mobile. Private perspectives never enter the shared number by default. Your own value shows as "Mine" in the tooltip.
+- **Scope:** the scope control (Everyone (public) / Mine) is on both desktop and mobile. Private perspectives never enter the shared number. Your own value shows as "Mine" in the tooltip.
 - **Masking:** values below the minimum contributor count show a lock with the n they have. Masked and empty values sort last in both directions and never match a filter ("Masked MIN sorts last").
 - **Drill-down:** "n perspectives ›", or the cell tooltip's action, opens the Perspectives tab filtered to that item. Its banner reconciles "counted" with "you can open".
 - **States:** loading, empty and error (Data select); five real themes from `frontend/src/app.css`; md tier (880px); stacked header layout; toolbar aggregator control.

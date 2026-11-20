@@ -14,9 +14,7 @@ import { COMPARE_DIVERGES, CONTESTED_STDDEV, METRICS, aggregator, aggregatorsFor
 function eligible(rows, scope) {
     if (scope === 'mine')
         return rows.filter((p) => p.owner === VIEWER);
-    if (scope === 'public')
-        return rows.filter((p) => p.privacy === 'PUBLIC');
-    return rows.filter((p) => p.privacy === 'PUBLIC' || p.allowInAggregates);
+    return rows.filter((p) => p.privacy === 'PUBLIC');
 }
 /** ADR 0002 section 7: at most one vote per user per content; the public row wins, else the newest. */
 function oneVotePerUser(rows) {

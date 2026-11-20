@@ -79,7 +79,6 @@ export function scopeControl(ctx: Ctx): HTMLElement {
       [
         { value: 'public', label: 'Everyone (public)' },
         { value: 'mine', label: 'Mine' },
-        { value: 'optin', label: '+ opted-in private' },
       ],
       s.scope,
       (v) => ctx.set((x) => void (x.scope = v))
@@ -144,7 +143,7 @@ export function drillBanner(ctx: Ctx): HTMLElement | null {
     `${s.pageName} counts ${row.counted} ${row.counted === 1 ? 'person' : 'people'} on this item (one vote each). ` +
     `You can open ${row.visible} of its ${row.total} perspectives` +
     (hidden
-      ? `: ${hidden} ${hidden === 1 ? 'is' : 'are'} private, never shown${s.scope === 'optin' ? ' (counted only if the owner opted in)' : ' and not counted'}.`
+      ? `: ${hidden} ${hidden === 1 ? 'is' : 'are'} private, never shown and not counted.`
       : '.');
   const showing = s.pScope === 'mine' ? ' Showing only yours: switch to Public to see the rest.' : '';
   return el('div', { class: 'drill-banner' }, [back, el('span', {}, [text + showing])]);
@@ -329,7 +328,7 @@ function perspectiveCell(ctx: Ctx, p: Perspective, c: ColDef): HTMLElement {
       td.append(
         el('span', { class: 'owner' }, [
           p.owner === VIEWER ? el('span', { class: 'you' }, ['you']) : p.owner,
-          p.privacy === 'PRIVATE' ? el('span', { class: 'lock', title: p.allowInAggregates ? 'Private · allowed in aggregates' : 'Private · only you' }, ['🔒']) : null,
+          p.privacy === 'PRIVATE' ? el('span', { class: 'lock', title: 'Private · only you' }, ['🔒']) : null,
         ])
       );
       break;
