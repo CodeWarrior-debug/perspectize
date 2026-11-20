@@ -1230,6 +1230,7 @@ select.select-inset {
 	}
 	.print-root table {
 		width: 100%;
+		table-layout: auto;
 		border-collapse: collapse;
 	}
 	.print-root thead {
@@ -1246,9 +1247,41 @@ select.select-inset {
 		vertical-align: top;
 		color: black;
 	}
-	/* Short values (counts, dates, ratings) stay on one line; only the item title wraps. */
-	.print-root td:not([data-col='item']) {
+	/* Text columns (item, channel, tags, cast, author, ...) wrap, even mid-word, so the table fits the page. */
+	.print-root th,
+	.print-root td {
+		overflow-wrap: anywhere;
+	}
+	/* Short numeric and date values stay on one line; every other column wraps. */
+	.print-root td[data-col='duration'],
+	.print-root td[data-col='views'],
+	.print-root td[data-col='likes'],
+	.print-root td[data-col='percentLiked'],
+	.print-root td[data-col='boxOffice'],
+	.print-root td[data-col='vsBudget'],
+	.print-root td[data-col='tmdbScore'],
+	.print-root td[data-col='budget'],
+	.print-root td[data-col='votes'],
+	.print-root td[data-col='pages'],
+	.print-root td[data-col='rating'],
+	.print-root td[data-col='editions'],
+	.print-root td[data-col='readers'],
+	.print-root td[data-col='tmdbId'],
+	.print-root td[data-col='id'],
+	.print-root td[data-col='rated'],
+	.print-root td[data-col='myQuality'],
+	.print-root td[data-col='myImportance'],
+	.print-root td[data-col='myAgreement'],
+	.print-root td[data-col='effectiveDate'],
+	.print-root td[data-col='evaluateBy'],
+	.print-root td[data-col='released'],
+	.print-root td[data-col='publishDate'],
+	.print-root td[data-col='published'],
+	.print-root td[data-col='webPublished'],
+	.print-root td[data-col='createdAt'],
+	.print-root td[data-col='updatedAt'] {
 		white-space: nowrap;
+		overflow-wrap: normal;
 	}
 	.print-root a {
 		color: black;

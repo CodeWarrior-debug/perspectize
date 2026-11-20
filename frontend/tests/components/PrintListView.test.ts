@@ -79,8 +79,31 @@ describe('PrintListView', () => {
 		]);
 	});
 
-	it('keeps every cell but the item title on one line in print css', () => {
-		expect(appCss).toMatch(/\.print-root td:not\(\[data-col='item'\]\)\s*\{\s*white-space: nowrap;/);
+	it('keeps only short numeric and date cells on one line in print css', () => {
+		const rule = appCss.match(/((?:\s*\.print-root td\[data-col='\w+'\],?)+)\s*\{\s*white-space: nowrap;/);
+		expect(rule).not.toBeNull();
+		const ids = [...rule![1].matchAll(/data-col='(\w+)'/g)].map((m) => m[1]);
+		for (const id of [
+			'duration',
+			'views',
+			'likes',
+			'percentLiked',
+			'effectiveDate',
+			'publishDate',
+			'updatedAt',
+			'createdAt',
+		]) {
+			expect(ids).toContain(id);
+		}
+		for (const id of ['item', 'category', 'channel', 'tags', 'cast', 'author', 'description']) {
+			expect(ids).not.toContain(id);
+		}
+		expect(appCss).not.toMatch(/td:not\(\[data-col='item'\]\)/);
+	});
+
+	it('fits the table to the page and wraps long words in print css', () => {
+		expect(appCss).toMatch(/\.print-root table\s*\{\s*width: 100%;\s*table-layout: auto;/);
+		expect(appCss).toMatch(/\.print-root td\s*\{\s*overflow-wrap: anywhere;/);
 	});
 
 	it('ships print css that repeats headers and keeps rows whole', () => {
