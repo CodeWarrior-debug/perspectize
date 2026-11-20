@@ -21,7 +21,7 @@ type mockContentRepository struct {
 	getByIDFn          func(ctx context.Context, id int) (*domain.Content, error)
 	getByURLFn         func(ctx context.Context, url string) (*domain.Content, error)
 	getOrCreateByURLFn func(ctx context.Context, content *domain.Content, refreshOnConflict bool) (*domain.Content, bool, error)
-	updateMetadataFn   func(ctx context.Context, id int, name string, response json.RawMessage, length *int) (*domain.Content, error)
+	updateMetadataFn   func(ctx context.Context, id int, name string, response json.RawMessage, length *int, lengthUnits *string, lengthDisplay *domain.LengthDisplay) (*domain.Content, error)
 	listFn             func(ctx context.Context, params domain.ContentListParams) (*domain.PaginatedContent, error)
 	updateClaimFn      func(ctx context.Context, id, ownerID int, text, html string, customFields json.RawMessage) (*domain.Content, error)
 	// updateClaimPrivacy records the privacy the service passed to UpdateClaim.
@@ -68,9 +68,9 @@ func (m *mockContentRepository) GetOrCreateByURL(ctx context.Context, content *d
 	return content, false, nil
 }
 
-func (m *mockContentRepository) UpdateMetadata(ctx context.Context, id int, name string, response json.RawMessage, length *int) (*domain.Content, error) {
+func (m *mockContentRepository) UpdateMetadata(ctx context.Context, id int, name string, response json.RawMessage, length *int, lengthUnits *string, lengthDisplay *domain.LengthDisplay) (*domain.Content, error) {
 	if m.updateMetadataFn != nil {
-		return m.updateMetadataFn(ctx, id, name, response, length)
+		return m.updateMetadataFn(ctx, id, name, response, length, lengthUnits, lengthDisplay)
 	}
 	return nil, domain.ErrNotFound
 }
@@ -541,7 +541,7 @@ func TestUpdateSourceData_Success(t *testing.T) {
 			assert.Equal(t, 1, id)
 			return existing, nil
 		},
-		updateMetadataFn: func(ctx context.Context, id int, name string, response json.RawMessage, length *int) (*domain.Content, error) {
+		updateMetadataFn: func(ctx context.Context, id int, name string, response json.RawMessage, length *int, lengthUnits *string, lengthDisplay *domain.LengthDisplay) (*domain.Content, error) {
 			capturedID = id
 			capturedName = name
 			capturedLength = length
@@ -683,7 +683,7 @@ func TestUpdateSourceData_PublicYouTubeOtherUserSucceeds(t *testing.T) {
 		getByIDFn: func(ctx context.Context, id int) (*domain.Content, error) {
 			return existing, nil
 		},
-		updateMetadataFn: func(ctx context.Context, id int, name string, response json.RawMessage, length *int) (*domain.Content, error) {
+		updateMetadataFn: func(ctx context.Context, id int, name string, response json.RawMessage, length *int, lengthUnits *string, lengthDisplay *domain.LengthDisplay) (*domain.Content, error) {
 			return &domain.Content{ID: id, Name: name, URL: &url, AddedByUserID: 7}, nil
 		},
 	}
@@ -733,7 +733,7 @@ func TestUpdateSourceData_RepositoryUpdateError(t *testing.T) {
 		getByIDFn: func(ctx context.Context, id int) (*domain.Content, error) {
 			return existing, nil
 		},
-		updateMetadataFn: func(ctx context.Context, id int, name string, response json.RawMessage, length *int) (*domain.Content, error) {
+		updateMetadataFn: func(ctx context.Context, id int, name string, response json.RawMessage, length *int, lengthUnits *string, lengthDisplay *domain.LengthDisplay) (*domain.Content, error) {
 			return nil, fmt.Errorf("db write failed")
 		},
 	}

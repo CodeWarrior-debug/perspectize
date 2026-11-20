@@ -27,7 +27,7 @@ type mockContentRepository struct {
 	getByIDFn          func(ctx context.Context, id int) (*domain.Content, error)
 	getByURLFn         func(ctx context.Context, url string) (*domain.Content, error)
 	getOrCreateByURLFn func(ctx context.Context, content *domain.Content) (*domain.Content, bool, error)
-	updateMetadataFn   func(ctx context.Context, id int, name string, response json.RawMessage, length *int) (*domain.Content, error)
+	updateMetadataFn   func(ctx context.Context, id int, name string, response json.RawMessage, length *int, lengthUnits *string, lengthDisplay *domain.LengthDisplay) (*domain.Content, error)
 	listFn             func(ctx context.Context, params domain.ContentListParams) (*domain.PaginatedContent, error)
 
 	setDisplayTitleFn   func(ctx context.Context, contentID int, title string) (string, error)
@@ -72,9 +72,9 @@ func (m *mockContentRepository) GetOrCreateByURL(ctx context.Context, content *d
 	return content, false, nil
 }
 
-func (m *mockContentRepository) UpdateMetadata(ctx context.Context, id int, name string, response json.RawMessage, length *int) (*domain.Content, error) {
+func (m *mockContentRepository) UpdateMetadata(ctx context.Context, id int, name string, response json.RawMessage, length *int, lengthUnits *string, lengthDisplay *domain.LengthDisplay) (*domain.Content, error) {
 	if m.updateMetadataFn != nil {
-		return m.updateMetadataFn(ctx, id, name, response, length)
+		return m.updateMetadataFn(ctx, id, name, response, length, lengthUnits, lengthDisplay)
 	}
 	return nil, domain.ErrNotFound
 }
@@ -807,7 +807,7 @@ func TestUpdateContentSourceData_Success(t *testing.T) {
 		getByIDFn: func(ctx context.Context, id int) (*domain.Content, error) {
 			return existing, nil
 		},
-		updateMetadataFn: func(ctx context.Context, id int, name string, response json.RawMessage, length *int) (*domain.Content, error) {
+		updateMetadataFn: func(ctx context.Context, id int, name string, response json.RawMessage, length *int, lengthUnits *string, lengthDisplay *domain.LengthDisplay) (*domain.Content, error) {
 			capturedID = id
 			return &domain.Content{ID: id, Name: name, URL: &url, ContentType: domain.ContentTypeYouTubeVideo, AddedByUserID: 1}, nil
 		},

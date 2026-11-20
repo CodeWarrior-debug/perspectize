@@ -127,21 +127,30 @@ func (r *GormContentRepository) GetOrCreateByURL(ctx context.Context, content *d
 }
 
 // UpdateMetadata performs a direct UPDATE of an existing content row's refreshable
-// fields (name, response, length) plus updated_at. It never touches created_at or
-// added_by_user_id, and it does not insert — the row must already exist.
-func (r *GormContentRepository) UpdateMetadata(ctx context.Context, id int, name string, response json.RawMessage, length *int) (*domain.Content, error) {
+// fields (name, response, length, and length units/display when given) plus updated_at.
+// It never touches created_at or added_by_user_id, and it does not insert — the row
+// must already exist.
+func (r *GormContentRepository) UpdateMetadata(ctx context.Context, id int, name string, response json.RawMessage, length *int, lengthUnits *string, lengthDisplay *domain.LengthDisplay) (*domain.Content, error) {
+	values := map[string]interface{}{
+		"name":       name,
+		"response":   response,
+		"length":     length,
+		"updated_at": time.Now(),
+	}
+	if lengthUnits != nil {
+		values["length_units"] = *lengthUnits
+	}
+	if lengthDisplay != nil {
+		values["length_display"] = lengthDisplayToJSON(lengthDisplay)
+	}
+
 	// RETURNING * gives back the updated row: one round trip, no re-read.
 	var updated ContentModel
 	result := r.db.WithContext(ctx).
 		Model(&updated).
 		Clauses(clause.Returning{}).
 		Where("id = ?", id).
-		Updates(map[string]interface{}{
-			"name":       name,
-			"response":   response,
-			"length":     length,
-			"updated_at": time.Now(),
-		})
+		Updates(values)
 
 	if result.Error != nil {
 		return nil, fmt.Errorf("failed to update content metadata: %w", result.Error)

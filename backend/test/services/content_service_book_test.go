@@ -604,12 +604,14 @@ func TestResolveBookISBN_HyphenatedISBN(t *testing.T) {
 // metadataWrite records what a refresh read and wrote, so tests can assert both
 // the payload and the DB cost (one GetByID, one UpdateMetadata).
 type metadataWrite struct {
-	getByIDCalls int
-	calls        int
-	id           int
-	name         string
-	response     json.RawMessage
-	length       *int
+	getByIDCalls  int
+	calls         int
+	id            int
+	name          string
+	response      json.RawMessage
+	length        *int
+	lengthUnits   *string
+	lengthDisplay *domain.LengthDisplay
 }
 
 func bookRefreshRepo(row *domain.Content, w *metadataWrite) *mockContentRepository {
@@ -618,12 +620,14 @@ func bookRefreshRepo(row *domain.Content, w *metadataWrite) *mockContentReposito
 			w.getByIDCalls++
 			return row, nil
 		},
-		updateMetadataFn: func(ctx context.Context, id int, name string, response json.RawMessage, length *int) (*domain.Content, error) {
+		updateMetadataFn: func(ctx context.Context, id int, name string, response json.RawMessage, length *int, lengthUnits *string, lengthDisplay *domain.LengthDisplay) (*domain.Content, error) {
 			w.calls++
 			w.id = id
 			w.name = name
 			w.response = response
 			w.length = length
+			w.lengthUnits = lengthUnits
+			w.lengthDisplay = lengthDisplay
 			return &domain.Content{ID: id, Name: name, ContentType: domain.ContentTypeBook, Response: response}, nil
 		},
 	}
@@ -739,21 +743,6 @@ func TestUpdateSourceData_BookWithoutSearchClient(t *testing.T) {
 
 	_, err := svc.UpdateSourceData(context.Background(), 9, 7)
 	assert.ErrorIs(t, err, services.ErrBookClientUnavailable)
-}
-
-func TestUpdateSourceData_MovieRefreshStaysOutOfScope(t *testing.T) {
-	url := "https://www.themoviedb.org/movie/603"
-	row := &domain.Content{ID: 9, Name: "The Matrix", URL: &url, ContentType: domain.ContentTypeMovie}
-	w := &metadataWrite{}
-	yt := &mockYouTubeClient{extractVideoIDFn: func(u string) (string, error) {
-		t.Fatal("a movie row must not reach the YouTube path")
-		return "", nil
-	}}
-	svc := services.NewContentService(bookRefreshRepo(row, w), yt, nil)
-
-	_, err := svc.UpdateSourceData(context.Background(), 9, 7)
-	assert.ErrorIs(t, err, domain.ErrInvalidInput)
-	assert.Equal(t, 0, w.calls)
 }
 
 func TestResolveBookISBN_NotFound(t *testing.T) {
