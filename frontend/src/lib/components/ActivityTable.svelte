@@ -52,6 +52,7 @@
 		durationFilterValueGetter,
 		parseDurationInput,
 		formatDurationSeconds,
+		formatDurationMinutes,
 		dateValueFormatter,
 		formatCount,
 		percentLikedValueGetter,
@@ -125,6 +126,10 @@
 	import { copyLibraryTable, downloadLibraryCsv } from '#lib/utils/exportActions.js';
 	import { copyWithToast, downloadWithToast } from '#lib/utils/toast.js';
 	import { addLandscapePageStyle, removeLandscapePageStyle, runPrint } from '#lib/utils/printing.js';
+	import ColumnChartPopover from '#lib/components/charts/ColumnChartPopover.svelte';
+	import { CHART_ELIGIBLE_COLS, isChartEligible } from '#lib/utils/columnCharts.js';
+	import { isChartOn, loadChartFlags, setChartFlag } from '#lib/utils/columnChartSettings.js';
+	import { topBottom, type TopBottom } from '#lib/utils/columnStats.js';
 	import {
 		COLUMN_VIEW_LABEL,
 		clearLayout,
@@ -293,6 +298,123 @@
 		layoutVersion++;
 	}
 
+	// ---------------------------------------------------------------------------
+	// Column charts (numeric columns in the Movie view, "Loaded" mode, desktop grid)
+	// ---------------------------------------------------------------------------
+
+	/** Chart-capable in this view (movie view, "Loaded" mode, desktop grid); drives the header template. */
+	function chartEligibleHere(colId: string): boolean {
+		return mode === 'loaded' && !cardMode && isChartEligible(colId, filters.type);
+	}
+
+	// The grid's stock header template plus a chart button, placed after the label so a click on it does not sort.
+	const CHART_BUTTON_SVG =
+		'<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="6" y1="20" x2="6" y2="12"/><line x1="12" y1="20" x2="12" y2="5"/><line x1="18" y1="20" x2="18" y2="9"/></svg>';
+	/**
+	 * Lets the keyboard reach the chart button inside a header cell. Keys pressed on the button are left
+	 * to the browser (Enter/Space click it) instead of the grid (where Enter would sort); Tab from the
+	 * header cell itself goes into the button when one is showing. Everything else keeps the grid's behaviour.
+	 */
+	function suppressChartKeyboard(params: { event: KeyboardEvent }): boolean {
+		const { event } = params;
+		const target = event.target as HTMLElement | null;
+		if (!target) return false;
+		if (target.closest('[data-chart-col]')) return true;
+		if (event.key === 'Tab' && !event.shiftKey && target.classList.contains('ag-header-cell')) {
+			return target.querySelector('[data-chart-col]:not([hidden])') !== null;
+		}
+		return false;
+	}
+
+	function chartHeaderParams(colId: string, label: string): { template?: string } {
+		if (!chartEligibleHere(colId)) return {};
+		const hidden = chartIconVisible(colId) ? '' : ' hidden';
+		return {
+			template: `<div class="ag-cell-label-container" role="presentation">
+				<span data-ref="eMenu" class="ag-header-icon ag-header-cell-menu-button" aria-hidden="true"></span>
+				<span data-ref="eFilterButton" class="ag-header-icon ag-header-cell-filter-button" aria-hidden="true"></span>
+				<div data-ref="eLabel" class="ag-header-cell-label" role="presentation">
+					<span data-ref="eText" class="ag-header-cell-text"></span>
+					<span data-ref="eFilter" class="ag-header-icon ag-header-label-icon ag-filter-icon" aria-hidden="true"></span>
+					<ag-sort-indicator data-ref="eSortIndicator"></ag-sort-indicator>
+				</div>
+				<button type="button" data-chart-col="${colId}" data-testid="column-chart-button-${colId}" aria-label="Chart ${label.replace(/"/g, '&quot;')}" title="Show chart" class="text-muted-foreground hover:text-foreground ml-1 rounded-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"${hidden}>${CHART_BUTTON_SVG}</button>
+			</div>`,
+		};
+	}
+
+	/** The header chart icon shows only when every one of these holds. */
+	function chartIconVisible(colId: string): boolean {
+		return chartEligibleHere(colId) && gridApi?.getColumn(colId)?.isVisible() === true && isChartOn(colId);
+	}
+
+	/**
+	 * The numbers the grid currently shows for a column: post-filter, post-sort,
+	 * read through the column's own valueGetter. `total` counts every shown row,
+	 * including those with no value. Null when the grid isn't available.
+	 */
+	function chartRows(colId: string): { values: number[]; names: string[]; total: number; ranked: TopBottom } | null {
+		const api = gridApi;
+		if (!api || api.isDestroyed()) return null;
+		const column = api.getColumn(colId);
+		const colDef = column?.getColDef();
+		if (!column || !colDef) return null;
+		const rows: { name: string; value: number | null }[] = [];
+		api.forEachNodeAfterFilterAndSort((node) => {
+			if (!node.data) return;
+			let v: unknown = api.getCellValue({ rowNode: node, colKey: column });
+			// Duration displays as text; its numeric (seconds) form is the filter value.
+			if (colId === 'duration' && typeof v !== 'number' && typeof colDef.filterValueGetter === 'function') {
+				v = (colDef.filterValueGetter as (p: unknown) => unknown)({ data: node.data, node, colDef, column, api });
+			}
+			rows.push({ name: node.data.name, value: typeof v === 'number' && Number.isFinite(v) ? v : null });
+		});
+		const values = rows.flatMap((r) => (r.value === null ? [] : [r.value]));
+		// Parallel to `values`: the movie behind each charted number, for the chart readout.
+		const names = rows.flatMap((r) => (r.value === null ? [] : [r.name]));
+		return {
+			values,
+			names,
+			total: rows.length,
+			ranked: topBottom(
+				rows,
+				(r) => r.value,
+				(r) => r.name,
+				10,
+			),
+		};
+	}
+
+	function chartFormat(colId: string): (n: number) => string {
+		if (colId === 'duration') return (n) => formatDurationMinutes(n);
+		const fmt = gridApi?.getColumn(colId)?.getColDef().valueFormatter;
+		if (typeof fmt === 'function') return (n) => String((fmt as (p: unknown) => unknown)({ value: n }));
+		return (n) => String(Math.round(n * 100) / 100);
+	}
+
+	let chartTarget = $state<{ colId: string; label: string; anchor: HTMLElement; keyboard: boolean } | null>(null);
+	let chartTick = $state(0); // bumps when the grid's rows change (filter, sort, new data)
+	const chartData = $derived.by(() => {
+		void chartTick;
+		return chartTarget ? chartRows(chartTarget.colId) : null;
+	});
+
+	function openChart(anchor: HTMLElement, colId: string, keyboard = false) {
+		const label = gridApi?.getColumn(colId)?.getColDef().headerName ?? colId;
+		chartTarget = { colId, label, anchor, keyboard };
+	}
+
+	function handleChartChange(colId: string, on: boolean) {
+		setChartFlag(colId, on);
+		layoutVersion++;
+	}
+
+	// Columns the picker offers a chart switch for are derived below (pickerChartColumns), once `mode` exists.
+	const pickerChartFlags = $derived.by(() => {
+		void layoutVersion;
+		return loadChartFlags();
+	});
+
 	function handleColumnsReset() {
 		clearLayout(columnView);
 		layoutVersion++;
@@ -345,6 +467,10 @@
 
 	// Individual derived fields from URL
 	const mode = $derived(gridParams.mode);
+	// Columns the picker offers a chart switch for (see handleChartChange).
+	const pickerChartColumns = $derived(
+		mode === 'loaded' && !cardMode ? [...CHART_ELIGIBLE_COLS].filter((c) => isChartEligible(c, filters.type)) : [],
+	);
 	const sorts = $derived(gridParams.sorts);
 	const pageNum = $derived(gridParams.page); // 1-indexed
 	const pageSize = $derived(gridParams.pageSize);
@@ -1303,6 +1429,15 @@
 			col.minWidth ?? 0,
 			headerMinWidth(col.headerName ?? '', { filter: col.filter !== false, sortable: col.sortable !== false }),
 		),
+		// Columns that can chart in the current view keep the stock grid header, with a chart
+		// button added to its template (outside the label, so it never sorts). The params are
+		// re-evaluated whenever the header is rebuilt (refreshHeader).
+		...(col.colId && CHART_ELIGIBLE_COLS.has(col.colId)
+			? {
+					headerComponentParams: () => chartHeaderParams(col.colId as string, col.headerName ?? (col.colId as string)),
+					suppressHeaderKeyboardEvent: suppressChartKeyboard,
+				}
+			: {}),
 	}));
 
 	// ---------------------------------------------------------------------------
@@ -1698,6 +1833,57 @@
 		observer.observe(gridContainer);
 		return () => observer.disconnect();
 	});
+	// Re-draw the headers when something the chart icon depends on changes (the picker
+	// switch, mode, card mode, type filter); the header component re-reads chartIconVisible.
+	$effect(() => {
+		if (!gridApi || !gridReady) return;
+		const api = gridApi;
+		void layoutVersion;
+		void mode;
+		void cardMode;
+		void filters.type;
+		requestAnimationFrame(() => {
+			if (api.isDestroyed()) return; // Grid may have been destroyed before rAF fires
+			api.refreshHeader();
+			// Show/hide each chart button to match its column's current state.
+			gridContainer?.querySelectorAll<HTMLElement>('[data-chart-col]').forEach((btn) => {
+				btn.hidden = !chartIconVisible(btn.dataset.chartCol ?? '');
+			});
+		});
+	});
+
+	// One delegated listener for every chart button (headers are rebuilt by the grid).
+	$effect(() => {
+		const el = gridContainer;
+		if (!el) return;
+		const onClick = (e: MouseEvent) => {
+			const btn = (e.target as HTMLElement | null)?.closest<HTMLElement>('[data-chart-col]');
+			if (!btn?.dataset.chartCol) return;
+			e.stopPropagation();
+			// A click from Enter/Space has detail 0; the popover then takes focus.
+			openChart(btn.closest<HTMLElement>('.ag-header-cell') ?? btn, btn.dataset.chartCol, e.detail === 0);
+		};
+		el.addEventListener('click', onClick);
+		return () => el.removeEventListener('click', onClick);
+	});
+
+	// An open chart closes when its icon no longer applies; it re-reads when the shown rows change.
+	$effect(() => {
+		void layoutVersion;
+		void mode;
+		void cardMode;
+		void filters.type;
+		if (chartTarget && !chartIconVisible(chartTarget.colId)) chartTarget = null;
+	});
+	$effect(() => {
+		const api = gridApi;
+		if (!api || !gridReady) return;
+		const bump = () => chartTick++;
+		api.addEventListener('modelUpdated', bump);
+		return () => {
+			if (!api.isDestroyed()) api.removeEventListener('modelUpdated', bump);
+		};
+	});
 </script>
 
 <div class="flex flex-col h-full gap-0">
@@ -1919,7 +2105,29 @@
 		{customLayout}
 		onToggle={handleColumnToggle}
 		onReset={handleColumnsReset}
+		chartColumns={pickerChartColumns}
+		chartFlags={pickerChartFlags}
+		onChartChange={handleChartChange}
 	/>
+{/if}
+
+<!-- Column chart popover — anchored to the clicked header cell -->
+{#if chartTarget && chartData}
+	{#key chartTarget.colId}
+		<ColumnChartPopover
+			colId={chartTarget.colId}
+			label={chartTarget.label}
+			values={chartData.values}
+			names={chartData.names}
+			total={chartData.total}
+			ranked={chartData.ranked}
+			format={chartFormat(chartTarget.colId)}
+			open={true}
+			onClose={() => (chartTarget = null)}
+			anchor={chartTarget.anchor}
+			focusOnOpen={chartTarget.keyboard}
+		/>
+	{/key}
 {/if}
 
 <!-- Print setup for "Print as list": mounted only while open, like the pickers. -->

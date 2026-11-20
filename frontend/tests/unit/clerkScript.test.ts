@@ -1,7 +1,12 @@
 import { describe, it, expect } from 'vitest';
 import { createRequire } from 'node:module';
 import { realpathSync } from 'node:fs';
-import { clerkFrontendApiOrigin, clerkPreloadValues, clerkScriptUrl } from '#lib/utils/clerkScript.js';
+import {
+	clerkFrontendApiOrigin,
+	clerkPreloadValues,
+	clerkPublishableKey,
+	clerkScriptUrl,
+} from '#lib/utils/clerkScript.js';
 
 // The same @clerk/shared svelte-clerk resolves (it isn't hoisted, so resolve from its real path).
 const svelteClerkEntry = realpathSync(createRequire(import.meta.url).resolve('svelte-clerk'));
@@ -87,4 +92,25 @@ describe('clerkPreloadValues', () => {
 			});
 		},
 	);
+});
+
+describe('clerkPublishableKey', () => {
+	it('uses the VITE_ key when only it is set', () => {
+		expect(clerkPublishableKey({ VITE_CLERK_PUBLISHABLE_KEY: DEV_KEY })).toBe(DEV_KEY);
+	});
+
+	// A static site (Sevalla) has no runtime env, so the PUBLIC_ name must reach the bundle at build time.
+	it('falls back to the PUBLIC_ key when the VITE_ one is unset', () => {
+		expect(clerkPublishableKey({ PUBLIC_CLERK_PUBLISHABLE_KEY: DEV_KEY })).toBe(DEV_KEY);
+	});
+
+	it('prefers the VITE_ key when both are set', () => {
+		expect(clerkPublishableKey({ VITE_CLERK_PUBLISHABLE_KEY: DEV_KEY, PUBLIC_CLERK_PUBLISHABLE_KEY: LIVE_KEY })).toBe(
+			DEV_KEY,
+		);
+	});
+
+	it('is empty when neither is set', () => {
+		expect(clerkPublishableKey({})).toBe('');
+	});
 });

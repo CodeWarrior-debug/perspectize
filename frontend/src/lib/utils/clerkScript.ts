@@ -53,16 +53,25 @@ const SCRIPT_URL_OVERRIDES = [
 ] as const;
 
 /**
+ * The publishable key from the build env: `VITE_CLERK_PUBLISHABLE_KEY`, else
+ * `PUBLIC_CLERK_PUBLISHABLE_KEY` (what Sevalla defines). A static site has no runtime env,
+ * so svelte-clerk's own fallback to the PUBLIC_ name finds nothing in the deployed bundle:
+ * vite.config.ts copies this value into the VITE_ name, which the layout inlines at build.
+ */
+export function clerkPublishableKey(env: Record<string, string | undefined>): string {
+	return env.VITE_CLERK_PUBLISHABLE_KEY || env.PUBLIC_CLERK_PUBLISHABLE_KEY || '';
+}
+
+/**
  * Values for the app.html preconnect/preload, from the build env. The publishable key is
- * resolved the way the app does: layout prop (`VITE_CLERK_PUBLISHABLE_KEY`), else the
- * `PUBLIC_CLERK_PUBLISHABLE_KEY` svelte-clerk falls back to (what Sevalla defines).
- * Both fields are '' when there is no usable key or a URL override is set.
+ * resolved as `clerkPublishableKey` does. Both fields are '' when there is no usable key
+ * or a URL override is set.
  */
 export function clerkPreloadValues(env: Record<string, string | undefined>): {
 	origin: string;
 	scriptUrl: string;
 } {
 	if (SCRIPT_URL_OVERRIDES.some((name) => env[name])) return { origin: '', scriptUrl: '' };
-	const origin = clerkFrontendApiOrigin(env.VITE_CLERK_PUBLISHABLE_KEY || env.PUBLIC_CLERK_PUBLISHABLE_KEY);
+	const origin = clerkFrontendApiOrigin(clerkPublishableKey(env));
 	return { origin, scriptUrl: clerkScriptUrl(origin) };
 }
