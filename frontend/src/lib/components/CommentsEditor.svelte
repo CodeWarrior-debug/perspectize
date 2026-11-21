@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { normalizeLinkUrl } from '#lib/utils/linkUrl.js';
 	import { onMount, onDestroy } from 'svelte';
 	import { Editor } from '@tiptap/core';
 	import StarterKit from '@tiptap/starter-kit';
@@ -138,11 +139,12 @@
 		const previousUrl = editor.getAttributes('link').href as string | undefined;
 		const url = window.prompt('Link URL', previousUrl ?? 'https://');
 		if (url === null) return; // cancelled
-		if (url === '') {
+		const href = normalizeLinkUrl(url);
+		if (href === '') {
 			editor.chain().focus().extendMarkRange('link').unsetLink().run();
 			return;
 		}
-		editor.chain().focus().extendMarkRange('link').setLink({ href: url }).run();
+		editor.chain().focus().extendMarkRange('link').setLink({ href }).run();
 	}
 
 	function promptForImage() {
