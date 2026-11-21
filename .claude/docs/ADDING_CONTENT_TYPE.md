@@ -164,7 +164,7 @@ For each type, answer these five questions with real fields and note each one's 
 | **What is it?** Title plus a one-line summary that skips source boilerplate | title, description's first non-promo line | title, tagline / overview | title, excerpt |
 | **How big?** The time it asks of the person | length | duration (runtime) | word count / reading time |
 | **How current?** | published date, age | release date | published date |
-| **How well received?** Raw counts plus one rate normalised for reach | views, likes, comments, **like rate**, **views/day** | TMDB score + **vote count** | comment count (`X-WP-Total` from `/wp/v2/comments?post=`; core WordPress has no views or likes) |
+| **How well received?** Raw counts, plus one rate normalised for reach where the source's terms allow it | views, likes, comments (raw counts only: YouTube's API policy forbids metrics calculated from them, so no like rate or views/day) | TMDB score + **vote count** | comment count (`X-WP-Total` from `/wp/v2/comments?post=`; core WordPress has no views or likes) |
 | **What's in it?** Full detail on demand, not in every row | description, chapters, tags | synopsis, cast, keywords | categories, tags, author |
 
 Rules that hold for every type:
