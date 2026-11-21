@@ -132,3 +132,52 @@ func PreferDeclaredCanonical(requested, finalURL, declared string) string {
 	}
 	return declaredCanonical
 }
+
+// IsSiteRoot reports whether a link names a whole site: its canonical form has
+// the root path and no query. A bare host, a trailing slash, a fragment and
+// tracking parameters all still count as the root; a real query (?p=12) does not.
+func IsSiteRoot(canonical string) bool {
+	c, err := Canonicalize(canonical)
+	if err != nil {
+		return false
+	}
+	u, err := url.Parse(c)
+	if err != nil {
+		return false
+	}
+	return u.Path == "/" && u.RawQuery == ""
+}
+
+// SiteRoot returns the root URL of the site a link belongs to: its canonical
+// scheme and host (www. dropped, non-default port kept) with the root path.
+func SiteRoot(canonical string) (string, error) {
+	c, err := Canonicalize(canonical)
+	if err != nil {
+		return "", err
+	}
+	u, err := url.Parse(c)
+	if err != nil {
+		return "", fmt.Errorf("%w: not a valid URL", domain.ErrInvalidInput)
+	}
+	return u.Scheme + "://" + u.Host + "/", nil
+}
+
+// SameSite reports whether two links share a host, ignoring case and a leading
+// www. A subdomain is a different site. Links that are not valid web URLs are
+// never the same site.
+func SameSite(a, b string) bool {
+	ha, ok := siteHost(a)
+	if !ok {
+		return false
+	}
+	hb, ok := siteHost(b)
+	return ok && ha == hb
+}
+
+func siteHost(raw string) (string, bool) {
+	u, err := parseWebURL(raw)
+	if err != nil {
+		return "", false
+	}
+	return strings.TrimPrefix(strings.ToLower(u.Hostname()), "www."), true
+}
