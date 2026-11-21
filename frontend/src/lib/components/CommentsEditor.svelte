@@ -73,7 +73,7 @@
 
 	let editorElement: HTMLDivElement;
 	let wrapperElement: HTMLDivElement;
-	let bubbleElement: HTMLDivElement;
+	let bubbleElement: HTMLDivElement | undefined = $state();
 	let slashElement: HTMLDivElement;
 	let slash: SlashMenuState | null = $state(null);
 	// Inline link editor: lives in the selection toolbar instead of the browser's prompt().
@@ -86,7 +86,7 @@
 	let updateTick = $state(0);
 
 	// `/` at the start of a line: insert things without leaving the keyboard. The table needs room, so it is desktop-only.
-	const slashItems: SlashItem[] = [
+	const buildSlashItems = (): SlashItem[] => [
 		{
 			id: 'h2',
 			label: 'Heading 2',
@@ -142,7 +142,7 @@
 			extensions: [
 				createWritingShortcuts({ onLink: openLinkEditor }),
 				createSlashCommand({
-					items: slashItems,
+					items: buildSlashItems(),
 					getMenuElement: () => slashElement,
 					getContainer: () => wrapperElement,
 					onState: (state) => (slash = state),
