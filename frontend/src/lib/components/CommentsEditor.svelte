@@ -35,6 +35,7 @@
 	import RowIcon from '@lucide/svelte/icons/rows-2';
 	import ColumnIcon from '@lucide/svelte/icons/columns-2';
 	import TrashIcon from '@lucide/svelte/icons/trash-2';
+	import { NO_AUTOFILL } from '#lib/utils/noAutofill.js';
 
 	/**
 	 * CommentsEditor — Tiptap editor for rich-text comments (a perspective's
@@ -654,7 +655,7 @@
 					class="bubble-input"
 					type="text"
 					inputmode="url"
-					autocomplete="off"
+					{...NO_AUTOFILL}
 					spellcheck="false"
 					aria-label="Link URL"
 					placeholder="Paste or type a link"
