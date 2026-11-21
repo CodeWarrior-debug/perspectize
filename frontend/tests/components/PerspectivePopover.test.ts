@@ -122,6 +122,18 @@ describe('PerspectivePopover component', () => {
 			expect(screen.getByText('Add perspective')).toBeInTheDocument();
 		});
 
+		it('names the dialog itself so screen readers announce it on open', async () => {
+			renderPopover({ existingPerspective: null });
+			await tick();
+			expect(screen.getByRole('dialog', { name: 'Add perspective' })).toBeInTheDocument();
+		});
+
+		it('names the dialog "Edit perspective" when editing', async () => {
+			renderPopover({ existingPerspective: { id: '1', quality: 7500, like: null } });
+			await tick();
+			expect(screen.getByRole('dialog', { name: 'Edit perspective' })).toBeInTheDocument();
+		});
+
 		it('renders dialog with "Edit perspective" title when editing', async () => {
 			renderPopover({
 				existingPerspective: {

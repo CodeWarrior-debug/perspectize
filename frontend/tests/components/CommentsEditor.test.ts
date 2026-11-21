@@ -3,6 +3,24 @@ import { render, screen, waitFor, fireEvent } from '@testing-library/svelte';
 import CommentsEditor from '#lib/components/CommentsEditor.svelte';
 
 describe('CommentsEditor', () => {
+	it('exposes the writing area as a named multiline textbox', async () => {
+		render(CommentsEditor, { props: { value: '', onChange: vi.fn() } });
+		const box = await screen.findByRole('textbox', { name: 'Comment' });
+		expect(box.getAttribute('aria-multiline')).toBe('true');
+	});
+
+	it('autofocus puts the caret in the writing area on mount', async () => {
+		render(CommentsEditor, { props: { value: '', onChange: vi.fn(), autofocus: true } });
+		const box = await screen.findByRole('textbox', { name: 'Comment' });
+		await waitFor(() => expect(document.activeElement).toBe(box));
+	});
+
+	it('does not steal focus unless asked', async () => {
+		render(CommentsEditor, { props: { value: '', onChange: vi.fn() } });
+		const box = await screen.findByRole('textbox', { name: 'Comment' });
+		expect(document.activeElement).not.toBe(box);
+	});
+
 	it('renders the default toolbar buttons', async () => {
 		render(CommentsEditor, { props: { value: '', onChange: vi.fn() } });
 

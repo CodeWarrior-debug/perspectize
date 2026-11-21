@@ -65,6 +65,8 @@
 	} = $props();
 
 	const isEditMode = $derived(existingPerspective !== null);
+	// The dialog's title is a plain <h2> inside the body, so give the dialog itself a name.
+	const dialogName = $derived(isEditMode ? 'Edit perspective' : 'Add perspective');
 
 	// Delete is offered only when the perspective provably belongs to the signed-in
 	// user (userId is the session user from every caller) — whatever its privacy
@@ -657,7 +659,7 @@
 				onclick={() => {
 					commentExpanded = true;
 				}}
-				aria-label="Add comment"
+				aria-label={hasComment ? 'Edit comment' : 'Add a comment'}
 				class="flex flex-1 items-center justify-between gap-2 h-14 px-3 rounded-lg border border-border bg-card cursor-pointer text-left"
 			>
 				<span
@@ -716,6 +718,7 @@
 		<DialogContent
 			class="w-[calc(100vw-2rem)] max-h-[90vh] overflow-hidden p-0 flex flex-col sm:max-w-[760px]"
 			overlayClass="bg-black/45"
+			aria-label={dialogName}
 		>
 			{@render modalBody(false)}
 		</DialogContent>
@@ -728,7 +731,7 @@
 			if (!isOpen) onClose();
 		}}
 	>
-		<DrawerContent class="max-h-[88dvh] flex flex-col p-0">
+		<DrawerContent class="max-h-[88dvh] flex flex-col p-0" aria-label={dialogName}>
 			{@render modalBody(true)}
 		</DrawerContent>
 	</Drawer>
