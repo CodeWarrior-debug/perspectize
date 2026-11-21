@@ -483,6 +483,7 @@
 	{/if}
 
 	<!-- Scrollable body — ratings + add field -->
+	<!-- svelte-ignore a11y_no_noninteractive_element_interactions -- the shortcut listens for keys bubbling from the fields inside -->
 	<form
 		bind:this={formEl}
 		onsubmit={handleSubmit}
