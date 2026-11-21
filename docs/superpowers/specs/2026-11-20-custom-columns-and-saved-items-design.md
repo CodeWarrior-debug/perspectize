@@ -43,7 +43,8 @@ CREATE TABLE IF NOT EXISTS public.user_saved_items (
     CONSTRAINT user_saved_items_origin_check CHECK (origin IN ('own', 'copy', 'link')),
     CONSTRAINT user_saved_items_setting_private_check CHECK (type <> 'setting' OR (privacy = 'private' AND origin = 'own')),
     CONSTRAINT user_saved_items_link_no_payload_check CHECK (origin <> 'link' OR payload IS NULL),
-    CONSTRAINT user_saved_items_own_no_source_check CHECK (origin <> 'own' OR source_id IS NULL)
+    CONSTRAINT user_saved_items_own_no_source_check CHECK (origin <> 'own' OR source_id IS NULL),
+    CONSTRAINT user_saved_items_copy_link_source_check CHECK (origin = 'own' OR source_id IS NOT NULL)
 );
 CREATE UNIQUE INDEX IF NOT EXISTS user_saved_items_user_type_name_unique
     ON public.user_saved_items (user_id, type, name) WHERE deleted_at IS NULL;
@@ -108,7 +109,9 @@ Movies: TMDB score, vote count, budget, box office, runtime, release year, my ov
 
 **No YouTube statistics are operands.** Issue #793 removes the shipped derived columns because YouTube's API policy forbids metrics calculated from like counts, and the same reasoning covers views and comments. YouTube rows can still use non-YouTube-sourced numbers (length, age in library, my ratings).
 
-Source terms for TMDB-derived formulas are checked under Decision 9 (Source Terms) of the content-type guide before the movie operands ship. **Open check, blocks Part 2.**
+**TMDB terms (decided).** TMDB's API terms bar making "derivatives" of TMDB content without defining the word, and have no carve-out for calculations. Decision: a custom column is the user's own calculation in their own browser, not something Perspectize makes, so movie operands go ahead. Conditions that stay: TMDB attribution (logo and notice) where the app already shows it; stored TMDB data refreshed within the terms' 6-month cache limit; no commercial use of TMDB content; a column built from TMDB fields is labelled as the user's own calculation (header tooltip: "Your calculation from TMDB score and Budget"), never as a TMDB figure. This reading is the owner's call and has not been confirmed with TMDB.
+
+**Formula tree shape.** A node is exactly one of `{"op": "<function>", "args": [...]}`, `{"const": <number>}` or `{"operand": "<key>"}`. The function name is the `op` key; there is no separate `fn` node.
 
 Missing is not zero (Decision 8). A formula with a missing operand gives no value: the cell is blank and the row sorts last. `coalesce` lets the author choose a fallback.
 
@@ -156,8 +159,8 @@ Themes, views and settings payloads (the table and API shape allow them); server
 
 ## Open questions
 
-1. TMDB terms for derived columns (blocks movie operands).
+1. ~~TMDB terms for derived columns~~ Decided: proceed, with the conditions in the Operands section.
 2. Should a custom column be limited to chosen content types, or always offered?
 3. Should the mobile card list show custom columns?
 4. Show "Used by" counts at all?
-5. Update the intent: browser-only evaluation narrows its server-parity outcome.
+5. ~~Update the intent~~ Done: the intent links this spec and notes it narrows the server-parity outcome.
