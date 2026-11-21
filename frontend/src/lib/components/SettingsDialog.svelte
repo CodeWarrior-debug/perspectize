@@ -4,6 +4,7 @@
 	import FontSettingsPanel from '#lib/components/fonts/FontSettingsPanel.svelte';
 	import SettingsIcon from '@lucide/svelte/icons/settings';
 	import FeedbackDialog from '#lib/components/FeedbackDialog.svelte';
+	import ShortcutHelp from '#lib/components/ShortcutHelp.svelte';
 	import ContributePanel from '#lib/components/contribute/ContributePanel.svelte';
 	import type { ThemeStore } from '#lib/theme/store.svelte.js';
 	import { createFontStore, type FontStore } from '#lib/fonts/store.svelte.js';
@@ -98,6 +99,7 @@
 								Restart onboarding
 							</Button>
 						</div>
+						<ShortcutHelp />
 					</div>
 				{:else if activeSection === 'theme'}
 					<ThemeCustomizePanel {store} />
