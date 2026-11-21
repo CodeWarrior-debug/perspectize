@@ -223,6 +223,66 @@ Not yet built: X1 to X8 and T03, T05 (wording and product calls for you).
 ### Honest coverage
 Personas were run in sessions rather than as 20 full characters; typing lab, seed and per-type passes are the deepest parts. Not covered: a real phone keyboard (virtual-keyboard resize), screen readers, the remaining personas' per-type reviews on mobile.
 
+## Round 3: adopting features from the best-in-class editors
+
+Brief: compare against the editors in `perspective-editor-layouts.md`, build what we lack, use it, keep only what adds value. Everything was exercised in a real browser (desktop and iPhone 14 emulation) before being kept.
+
+### Feature matrix
+
+The competitor columns come from `perspective-editor-layouts.md` and general product knowledge, not a fresh feature-by-feature audit; treat a single cell as indicative.
+
+| Feature | Medium | Ghost | Notion | Substack | Linear | iA Writer | Google Docs | Bear | Perspectize now |
+|---|---|---|---|---|---|---|---|---|---|
+| Floating toolbar on selection | yes | yes | yes | yes | yes | no | no | no | **added** (desktop only) |
+| `/` insert menu | no | yes | yes | yes | yes | no | no | no | **added** (headings, lists, quote, link, image, table) |
+| `# ` / `> ` / `- ` typing shortcuts | partial | yes | yes | yes | yes | yes | partial | yes | **added** `# `, `> `; lists already worked |
+| Cmd/Ctrl+K link | yes | yes | yes | yes | yes | no | yes | yes | **added** |
+| Inline link editor and link card (open, edit, remove) | yes | yes | yes | yes | yes | no | yes | no | **added**; every Link entry point uses it (prompt only on phones) |
+| Blockquote | yes | yes | yes | yes | yes | yes | no | yes | **added** (needed the sanitizer change, below) |
+| Word count | no | yes | no | no | no | yes | yes | yes | **added** (footer) |
+| Draft-saved note | yes | yes | yes | yes | yes | yes | yes | yes | **added** ("Draft saved on this device") |
+| Focus / typewriter mode | no | no | no | no | no | yes | no | no | **added** (optional, expanded editor only) |
+| Smart quotes, dashes, ellipsis | yes | yes | yes | yes | yes | yes | yes | yes | **added**, limited to those (no symbol swaps such as (c) or ->) |
+| Pasted H1-H6 mapped to our two heading levels | yes | yes | yes | yes | yes | n/a | yes | yes | **added** |
+| Undo / redo buttons | no | no | no | no | no | no | yes | no | not built (keyboard works; low value) |
+| Drag handles for blocks | no | no | yes | no | no | no | no | no | not built (touch-hostile, high cost) |
+| Typed-URL autolink | yes | yes | yes | yes | yes | no | yes | yes | not built on purpose (see T03; a pasted URL does link) |
+
+### Verdicts
+
+All of the "added" rows were kept. Notes on each:
+
+- **Selection toolbar:** desktop only. On phones the sheet toolbar already stays in view, and a floating bar fights the keyboard and the selection handles.
+- **Focus mode:** only shown when the editor is expanded, off by default, and dims the other paragraphs rather than hiding them.
+- **Typography:** the full extension swaps 16 symbols, some of which would corrupt reviews that quote code or maths, so only quotes, dashes and the ellipsis are on.
+- **Blockquote:** it is the one change with a deploy order. Both sanitizers (frontend DOMPurify and backend bluemonday) must allow `blockquote` or it is stripped on save. The backend change must ship with or before the frontend.
+
+### Bugs found while using the new features
+
+1. The expanded editor pushed Save out of the dialog at windows 700 px tall or less (old build: Save cut off at 1280x700 and 1280x600; fixed by sizing the expanded editor against the dialog height). Clips 09 and 10 show it before and after at 1280x600.
+2. Slash menu Escape closed the whole dialog (fixed: the key is consumed while the menu is open).
+3. Enter inside a list item split the list instead of choosing the menu entry (fixed by raising the slash extension's priority). Verified in the browser; the unit test for it does not fail without the fix, so the browser run is the real evidence.
+4. Pasted headings kept H1/H4+ and then were dropped by the schema; they now map to the two supported levels.
+5. A trailing space in a selection was included in a link; it is now trimmed.
+
+### Correction to Round 2
+
+The IME note said Enter during composition adds a paragraph only after this work. It does so before and after, with the synthetic composition used by the probe. That is a probe limitation, not a regression, and a real IME was not tested.
+
+### Checks
+
+- Contrast (axe `color-contrast`) on the slash menu, selection toolbar, link input, link card and footer across 26 themes: 0 violations.
+- Typing 583 characters quickly arrives exactly; the toolbar stays a single row on a phone.
+- Selecting then scrolling the text out of view leaves the toolbar at its old position (a known limitation of this extension; it hides on click-away).
+
+### Evidence
+
+Clips (uploaded to the `screenshots` release; names): `sv-persona-vid-07-slash-menu-quote`, `08-selection-toolbar-link`, `09-expand-save-before`, `10-expand-save-after`, `11-focus-mode-draft-note`.
+
+### Not covered
+
+A real phone keyboard, screen readers, a real IME, and per-persona runs of the new features.
+
 ## Proposals (not built)
 
 Each needs a product decision or touches more than one layer.
