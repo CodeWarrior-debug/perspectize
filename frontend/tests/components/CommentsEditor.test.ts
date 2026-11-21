@@ -100,6 +100,73 @@ describe('CommentsEditor', () => {
 		await waitFor(() => expect(onChange).toHaveBeenLastCalledWith('<p><strong>hello</strong> world</p>'));
 	});
 
+	async function select(box: HTMLElement, start: number, end: number) {
+		box.focus();
+		const text = box.querySelector('p')!.firstChild!;
+		const range = document.createRange();
+		range.setStart(text, start);
+		range.setEnd(text, end);
+		const selection = window.getSelection()!;
+		selection.removeAllRanges();
+		selection.addRange(range);
+		document.dispatchEvent(new Event('selectionchange'));
+	}
+
+	it('edits a link in the selection toolbar instead of the browser prompt', async () => {
+		const onChange = vi.fn();
+		const prompt = vi.spyOn(window, 'prompt');
+		render(CommentsEditor, { props: { value: '<p>hello world</p>', onChange } });
+		const box = await screen.findByRole('textbox', { name: 'Comment' });
+		await select(box, 0, 5);
+		await fireEvent.click(await screen.findByLabelText('Link (selection)'));
+		const input = (await screen.findByLabelText('Link URL')) as HTMLInputElement;
+		expect(input.value).toBe('https://');
+		expect(prompt).not.toHaveBeenCalled();
+		await fireEvent.input(input, { target: { value: 'example.com/a' } });
+		await fireEvent.keyDown(input, { key: 'Enter' });
+		await waitFor(() =>
+			expect(onChange).toHaveBeenLastCalledWith(expect.stringContaining('href="https://example.com/a"')),
+		);
+		await waitFor(() => expect(screen.queryByLabelText('Link URL')).toBeNull());
+		prompt.mockRestore();
+	});
+
+	it('keeps Escape in the link field from closing the dialog', async () => {
+		render(CommentsEditor, { props: { value: '<p>hello world</p>', onChange: vi.fn() } });
+		const box = await screen.findByRole('textbox', { name: 'Comment' });
+		await select(box, 0, 5);
+		await fireEvent.click(await screen.findByLabelText('Link (selection)'));
+		const input = await screen.findByLabelText('Link URL');
+		const outer = vi.fn();
+		document.addEventListener('keydown', outer);
+		await fireEvent.keyDown(input, { key: 'Escape' });
+		document.removeEventListener('keydown', outer);
+		expect(outer).not.toHaveBeenCalled();
+		await waitFor(() => expect(screen.queryByLabelText('Link URL')).toBeNull());
+	});
+
+	it('shows a link card with Open, Edit and Remove when the caret is inside a link, and removes the link', async () => {
+		const onChange = vi.fn();
+		render(CommentsEditor, {
+			props: { value: '<p><a href="https://example.com/x">hello</a> world</p>', onChange },
+		});
+		const box = await screen.findByRole('textbox', { name: 'Comment' });
+		const linkText = box.querySelector('a')!.firstChild!;
+		box.focus();
+		const range = document.createRange();
+		range.setStart(linkText, 2);
+		range.setEnd(linkText, 2);
+		window.getSelection()!.removeAllRanges();
+		window.getSelection()!.addRange(range);
+		document.dispatchEvent(new Event('selectionchange'));
+		const open = await screen.findByLabelText('Open link in a new tab', {}, { timeout: 2000 });
+		expect(open.getAttribute('href')).toBe('https://example.com/x');
+		expect(open.getAttribute('rel')).toBe('noopener noreferrer');
+		expect(screen.getByLabelText('Edit link')).toBeInTheDocument();
+		await fireEvent.click(screen.getByLabelText('Remove link'));
+		await waitFor(() => expect(onChange).toHaveBeenLastCalledWith('<p>hello world</p>'));
+	});
+
 	it('renders the default toolbar buttons', async () => {
 		render(CommentsEditor, { props: { value: '', onChange: vi.fn() } });
 

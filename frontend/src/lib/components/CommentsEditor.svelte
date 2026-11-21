@@ -117,7 +117,7 @@
 			label: 'Link',
 			hint: isMobile ? 'by URL' : /Mac|iPhone|iPad/.test(navigator.platform) ? '⌘K' : 'Ctrl K',
 			keywords: ['url', 'source'],
-			run: () => promptForLink(),
+			run: () => openLinkEditor(),
 		},
 		{ id: 'image', label: 'Image', hint: 'by URL', keywords: ['picture', 'photo'], run: () => promptForImage() },
 		...(isMobile
@@ -380,7 +380,7 @@
 						label: 'Link',
 						icon: LinkIcon,
 						isActive: () => editor!.isActive('link'),
-						run: () => promptForLink(),
+						run: () => openLinkEditor(),
 					},
 					{
 						id: 'image',
