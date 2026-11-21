@@ -97,7 +97,7 @@
 	);
 </script>
 
-<div class="flex flex-col h-[calc(100vh-4rem)]">
+<main class="flex flex-col h-[calc(100vh-4rem)]">
 	<!-- Page Header: Title + Search -->
 	<div class="w-full max-w-screen-xl mx-auto px-4 md:px-6 lg:px-8 py-4">
 		<div class="flex flex-col sm:flex-row sm:flex-wrap sm:items-center sm:justify-between gap-3">
@@ -190,4 +190,4 @@
 			{/await}
 		</div>
 	</div>
-</div>
+</main>
