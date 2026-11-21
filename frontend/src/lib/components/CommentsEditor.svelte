@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { normalizeLinkUrl } from '#lib/utils/linkUrl.js';
 	import { createWritingShortcuts, typographyOptions } from '#lib/utils/writingShortcuts.js';
+	import { createSlashCommand, type SlashItem, type SlashMenuState } from '#lib/utils/slashCommand.js';
 	import { onMount, onDestroy } from 'svelte';
 	import { Editor } from '@tiptap/core';
 	import StarterKit from '@tiptap/starter-kit';
@@ -66,16 +67,69 @@
 	let editorElement: HTMLDivElement;
 	let wrapperElement: HTMLDivElement;
 	let bubbleElement: HTMLDivElement;
+	let slashElement: HTMLDivElement;
+	let slash: SlashMenuState | null = $state(null);
 	let editor: Editor | null = $state(null);
 	// Bumped on every editor transaction so `items`/toolbar active-state
 	// recomputes; Tiptap's Editor instance isn't itself reactive to Svelte.
 	let updateTick = $state(0);
+
+	// `/` at the start of a line: insert things without leaving the keyboard. The table needs room, so it is desktop-only.
+	const slashItems: SlashItem[] = [
+		{
+			id: 'h2',
+			label: 'Heading 2',
+			hint: '##',
+			keywords: ['title', 'heading', 'h2'],
+			run: (e) => e.chain().focus().setHeading({ level: 2 }).run(),
+		},
+		{
+			id: 'h3',
+			label: 'Heading 3',
+			hint: '###',
+			keywords: ['subtitle', 'heading', 'h3'],
+			run: (e) => e.chain().focus().setHeading({ level: 3 }).run(),
+		},
+		{
+			id: 'bullets',
+			label: 'Bullet list',
+			hint: '-',
+			keywords: ['unordered', 'points'],
+			run: (e) => e.chain().focus().toggleBulletList().run(),
+		},
+		{
+			id: 'numbers',
+			label: 'Numbered list',
+			hint: '1.',
+			keywords: ['ordered', 'steps'],
+			run: (e) => e.chain().focus().toggleOrderedList().run(),
+		},
+		{ id: 'link', label: 'Link', hint: 'Ctrl K', keywords: ['url', 'source'], run: () => promptForLink() },
+		{ id: 'image', label: 'Image', hint: 'by URL', keywords: ['picture', 'photo'], run: () => promptForImage() },
+		...(isMobile
+			? []
+			: [
+					{
+						id: 'table',
+						label: 'Table',
+						hint: '2 × 2',
+						keywords: ['grid', 'compare'],
+						run: (e: Editor) => e.chain().focus().insertTable({ rows: 2, cols: 2 }).run(),
+					},
+				]),
+	];
 
 	onMount(() => {
 		editor = new Editor({
 			element: editorElement,
 			extensions: [
 				createWritingShortcuts({ onLink: promptForLink }),
+				createSlashCommand({
+					items: slashItems,
+					getMenuElement: () => slashElement,
+					getContainer: () => wrapperElement,
+					onState: (state) => (slash = state),
+				}),
 				StarterKit.configure({
 					codeBlock: false,
 					blockquote: false,
@@ -133,6 +187,14 @@
 				},
 			},
 		});
+	});
+
+	// The caret stays in the text while the menu is open, so the menu's current row is announced via activedescendant.
+	$effect(() => {
+		const dom = editor?.view.dom;
+		if (!dom) return;
+		if (slash) dom.setAttribute('aria-activedescendant', `slash-${slash.items[slash.index].id}`);
+		else dom.removeAttribute('aria-activedescendant');
 	});
 
 	// Sync external value changes (e.g., a draft restored by the parent)
@@ -331,7 +393,8 @@
 
 <div
 	bind:this={wrapperElement}
-	class="comment-editor-wrapper relative border border-input rounded-lg bg-card overflow-clip flex flex-col w-full min-w-0"
+	class="comment-editor-wrapper relative border border-input rounded-lg bg-card flex flex-col w-full min-w-0"
+	class:overflow-clip={!slash}
 	style:--pe-min-height={expanded ? 'min(60dvh, 560px)' : `${minHeight}px`}
 	style:--pe-max-height={expanded ? 'min(60dvh, 560px)' : `max(${minHeight}px, min(40dvh, 320px))`}
 	data-expanded={expanded}
@@ -391,6 +454,32 @@
 		style="max-height: var(--pe-max-height); overflow-y: auto;"
 	></div>
 
+	<!-- Insert menu: the plugin moves this node next to the caret while a line starts with "/". -->
+	<div
+		bind:this={slashElement}
+		class="slash-menu"
+		role="listbox"
+		aria-label="Insert"
+		style:display={slash ? 'flex' : 'none'}
+	>
+		{#each slash?.items ?? [] as item, i (item.id)}
+			<button
+				type="button"
+				role="option"
+				tabindex="-1"
+				id={`slash-${item.id}`}
+				class="slash-item"
+				class:active={i === slash?.index}
+				aria-selected={i === slash?.index}
+				onmousedown={(e) => e.preventDefault()}
+				onclick={() => slash?.choose(i)}
+			>
+				<span>{item.label}</span>
+				<span class="slash-hint">{item.hint}</span>
+			</button>
+		{/each}
+	</div>
+
 	{#if !isMobile}
 		<!-- Floating selection toolbar; Tiptap moves this node next to the selection and hides it otherwise. -->
 		<div
@@ -447,6 +536,42 @@
 	.tool-btn.active {
 		background: color-mix(in srgb, var(--color-foreground) 16%, transparent);
 		color: var(--color-foreground);
+	}
+
+	.slash-menu {
+		position: absolute;
+		top: 0;
+		left: 0;
+		z-index: 40;
+		flex-direction: column;
+		min-width: 11rem;
+		padding: 4px;
+		border: 1px solid var(--color-border);
+		border-radius: 8px;
+		background: var(--color-popover, var(--color-card));
+		box-shadow: 0 6px 20px color-mix(in srgb, var(--color-foreground) 20%, transparent);
+	}
+	.slash-item {
+		display: flex;
+		justify-content: space-between;
+		align-items: center;
+		gap: 1.5rem;
+		padding: 5px 8px;
+		border: none;
+		border-radius: 5px;
+		background: transparent;
+		font-size: 13px;
+		color: var(--color-foreground);
+		cursor: pointer;
+		text-align: left;
+	}
+	.slash-item.active,
+	.slash-item:hover {
+		background: color-mix(in srgb, var(--color-foreground) 10%, transparent);
+	}
+	.slash-hint {
+		font-size: 11px;
+		color: var(--color-muted-foreground);
 	}
 
 	/* Absolute and shrink-wrapped from the start: Floating UI measures the node before it first positions it. */
