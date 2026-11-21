@@ -4,7 +4,7 @@
  * `myRatings` (storage 0-10000) to each row before evaluating.
  *
  * No YouTube statistics belong here (views, likes, comments): YouTube's API policy forbids
- * metrics derived from them (issue #793). A test guards the keys, labels and aliases.
+ * metrics derived from them. A test guards the keys, labels and aliases.
  */
 import {
 	budgetValueGetter,
