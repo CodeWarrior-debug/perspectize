@@ -124,6 +124,23 @@ func TestIntSliceToInt64Array(t *testing.T) {
 	assert.Equal(t, Int64Array{1, -2, 3}, intSliceToInt64Array([]int{1, -2, 3}))
 }
 
+// Literal SQL for the guarded statistics counts, spelled out rather than built with
+// statCountExpr so a change to the helper's output is caught here.
+const (
+	guardedViews = "(CASE WHEN (response->'items'->0->'statistics'->>'viewCount') ~ '^[0-9]+$' " +
+		"THEN (response->'items'->0->'statistics'->>'viewCount')::BIGINT ELSE NULL END)"
+	guardedLikes = "(CASE WHEN (response->'items'->0->'statistics'->>'likeCount') ~ '^[0-9]+$' " +
+		"THEN (response->'items'->0->'statistics'->>'likeCount')::BIGINT ELSE NULL END)"
+	guardedPercentLiked = "CASE " +
+		"WHEN " + guardedViews + " IS NULL " +
+		"  OR " + guardedLikes + " IS NULL " +
+		"  OR " + guardedViews + " = 0 " +
+		"THEN NULL " +
+		"ELSE " + guardedLikes + "::FLOAT8 " +
+		"     / NULLIF(" + guardedViews + ", 0) " +
+		"END"
+)
+
 func TestBuildContentSortRules(t *testing.T) {
 	tests := []struct {
 		name         string
@@ -139,7 +156,7 @@ func TestBuildContentSortRules(t *testing.T) {
 			wantPrimary: paginator.Rule{
 				Key:             "ViewCount",
 				Order:           paginator.ASC,
-				SQLRepr:         "(response->'items'->0->'statistics'->>'viewCount')::BIGINT",
+				SQLRepr:         guardedViews,
 				NULLReplacement: int64(0),
 			},
 			wantTieOrder: paginator.ASC,
@@ -149,10 +166,9 @@ func TestBuildContentSortRules(t *testing.T) {
 			sortBy: domain.ContentSortByLikeCount,
 			order:  domain.SortOrderDesc,
 			wantPrimary: paginator.Rule{
-				Key:   "LikeCount",
-				Order: paginator.DESC,
-				SQLRepr: "CASE WHEN (response->'items'->0->'statistics'->>'likeCount') ~ '^[0-9]+$' " +
-					"THEN (response->'items'->0->'statistics'->>'likeCount')::BIGINT ELSE NULL END",
+				Key:             "LikeCount",
+				Order:           paginator.DESC,
+				SQLRepr:         guardedLikes,
 				NULLReplacement: int64(0),
 			},
 			wantTieOrder: paginator.DESC,
@@ -162,16 +178,9 @@ func TestBuildContentSortRules(t *testing.T) {
 			sortBy: domain.ContentSortByPercentLiked,
 			order:  domain.SortOrderAsc,
 			wantPrimary: paginator.Rule{
-				Key:   "PercentLiked",
-				Order: paginator.ASC,
-				SQLRepr: "CASE " +
-					"WHEN (response->'items'->0->'statistics'->>'viewCount') IS NULL " +
-					"  OR (response->'items'->0->'statistics'->>'likeCount') IS NULL " +
-					"  OR (response->'items'->0->'statistics'->>'viewCount')::BIGINT = 0 " +
-					"THEN NULL " +
-					"ELSE (response->'items'->0->'statistics'->>'likeCount')::FLOAT8 " +
-					"     / NULLIF((response->'items'->0->'statistics'->>'viewCount')::BIGINT, 0) " +
-					"END",
+				Key:             "PercentLiked",
+				Order:           paginator.ASC,
+				SQLRepr:         guardedPercentLiked,
 				NULLReplacement: float64(-1),
 			},
 			wantTieOrder: paginator.ASC,
@@ -181,16 +190,9 @@ func TestBuildContentSortRules(t *testing.T) {
 			sortBy: domain.ContentSortByPercentLiked,
 			order:  domain.SortOrderDesc,
 			wantPrimary: paginator.Rule{
-				Key:   "PercentLiked",
-				Order: paginator.DESC,
-				SQLRepr: "CASE " +
-					"WHEN (response->'items'->0->'statistics'->>'viewCount') IS NULL " +
-					"  OR (response->'items'->0->'statistics'->>'likeCount') IS NULL " +
-					"  OR (response->'items'->0->'statistics'->>'viewCount')::BIGINT = 0 " +
-					"THEN NULL " +
-					"ELSE (response->'items'->0->'statistics'->>'likeCount')::FLOAT8 " +
-					"     / NULLIF((response->'items'->0->'statistics'->>'viewCount')::BIGINT, 0) " +
-					"END",
+				Key:             "PercentLiked",
+				Order:           paginator.DESC,
+				SQLRepr:         guardedPercentLiked,
 				NULLReplacement: float64(-1),
 			},
 			wantTieOrder: paginator.DESC,

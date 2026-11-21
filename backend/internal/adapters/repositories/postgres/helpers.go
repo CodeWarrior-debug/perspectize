@@ -175,6 +175,15 @@ const (
 	nullPublishedAtDesc = ""
 )
 
+// statCountExpr returns a SQL expression for one YouTube statistics count as a BIGINT.
+// A stored count can be an empty string (hidden likes) or otherwise non-numeric, and a
+// bare ::BIGINT cast fails the whole query on it. Only all-digit values are cast; anything
+// else is NULL, which sorts as 0 and never matches a min/max filter.
+func statCountExpr(key string) string {
+	raw := "(response->'items'->0->'statistics'->>'" + key + "')"
+	return "(CASE WHEN " + raw + " ~ '^[0-9]+$' THEN " + raw + "::BIGINT ELSE NULL END)"
+}
+
 // contentSortRule builds a single paginator.Rule for one content sort column.
 func contentSortRule(sortBy domain.ContentSortBy, order domain.SortOrder) paginator.Rule {
 	boxOfficeNull, vsBudgetNull, ageRatingNull := nullBoxOfficeDesc, nullVsBudgetDesc, nullAgeRatingDesc
@@ -198,20 +207,18 @@ func contentSortRule(sortBy domain.ContentSortBy, order domain.SortOrder) pagina
 		return paginator.Rule{
 			Key:             "ViewCount",
 			Order:           paginatorOrder,
-			SQLRepr:         "(response->'items'->0->'statistics'->>'viewCount')::BIGINT",
+			SQLRepr:         statCountExpr("viewCount"),
 			NULLReplacement: int64(0),
 		}
 	case domain.ContentSortByLikeCount:
 		return paginator.Rule{
-			Key:   "LikeCount",
-			Order: paginatorOrder,
-			// YouTube can store an empty likeCount for hidden likes; a bare ::BIGINT cast
-			// fails the whole query on it. Non-numeric values sort like unknowns (0).
-			SQLRepr: "CASE WHEN (response->'items'->0->'statistics'->>'likeCount') ~ '^[0-9]+$' " +
-				"THEN (response->'items'->0->'statistics'->>'likeCount')::BIGINT ELSE NULL END",
+			Key:             "LikeCount",
+			Order:           paginatorOrder,
+			SQLRepr:         statCountExpr("likeCount"),
 			NULLReplacement: int64(0),
 		}
 	case domain.ContentSortByPercentLiked:
+		views, likes := statCountExpr("viewCount"), statCountExpr("likeCount")
 		return paginator.Rule{
 			Key: "PercentLiked",
 			// Computed the same way the frontend's percentLikedValueGetter does: likes as a
@@ -220,12 +227,12 @@ func contentSortRule(sortBy domain.ContentSortBy, order domain.SortOrder) pagina
 			// meaningful rate to show.
 			Order: paginatorOrder,
 			SQLRepr: "CASE " +
-				"WHEN (response->'items'->0->'statistics'->>'viewCount') IS NULL " +
-				"  OR (response->'items'->0->'statistics'->>'likeCount') IS NULL " +
-				"  OR (response->'items'->0->'statistics'->>'viewCount')::BIGINT = 0 " +
+				"WHEN " + views + " IS NULL " +
+				"  OR " + likes + " IS NULL " +
+				"  OR " + views + " = 0 " +
 				"THEN NULL " +
-				"ELSE (response->'items'->0->'statistics'->>'likeCount')::FLOAT8 " +
-				"     / NULLIF((response->'items'->0->'statistics'->>'viewCount')::BIGINT, 0) " +
+				"ELSE " + likes + "::FLOAT8 " +
+				"     / NULLIF(" + views + ", 0) " +
 				"END",
 			NULLReplacement: float64(-1),
 		}

@@ -423,17 +423,17 @@ func (r *GormContentRepository) List(ctx context.Context, params domain.ContentL
 		query = applyWebPageRoleFilter(query, params.Filter.WebPageRoles)
 		// View count filters (JSONB extraction)
 		if params.Filter.MinViewCount != nil {
-			query = query.Where("(response->'items'->0->'statistics'->>'viewCount')::BIGINT >= ?", *params.Filter.MinViewCount)
+			query = query.Where(statCountExpr("viewCount")+" >= ?", *params.Filter.MinViewCount)
 		}
 		if params.Filter.MaxViewCount != nil {
-			query = query.Where("(response->'items'->0->'statistics'->>'viewCount')::BIGINT <= ?", *params.Filter.MaxViewCount)
+			query = query.Where(statCountExpr("viewCount")+" <= ?", *params.Filter.MaxViewCount)
 		}
 		// Like count filters (JSONB extraction)
 		if params.Filter.MinLikeCount != nil {
-			query = query.Where("(response->'items'->0->'statistics'->>'likeCount')::BIGINT >= ?", *params.Filter.MinLikeCount)
+			query = query.Where(statCountExpr("likeCount")+" >= ?", *params.Filter.MinLikeCount)
 		}
 		if params.Filter.MaxLikeCount != nil {
-			query = query.Where("(response->'items'->0->'statistics'->>'likeCount')::BIGINT <= ?", *params.Filter.MaxLikeCount)
+			query = query.Where(statCountExpr("likeCount")+" <= ?", *params.Filter.MaxLikeCount)
 		}
 		// Published date filters (JSONB extraction, ISO 8601 string comparison)
 		if params.Filter.PublishedAfter != nil {
