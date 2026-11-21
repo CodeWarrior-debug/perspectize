@@ -73,6 +73,10 @@
 		status?: string;
 	} = $props();
 
+	// The dialog is at most 90vh tall and carries a header, this toolbar and footer, and the Save row around the
+	// writing area, so the expanded height is what is left of 90dvh (not a share of the whole window).
+	const EXPANDED_HEIGHT = 'clamp(160px, calc(90dvh - 290px), 560px)';
+
 	let editorElement: HTMLDivElement;
 	let wrapperElement: HTMLDivElement;
 	let bubbleElement: HTMLDivElement | undefined = $state();
@@ -520,8 +524,8 @@
 	class="comment-editor-wrapper relative border border-input rounded-lg bg-card flex flex-col w-full min-w-0"
 	class:overflow-clip={!slash}
 	data-focus-mode={expanded && focusMode}
-	style:--pe-min-height={expanded ? 'min(60dvh, 560px)' : `${minHeight}px`}
-	style:--pe-max-height={expanded ? 'min(60dvh, 560px)' : `max(${minHeight}px, min(40dvh, 320px))`}
+	style:--pe-min-height={expanded ? EXPANDED_HEIGHT : `${minHeight}px`}
+	style:--pe-max-height={expanded ? EXPANDED_HEIGHT : `max(${minHeight}px, min(40dvh, 320px))`}
 	data-expanded={expanded}
 >
 	<!-- Toolbar -->

@@ -226,6 +226,22 @@ describe('CommentsEditor', () => {
 		expect(screen.queryByLabelText('Quote')).toBeNull();
 	});
 
+	// The dialog is capped at 90vh, so an expanded editor sized as a share of the window pushed the Save row out
+	// of view on laptop-height screens; the height has to be what remains of 90dvh after the dialog's other parts.
+	it('sizes the expanded writing area from what the dialog has room for, not a share of the window', async () => {
+		const props = { value: '', onChange: vi.fn(), showPopout: true, onPopout: vi.fn() };
+		const { container, rerender } = render(CommentsEditor, { props });
+		await screen.findByRole('textbox', { name: 'Comment' });
+		const frame = container.querySelector('.comment-editor-wrapper') as HTMLElement;
+		expect(frame.style.getPropertyValue('--pe-min-height')).toBe('80px');
+
+		await rerender({ ...props, expanded: true });
+		const expandedHeight = frame.style.getPropertyValue('--pe-min-height');
+		expect(expandedHeight).toContain('90dvh');
+		expect(expandedHeight).not.toContain('60dvh');
+		expect(frame.style.getPropertyValue('--pe-max-height')).toBe(expandedHeight);
+	});
+
 	it('renders the default toolbar buttons', async () => {
 		render(CommentsEditor, { props: { value: '', onChange: vi.fn() } });
 
