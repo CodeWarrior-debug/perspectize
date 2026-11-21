@@ -104,7 +104,13 @@
 			keywords: ['ordered', 'steps'],
 			run: (e) => e.chain().focus().toggleOrderedList().run(),
 		},
-		{ id: 'link', label: 'Link', hint: 'Ctrl K', keywords: ['url', 'source'], run: () => promptForLink() },
+		{
+			id: 'link',
+			label: 'Link',
+			hint: isMobile ? 'by URL' : /Mac|iPhone|iPad/.test(navigator.platform) ? '⌘K' : 'Ctrl K',
+			keywords: ['url', 'source'],
+			run: () => promptForLink(),
+		},
 		{ id: 'image', label: 'Image', hint: 'by URL', keywords: ['picture', 'photo'], run: () => promptForImage() },
 		...(isMobile
 			? []
