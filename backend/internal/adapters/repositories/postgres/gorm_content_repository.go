@@ -421,6 +421,9 @@ func (r *GormContentRepository) List(ctx context.Context, params domain.ContentL
 		query = applyMovieColumnFilters(query, params.Filter)
 		query = applyBookColumnFilters(query, params.Filter)
 		query = applyWebPageRoleFilter(query, params.Filter.WebPageRoles)
+		if params.Filter.ParentContentID != nil {
+			query = query.Where("parent_content_id = ?", *params.Filter.ParentContentID)
+		}
 		// View count filters (JSONB extraction)
 		if params.Filter.MinViewCount != nil {
 			query = query.Where(statCountExpr("viewCount")+" >= ?", *params.Filter.MinViewCount)

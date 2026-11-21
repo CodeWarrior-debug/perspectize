@@ -294,7 +294,7 @@ func (r *mutationResolver) CreateContentFromWebPage(ctx context.Context, input m
 		return nil, fmt.Errorf("access denied: authentication required")
 	}
 
-	content, err := r.ContentService.CreateFromWebPage(ctx, portservices.CreateWebPageInput{URL: input.URL, Roles: input.WebPageRoles}, authUser.ID)
+	content, err := r.ContentService.CreateFromWebPage(ctx, portservices.CreateWebPageInput{URL: input.URL, Roles: input.WebPageRoles, ParentContentID: input.ParentContentID}, authUser.ID)
 	if errors.Is(err, domain.ErrAlreadyExists) && content != nil {
 		return &model.CreateContentResult{Content: domainToModel(content), AlreadyExisted: true}, nil
 	}
@@ -308,6 +308,47 @@ func (r *mutationResolver) CreateContentFromWebPage(ctx context.Context, input m
 		return nil, fmt.Errorf("failed to save webpage")
 	}
 	return &model.CreateContentResult{Content: domainToModel(content), AlreadyExisted: false}, nil
+}
+
+// CreateContentFromWebsite is the resolver for the createContentFromWebsite field.
+// The service stores the website under its root URL, whatever page link was given.
+func (r *mutationResolver) CreateContentFromWebsite(ctx context.Context, input model.CreateContentFromWebsiteInput) (*model.CreateContentResult, error) {
+	authUser, err := auth.RequireAuth(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("access denied: authentication required")
+	}
+
+	content, err := r.ContentService.CreateFromWebsite(ctx, input.URL, authUser.ID)
+	if errors.Is(err, domain.ErrAlreadyExists) && content != nil {
+		return &model.CreateContentResult{Content: domainToModel(content), AlreadyExisted: true}, nil
+	}
+	if err != nil {
+		if msg := webPageInputMessage(err); msg != "" {
+			return nil, errors.New(msg)
+		}
+		slog.Error("creating website content failed", "userID", authUser.ID, "error", err)
+		return nil, fmt.Errorf("failed to save website")
+	}
+	return &model.CreateContentResult{Content: domainToModel(content), AlreadyExisted: false}, nil
+}
+
+// ParentContent is the resolver for the parentContent field. The parent comes from
+// the per-request content loader, so a page of rows costs one query however many
+// of them share a parent. Null when the row has no parent, the parent is gone, or
+// the viewer may not read it.
+func (r *contentResolver) ParentContent(ctx context.Context, obj *model.Content) (*model.Content, error) {
+	if obj.ParentContentID == nil {
+		return nil, nil
+	}
+	parent, err := r.contentByID(ctx, *obj.ParentContentID)
+	if err != nil {
+		slog.Error("resolving parent content failed", "contentID", obj.ID, "parentContentID", *obj.ParentContentID, "error", err)
+		return nil, nil
+	}
+	if parent == nil || !canViewContent(ctx, parent.Privacy, parent.AddedByUserID) {
+		return nil, nil
+	}
+	return domainToModel(parent), nil
 }
 
 // PreviewWebPage is the resolver for the previewWebPage field. It reads the
@@ -737,6 +778,7 @@ func (r *queryResolver) Content(ctx context.Context, first *int, after *string, 
 		params.Filter.MinBookRating = filter.MinBookRating
 		params.Filter.MaxBookRating = filter.MaxBookRating
 		params.Filter.WebPageRoles = filter.WebPageRoles
+		params.Filter.ParentContentID = filter.ParentContentID
 		params.Filter.MinViewCount = filter.MinViewCount
 		params.Filter.MaxViewCount = filter.MaxViewCount
 		params.Filter.MinLikeCount = filter.MinLikeCount

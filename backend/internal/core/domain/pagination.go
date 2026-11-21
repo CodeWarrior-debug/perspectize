@@ -103,6 +103,8 @@ type ContentFilter struct {
 	// WebPageRoles matches webpage rows that play any of these roles (OR'd). Other
 	// content types never match. Empty = no role filter.
 	WebPageRoles []WebPageRole
+	// ParentContentID keeps only the rows filed under this content (a website's pages).
+	ParentContentID *int
 }
 
 // ContentListParams contains parameters for paginated content queries

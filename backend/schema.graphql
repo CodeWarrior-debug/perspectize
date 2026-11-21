@@ -236,6 +236,10 @@ type Content {
   book: JSON
   "Webpage-specific metadata for the grid: siteName, domain, imageUrl, faviconUrl, publishedAt, author, webPageRoles (never null, [] when none); null for other content types."
   webPage: JSON
+  "The WEBSITE row this page is filed under; null when it is not filed under one."
+  parentContentID: Int
+  "The parent content row, batched per request; null when there is none or the viewer cannot read it."
+  parentContent: Content
   primaryCategory: Category
   # The import that created this row. Null for hand-added content, and when that
   # import is closed and the viewer isn't an admin.
@@ -326,6 +330,7 @@ enum ContentType {
   MOVIE
   BOOK
   WEB_PAGE
+  WEBSITE
 }
 
 # Text columns that ContentFilter.search can be scoped to.
@@ -367,6 +372,13 @@ input CreateContentFromWebPageInput {
   url: String!
   # Roles the adder picked. Omitted or [] saves a plain webpage. Never inferred from the page.
   webPageRoles: [WebPageRole!]
+  # File the page under this WEBSITE row (same host). Ignored when the page already exists.
+  parentContentID: IntID
+}
+
+input CreateContentFromWebsiteInput {
+  # Any http(s) URL on the site; the website is stored under its root (https://host/)
+  url: String!
 }
 
 # Outcome of reading a page's <head>. Shown in the Add dialog's import preview.
@@ -510,6 +522,8 @@ input ContentFilter {
   maxBookRating: Float
   # Webpage role filter (webpage rows only; other rows never match). Matches any of these roles (OR'd).
   webPageRoles: [WebPageRole!]
+  # Rows filed under this content (e.g. a website's pages)
+  parentContentID: IntID
   # View/like count filters
   minViewCount: Int
   maxViewCount: Int
@@ -897,6 +911,7 @@ type Mutation {
 
   # Webpage mutations
   createContentFromWebPage(input: CreateContentFromWebPageInput!): CreateContentResult! @auth
+  createContentFromWebsite(input: CreateContentFromWebsiteInput!): CreateContentResult! @auth
 
   # Bible passage mutations
   createContentFromPassage(input: CreateContentFromPassageInput!): Content! @auth

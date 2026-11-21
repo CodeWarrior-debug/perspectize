@@ -218,6 +218,8 @@ func domainToModel(c *domain.Content) *model.Content {
 		VerseEndID:   c.VerseEndID,
 		DisplayTitle: c.DisplayTitle,
 		Privacy:      contentPrivacy(c.Privacy),
+		// The row's own FK; ParentContent batch-loads the parent by it.
+		ParentContentID: c.ParentContentID,
 	}
 
 	// Parse the user-set custom fields JSONB; nil/empty stays null in GraphQL.

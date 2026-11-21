@@ -96,12 +96,16 @@ type Content struct {
 	// Book-specific metadata (the shaped Open Library payload); null for other content types.
 	Book map[string]any `json:"book,omitempty"`
 	// Webpage-specific metadata for the grid: siteName, domain, imageUrl, faviconUrl, publishedAt, author, webPageRoles (never null, [] when none); null for other content types.
-	WebPage         map[string]any `json:"webPage,omitempty"`
-	PrimaryCategory *Category      `json:"primaryCategory,omitempty"`
-	ImportedFrom    *ImportJobRef  `json:"importedFrom,omitempty"`
-	VerseStartID    *int           `json:"verseStartID,omitempty"`
-	VerseEndID      *int           `json:"verseEndID,omitempty"`
-	DisplayTitle    *string        `json:"displayTitle,omitempty"`
+	WebPage map[string]any `json:"webPage,omitempty"`
+	// The WEBSITE row this page is filed under; null when it is not filed under one.
+	ParentContentID *int `json:"parentContentID,omitempty"`
+	// The parent content row, batched per request; null when there is none or the viewer cannot read it.
+	ParentContent   *Content      `json:"parentContent,omitempty"`
+	PrimaryCategory *Category     `json:"primaryCategory,omitempty"`
+	ImportedFrom    *ImportJobRef `json:"importedFrom,omitempty"`
+	VerseStartID    *int          `json:"verseStartID,omitempty"`
+	VerseEndID      *int          `json:"verseEndID,omitempty"`
+	DisplayTitle    *string       `json:"displayTitle,omitempty"`
 	// User-set attributes; for CLAIM, effectiveDate and evaluateBy as YYYY-MM-DD. Null when unset.
 	CustomFields            map[string]any `json:"customFields,omitempty"`
 	Privacy                 domain.Privacy `json:"privacy"`
@@ -141,6 +145,7 @@ type ContentFilter struct {
 	MinBookRating       *float64                    `json:"minBookRating,omitempty"`
 	MaxBookRating       *float64                    `json:"maxBookRating,omitempty"`
 	WebPageRoles        []domain.WebPageRole        `json:"webPageRoles,omitempty"`
+	ParentContentID     *int                        `json:"parentContentID,omitempty"`
 	MinViewCount        *int                        `json:"minViewCount,omitempty"`
 	MaxViewCount        *int                        `json:"maxViewCount,omitempty"`
 	MinLikeCount        *int                        `json:"minLikeCount,omitempty"`
@@ -190,8 +195,13 @@ type CreateContentFromPassageInput struct {
 }
 
 type CreateContentFromWebPageInput struct {
-	URL          string               `json:"url"`
-	WebPageRoles []domain.WebPageRole `json:"webPageRoles,omitempty"`
+	URL             string               `json:"url"`
+	WebPageRoles    []domain.WebPageRole `json:"webPageRoles,omitempty"`
+	ParentContentID *int                 `json:"parentContentID,omitempty"`
+}
+
+type CreateContentFromWebsiteInput struct {
+	URL string `json:"url"`
 }
 
 type CreateContentFromYouTubeInput struct {

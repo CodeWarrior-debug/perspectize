@@ -180,6 +180,9 @@ models:
       # the closed-import visibility rule.
       importedFrom:
         resolver: true
+      # Batched through the per-request content loader.
+      parentContent:
+        resolver: true
     # Non-schema fields: carry the FKs already loaded by the content query so
     # resolvers can batch-load the category / import via dataloader instead of
     # re-fetching the content row per item.
