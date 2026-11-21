@@ -261,4 +261,37 @@ describe('RatingInput component', () => {
 			expect(bar?.classList.contains('cursor-pointer')).toBe(true);
 		});
 	});
+
+	describe('typed entry', () => {
+		it('clamps an entry above 10 to 10.000 so the box never shows a value Save would reject', async () => {
+			renderRatingInput({ value: null });
+			const input = screen.getByRole('spinbutton') as HTMLInputElement;
+			await fireEvent.change(input, { target: { value: '11' } });
+			expect(input.value).toBe('10.000');
+			expect(input.validity.valid).toBe(true);
+		});
+
+		it('re-syncs the box when the clamped value equals the stored one (10 typed over 11)', async () => {
+			renderRatingInput({ value: 10000 });
+			const input = screen.getByRole('spinbutton') as HTMLInputElement;
+			await fireEvent.change(input, { target: { value: '11' } });
+			expect(input.value).toBe('10.000');
+		});
+
+		it('clamps a negative entry to 0.000', async () => {
+			renderRatingInput({ value: null });
+			const input = screen.getByRole('spinbutton') as HTMLInputElement;
+			await fireEvent.change(input, { target: { value: '-3' } });
+			expect(input.value).toBe('0.000');
+		});
+
+		it('selects the whole number on focus so typing replaces it instead of editing it', async () => {
+			const select = vi.spyOn(HTMLInputElement.prototype, 'select');
+			renderRatingInput({ value: 8500 });
+			const input = screen.getByRole('spinbutton');
+			await fireEvent.focus(input);
+			await vi.waitFor(() => expect(select).toHaveBeenCalled());
+			select.mockRestore();
+		});
+	});
 });
