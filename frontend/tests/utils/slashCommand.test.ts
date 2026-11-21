@@ -154,4 +154,20 @@ describe('slash command menu', () => {
 		e.view.someProp('handleKeyDown', (f) => f(e.view, event));
 		expect(stop).toHaveBeenCalled();
 	});
+
+	// The list keymap claims Enter (splitListItem) unless the menu's handler is ahead of it.
+	it('Enter picks the highlighted item inside a list item instead of splitting the list', async () => {
+		const { e, last } = setup();
+		e.commands.setContent('<ul><li><p>one</p></li><li><p></p></li></ul>');
+		let pos = 0;
+		e.state.doc.descendants((node, p) => {
+			if (node.type.name === 'paragraph' && node.content.size === 0 && p > 3) pos = p + 1;
+		});
+		e.commands.setTextSelection(pos);
+		typeText(e, '/head');
+		await vi.waitFor(() => expect(last()?.items.map((i) => i.id)).toEqual(['h2', 'h3']));
+		press(e, 'Enter');
+		expect(e.state.doc.textContent).toBe('one');
+		expect(e.isActive('heading', { level: 2 })).toBe(true);
+	});
 });

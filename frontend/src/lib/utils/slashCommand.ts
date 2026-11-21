@@ -39,6 +39,9 @@ export function createSlashCommand(options: {
 	return Extension.create({
 		name: 'slashCommand',
 
+		// Ahead of the list and table keymaps, which would otherwise take Enter and Tab before the open menu sees them.
+		priority: 1000,
+
 		addProseMirrorPlugins() {
 			return [
 				Suggestion<SlashItem, SlashItem>({
