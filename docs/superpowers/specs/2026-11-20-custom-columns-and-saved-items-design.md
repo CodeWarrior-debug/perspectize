@@ -72,7 +72,8 @@ Notes:
 - Delete sets `deleted_at`. Every read filters `deleted_at IS NULL` through **one repository scope**, with a test per read path.
 - The UI offers an Undo toast (`toastWithAction`, 4 s). No trash page in v1.
 - A deleted source makes its links show "no longer available"; copies are unaffected.
-- Account deletion follows today's reassign-to-`[deleted]` rule until issue #754 settles user soft delete. `UserService.Delete` gets a `ReassignByUser` call for this table. A retention purge is a follow-up tied to #754.
+- Account deletion follows today's reassign-to-`[deleted]` rule until issue #754 settles user soft delete. `UserService.Delete` gets a `ReassignByUser` call for this table. In one UPDATE it sets `user_id` to the sentinel, appends ` (#<id>)` to the name (as todo lists do, so two deleted users with the same name can't collide on the unique index), sets `privacy = 'private'` and sets `deleted_at` if unset. A deleted account's items therefore vanish and links to them show "no longer available"; copies keep their credit as "no longer available". A retention purge is a follow-up tied to #754.
+- **Copying onto a name you already use** adds " (copy)" to the new row's name, then " (copy 2)", " (copy 3)" and so on until free. Creating or renaming an item to a name already in use is a typed error (`ErrAlreadyExists`) the UI shows.
 
 ### API shape
 
