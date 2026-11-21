@@ -19,6 +19,7 @@ describe('CommentsEditor', () => {
 		render(CommentsEditor, { props: { value: '', onChange: vi.fn() } });
 		const box = await screen.findByRole('textbox', { name: 'Comment' });
 		expect(document.activeElement).not.toBe(box);
+	});
 
 	// jsdom has no layout, so assert the two classes that make the toolbar stay put while the
 	// phone sheet scrolls to the caret: the toolbar is sticky and no ancestor inside the editor
