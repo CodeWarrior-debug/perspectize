@@ -260,6 +260,35 @@ func TestImportItemsRoundTrips(t *testing.T) {
 	assert.Equal(t, result{AlreadyInLibrary: 3}, again)
 }
 
+const stageImportFromFileMutation = `mutation($input: StageImportFromFileInput!) {
+  stageImportFromFile(input: $input) { id name sources { id title status itemCount destinationType } }
+}`
+
+// TestStageImportFromFileRoundTrips pins stageImportFromFile: the job INSERT and
+// its source INSERT (2), every row in one upsert (1) and the source's count
+// update (1), whatever the number of rows.
+func TestStageImportFromFileRoundTrips(t *testing.T) {
+	h := newHarness(t)
+	_, token := adminUser(t, h, "imp-sf")
+	h.warm(token)
+
+	items := make([]map[string]any, 3)
+	for i := range items {
+		items[i] = map[string]any{
+			"externalId": fmt.Sprintf("rt-%d", i), "url": fmt.Sprintf("https://rt-stage.example.com/post-%d", i),
+			"title": fmt.Sprintf("Post %d", i), "position": i,
+			"facts": map[string]any{"kind": "PAGE", "webPageRoles": []string{"BLOG_POST"}},
+		}
+	}
+	data := h.roundTrips(4, token, stageImportFromFileMutation, map[string]any{"input": map[string]any{
+		"name": "Staged blog", "websiteUrl": "https://rt-stage.example.com/", "items": items,
+	}})
+	job := decode[rtImportJob](t, data, "stageImportFromFile")
+	require.Len(t, job.Sources, 1)
+	assert.Equal(t, "READY", job.Sources[0].Status)
+	assert.Equal(t, 3, job.Sources[0].ItemCount)
+}
+
 const setExcludedMutation = `mutation($input: SetImportItemsExcludedInput!) { setImportItemsExcluded(input: $input) }`
 
 const closeImportJobMutation = `mutation($input: CloseImportJobInput!) { closeImportJob(input: $input) { id closedAt } }`

@@ -1,6 +1,7 @@
 package resolvers
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -1224,6 +1225,44 @@ func modelToCreateImportJobInput(in model.CreateImportJobInput) domain.CreateImp
 		out.Sources[i] = domain.CreateImportSourceInput{SourceType: s.SourceType, Ref: s.Ref, Role: s.Role}
 	}
 	return out
+}
+
+// modelToStageImportFileInput maps a staged file to its domain form. facts and
+// details are JSON objects decoded into ImportFacts / ImportItemDetails with
+// unknown keys refused, so a typo'd key fails the file instead of being dropped.
+func modelToStageImportFileInput(in model.StageImportFromFileInput) (domain.StageImportFileInput, error) {
+	out := domain.StageImportFileInput{
+		Name: in.Name, SourceTitle: in.SourceTitle, WebsiteURL: in.WebsiteURL,
+		Items: make([]domain.StageImportFileItem, len(in.Items)),
+	}
+	for i, it := range in.Items {
+		if it == nil {
+			return domain.StageImportFileInput{}, fmt.Errorf("%w: row %d is empty", domain.ErrInvalidInput, i+1)
+		}
+		row := domain.StageImportFileItem{ExternalID: it.ExternalID, URL: it.URL, Title: it.Title, Position: it.Position}
+		if err := decodeStrictJSON(it.Facts, &row.Facts); err != nil {
+			return domain.StageImportFileInput{}, fmt.Errorf("%w: row %d: facts: %s", domain.ErrInvalidInput, i+1, err)
+		}
+		if it.Details != nil {
+			if err := decodeStrictJSON(it.Details, &row.Details); err != nil {
+				return domain.StageImportFileInput{}, fmt.Errorf("%w: row %d: details: %s", domain.ErrInvalidInput, i+1, err)
+			}
+		}
+		out.Items[i] = row
+	}
+	return out, nil
+}
+
+// decodeStrictJSON decodes a JSON object (as gqlgen hands it over) into dst,
+// refusing keys dst has no field for.
+func decodeStrictJSON(src map[string]any, dst any) error {
+	raw, err := json.Marshal(src)
+	if err != nil {
+		return err
+	}
+	dec := json.NewDecoder(bytes.NewReader(raw))
+	dec.DisallowUnknownFields()
+	return dec.Decode(dst)
 }
 
 // stringsOrEmpty returns s, or an empty slice for nil, for non-null GraphQL lists.

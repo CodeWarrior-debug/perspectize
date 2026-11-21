@@ -13,6 +13,9 @@ const (
 	ImportSourceYouTubeChannel ImportSourceType = "YOUTUBE_CHANNEL"
 	// ImportSourceTMDBPerson lists a person's filmography; items become MOVIE content.
 	ImportSourceTMDBPerson ImportSourceType = "TMDB_PERSON"
+	// ImportSourceCandidateFile is a file of candidates an admin supplies; rows
+	// become WEB_PAGE content and nothing is listed from an outside API.
+	ImportSourceCandidateFile ImportSourceType = "CANDIDATE_FILE"
 )
 
 // DestinationType is the content type every item of this source becomes.
@@ -20,6 +23,8 @@ func (t ImportSourceType) DestinationType() ContentType {
 	switch t {
 	case ImportSourceTMDBPerson:
 		return ContentTypeMovie
+	case ImportSourceCandidateFile:
+		return ContentTypeWebPage
 	default:
 		return ContentTypeYouTubeVideo
 	}
@@ -27,7 +32,7 @@ func (t ImportSourceType) DestinationType() ContentType {
 
 // Valid reports whether t is a known source type.
 func (t ImportSourceType) Valid() bool {
-	return t == ImportSourceYouTubeChannel || t == ImportSourceTMDBPerson
+	return t == ImportSourceYouTubeChannel || t == ImportSourceTMDBPerson || t == ImportSourceCandidateFile
 }
 
 // ImportPersonRole narrows a TMDB person source to one kind of credit.
@@ -68,6 +73,7 @@ const (
 	ImportItemKindShort ImportItemKind = "SHORT"
 	ImportItemKindLive  ImportItemKind = "LIVE"
 	ImportItemKindMovie ImportItemKind = "MOVIE"
+	ImportItemKindPage  ImportItemKind = "PAGE"
 )
 
 // ImportItemStatus is the outcome of importing one candidate. A nil status on
@@ -187,6 +193,8 @@ type ImportFacts struct {
 	Revenue         *int64         `json:"revenue,omitempty"` // box office takings, USD
 	Budget          *int64         `json:"budget,omitempty"`  // production budget, USD
 	ThumbnailURL    *string        `json:"thumbnailUrl,omitempty"`
+	WebPageRoles    []string       `json:"webPageRoles,omitempty"` // what a page is, e.g. "BLOG_POST"
+	WordCount       *int           `json:"wordCount,omitempty"`
 }
 
 // ImportItemDetails is the detail-panel payload, stored as JSONB and fetched lazily.
@@ -234,6 +242,28 @@ type CreateImportJobInput struct {
 	Name        string
 	Description *string
 	Sources     []CreateImportSourceInput
+}
+
+// MaxStagedFileItems bounds how many rows one staged file may hold.
+const MaxStagedFileItems = 5000
+
+// StageImportFileItem is one candidate row of a file an admin stages.
+type StageImportFileItem struct {
+	ExternalID string // at most 64 characters, unique in the file
+	URL        string
+	Title      string
+	Position   int // 0 = newest
+	Facts      ImportFacts
+	Details    ImportItemDetails
+}
+
+// StageImportFileInput is a whole candidates file. WebsiteURL, when set, is the
+// site every row must be on and the one the rows are filed under.
+type StageImportFileInput struct {
+	Name        string
+	SourceTitle *string
+	WebsiteURL  *string
+	Items       []StageImportFileItem
 }
 
 // ImportBatchResult reports what an importItems call did with the requested rows.

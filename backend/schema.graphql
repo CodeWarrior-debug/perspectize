@@ -671,6 +671,9 @@ enum ImportSourceType {
   YOUTUBE_CHANNEL
   # A TMDB person's filmography; rows become MOVIE content.
   TMDB_PERSON
+  # A file of candidates an admin supplies (stageImportFromFile); rows become
+  # WEB_PAGE content. Nothing is listed from an outside API.
+  CANDIDATE_FILE
 }
 
 enum ImportPersonRole {
@@ -759,11 +762,12 @@ type ImportItem {
   title: String!
   # Decision facts, shown as sheet columns named after the keys. Keys mean the
   # same thing for every content type; a missing key is unknown, never 0.
-  # kind ("VIDEO" | "SHORT" | "LIVE" | "MOVIE"), summary, publishedAt,
+  # kind ("VIDEO" | "SHORT" | "LIVE" | "MOVIE" | "PAGE"), summary, publishedAt,
   # durationSeconds, viewCount, likeCount (absent when the channel hides likes),
   # commentCount, rating (0-10), ratingCount, ratingSource (e.g. "TMDB"),
   # chapterCount, hasCaptions, genres, topCast (up to 3 top-billed),
-  # popularity (TMDB), reviewCount, revenue and budget (USD), thumbnailUrl.
+  # popularity (TMDB), reviewCount, revenue and budget (USD), thumbnailUrl,
+  # webPageRoles (e.g. ["BLOG_POST"]), wordCount.
   facts: JSON!
   # Marked "don't import" (by anyone, until the import is closed): can't be imported.
   excluded: Boolean!
@@ -899,6 +903,32 @@ type ImportItemsResult {
   excluded: Int!
 }
 
+# One row of a candidates file. facts and details are JSON objects with only the
+# keys of ImportItem.facts and the import item details; an unknown key refuses the file.
+input StageImportItemInput {
+  # At most 64 characters, unique in the file.
+  externalId: String!
+  # http or https; on websiteUrl's host when websiteUrl is set. A bare site root is refused.
+  url: String!
+  # At most 300 characters.
+  title: String!
+  # 0 = newest.
+  position: Int!
+  facts: JSON!
+  details: JSON
+}
+
+input StageImportFromFileInput {
+  # The import's name.
+  name: String!
+  # e.g. "Jordan's Journey".
+  sourceTitle: String
+  # Set: every row must be on this site and is filed under it. Null: standalone pages.
+  websiteUrl: String
+  # 1 to 5,000 rows.
+  items: [StageImportItemInput!]!
+}
+
 type Mutation {
   createContentFromYouTube(input: CreateContentFromYouTubeInput!): CreateContentResult! @auth
   updateContentSourceData(contentId: IntID!): Content! @auth
@@ -982,6 +1012,9 @@ type Mutation {
   setImportItemsExcluded(input: SetImportItemsExcludedInput!): Int! @auth
   # Admin only: close (hide from non-admins, read-only) or reopen an import.
   closeImportJob(input: CloseImportJobInput!): ImportJob! @auth
+  # Admin only: stage a file of candidates as an approved import with one READY
+  # source. The whole file is checked first; one bad row refuses it, naming the row.
+  stageImportFromFile(input: StageImportFromFileInput!): ImportJob! @auth
   # Queues the picked rows and imports them in the background as the caller.
   importItems(input: ImportItemsInput!): ImportItemsResult! @auth
 }

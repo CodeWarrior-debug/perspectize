@@ -640,6 +640,22 @@ type SetPrimaryCategoryInput struct {
 	EntityType  *string `json:"entityType,omitempty"`
 }
 
+type StageImportFromFileInput struct {
+	Name        string                  `json:"name"`
+	SourceTitle *string                 `json:"sourceTitle,omitempty"`
+	WebsiteURL  *string                 `json:"websiteUrl,omitempty"`
+	Items       []*StageImportItemInput `json:"items"`
+}
+
+type StageImportItemInput struct {
+	ExternalID string         `json:"externalId"`
+	URL        string         `json:"url"`
+	Title      string         `json:"title"`
+	Position   int            `json:"position"`
+	Facts      map[string]any `json:"facts"`
+	Details    map[string]any `json:"details,omitempty"`
+}
+
 type StreamReset struct {
 	ThreadID string `json:"threadId"`
 }
