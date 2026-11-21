@@ -416,7 +416,7 @@ describe('CommentsEditor', () => {
 			await waitFor(() => expect(document.querySelector('.ProseMirror')).not.toBeNull());
 
 			const wrapper = document.querySelector('.comment-editor-wrapper') as HTMLElement;
-			expect(wrapper.style.getPropertyValue('--pe-max-height')).toBe('min(60dvh, 560px)');
+			expect(wrapper.style.getPropertyValue('--pe-max-height')).toBe('clamp(160px, calc(90dvh - 290px), 560px)');
 		});
 	});
 });
