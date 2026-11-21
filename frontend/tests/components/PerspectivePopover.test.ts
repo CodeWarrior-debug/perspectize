@@ -1221,6 +1221,30 @@ describe('PerspectivePopover component', () => {
 				expect(mocks.mockUpdateMutateAsync).toHaveBeenCalledTimes(1);
 			});
 		});
+
+		describe('offline save', () => {
+			const offlineMsg = "You're offline. This will save when you reconnect.";
+			const setOnline = (value: boolean) => vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(value);
+
+			it('tells the person the save is waiting for a connection, and still submits', async () => {
+				const online = setOnline(false);
+				renderPopover({ existingPerspective: existing });
+				await tick();
+				await fireEvent.click(screen.getByRole('button', { name: 'Save perspective' }));
+				expect(toast.info).toHaveBeenCalledWith(offlineMsg, { duration: 6000 });
+				expect(mocks.mockUpdateMutateAsync).toHaveBeenCalledTimes(1);
+				online.mockRestore();
+			});
+
+			it('says nothing while online', async () => {
+				const online = setOnline(true);
+				renderPopover({ existingPerspective: existing });
+				await tick();
+				await fireEvent.click(screen.getByRole('button', { name: 'Save perspective' }));
+				expect(toast.info).not.toHaveBeenCalled();
+				online.mockRestore();
+			});
+		});
 	});
 
 	describe('expanding the comment editor in place', () => {

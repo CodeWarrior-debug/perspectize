@@ -371,6 +371,11 @@
 		// offers Retry, and the review text survives as a draft (flushed below,
 		// cleared only once the save succeeds).
 		flushPendingDraft();
+		// The sheet closes at once and a save made offline just waits; without this the
+		// person believes it is safe on the server.
+		if (typeof navigator !== 'undefined' && !navigator.onLine) {
+			toast.info("You're offline. This will save when you reconnect.", { duration: 6000 });
+		}
 		const key = draftKey(contentId, userId);
 		const afterSave = () => {
 			clearDraft(key);
