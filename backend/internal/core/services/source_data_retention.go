@@ -25,14 +25,15 @@ func NewSourceDataRetention(db *gorm.DB) *SourceDataRetention {
 	return &SourceDataRetention{db: db, now: time.Now}
 }
 
-// purgeSQL per target. Each clears the counts only, leaves updated_at alone
+// purgeSQL per target. content_type is stored lowercase (the repository
+// converts to and from the domain's uppercase). Each clears the counts only, leaves updated_at alone
 // (a clear is not a refresh) and ages a row from its fetch stamp, falling back
 // to created_at when it has none.
 var purgeSQL = map[domain.SourceDataTarget]string{
 	domain.SourceDataTargetYouTubeStatistics: `
 		UPDATE content
 		SET response = response #- '{items,0,statistics}'
-		WHERE (content_type = 'YOUTUBE_VIDEO' OR content_type = '')
+		WHERE content_type IN ('youtube_video', '')
 		  AND response #> '{items,0,statistics}' IS NOT NULL
 		  AND COALESCE(NULLIF(response->>'perspectizeFetchedAt', '')::timestamptz, created_at) < ?`,
 }

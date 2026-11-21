@@ -10,6 +10,7 @@ import (
 
 	"github.com/CodeWarrior-debug/perspectize/backend/internal/core/domain"
 	"github.com/CodeWarrior-debug/perspectize/backend/internal/core/services"
+	"github.com/CodeWarrior-debug/perspectize/backend/internal/perf/querycount"
 	"github.com/CodeWarrior-debug/perspectize/backend/pkg/database"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -78,18 +79,20 @@ func TestSourceDataRetention_PurgeClearsOnlyOldYouTubeCounts(t *testing.T) {
 			VALUES (?, ?::jsonb, ?, ?) RETURNING id`, ct, resp, now.AddDate(0, 0, -createdDaysAgo), now.AddDate(0, 0, -1)).Scan(&id).Error)
 		return id
 	}
-	old := row("YOUTUBE_VIDEO", 40, 100, true)
-	fresh := row("YOUTUBE_VIDEO", 5, 100, true)         // old row, recently refreshed
-	unstampedOld := row("YOUTUBE_VIDEO", -1, 100, true) // ages from created_at
-	unstampedNew := row("YOUTUBE_VIDEO", -1, 3, true)
-	movie := row("MOVIE", 40, 100, true)
-	cleared := row("YOUTUBE_VIDEO", 40, 100, false)
+	old := row("youtube_video", 40, 100, true)
+	fresh := row("youtube_video", 5, 100, true)         // old row, recently refreshed
+	unstampedOld := row("youtube_video", -1, 100, true) // ages from created_at
+	unstampedNew := row("youtube_video", -1, 3, true)
+	movie := row("movie", 40, 100, true)
+	cleared := row("youtube_video", 40, 100, false)
 
 	svc := services.NewSourceDataRetention(db)
+	counter := querycount.Attach(t, db)
 	adminUser := &domain.AuthenticatedUser{ID: 1, Role: domain.UserRoleAdmin}
 	n, err := svc.Purge(context.Background(), adminUser, domain.SourceDataTargetYouTubeStatistics, 30)
 	require.NoError(t, err)
 	assert.EqualValues(t, 2, n, "the stale stamped row and the stale unstamped row")
+	counter.AssertExactly(t, 1) // one UPDATE, however many rows qualify
 
 	hasStats := func(id int) bool {
 		var ok bool
