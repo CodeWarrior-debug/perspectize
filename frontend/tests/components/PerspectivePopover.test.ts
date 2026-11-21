@@ -504,6 +504,42 @@ describe('PerspectivePopover component', () => {
 			expect(payload.agreement).toBe(5000);
 		});
 
+		it('Cmd/Ctrl+Enter inside the writing area saves; plain Enter does not', async () => {
+			renderPopover({
+				existingPerspective: {
+					id: '5',
+					quality: 7500,
+					agreement: 5000,
+					importance: null,
+					confidence: null,
+					like: null,
+				},
+			});
+			await tick();
+			const editor = screen.getByLabelText('Comment');
+			const before = mocks.mockUpdateMutateAsync.mock.calls.length;
+
+			await fireEvent.keyDown(editor, { key: 'Enter' });
+			expect(mocks.mockUpdateMutateAsync.mock.calls.length).toBe(before);
+
+			await fireEvent.keyDown(editor, { key: 'Enter', ctrlKey: true });
+			expect(mocks.mockUpdateMutateAsync.mock.calls.length).toBe(before + 1);
+
+			await fireEvent.keyDown(editor, { key: 'Enter', metaKey: true });
+			expect(mocks.mockUpdateMutateAsync.mock.calls.length).toBe(before + 2);
+
+			// The editor row may be nested in the form (phones): one keypress is still one save.
+			const form = editor.closest('form');
+			if (form) {
+				const handler = vi.fn();
+				document.addEventListener('keydown', handler);
+				await fireEvent.keyDown(editor, { key: 'Enter', ctrlKey: true });
+				document.removeEventListener('keydown', handler);
+				expect(handler).not.toHaveBeenCalled();
+				expect(mocks.mockUpdateMutateAsync.mock.calls.length).toBe(before + 3);
+			}
+		});
+
 		it('clearing the thumb (toggling it off) sends like: null, keeping the untouched rating', async () => {
 			renderPopover({
 				existingPerspective: {

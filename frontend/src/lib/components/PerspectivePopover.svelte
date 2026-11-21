@@ -338,6 +338,19 @@
 	// deleted by id yet.
 	const isStillSaving = $derived(isOptimisticId(existingPerspective?.id));
 
+	// Cmd/Ctrl+Enter saves from anywhere in the form, including the writing area where a bare
+	// Enter starts a new paragraph, so a keyboard writer need not Tab to the Save button.
+	let formEl: HTMLFormElement | undefined = $state();
+
+	function submitOnModEnter(e: KeyboardEvent) {
+		if (e.key !== 'Enter' || !(e.metaKey || e.ctrlKey) || e.isComposing) return;
+		e.preventDefault();
+		// The editor row sits inside the form on phones and outside it on desktop, so both carry
+		// this handler; stopping here keeps a phone keypress from submitting twice.
+		e.stopPropagation();
+		formEl?.requestSubmit();
+	}
+
 	function handleSubmit(e: Event) {
 		e.preventDefault();
 
@@ -470,7 +483,12 @@
 	{/if}
 
 	<!-- Scrollable body — ratings + add field -->
-	<form onsubmit={handleSubmit} class="flex flex-col flex-1 min-h-0 overflow-hidden">
+	<form
+		bind:this={formEl}
+		onsubmit={handleSubmit}
+		onkeydown={submitOnModEnter}
+		class="flex flex-col flex-1 min-h-0 overflow-hidden"
+	>
 		<div class="flex-1 min-h-0 overflow-y-auto overscroll-contain">
 			{#if mobile}
 				{@render commentRows(true)}
@@ -641,7 +659,12 @@
 
 {#snippet commentRows(mobile: boolean)}
 	<!-- Overall + Comment row -->
-	<div class="shrink-0 flex items-center gap-3.5 px-5 py-3.5 border-b border-border">
+	<!-- On desktop this row sits outside the form, so it carries its own Cmd/Ctrl+Enter handler. -->
+	<div
+		class="shrink-0 flex items-center gap-3.5 px-5 py-3.5 border-b border-border"
+		onkeydown={submitOnModEnter}
+		role="presentation"
+	>
 		<div class="flex flex-col items-center gap-1.5 flex-shrink-0">
 			<span class="font-sans text-[11px] font-medium text-muted-foreground uppercase tracking-[0.06em]"> Overall </span>
 			<Thumbs
