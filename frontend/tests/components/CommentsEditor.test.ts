@@ -19,6 +19,18 @@ describe('CommentsEditor', () => {
 		render(CommentsEditor, { props: { value: '', onChange: vi.fn() } });
 		const box = await screen.findByRole('textbox', { name: 'Comment' });
 		expect(document.activeElement).not.toBe(box);
+
+	// jsdom has no layout, so assert the two classes that make the toolbar stay put while the
+	// phone sheet scrolls to the caret: the toolbar is sticky and no ancestor inside the editor
+	// frame is a clipping scroll container (overflow-hidden would make it the sticky scope).
+	it('keeps the toolbar sticky inside a frame that clips without becoming a scroll container', async () => {
+		const { container } = render(CommentsEditor, { props: { value: '', onChange: vi.fn() } });
+		await screen.findByLabelText('Bold');
+		const frame = container.querySelector('.comment-editor-wrapper') as HTMLElement;
+		const toolbar = screen.getByLabelText('Bold').parentElement as HTMLElement;
+		expect(toolbar.classList.contains('sticky')).toBe(true);
+		expect(frame.classList.contains('overflow-clip')).toBe(true);
+		expect(frame.classList.contains('overflow-hidden')).toBe(false);
 	});
 
 	it('renders the default toolbar buttons', async () => {

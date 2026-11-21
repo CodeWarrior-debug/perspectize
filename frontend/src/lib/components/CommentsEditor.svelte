@@ -300,13 +300,14 @@
 </script>
 
 <div
-	class="comment-editor-wrapper border border-input rounded-lg bg-card overflow-hidden flex flex-col w-full min-w-0"
+	class="comment-editor-wrapper border border-input rounded-lg bg-card overflow-clip flex flex-col w-full min-w-0"
 	style:--pe-min-height={expanded ? 'min(60dvh, 560px)' : `${minHeight}px`}
 	style:--pe-max-height={expanded ? 'min(60dvh, 560px)' : `max(${minHeight}px, min(40dvh, 320px))`}
 	data-expanded={expanded}
 >
 	<!-- Toolbar -->
-	<div class="flex items-center gap-0.5 px-1.5 py-1 border-b border-border bg-muted relative flex-wrap">
+	<!-- Sticky: typing scrolls the phone sheet to keep the caret visible, which would otherwise carry the toolbar under the header. -->
+	<div class="sticky top-0 z-10 flex items-center gap-0.5 px-1.5 py-1 border-b border-border bg-muted flex-wrap">
 		<select class="heading-select" value={headingValue} onchange={onHeadingChange} aria-label="Text style">
 			{#each headingLevels as level (level.value)}
 				<option value={level.value}>{level.label}</option>
