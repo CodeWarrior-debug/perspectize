@@ -174,6 +174,7 @@ func contentModelToDomain(m *ContentModel) *domain.Content {
 		CustomFields:      nonEmptyRawJSON(m.CustomFields),
 		Privacy:           contentPrivacyFromDB(m.Privacy),
 		ImportJobID:       m.ImportJobID,
+		ParentContentID:   m.ParentContentID,
 		CreatedAt:         m.CreatedAt,
 		UpdatedAt:         m.UpdatedAt,
 	}
@@ -217,6 +218,7 @@ func contentDomainToModel(c *domain.Content) *ContentModel {
 		CustomFields:      nonEmptyRawJSON(c.CustomFields),
 		Privacy:           contentPrivacyToDB(c.Privacy),
 		ImportJobID:       c.ImportJobID,
+		ParentContentID:   c.ParentContentID,
 		// CreatedAt and UpdatedAt are managed by GORM
 	}
 }

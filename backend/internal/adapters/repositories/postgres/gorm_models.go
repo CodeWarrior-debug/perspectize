@@ -58,6 +58,7 @@ type ContentModel struct {
 	CustomFields      json.RawMessage `gorm:"type:jsonb;column:custom_fields"`
 	Privacy           string          `gorm:"column:privacy;not null;default:public"`
 	ImportJobID       *int            `gorm:"column:import_job_id"`
+	ParentContentID   *int            `gorm:"column:parent_content_id"`
 
 	// TotalCount is read-only and only present when List selects it: the
 	// filtered total, computed by a scalar subquery in the same statement as

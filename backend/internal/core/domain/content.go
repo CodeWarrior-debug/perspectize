@@ -15,6 +15,7 @@ const (
 	ContentTypeMovie        ContentType = "MOVIE"
 	ContentTypeBook         ContentType = "BOOK"
 	ContentTypeWebPage      ContentType = "WEB_PAGE"
+	ContentTypeWebsite      ContentType = "WEBSITE"
 )
 
 // WebPageRole is a role a webpage plays, chosen by the person who added it
@@ -56,6 +57,7 @@ const (
 	FetchStatusTimeout  FetchStatus = "TIMEOUT"
 	FetchStatusNotHTML  FetchStatus = "NOT_HTML"
 	FetchStatusTooLarge FetchStatus = "TOO_LARGE"
+	FetchStatusImported FetchStatus = "IMPORTED" // facts came from an import file; no fetch was made
 )
 
 // WebPageSchemaVersion is the version of the stored WebPageMeta shape.
@@ -176,8 +178,11 @@ type Content struct {
 	// ImportJobID is the import that created this row; nil for hand-added content.
 	// Set once at insert: a later re-add of the same URL never changes it.
 	ImportJobID *int
-	CreatedAt   time.Time
-	UpdatedAt   time.Time
+	// ParentContentID is the content row this one is filed under (a WEB_PAGE under
+	// its WEBSITE); nil when it has no parent.
+	ParentContentID *int
+	CreatedAt       time.Time
+	UpdatedAt       time.Time
 }
 
 // VisibleTo reports whether viewerID may read this row. A PRIVATE row is visible
