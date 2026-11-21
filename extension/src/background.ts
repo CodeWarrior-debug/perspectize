@@ -6,15 +6,21 @@ const POPUP_WIDTH = 480;
 const POPUP_HEIGHT = 720;
 const BADGE_MS = 2000;
 
-/** Opens the add form for `url` in a small popup window on the chosen Perspectize origin. */
+/** Opens the add form for `url` in a small popup window on the Perspectize origin chosen on the options page. */
 async function openAddWindow(url: string | undefined, title?: string) {
 	if (!isAddableUrl(url)) {
 		flagUnsupported();
 		return;
 	}
-	const { baseUrl } = (await chrome.storage.sync.get('baseUrl')) as { baseUrl?: string };
+	const { baseUrl } = (await chrome.storage.local.get('baseUrl')) as { baseUrl?: string };
+	const base = getBaseUrl(baseUrl);
+	if (!base) {
+		// No address chosen yet: ask for it instead of opening nothing.
+		await chrome.runtime.openOptionsPage();
+		return;
+	}
 	await chrome.windows.create({
-		url: buildAddUrl(getBaseUrl(baseUrl), url as string, title),
+		url: buildAddUrl(base, url as string, title),
 		type: 'popup',
 		width: POPUP_WIDTH,
 		height: POPUP_HEIGHT,

@@ -16,7 +16,7 @@ Pages that cannot be added (`chrome://`, `file://`, the Chrome Web Store) show a
 |---|---|
 | `activeTab` | read the current tab's address and title when you click the button |
 | `contextMenus` | the right-click entry |
-| `storage` | remember which Perspectize address to open (production, localhost or a preview). Not an auth token |
+| `storage` | remember which Perspectize address to open (entered on the options page; kept on this browser only, never synced). Not an auth token |
 
 There are no host permissions, so Chrome shows no "read and change all your data" warning. The extension sends nothing anywhere except by opening the Perspectize page you can see.
 
@@ -31,7 +31,7 @@ Then open `chrome://extensions`, turn on Developer mode, choose "Load unpacked" 
 
 ## Which Perspectize it opens
 
-Production by default (`PRODUCTION_BASE` in `src/baseUrl.ts`: confirm it is the live app's address before publishing). Open the extension's options page to point it at `http://localhost:5173` or a PR preview. Only the origin is kept.
+There is no built-in address, so no deployment's URL is committed. The first click opens the options page; enter your Perspectize address there (or use the `localhost:5173` button). It is saved in `chrome.storage.local`, so it stays on this browser and is not synced to your Google account. Only the origin is kept.
 
 ## Tests
 

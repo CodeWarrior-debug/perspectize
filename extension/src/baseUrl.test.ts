@@ -1,9 +1,9 @@
 import { describe, it, expect } from 'vitest';
-import { getBaseUrl, PRODUCTION_BASE } from './baseUrl';
+import { getBaseUrl } from './baseUrl';
 
 describe('getBaseUrl', () => {
-	it('uses production when nothing is stored', () => {
-		expect(getBaseUrl(undefined)).toBe(PRODUCTION_BASE);
+	it('is null when nothing is stored, so the caller asks for an address', () => {
+		expect(getBaseUrl(undefined)).toBeNull();
 	});
 
 	it('uses a stored http(s) origin', () => {
@@ -15,9 +15,9 @@ describe('getBaseUrl', () => {
 		expect(getBaseUrl('https://pr-1.preview.example/some/path?x=1')).toBe('https://pr-1.preview.example');
 	});
 
-	it('falls back to production for anything unsafe or malformed', () => {
-		expect(getBaseUrl('javascript:alert(1)')).toBe(PRODUCTION_BASE);
-		expect(getBaseUrl('garbage')).toBe(PRODUCTION_BASE);
-		expect(getBaseUrl('')).toBe(PRODUCTION_BASE);
+	it('is null for anything unsafe or malformed', () => {
+		expect(getBaseUrl('javascript:alert(1)')).toBeNull();
+		expect(getBaseUrl('garbage')).toBeNull();
+		expect(getBaseUrl('')).toBeNull();
 	});
 });
