@@ -141,6 +141,18 @@ describe('CommentsEditor', () => {
 		prompt.mockRestore();
 	});
 
+	it('leaves the trailing space of the selection out of the link', async () => {
+		const onChange = vi.fn();
+		render(CommentsEditor, { props: { value: '<p>hello world</p>', onChange } });
+		const box = await screen.findByRole('textbox', { name: 'Comment' });
+		await select(box, 0, 6);
+		await fireEvent.click(await screen.findByLabelText('Link (selection)'));
+		const input = await screen.findByLabelText('Link URL');
+		await fireEvent.input(input, { target: { value: 'https://example.com' } });
+		await fireEvent.keyDown(input, { key: 'Enter' });
+		await waitFor(() => expect(onChange).toHaveBeenLastCalledWith(expect.stringMatching(/>hello<\/a> world<\/p>/)));
+	});
+
 	it('keeps Escape in the link field from closing the dialog', async () => {
 		render(CommentsEditor, { props: { value: '<p>hello world</p>', onChange: vi.fn() } });
 		const box = await screen.findByRole('textbox', { name: 'Comment' });

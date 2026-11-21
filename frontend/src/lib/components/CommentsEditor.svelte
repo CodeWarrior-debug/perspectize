@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { normalizeLinkUrl } from '#lib/utils/linkUrl.js';
-	import { createWritingShortcuts, typographyOptions } from '#lib/utils/writingShortcuts.js';
+	import { createWritingShortcuts, EditorHeading, typographyOptions } from '#lib/utils/writingShortcuts.js';
 	import { createSlashCommand, type SlashItem, type SlashMenuState } from '#lib/utils/slashCommand.js';
 	import { onMount, onDestroy, tick } from 'svelte';
 	import { Editor } from '@tiptap/core';
@@ -156,6 +156,7 @@
 			element: editorElement,
 			extensions: [
 				createWritingShortcuts({ onLink: openLinkEditor }),
+				EditorHeading,
 				createSlashCommand({
 					items: buildSlashItems(),
 					getMenuElement: () => slashElement,
@@ -165,7 +166,7 @@
 				StarterKit.configure({
 					codeBlock: false,
 					horizontalRule: false,
-					heading: { levels: [2, 3] },
+					heading: false,
 					// StarterKit v3 bundles Link and Underline; we register our own
 					// configured copies below, so disable the bundled ones to avoid
 					// duplicate extensions (which silently kept openOnClick/autolink on).
@@ -277,8 +278,19 @@
 		if (!editor) return;
 		const href = normalizeLinkUrl(linkText);
 		linkEditing = false;
-		if (href === '') editor.chain().focus().extendMarkRange('link').unsetLink().run();
-		else editor.chain().focus().extendMarkRange('link').setLink({ href }).run();
+		if (href === '') {
+			editor.chain().focus().extendMarkRange('link').unsetLink().run();
+			return;
+		}
+		// A double-click or Option-Shift-Arrow selection usually carries the trailing space; a link should not.
+		const { from, to } = editor.state.selection;
+		const selected = editor.state.doc.textBetween(from, to);
+		const lead = selected.length - selected.trimStart().length;
+		const trail = selected.length - selected.trimEnd().length;
+		const chain = editor.chain().focus();
+		if (lead + trail > 0 && lead + trail < selected.length)
+			chain.setTextSelection({ from: from + lead, to: to - trail });
+		chain.extendMarkRange('link').setLink({ href }).run();
 	}
 
 	function removeLink() {

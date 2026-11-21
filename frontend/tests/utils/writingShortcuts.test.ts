@@ -2,7 +2,7 @@ import { describe, it, expect, vi, afterEach } from 'vitest';
 import { Editor } from '@tiptap/core';
 import StarterKit from '@tiptap/starter-kit';
 import Typography from '@tiptap/extension-typography';
-import { createWritingShortcuts, typographyOptions } from '#lib/utils/writingShortcuts.js';
+import { createWritingShortcuts, EditorHeading, typographyOptions } from '#lib/utils/writingShortcuts.js';
 
 let editor: Editor | null = null;
 
@@ -90,5 +90,16 @@ describe('typography', () => {
 		e.commands.focus('end');
 		typeText(e, '(c) a -> b 1/2 (tm) +/-');
 		expect(e.state.doc.textContent).toBe('(c) a -> b 1/2 (tm) +/-');
+	});
+});
+
+describe('pasted headings', () => {
+	it('maps H1-H6 onto the two heading levels the editor has', () => {
+		editor = new Editor({
+			element: document.createElement('div'),
+			extensions: [EditorHeading, StarterKit.configure({ heading: false })],
+			content: '<h1>a</h1><h2>b</h2><h3>c</h3><h4>d</h4><h6>e</h6><p>f</p>',
+		});
+		expect(editor.getHTML()).toBe('<h2>a</h2><h2>b</h2><h3>c</h3><h3>d</h3><h3>e</h3><p>f</p>');
 	});
 });

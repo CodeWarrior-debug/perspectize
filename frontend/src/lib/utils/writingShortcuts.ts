@@ -1,4 +1,5 @@
 import { Extension, textblockTypeInputRule } from '@tiptap/core';
+import Heading from '@tiptap/extension-heading';
 
 /**
  * Writing shortcuts that acclaimed editors (Notion, Linear, Ghost, Google Docs) share and that
@@ -52,3 +53,13 @@ export const typographyOptions = {
 	oneQuarter: false,
 	threeQuarters: false,
 } as const;
+
+/**
+ * The editor has two heading levels, so pasted H1 and H4-H6 (web pages, Google Docs) would otherwise lose their
+ * heading and arrive as plain paragraphs: H1 and H2 become Heading 2, H3 to H6 become Heading 3.
+ */
+export const EditorHeading = Heading.extend({
+	parseHTML() {
+		return [1, 2, 3, 4, 5, 6].map((level) => ({ tag: `h${level}`, attrs: { level: level <= 2 ? 2 : 3 } }));
+	},
+}).configure({ levels: [2, 3] });
