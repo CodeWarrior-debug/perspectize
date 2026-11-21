@@ -92,6 +92,7 @@ describe('ActivityDetailsModal source numbers', () => {
 		render(ActivityDetailsModal, { props: { content: expired, open: true, onClose: vi.fn() } });
 		expect(screen.getAllByText('Refresh to view')).toHaveLength(2);
 		expect(screen.getByTestId('source-data-expired-hint')).toHaveTextContent(/Sign in to refresh/);
+		expect(screen.getByRole('button', { name: /Refresh numbers/ })).toBeDisabled(); // no sign-in, no refresh
 	});
 
 	it('expired + refreshing: shows progress and disables the button', () => {

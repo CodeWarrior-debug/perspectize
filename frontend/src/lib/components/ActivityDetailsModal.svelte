@@ -483,7 +483,7 @@
 						{#if !isPassage && !isWebPage}
 							<button
 								type="button"
-								disabled={updateSourceData.isPending || cooldown.active}
+								disabled={updateSourceData.isPending || cooldown.active || sourceState === 'expired-signed-out'}
 								onclick={handleUpdateSourceData}
 								class="{MODAL_ACTION_CLASS} grow basis-36"
 							>
