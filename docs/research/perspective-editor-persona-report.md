@@ -179,6 +179,50 @@ export function normalizeLinkUrl(raw: string): string {
 
 Test: two cases in `MessagesLayout.test.ts` (list shown and detail hidden with no thread; the reverse with one open).
 
+## Round 2: typing the review (the main focus), per-type seed, titles
+
+Round 1 under-served the writing experience. Round 2 typed into the editor on desktop and an iPhone 14 emulation, on a seed that now holds every content type (YouTube, movie, book, web page, website, claim) built through the product's own GraphQL paths. Clips are GIF previews that link to the mp4.
+
+### Typing findings
+| ID | Severity | Finding | Status |
+|---|---|---|---|
+| T01 | High | A reload or app switch within ~0.8 s of typing lost the draft (1 s debounce). | Fixed |
+| T02 | High (phone) | After a few lines the toolbar scrolled under the sheet header; Bold, lists and links were unreachable. | Fixed |
+| T04 | Medium | No Cmd/Ctrl+Enter to save from the writing area. | Fixed |
+| T09 | Medium | Expand button took focus; typing straight after expanding went nowhere. | Fixed |
+| T08 | Medium (phone) | Thumbs column took ~30% of the width beside the editor; toolbar wrapped to two rows. | Fixed |
+| T03 | Medium | A typed URL does not autolink, a pasted one does (`autolink: false` is deliberate per the paste-policy spike). | Proposal |
+| T05 | Low | `# ` does not make a heading (levels are 2 and 3); `## ` and `### ` do. | Proposal |
+| T06 | Good | 583 fast characters with emoji, accents, em dash arrive exact; IME composition, ZWJ emoji and RTL text are intact; Enter during composition does not split the paragraph; paste and undo behave. | Keep |
+| T10 | Good | Rating select-on-focus survives human-speed clicks (held 0 to 400 ms). | Keep |
+
+### Diffs and evidence
+1. **Write the draft when the page hides** (`PerspectivePopover.svelte`: `pagehide` and `visibilitychange` call `flushPendingDraft`). Advantage: no lost words on reload or app switch. Before [![sv-persona-vid-03-draft-reload-before](https://github.com/CodeWarrior-debug/perspectize/releases/download/screenshots/sv-persona-vid-03-draft-reload-before.gif)](https://github.com/CodeWarrior-debug/perspectize/releases/download/screenshots/sv-persona-vid-03-draft-reload-before.mp4) After [![sv-persona-vid-04-draft-reload-after](https://github.com/CodeWarrior-debug/perspectize/releases/download/screenshots/sv-persona-vid-04-draft-reload-after.gif)](https://github.com/CodeWarrior-debug/perspectize/releases/download/screenshots/sv-persona-vid-04-draft-reload-after.mp4)
+2. **Sticky toolbar** (`CommentsEditor.svelte`: `sticky top-0 z-10`, frame `overflow-clip`). Advantage: formatting stays reachable while typing long reviews on a phone. Before [![sv-persona-vid-01-mobile-toolbar-before](https://github.com/CodeWarrior-debug/perspectize/releases/download/screenshots/sv-persona-vid-01-mobile-toolbar-before.gif)](https://github.com/CodeWarrior-debug/perspectize/releases/download/screenshots/sv-persona-vid-01-mobile-toolbar-before.mp4) After [![sv-persona-vid-02-mobile-toolbar-after](https://github.com/CodeWarrior-debug/perspectize/releases/download/screenshots/sv-persona-vid-02-mobile-toolbar-after.gif)](https://github.com/CodeWarrior-debug/perspectize/releases/download/screenshots/sv-persona-vid-02-mobile-toolbar-after.mp4)
+3. **Cmd/Ctrl+Enter saves** (`submitOnModEnter`, ignores IME composition). Advantage: keyboard-only writers finish without reaching for the mouse. Before [![sv-persona-vid-05-keyboard-save-before](https://github.com/CodeWarrior-debug/perspectize/releases/download/screenshots/sv-persona-vid-05-keyboard-save-before.gif)](https://github.com/CodeWarrior-debug/perspectize/releases/download/screenshots/sv-persona-vid-05-keyboard-save-before.mp4) After [![sv-persona-vid-06-keyboard-save-after](https://github.com/CodeWarrior-debug/perspectize/releases/download/screenshots/sv-persona-vid-06-keyboard-save-after.gif)](https://github.com/CodeWarrior-debug/perspectize/releases/download/screenshots/sv-persona-vid-06-keyboard-save-after.mp4)
+4. **Expand keeps the caret in the text** (mousedown no longer steals focus; focus returned after toggling). Advantage: typing continues after expanding.
+5. **Full-width open editor on a phone** (thumbs row stacks above the editor). Advantage: wider writing lines and a one-row toolbar. Before ![before](https://github.com/CodeWarrior-debug/perspectize/releases/download/screenshots/sv-persona-15-phone-editor-before.png) After ![after](https://github.com/CodeWarrior-debug/perspectize/releases/download/screenshots/sv-persona-16-phone-editor-after.png)
+
+Tests: draft flush (pagehide; hidden vs visible), sticky classes, Cmd/Ctrl+Enter, expand focus.
+
+### Titles and subtitles audit
+| ID | Page | Finding | Suggested wording |
+|---|---|---|---|
+| X1 | Library | Subtitle "Everything Perspectize members have added." is identical for every type filter, yet the default view shows only YouTube videos. | Subtitle follows the filter ("Videos members have added"); tab title "Movies · Library". |
+| X2 | Library chips | "Other types" lacks Website. | Add it. |
+| X3 | Discover | Subtitle is correct per tab (checked); the initial one names only YouTube while tabs include Movies and Books. | Neutral lead-in for the page, per-tab line below. |
+| X4 | Add perspective | Dialog title, placeholder and four rating fields are identical for every type. | Type-aware placeholder ("What did you think of the film?"). |
+| X5 | Messages | List row shows the thread title, the open thread header shows the other member; no h1; tab title never changes. | Show thread title in header; set the tab title. |
+| X6 | Declare | No subtitle, claim box is red on first load, list of claims has no heading. | "Your claims" heading; neutral empty state. |
+| X7 | Compare | Missing content shows both an error and "No one has shared a perspective" (contradictory). | Show only the error. |
+| X8 | Add Content | `john3:16`, `Jn 3 16`, `John 99:1` leave Add disabled with no message. | One-line hint under the box. |
+| Good | Import, Discover tabs | Accurate and specific. | Keep. |
+
+Not yet built: X1 to X8 and T03, T05 (wording and product calls for you).
+
+### Honest coverage
+Personas were run in sessions rather than as 20 full characters; typing lab, seed and per-type passes are the deepest parts. Not covered: a real phone keyboard (virtual-keyboard resize), screen readers, the remaining personas' per-type reviews on mobile.
+
 ## Proposals (not built)
 
 Each needs a product decision or touches more than one layer.
