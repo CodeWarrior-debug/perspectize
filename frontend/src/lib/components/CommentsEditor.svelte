@@ -6,6 +6,9 @@
 	import StarterKit from '@tiptap/starter-kit';
 	import Underline from '@tiptap/extension-underline';
 	import Placeholder from '@tiptap/extension-placeholder';
+	import { CharacterCount } from '@tiptap/extensions';
+	import Typography from '@tiptap/extension-typography';
+	import BubbleMenu from '@tiptap/extension-bubble-menu';
 	import Link from '@tiptap/extension-link';
 	import Image from '@tiptap/extension-image';
 	import { Table } from '@tiptap/extension-table';
@@ -61,6 +64,8 @@
 	} = $props();
 
 	let editorElement: HTMLDivElement;
+	let wrapperElement: HTMLDivElement;
+	let bubbleElement: HTMLDivElement;
 	let editor: Editor | null = $state(null);
 	// Bumped on every editor transaction so `items`/toolbar active-state
 	// recomputes; Tiptap's Editor instance isn't itself reactive to Svelte.
@@ -88,6 +93,20 @@
 				}),
 				Underline,
 				Placeholder.configure({ placeholder }),
+				CharacterCount,
+				// Floating selection toolbar (Medium / Notion / Substack): format the words you just selected without
+				// travelling to the top toolbar. Desktop only: a phone's own selection menu occupies the same spot.
+				...(isMobile
+					? []
+					: [
+							BubbleMenu.configure({
+								element: bubbleElement,
+								appendTo: () => wrapperElement,
+								options: { strategy: 'absolute', placement: 'top', offset: 8, flip: true, shift: { padding: 8 } },
+								shouldShow: ({ editor: e, from, to }) => e.isFocused && from !== to && !e.isActive('image'),
+							}),
+						]),
+				Typography,
 				Link.configure({ openOnClick: false, autolink: false }),
 				Image,
 				Table.configure({ resizable: false }),
@@ -264,11 +283,20 @@
 			: [],
 	);
 
+	const BUBBLE_IDS = ['bold', 'italic', 'underline', 'link'];
+	const bubbleItems = $derived(items.filter((i) => BUBBLE_IDS.includes(i.id)));
+
 	const BASIC_TOOLBAR_IDS = new Set(['bold', 'italic', 'underline', 'bulletList', 'orderedList', 'link']);
 
 	const visibleItems = $derived(
 		items.filter((i) => (!i.desktopOnly || !isMobile) && (toolbar === 'full' || BASIC_TOOLBAR_IDS.has(i.id))),
 	);
+
+	// Words as the writer counts them (Ghost / iA Writer footer). Reads `updateTick` so it follows every edit.
+	const wordCount = $derived.by(() => {
+		void updateTick;
+		return editor ? (editor.storage.characterCount.words() as number) : 0;
+	});
 
 	const headingLevels = [
 		{ value: '0', label: 'Paragraph' },
@@ -302,7 +330,8 @@
 </script>
 
 <div
-	class="comment-editor-wrapper border border-input rounded-lg bg-card overflow-clip flex flex-col w-full min-w-0"
+	bind:this={wrapperElement}
+	class="comment-editor-wrapper relative border border-input rounded-lg bg-card overflow-clip flex flex-col w-full min-w-0"
 	style:--pe-min-height={expanded ? 'min(60dvh, 560px)' : `${minHeight}px`}
 	style:--pe-max-height={expanded ? 'min(60dvh, 560px)' : `max(${minHeight}px, min(40dvh, 320px))`}
 	data-expanded={expanded}
@@ -361,6 +390,39 @@
 		class="comment-editor-scroll"
 		style="max-height: var(--pe-max-height); overflow-y: auto;"
 	></div>
+
+	{#if !isMobile}
+		<!-- Floating selection toolbar; Tiptap moves this node next to the selection and hides it otherwise. -->
+		<div
+			bind:this={bubbleElement}
+			class="bubble-toolbar"
+			role="toolbar"
+			aria-label="Format selection"
+			style="visibility: hidden"
+		>
+			{#each bubbleItems as item (item.id)}
+				<button
+					type="button"
+					class="tool-btn"
+					class:active={item.isActive()}
+					onmousedown={(e) => e.preventDefault()}
+					onclick={toolAction(item.run)}
+					aria-label={`${item.label} (selection)`}
+					aria-pressed={item.toggle ? item.isActive() : undefined}
+				>
+					<item.icon size={14} />
+				</button>
+			{/each}
+		</div>
+	{/if}
+
+	<!-- Quiet word count: appears with the first word so an empty editor stays clean. -->
+	{#if wordCount > 0}
+		<div class="word-count" data-testid="word-count" aria-live="off">
+			{wordCount}
+			{wordCount === 1 ? 'word' : 'words'}
+		</div>
+	{/if}
 </div>
 
 <style>
@@ -385,6 +447,31 @@
 	.tool-btn.active {
 		background: color-mix(in srgb, var(--color-foreground) 16%, transparent);
 		color: var(--color-foreground);
+	}
+
+	/* Absolute and shrink-wrapped from the start: Floating UI measures the node before it first positions it. */
+	.bubble-toolbar {
+		position: absolute;
+		top: 0;
+		left: 0;
+		width: max-content;
+		display: flex;
+		gap: 2px;
+		padding: 3px;
+		z-index: 30;
+		border: 1px solid var(--color-border);
+		border-radius: 8px;
+		background: var(--color-popover, var(--color-card));
+		box-shadow: 0 4px 14px color-mix(in srgb, var(--color-foreground) 18%, transparent);
+	}
+
+	.word-count {
+		padding: 2px 10px 3px;
+		font-size: 11px;
+		text-align: right;
+		color: var(--color-muted-foreground);
+		border-top: 1px solid var(--color-border);
+		font-variant-numeric: tabular-nums;
 	}
 
 	.heading-select {

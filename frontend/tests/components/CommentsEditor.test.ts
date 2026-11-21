@@ -1,6 +1,15 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeAll } from 'vitest';
 import { render, screen, waitFor, fireEvent } from '@testing-library/svelte';
 import CommentsEditor from '#lib/components/CommentsEditor.svelte';
+
+// jsdom has no layout: ProseMirror and Floating UI measure ranges and elements while placing the
+// selection toolbar, so give them zero-size rectangles.
+const emptyRects = () => Object.assign([], { item: () => null }) as unknown as DOMRectList;
+beforeAll(() => {
+	Range.prototype.getClientRects = emptyRects;
+	Range.prototype.getBoundingClientRect = () => new DOMRect(0, 0, 0, 0);
+	Element.prototype.getClientRects = emptyRects;
+});
 
 describe('CommentsEditor', () => {
 	it('exposes the writing area as a named multiline textbox', async () => {
@@ -41,6 +50,54 @@ describe('CommentsEditor', () => {
 		await fireEvent.click(screen.getByLabelText('Expand comment'));
 		expect(onPopout).toHaveBeenCalledTimes(1);
 		await waitFor(() => expect(document.activeElement).toBe(box));
+	});
+
+	it('shows no word count while the editor is empty', async () => {
+		render(CommentsEditor, { props: { value: '', onChange: vi.fn() } });
+		await screen.findByRole('textbox', { name: 'Comment' });
+		expect(screen.queryByTestId('word-count')).toBeNull();
+	});
+
+	it('counts the words of an existing review, singular for one', async () => {
+		const { rerender } = render(CommentsEditor, {
+			props: { value: '<p>one two three</p><ul><li>four</li></ul>', onChange: vi.fn() },
+		});
+		expect((await screen.findByTestId('word-count')).textContent?.replace(/\s+/g, ' ').trim()).toBe('4 words');
+		await rerender({ value: '<p>solo</p>', onChange: vi.fn() });
+		await waitFor(() =>
+			expect(screen.getByTestId('word-count').textContent?.replace(/\s+/g, ' ').trim()).toBe('1 word'),
+		);
+	});
+
+	it('has no floating selection toolbar on a phone', async () => {
+		render(CommentsEditor, { props: { value: '<p>hello world</p>', onChange: vi.fn(), isMobile: true } });
+		await screen.findByRole('textbox', { name: 'Comment' });
+		expect(document.querySelector('.bubble-toolbar')).toBeNull();
+	});
+
+	it('keeps the floating selection toolbar out of view until words are selected', async () => {
+		render(CommentsEditor, { props: { value: '<p>hello world</p>', onChange: vi.fn() } });
+		await screen.findByRole('textbox', { name: 'Comment' });
+		expect(screen.queryByRole('toolbar', { name: 'Format selection' })).toBeNull();
+	});
+
+	it('shows Bold, Italic, Underline and Link next to selected words and formats them', async () => {
+		const onChange = vi.fn();
+		render(CommentsEditor, { props: { value: '<p>hello world</p>', onChange } });
+		const box = await screen.findByRole('textbox', { name: 'Comment' });
+		box.focus();
+		const text = box.querySelector('p')!.firstChild!;
+		const range = document.createRange();
+		range.setStart(text, 0);
+		range.setEnd(text, 5);
+		const selection = window.getSelection()!;
+		selection.removeAllRanges();
+		selection.addRange(range);
+		document.dispatchEvent(new Event('selectionchange'));
+		const bar = await screen.findByRole('toolbar', { name: 'Format selection' }, { timeout: 2000 });
+		expect(bar.querySelectorAll('button')).toHaveLength(4);
+		await fireEvent.click(screen.getByLabelText('Bold (selection)'));
+		await waitFor(() => expect(onChange).toHaveBeenLastCalledWith('<p><strong>hello</strong> world</p>'));
 	});
 
 	it('renders the default toolbar buttons', async () => {
