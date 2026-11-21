@@ -12,13 +12,13 @@ Spec: [2026-11-20-custom-columns-and-saved-items-design.md](../specs/2026-11-20-
 | 2 | `feature/saved-items-backend` | migration + domain + port + service + GORM repo + GraphQL + `UserService.Delete` reassign | dark: deploys unused; migration applied by hand per environment |
 | 3 | `feature/custom-columns-frontend` | evaluator, builder, grid integration, hooks | merge-gated; user-visible, needs `needs-demo-video` |
 
-Migration 000039 is **provisional**: open PRs #810 (000039–000042) and #825 (000043–000044) also claim numbers. Rename to the next free number on `main` as the last step before merging PR 2.
+The migration is numbered 000041, the next free number on `main` when PR 2 was rebased. Open PR #810 also claims 000041 and renumbers itself when it merges.
 
 ## PR 2: backend (dark), in order
 
 Template: the user-todo feature (`user_todo.go`, `user_todo_repository.go`, `user_todo_service.go`, `gorm_user_todo_repository.go`, `user_todo.resolvers.go`, tests under `test/`).
 
-1. **Migration `000039_add_user_saved_items`** up and down, idempotent, schema as in the spec. Written and reviewed only; never applied to Neon.
+1. **Migration `000041_add_user_saved_items`** up and down, idempotent, schema as in the spec. Written and reviewed only; never applied to Neon.
 2. **Domain** `core/domain/saved_item.go`: `SavedItemType` (`FORMULA`, `THEME`, `VIEW`, `SETTING`), `SavedItemOrigin` (`OWN`, `COPY`, `LINK`), `SavedItem`, `SavedFormulaPayload` with expression-tree validation (node count and depth caps, whitelisted functions, finite numbers). Reuses `domain.Privacy`. Zero external imports.
 3. **Port** `ports/repositories/saved_item_repository.go` and `ports/services/saved_item_service.go`.
 4. **Service** `core/services/saved_item_service.go`: create, update, soft delete, restore, set privacy, copy (auto-suffix name), link (public source only, no chains), convert link to copy, list mine, list shared. Owner guard at the service; non-owner on a private row is "not found".
