@@ -675,7 +675,8 @@
 				<CommentsEditor
 					value={comment}
 					onChange={handleCommentChange}
-					minHeight={68}
+					minHeight={mobile ? 68 : 140}
+					autofocus={!mobile}
 					showPopout={true}
 					expanded={commentExpanded}
 					onPopout={() => {

@@ -41,6 +41,7 @@
 		expanded = false,
 		isMobile = false,
 		toolbar = 'full',
+		autofocus = false,
 	}: {
 		value?: string;
 		onChange: (html: string) => void;
@@ -53,6 +54,8 @@
 		isMobile?: boolean;
 		/** `basic` hides the image and table buttons (short notes); `full` is the perspective editor. */
 		toolbar?: 'full' | 'basic';
+		/** Put the caret in the writing area on mount (desktop dialogs; a phone would raise its keyboard unasked). */
+		autofocus?: boolean;
 	} = $props();
 
 	let editorElement: HTMLDivElement;
@@ -90,6 +93,7 @@
 				TableCell,
 			],
 			content: value,
+			autofocus: autofocus ? 'end' : false,
 			onUpdate: ({ editor: e }) => {
 				onChange(e.getHTML());
 				updateTick++;
