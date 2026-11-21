@@ -25,6 +25,12 @@ var (
 	// ErrUnknownWebPageRole is returned for a webpage role outside the known set. It
 	// also wraps ErrInvalidInput, so callers that match the sentinel still see it.
 	ErrUnknownWebPageRole = errors.New("unknown webpage role")
+	// The webpage input sentinels below each wrap ErrInvalidInput too, so callers that
+	// match that sentinel still see them; each names one known user mistake.
+	ErrWebPageIsWebsite = errors.New("link is a website, not a page")
+	ErrParentNotFound   = errors.New("parent website does not exist")
+	ErrParentNotWebsite = errors.New("parent is not a website")
+	ErrParentOtherHost  = errors.New("parent website is on a different host")
 	// ErrClaimHasOthers is returned when a claim can't be deleted because another
 	// user has a perspective or a plan item on it. The owner can keep it anonymised.
 	ErrClaimHasOthers = errors.New("claim has perspectives or plans by other users")

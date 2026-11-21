@@ -102,7 +102,11 @@ func (m *mockContentService) CreateFromBook(ctx context.Context, rawURLOrISBN st
 	return nil, nil
 }
 
-func (m *mockContentService) CreateFromWebPage(ctx context.Context, rawURL string, roles []domain.WebPageRole, userID int) (*domain.Content, error) {
+func (m *mockContentService) CreateFromWebPage(ctx context.Context, in portservices.CreateWebPageInput, userID int) (*domain.Content, error) {
+	return nil, nil
+}
+
+func (m *mockContentService) CreateFromWebsite(ctx context.Context, rawURL string, userID int) (*domain.Content, error) {
 	return nil, nil
 }
 

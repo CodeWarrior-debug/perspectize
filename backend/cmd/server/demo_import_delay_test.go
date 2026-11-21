@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/CodeWarrior-debug/perspectize/backend/internal/core/domain"
+	portservices "github.com/CodeWarrior-debug/perspectize/backend/internal/core/ports/services"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -32,6 +33,16 @@ func (c *countingCreator) CreateFromYouTube(context.Context, string, int) (*doma
 func (c *countingCreator) CreateFromMovie(context.Context, string, int) (*domain.Content, error) {
 	c.calls++
 	return &domain.Content{ID: 2}, nil
+}
+
+func (c *countingCreator) CreateFromWebPage(context.Context, portservices.CreateWebPageInput, int) (*domain.Content, error) {
+	c.calls++
+	return &domain.Content{ID: 3}, nil
+}
+
+func (c *countingCreator) CreateFromWebsite(context.Context, string, int) (*domain.Content, error) {
+	c.calls++
+	return &domain.Content{ID: 4}, nil
 }
 
 func TestSlowImportCreator(t *testing.T) {

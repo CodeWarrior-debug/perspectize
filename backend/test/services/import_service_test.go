@@ -36,6 +36,10 @@ type fakeImportRepo struct {
 	failQueuedErr error
 	// failQueuedCalls counts FailQueuedItems calls, including the ones that fail.
 	failQueuedCalls int
+	// getJobCalls and detailsCalls count GetJob and GetItemDetailsByIDs calls.
+	getJobCalls, detailsCalls int
+	// detailsErr is returned by GetItemDetailsByIDs.
+	detailsErr error
 }
 
 var _ repositories.ImportJobRepository = (*fakeImportRepo)(nil)
@@ -75,6 +79,9 @@ func (r *fakeImportRepo) ListJobs(_ context.Context, includeClosed bool) ([]*dom
 
 func (r *fakeImportRepo) GetJobState(ctx context.Context, id int) (*domain.ImportJob, error) {
 	j, err := r.GetJob(ctx, id)
+	r.mu.Lock()
+	r.getJobCalls-- // the state read is its own statement, not a read of the sources
+	r.mu.Unlock()
 	if err != nil {
 		return nil, err
 	}
@@ -115,6 +122,7 @@ func (r *fakeImportRepo) SetExcluded(_ context.Context, jobID int, ids []int, ex
 func (r *fakeImportRepo) GetJob(_ context.Context, id int) (*domain.ImportJob, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
+	r.getJobCalls++
 	if j, ok := r.jobs[id]; ok {
 		return j, nil
 	}
@@ -281,6 +289,23 @@ func (r *fakeImportRepo) GetItemWithDetails(_ context.Context, itemID int) (*dom
 		return it, nil
 	}
 	return nil, domain.ErrNotFound
+}
+
+func (r *fakeImportRepo) GetItemDetailsByIDs(_ context.Context, jobID int, ids []int) (map[int]*domain.ImportItemDetails, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.detailsCalls++
+	if r.detailsErr != nil {
+		return nil, r.detailsErr
+	}
+	out := make(map[int]*domain.ImportItemDetails, len(ids))
+	for _, id := range ids {
+		if it, ok := r.items[id]; ok && it.Item.JobID == jobID {
+			d := it.Details
+			out[id] = &d
+		}
+	}
+	return out, nil
 }
 
 func (r *fakeImportRepo) MarkQueued(_ context.Context, jobID int, ids []int) ([]int, error) {
@@ -489,6 +514,14 @@ func (c *fakeCreator) CreateFromYouTube(ctx context.Context, url string, userID 
 
 func (c *fakeCreator) CreateFromMovie(ctx context.Context, url string, userID int) (*domain.Content, error) {
 	return c.create(ctx, url, userID, &c.movies)
+}
+
+func (c *fakeCreator) CreateFromWebPage(context.Context, portservices.CreateWebPageInput, int) (*domain.Content, error) {
+	return nil, errors.New("fakeCreator does not create webpages")
+}
+
+func (c *fakeCreator) CreateFromWebsite(context.Context, string, int) (*domain.Content, error) {
+	return nil, errors.New("fakeCreator does not create websites")
 }
 
 var (

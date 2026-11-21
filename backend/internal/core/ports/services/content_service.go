@@ -20,6 +20,22 @@ type CreateClaimInput struct {
 	Privacy *domain.Privacy
 }
 
+// CreateWebPageInput holds the input for saving a webpage.
+type CreateWebPageInput struct {
+	URL string
+	// Roles are the adder's picks (the first is primary). Nil or empty means none:
+	// nothing is detected.
+	Roles []domain.WebPageRole
+	// ParentContentID files the page under a WEBSITE row on the same host.
+	ParentContentID *int
+	// ParentValidated is set only by the import worker, after it found or created
+	// the parent website itself and staging checked every row is on that site. It
+	// skips the per-page parent read. Public mutations must never set it.
+	ParentValidated bool
+	// Prefetched, when set, replaces the network fetch (import files carry the facts).
+	Prefetched *domain.WebPageMeta
+}
+
 // UpdateClaimInput holds the input for replacing a claim's text and dates.
 // ActorUserID must own the claim. Nil or empty EffectiveDate means today UTC;
 // nil or empty EvaluateBy clears the evaluate-by date.
@@ -139,10 +155,14 @@ type ContentService interface {
 	// Open Library has no record for the ISBN.
 	ResolveBookISBN(ctx context.Context, isbn string) (*BookSearchResult, error)
 
-	// CreateFromWebPage saves a webpage by URL, attributed to userID. roles are the
-	// adder's picks (the first is primary; empty means a plain webpage). If the URL
-	// is already saved, returns that row with ErrAlreadyExists and ignores roles.
-	CreateFromWebPage(ctx context.Context, rawURL string, roles []domain.WebPageRole, userID int) (*domain.Content, error)
+	// CreateFromWebPage saves a webpage, attributed to userID. A site-root URL is
+	// refused (ErrInvalidInput; use CreateFromWebsite). If the URL is already saved,
+	// returns that row with ErrAlreadyExists and ignores roles and parent.
+	CreateFromWebPage(ctx context.Context, in CreateWebPageInput, userID int) (*domain.Content, error)
+
+	// CreateFromWebsite saves the website that rawURL belongs to, stored under its
+	// root URL. If it is already saved, returns that row with ErrAlreadyExists.
+	CreateFromWebsite(ctx context.Context, rawURL string, userID int) (*domain.Content, error)
 
 	// PreviewWebPage reads a page's metadata for the Add dialog's import preview.
 	// It never writes.

@@ -445,3 +445,20 @@ func TestContentMapper_CustomFields_RoundTrip(t *testing.T) {
 		assert.Nil(t, m.CustomFields)
 	})
 }
+
+func TestContentParentIDRoundTrip(t *testing.T) {
+	t.Run("nil stays nil", func(t *testing.T) {
+		m := contentDomainToModel(&domain.Content{Name: "x", ContentType: domain.ContentTypeWebsite})
+		assert.Nil(t, m.ParentContentID)
+		assert.Nil(t, contentModelToDomain(m).ParentContentID)
+	})
+	t.Run("value round-trips and website is lowercased", func(t *testing.T) {
+		m := contentDomainToModel(&domain.Content{Name: "x", ContentType: domain.ContentTypeWebsite, ParentContentID: intPtr(7)})
+		assert.Equal(t, "website", m.ContentType)
+		require.NotNil(t, m.ParentContentID)
+		back := contentModelToDomain(m)
+		require.NotNil(t, back.ParentContentID)
+		assert.Equal(t, 7, *back.ParentContentID)
+		assert.Equal(t, domain.ContentTypeWebsite, back.ContentType)
+	})
+}

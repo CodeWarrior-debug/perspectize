@@ -50,6 +50,14 @@ type ImportService interface {
 	// this server has no API key for; domain.ErrNotFound when a source doesn't exist.
 	CreateImportJob(ctx context.Context, actor *domain.AuthenticatedUser, input domain.CreateImportJobInput) (*domain.ImportJob, error)
 
+	// StageImportFromFile saves an admin-supplied candidates file as an APPROVED
+	// import with one READY CANDIDATE_FILE source and every row staged: nothing is
+	// listed and no outside API is called. Admin only (domain.ErrForbidden). The
+	// whole file is checked first and refused with domain.ErrInvalidInput naming
+	// the first bad row, so a half-staged import cannot happen. Statement count is
+	// the same for any number of rows: job + source, one items upsert, one source update.
+	StageImportFromFile(ctx context.Context, actor *domain.AuthenticatedUser, in domain.StageImportFileInput) (*domain.ImportJob, error)
+
 	// UpdateImportJobDescription replaces the description of an import the actor
 	// requested, sanitized and at most domain.MaxImportJobDescriptionChars.
 	// Only the requester may edit it (domain.ErrForbidden, even for an admin),

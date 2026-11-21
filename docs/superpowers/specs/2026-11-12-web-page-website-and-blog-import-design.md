@@ -27,7 +27,7 @@ No migration and no behaviour change: nothing is built yet. There is no role det
 |---|---|
 | Identity / canonical URL | The origin: `https://<host>/` (scheme kept, `www.` dropped, host lowercased, path `/`). |
 | Site root vs page | A URL with path `/` and no query is **always a `WEBSITE`, never a `WEB_PAGE`**. This keeps the global `UNIQUE(url)` from ever holding one address under two types. A page like `https://x.com/?p=12` (has a query) is a webpage. |
-| Link | `content.parent_content_id` (nullable FK to `content(id)`, `ON DELETE RESTRICT`, indexed). This is the same column the [TMDB hierarchy design](2026-09-27-tmdb-content-types-design.md) §3 specifies; whichever PR lands first creates it, with that exact definition. |
+| Link | `content.parent_content_id` (nullable FK to `content(id)`, `ON DELETE RESTRICT`, not indexed until `pg_stat_statements` shows a need). This is the same column the [TMDB hierarchy design](2026-09-27-tmdb-content-types-design.md) §3 specifies; whichever PR lands first creates it, with that exact definition. |
 | Who may be a parent | Only a `WEBSITE` row, and only of a `WEB_PAGE` row on the **same host** (`www.` ignored). Enforced in the service. A website has no parent. |
 | **No force-add** | Unlike seasons and episodes, adding a page never adds its website. A page with no parent is normal. |
 | Metadata | A website reads the same `<head>` fields through the same safe fetcher (webpage design §4): title, `siteName`, description, image, favicon, language. It has no `publishedAt`, `author` or roles. |

@@ -103,7 +103,7 @@ func TestCreateContentFromWebPage_BlockedAddressGivesGenericMessage(t *testing.T
 	server := setupWebPageServer(repo, stubWebPageClient{err: refused})
 	defer server.Close()
 
-	result := executeGraphQL(t, server, `mutation { createContentFromWebPage(input: { url: "https://internal.example/" }) { alreadyExisted } }`)
+	result := executeGraphQL(t, server, `mutation { createContentFromWebPage(input: { url: "https://internal.example/page" }) { alreadyExisted } }`)
 	require.NotEmpty(t, result.Errors)
 	assert.Contains(t, result.Errors[0].Message, "invalid webpage URL")
 	assert.NotContains(t, result.Errors[0].Message, "10.0.0.1", "the blocked address must not reach the client")

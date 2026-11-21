@@ -78,6 +78,11 @@ type ImportJobRepository interface {
 	// domain.ErrNotFound.
 	GetItemWithDetails(ctx context.Context, itemID int) (*domain.ImportItemWithDetails, error)
 
+	// GetItemDetailsByIDs returns the detail payloads of the rows of jobID among
+	// ids, keyed by row id (1 query for any number of ids; 0 for empty ids).
+	// Ids from other jobs and unknown ids are absent.
+	GetItemDetailsByIDs(ctx context.Context, jobID int, ids []int) (map[int]*domain.ImportItemDetails, error)
+
 	// MarkQueued sets import_status to QUEUED on the rows of jobID among ids
 	// that aren't excluded and have never been imported or last failed, and returns the ids it
 	// changed (1 statement; 0 for empty ids).

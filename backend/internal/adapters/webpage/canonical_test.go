@@ -165,3 +165,57 @@ func TestPreferDeclaredCanonical(t *testing.T) {
 		})
 	}
 }
+
+func TestIsSiteRoot(t *testing.T) {
+	tests := []struct {
+		in   string
+		want bool
+	}{
+		{"https://x.com/", true},
+		{"https://x.com", true},
+		{"https://www.x.com/", true},
+		{"https://x.com/#top", true},
+		{"https://x.com/a", false},
+		{"https://x.com/?p=12", false},
+		{"https://x.com/?utm_source=a", true},
+		{"ftp://x.com/", false},
+		{"not a url", false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.in, func(t *testing.T) {
+			assert.Equal(t, tt.want, IsSiteRoot(tt.in))
+		})
+	}
+}
+
+func TestSiteRoot(t *testing.T) {
+	got, err := SiteRoot("https://x.com/2020/a/")
+	require.NoError(t, err)
+	assert.Equal(t, "https://x.com/", got)
+
+	got, err = SiteRoot("http://www.X.com:8080/a?b=1#c")
+	require.NoError(t, err)
+	assert.Equal(t, "http://x.com:8080/", got)
+
+	_, err = SiteRoot("ftp://x.com")
+	require.Error(t, err)
+	assert.True(t, errors.Is(err, domain.ErrInvalidInput))
+}
+
+func TestSameSite(t *testing.T) {
+	tests := []struct {
+		name string
+		a, b string
+		want bool
+	}{
+		{"www and case ignored", "https://www.X.com/a", "https://x.com/", true},
+		{"subdomain differs", "https://blog.x.com/", "https://x.com/", false},
+		{"different host", "https://y.com/", "https://x.com/", false},
+		{"invalid input", "ftp://x.com/", "https://x.com/", false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.want, SameSite(tt.a, tt.b))
+		})
+	}
+}

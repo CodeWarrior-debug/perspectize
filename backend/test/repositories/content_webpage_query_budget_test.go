@@ -11,6 +11,7 @@ import (
 
 	"github.com/CodeWarrior-debug/perspectize/backend/internal/adapters/repositories/postgres"
 	"github.com/CodeWarrior-debug/perspectize/backend/internal/core/domain"
+	portservices "github.com/CodeWarrior-debug/perspectize/backend/internal/core/ports/services"
 	"github.com/CodeWarrior-debug/perspectize/backend/internal/core/services"
 	"github.com/CodeWarrior-debug/perspectize/backend/internal/perf/querycount"
 )
@@ -56,7 +57,7 @@ func TestQueryBudget_CreateFromWebPageNewRowIsTwoStatements(t *testing.T) {
 	mock.ExpectQuery("FROM").WillReturnRows(sqlmock.NewRows([]string{"id"}))
 	mock.ExpectQuery("INSERT").WillReturnRows(sqlmock.NewRows([]string{"id", "created_at", "updated_at"}).AddRow(7, now, now))
 
-	_, err := svc.CreateFromWebPage(context.Background(), "https://example.com/a", nil, 1)
+	_, err := svc.CreateFromWebPage(context.Background(), portservices.CreateWebPageInput{URL: "https://example.com/a"}, 1)
 	require.NoError(t, err)
 	counter.AssertExactly(t, 2)
 	assert.Equal(t, 1, pages.calls)
@@ -71,7 +72,7 @@ func TestQueryBudget_CreateFromWebPageExistingRowIsOneStatement(t *testing.T) {
 	mock.ExpectQuery("FROM").WillReturnRows(sqlmock.NewRows([]string{"id", "url", "content_type"}).
 		AddRow(42, "https://example.com/a", "WEB_PAGE"))
 
-	_, err := svc.CreateFromWebPage(context.Background(), "https://example.com/a", nil, 1)
+	_, err := svc.CreateFromWebPage(context.Background(), portservices.CreateWebPageInput{URL: "https://example.com/a"}, 1)
 	require.ErrorIs(t, err, domain.ErrAlreadyExists)
 	counter.AssertExactly(t, 1)
 	assert.Equal(t, 0, pages.calls)
@@ -104,5 +105,24 @@ func TestQueryBudget_PreviewWebPageWithDifferentDeclaredKeyIsTwoStatements(t *te
 	_, err := svc.PreviewWebPage(context.Background(), "https://example.com/a")
 	require.NoError(t, err)
 	counter.AssertExactly(t, 2)
+	require.NoError(t, mock.ExpectationsWereMet())
+}
+
+// Filing a webpage under a website adds exactly one statement, the parent's GetByID:
+// dedupe lookup, parent lookup, INSERT. The fetch is not a database statement.
+func TestQueryBudget_CreateFromWebPageWithParentIsThreeStatements(t *testing.T) {
+	pages := &budgetPages{meta: okPage("https://example.com/a", "")}
+	svc, mock, counter := budgetService(t, pages)
+	now := time.Now()
+
+	mock.ExpectQuery("FROM").WillReturnRows(sqlmock.NewRows([]string{"id"}))
+	mock.ExpectQuery("FROM").WillReturnRows(sqlmock.NewRows([]string{"id", "url", "content_type"}).
+		AddRow(9, "https://example.com/", "WEBSITE"))
+	mock.ExpectQuery("INSERT").WillReturnRows(sqlmock.NewRows([]string{"id", "created_at", "updated_at"}).AddRow(7, now, now))
+
+	parent := 9
+	_, err := svc.CreateFromWebPage(context.Background(), portservices.CreateWebPageInput{URL: "https://example.com/a", ParentContentID: &parent}, 1)
+	require.NoError(t, err)
+	counter.AssertExactly(t, 3)
 	require.NoError(t, mock.ExpectationsWereMet())
 }

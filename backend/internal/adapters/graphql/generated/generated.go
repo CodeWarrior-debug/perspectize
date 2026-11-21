@@ -111,6 +111,8 @@ type ComplexityRoot struct {
 		LikeCount               func(childComplexity int) int
 		Movie                   func(childComplexity int) int
 		Name                    func(childComplexity int) int
+		ParentContent           func(childComplexity int) int
+		ParentContentID         func(childComplexity int) int
 		PerspectiveCount        func(childComplexity int) int
 		PrimaryCategory         func(childComplexity int) int
 		Privacy                 func(childComplexity int) int
@@ -369,6 +371,7 @@ type ComplexityRoot struct {
 		CreateContentFromMovie          func(childComplexity int, input model.CreateContentFromMovieInput) int
 		CreateContentFromPassage        func(childComplexity int, input model.CreateContentFromPassageInput) int
 		CreateContentFromWebPage        func(childComplexity int, input model.CreateContentFromWebPageInput) int
+		CreateContentFromWebsite        func(childComplexity int, input model.CreateContentFromWebsiteInput) int
 		CreateContentFromYouTube        func(childComplexity int, input model.CreateContentFromYouTubeInput) int
 		CreateImportJob                 func(childComplexity int, input model.CreateImportJobInput) int
 		CreateMessageThread             func(childComplexity int, input model.CreateMessageThreadInput) int
@@ -398,6 +401,7 @@ type ComplexityRoot struct {
 		SetPassageDisplayTitle          func(childComplexity int, input model.SetPassageDisplayTitleInput) int
 		SetPrimaryCategory              func(childComplexity int, input model.SetPrimaryCategoryInput) int
 		SetTyping                       func(childComplexity int, threadID string, typing bool) int
+		StageImportFromFile             func(childComplexity int, input model.StageImportFromFileInput) int
 		UpdateClaim                     func(childComplexity int, id string, input model.UpdateClaimInput) int
 		UpdateContentSourceData         func(childComplexity int, contentID int) int
 		UpdateImportJobDescription      func(childComplexity int, input model.UpdateImportJobDescriptionInput) int
@@ -658,6 +662,7 @@ type ComplexityRoot struct {
 type ContentResolver interface {
 	AddedBy(ctx context.Context, obj *model.Content) (*model.User, error)
 
+	ParentContent(ctx context.Context, obj *model.Content) (*model.Content, error)
 	PrimaryCategory(ctx context.Context, obj *model.Content) (*model.Category, error)
 	ImportedFrom(ctx context.Context, obj *model.Content) (*model.ImportJobRef, error)
 
@@ -691,6 +696,7 @@ type MutationResolver interface {
 	CreateContentFromMovie(ctx context.Context, input model.CreateContentFromMovieInput) (*model.Content, error)
 	CreateContentFromBook(ctx context.Context, input model.CreateContentFromBookInput) (*model.Content, error)
 	CreateContentFromWebPage(ctx context.Context, input model.CreateContentFromWebPageInput) (*model.CreateContentResult, error)
+	CreateContentFromWebsite(ctx context.Context, input model.CreateContentFromWebsiteInput) (*model.CreateContentResult, error)
 	CreateContentFromPassage(ctx context.Context, input model.CreateContentFromPassageInput) (*model.Content, error)
 	SetPassageDisplayTitle(ctx context.Context, input model.SetPassageDisplayTitleInput) (*model.Content, error)
 	ClearPassageDisplayTitle(ctx context.Context, contentID int) (*model.Content, error)
@@ -721,6 +727,7 @@ type MutationResolver interface {
 	ReviewImportJob(ctx context.Context, input model.ReviewImportJobInput) (*model.ImportJob, error)
 	SetImportItemsExcluded(ctx context.Context, input model.SetImportItemsExcludedInput) (int, error)
 	CloseImportJob(ctx context.Context, input model.CloseImportJobInput) (*model.ImportJob, error)
+	StageImportFromFile(ctx context.Context, input model.StageImportFromFileInput) (*model.ImportJob, error)
 	ImportItems(ctx context.Context, input model.ImportItemsInput) (*model.ImportItemsResult, error)
 	CreateMessageThread(ctx context.Context, input model.CreateMessageThreadInput) (*model.MessageThread, error)
 	SendMessage(ctx context.Context, input model.SendMessageInput) (*model.Message, error)
@@ -1103,6 +1110,18 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.Content.Name(childComplexity), true
+	case "Content.parentContent":
+		if e.ComplexityRoot.Content.ParentContent == nil {
+			break
+		}
+
+		return e.ComplexityRoot.Content.ParentContent(childComplexity), true
+	case "Content.parentContentID":
+		if e.ComplexityRoot.Content.ParentContentID == nil {
+			break
+		}
+
+		return e.ComplexityRoot.Content.ParentContentID(childComplexity), true
 	case "Content.perspectiveCount":
 		if e.ComplexityRoot.Content.PerspectiveCount == nil {
 			break
@@ -2203,6 +2222,17 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.Mutation.CreateContentFromWebPage(childComplexity, args["input"].(model.CreateContentFromWebPageInput)), true
+	case "Mutation.createContentFromWebsite":
+		if e.ComplexityRoot.Mutation.CreateContentFromWebsite == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_createContentFromWebsite_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.ComplexityRoot.Mutation.CreateContentFromWebsite(childComplexity, args["input"].(model.CreateContentFromWebsiteInput)), true
 	case "Mutation.createContentFromYouTube":
 		if e.ComplexityRoot.Mutation.CreateContentFromYouTube == nil {
 			break
@@ -2522,6 +2552,17 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.Mutation.SetTyping(childComplexity, args["threadId"].(string), args["typing"].(bool)), true
+	case "Mutation.stageImportFromFile":
+		if e.ComplexityRoot.Mutation.StageImportFromFile == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_stageImportFromFile_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.ComplexityRoot.Mutation.StageImportFromFile(childComplexity, args["input"].(model.StageImportFromFileInput)), true
 	case "Mutation.updateClaim":
 		if e.ComplexityRoot.Mutation.UpdateClaim == nil {
 			break
@@ -3786,6 +3827,7 @@ func (e *executableSchema) Exec(ctx context.Context) graphql.ResponseHandler {
 			graphql.NewInputUnmarshaler("CreateContentFromMovieInput", ec.unmarshalInputCreateContentFromMovieInput),
 			graphql.NewInputUnmarshaler("CreateContentFromPassageInput", ec.unmarshalInputCreateContentFromPassageInput),
 			graphql.NewInputUnmarshaler("CreateContentFromWebPageInput", ec.unmarshalInputCreateContentFromWebPageInput),
+			graphql.NewInputUnmarshaler("CreateContentFromWebsiteInput", ec.unmarshalInputCreateContentFromWebsiteInput),
 			graphql.NewInputUnmarshaler("CreateContentFromYouTubeInput", ec.unmarshalInputCreateContentFromYouTubeInput),
 			graphql.NewInputUnmarshaler("CreateImportJobInput", ec.unmarshalInputCreateImportJobInput),
 			graphql.NewInputUnmarshaler("CreateImportSourceInput", ec.unmarshalInputCreateImportSourceInput),
@@ -3803,6 +3845,8 @@ func (e *executableSchema) Exec(ctx context.Context) graphql.ResponseHandler {
 			graphql.NewInputUnmarshaler("SetImportItemsExcludedInput", ec.unmarshalInputSetImportItemsExcludedInput),
 			graphql.NewInputUnmarshaler("SetPassageDisplayTitleInput", ec.unmarshalInputSetPassageDisplayTitleInput),
 			graphql.NewInputUnmarshaler("SetPrimaryCategoryInput", ec.unmarshalInputSetPrimaryCategoryInput),
+			graphql.NewInputUnmarshaler("StageImportFromFileInput", ec.unmarshalInputStageImportFromFileInput),
+			graphql.NewInputUnmarshaler("StageImportItemInput", ec.unmarshalInputStageImportItemInput),
 			graphql.NewInputUnmarshaler("UpdateClaimInput", ec.unmarshalInputUpdateClaimInput),
 			graphql.NewInputUnmarshaler("UpdateImportJobDescriptionInput", ec.unmarshalInputUpdateImportJobDescriptionInput),
 			graphql.NewInputUnmarshaler("UpdatePerspectiveInput", ec.unmarshalInputUpdatePerspectiveInput),
@@ -4141,6 +4185,10 @@ type Content {
   book: JSON
   "Webpage-specific metadata for the grid: siteName, domain, imageUrl, faviconUrl, publishedAt, author, webPageRoles (never null, [] when none); null for other content types."
   webPage: JSON
+  "The WEBSITE row this page is filed under; null when it is not filed under one."
+  parentContentID: Int
+  "The parent content row, batched per request; null when there is none or the viewer cannot read it."
+  parentContent: Content
   primaryCategory: Category
   # The import that created this row. Null for hand-added content, and when that
   # import is closed and the viewer isn't an admin.
@@ -4231,6 +4279,7 @@ enum ContentType {
   MOVIE
   BOOK
   WEB_PAGE
+  WEBSITE
 }
 
 # Text columns that ContentFilter.search can be scoped to.
@@ -4272,6 +4321,13 @@ input CreateContentFromWebPageInput {
   url: String!
   # Roles the adder picked. Omitted or [] saves a plain webpage. Never inferred from the page.
   webPageRoles: [WebPageRole!]
+  # File the page under this WEBSITE row (same host). Ignored when the page already exists.
+  parentContentID: IntID
+}
+
+input CreateContentFromWebsiteInput {
+  # Any http(s) URL on the site; the website is stored under its root (https://host/)
+  url: String!
 }
 
 # Outcome of reading a page's <head>. Shown in the Add dialog's import preview.
@@ -4415,6 +4471,8 @@ input ContentFilter {
   maxBookRating: Float
   # Webpage role filter (webpage rows only; other rows never match). Matches any of these roles (OR'd).
   webPageRoles: [WebPageRole!]
+  # Rows filed under this content (e.g. a website's pages)
+  parentContentID: IntID
   # View/like count filters
   minViewCount: Int
   maxViewCount: Int
@@ -4562,6 +4620,9 @@ enum ImportSourceType {
   YOUTUBE_CHANNEL
   # A TMDB person's filmography; rows become MOVIE content.
   TMDB_PERSON
+  # A file of candidates an admin supplies (stageImportFromFile); rows become
+  # WEB_PAGE content. Nothing is listed from an outside API.
+  CANDIDATE_FILE
 }
 
 enum ImportPersonRole {
@@ -4650,11 +4711,12 @@ type ImportItem {
   title: String!
   # Decision facts, shown as sheet columns named after the keys. Keys mean the
   # same thing for every content type; a missing key is unknown, never 0.
-  # kind ("VIDEO" | "SHORT" | "LIVE" | "MOVIE"), summary, publishedAt,
+  # kind ("VIDEO" | "SHORT" | "LIVE" | "MOVIE" | "PAGE"), summary, publishedAt,
   # durationSeconds, viewCount, likeCount (absent when the channel hides likes),
   # commentCount, rating (0-10), ratingCount, ratingSource (e.g. "TMDB"),
   # chapterCount, hasCaptions, genres, topCast (up to 3 top-billed),
-  # popularity (TMDB), reviewCount, revenue and budget (USD), thumbnailUrl.
+  # popularity (TMDB), reviewCount, revenue and budget (USD), thumbnailUrl,
+  # webPageRoles (e.g. ["BLOG_POST"]), wordCount.
   facts: JSON!
   # Marked "don't import" (by anyone, until the import is closed): can't be imported.
   excluded: Boolean!
@@ -4790,6 +4852,32 @@ type ImportItemsResult {
   excluded: Int!
 }
 
+# One row of a candidates file. facts and details are JSON objects with only the
+# keys of ImportItem.facts and the import item details; an unknown key refuses the file.
+input StageImportItemInput {
+  # At most 64 characters, unique in the file.
+  externalId: String!
+  # http or https; on websiteUrl's host when websiteUrl is set. A bare site root is refused.
+  url: String!
+  # At most 300 characters.
+  title: String!
+  # 0 = newest.
+  position: Int!
+  facts: JSON!
+  details: JSON
+}
+
+input StageImportFromFileInput {
+  # The import's name.
+  name: String!
+  # e.g. "Jordan's Journey".
+  sourceTitle: String
+  # Set: every row must be on this site and is filed under it. Null: standalone pages.
+  websiteUrl: String
+  # 1 to 5,000 rows.
+  items: [StageImportItemInput!]!
+}
+
 type Mutation {
   createContentFromYouTube(input: CreateContentFromYouTubeInput!): CreateContentResult! @auth
   updateContentSourceData(contentId: IntID!): Content! @auth
@@ -4802,6 +4890,7 @@ type Mutation {
 
   # Webpage mutations
   createContentFromWebPage(input: CreateContentFromWebPageInput!): CreateContentResult! @auth
+  createContentFromWebsite(input: CreateContentFromWebsiteInput!): CreateContentResult! @auth
 
   # Bible passage mutations
   createContentFromPassage(input: CreateContentFromPassageInput!): Content! @auth
@@ -4872,6 +4961,9 @@ type Mutation {
   setImportItemsExcluded(input: SetImportItemsExcludedInput!): Int! @auth
   # Admin only: close (hide from non-admins, read-only) or reopen an import.
   closeImportJob(input: CloseImportJobInput!): ImportJob! @auth
+  # Admin only: stage a file of candidates as an approved import with one READY
+  # source. The whole file is checked first; one bad row refuses it, naming the row.
+  stageImportFromFile(input: StageImportFromFileInput!): ImportJob! @auth
   # Queues the picked rows and imports them in the background as the caller.
   importItems(input: ImportItemsInput!): ImportItemsResult! @auth
 }
@@ -5402,6 +5494,10 @@ func (ec *executionContext) childFields_Content(ctx context.Context, field graph
 		return ec.fieldContext_Content_book(ctx, field)
 	case "webPage":
 		return ec.fieldContext_Content_webPage(ctx, field)
+	case "parentContentID":
+		return ec.fieldContext_Content_parentContentID(ctx, field)
+	case "parentContent":
+		return ec.fieldContext_Content_parentContent(ctx, field)
 	case "primaryCategory":
 		return ec.fieldContext_Content_primaryCategory(ctx, field)
 	case "importedFrom":
@@ -6482,6 +6578,20 @@ func (ec *executionContext) field_Mutation_createContentFromWebPage_args(ctx con
 	return args, nil
 }
 
+func (ec *executionContext) field_Mutation_createContentFromWebsite_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "input",
+		func(ctx context.Context, v any) (model.CreateContentFromWebsiteInput, error) {
+			return ec.unmarshalNCreateContentFromWebsiteInput2githubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋadaptersᚋgraphqlᚋmodelᚐCreateContentFromWebsiteInput(ctx, v)
+		})
+	if err != nil {
+		return nil, err
+	}
+	args["input"] = arg0
+	return args, nil
+}
+
 func (ec *executionContext) field_Mutation_createContentFromYouTube_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
 	var err error
 	args := map[string]any{}
@@ -6933,6 +7043,20 @@ func (ec *executionContext) field_Mutation_setTyping_args(ctx context.Context, r
 		return nil, err
 	}
 	args["typing"] = arg1
+	return args, nil
+}
+
+func (ec *executionContext) field_Mutation_stageImportFromFile_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "input",
+		func(ctx context.Context, v any) (model.StageImportFromFileInput, error) {
+			return ec.unmarshalNStageImportFromFileInput2githubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋadaptersᚋgraphqlᚋmodelᚐStageImportFromFileInput(ctx, v)
+		})
+	if err != nil {
+		return nil, err
+	}
+	args["input"] = arg0
 	return args, nil
 }
 
@@ -9006,6 +9130,61 @@ func (ec *executionContext) _Content_webPage(ctx context.Context, field graphql.
 }
 func (ec *executionContext) fieldContext_Content_webPage(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	return graphql.NewScalarFieldContext("Content", field, false, false, "JSON")
+}
+
+func (ec *executionContext) _Content_parentContentID(ctx context.Context, field graphql.CollectedField, obj *model.Content) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_Content_parentContentID(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.ParentContentID, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v *int) graphql.Marshaler {
+			return ec.marshalOInt2ᚖint(ctx, selections, v)
+		},
+		true,
+		false,
+	)
+}
+func (ec *executionContext) fieldContext_Content_parentContentID(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("Content", field, false, false, "Int")
+}
+
+func (ec *executionContext) _Content_parentContent(ctx context.Context, field graphql.CollectedField, obj *model.Content) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_Content_parentContent(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return ec.Resolvers.Content().ParentContent(ctx, obj)
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v *model.Content) graphql.Marshaler {
+			return ec.marshalOContent2ᚖgithubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋadaptersᚋgraphqlᚋmodelᚐContent(ctx, selections, v)
+		},
+		true,
+		false,
+	)
+}
+func (ec *executionContext) fieldContext_Content_parentContent(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Content",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.childFields_Content(ctx, field)
+		},
+	}
+	return fc, nil
 }
 
 func (ec *executionContext) _Content_primaryCategory(ctx context.Context, field graphql.CollectedField, obj *model.Content) (ret graphql.Marshaler) {
@@ -13167,6 +13346,63 @@ func (ec *executionContext) fieldContext_Mutation_createContentFromWebPage(ctx c
 	return fc, nil
 }
 
+func (ec *executionContext) _Mutation_createContentFromWebsite(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_Mutation_createContentFromWebsite(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.Resolvers.Mutation().CreateContentFromWebsite(ctx, fc.Args["input"].(model.CreateContentFromWebsiteInput))
+		},
+		func(ctx context.Context, next graphql.Resolver) graphql.Resolver {
+			directive0 := next
+
+			directive1 := func(ctx context.Context) (any, error) {
+				if ec.Directives.Auth == nil {
+					var zeroVal *model.CreateContentResult
+					return zeroVal, errors.New("directive auth is not implemented")
+				}
+				return ec.Directives.Auth(ctx, nil, directive0)
+			}
+
+			next = directive1
+			return next
+		},
+		func(ctx context.Context, selections ast.SelectionSet, v *model.CreateContentResult) graphql.Marshaler {
+			return ec.marshalNCreateContentResult2ᚖgithubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋadaptersᚋgraphqlᚋmodelᚐCreateContentResult(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_Mutation_createContentFromWebsite(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.childFields_CreateContentResult(ctx, field)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Mutation_createContentFromWebsite_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _Mutation_createContentFromPassage(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
@@ -14871,6 +15107,63 @@ func (ec *executionContext) fieldContext_Mutation_closeImportJob(ctx context.Con
 	}()
 	ctx = graphql.WithFieldContext(ctx, fc)
 	if fc.Args, err = ec.field_Mutation_closeImportJob_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Mutation_stageImportFromFile(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_Mutation_stageImportFromFile(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.Resolvers.Mutation().StageImportFromFile(ctx, fc.Args["input"].(model.StageImportFromFileInput))
+		},
+		func(ctx context.Context, next graphql.Resolver) graphql.Resolver {
+			directive0 := next
+
+			directive1 := func(ctx context.Context) (any, error) {
+				if ec.Directives.Auth == nil {
+					var zeroVal *model.ImportJob
+					return zeroVal, errors.New("directive auth is not implemented")
+				}
+				return ec.Directives.Auth(ctx, nil, directive0)
+			}
+
+			next = directive1
+			return next
+		},
+		func(ctx context.Context, selections ast.SelectionSet, v *model.ImportJob) graphql.Marshaler {
+			return ec.marshalNImportJob2ᚖgithubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋadaptersᚋgraphqlᚋmodelᚐImportJob(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_Mutation_stageImportFromFile(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.childFields_ImportJob(ctx, field)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Mutation_stageImportFromFile_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
 		ec.Error(ctx, err)
 		return fc, err
 	}
@@ -21573,7 +21866,7 @@ func (ec *executionContext) unmarshalInputContentFilter(ctx context.Context, obj
 		asMap[k] = v
 	}
 
-	fieldsInOrder := [...]string{"contentType", "contentTypes", "minLengthSeconds", "maxLengthSeconds", "search", "searchFields", "personId", "personRole", "genreContains", "castContains", "ageRating", "releasedAfter", "releasedBefore", "minBoxOffice", "maxBoxOffice", "minTmdbScore", "maxTmdbScore", "authorContains", "minPublishYear", "maxPublishYear", "minPages", "maxPages", "minBookRating", "maxBookRating", "webPageRoles", "minViewCount", "maxViewCount", "minLikeCount", "maxLikeCount", "publishedAfter", "publishedBefore", "channelTitle", "tagContains", "descriptionSearch", "addedByUsername", "minPerspectiveCount", "createdAfter", "createdBefore", "updatedAfter", "updatedBefore"}
+	fieldsInOrder := [...]string{"contentType", "contentTypes", "minLengthSeconds", "maxLengthSeconds", "search", "searchFields", "personId", "personRole", "genreContains", "castContains", "ageRating", "releasedAfter", "releasedBefore", "minBoxOffice", "maxBoxOffice", "minTmdbScore", "maxTmdbScore", "authorContains", "minPublishYear", "maxPublishYear", "minPages", "maxPages", "minBookRating", "maxBookRating", "webPageRoles", "parentContentID", "minViewCount", "maxViewCount", "minLikeCount", "maxLikeCount", "publishedAfter", "publishedBefore", "channelTitle", "tagContains", "descriptionSearch", "addedByUsername", "minPerspectiveCount", "createdAfter", "createdBefore", "updatedAfter", "updatedBefore"}
 	for _, k := range fieldsInOrder {
 		v, ok := asMap[k]
 		if !ok {
@@ -21755,6 +22048,13 @@ func (ec *executionContext) unmarshalInputContentFilter(ctx context.Context, obj
 				return it, err
 			}
 			it.WebPageRoles = data
+		case "parentContentID":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("parentContentID"))
+			data, err := ec.unmarshalOIntID2ᚖint(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.ParentContentID = data
 		case "minViewCount":
 			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("minViewCount"))
 			data, err := ec.unmarshalOInt2ᚖint(ctx, v)
@@ -22175,7 +22475,7 @@ func (ec *executionContext) unmarshalInputCreateContentFromWebPageInput(ctx cont
 		asMap[k] = v
 	}
 
-	fieldsInOrder := [...]string{"url", "webPageRoles"}
+	fieldsInOrder := [...]string{"url", "webPageRoles", "parentContentID"}
 	for _, k := range fieldsInOrder {
 		v, ok := asMap[k]
 		if !ok {
@@ -22196,6 +22496,13 @@ func (ec *executionContext) unmarshalInputCreateContentFromWebPageInput(ctx cont
 				return it, err
 			}
 			it.WebPageRoles = data
+		case "parentContentID":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("parentContentID"))
+			data, err := ec.unmarshalOIntID2ᚖint(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.ParentContentID = data
 		}
 	}
 	return it, nil
@@ -22210,6 +22517,48 @@ func (ec *executionContext) unmarshalInputCreateContentFromWebPageInput(ctx cont
 func UnmarshalCreateContentFromWebPageInput(ctx context.Context, raw any) (model.CreateContentFromWebPageInput, error) {
 	var out model.CreateContentFromWebPageInput
 	err := graphql.UnmarshalNamedInputFromContext(ctx, "CreateContentFromWebPageInput", raw, &out)
+	return out, err
+}
+
+func (ec *executionContext) unmarshalInputCreateContentFromWebsiteInput(ctx context.Context, obj any) (model.CreateContentFromWebsiteInput, error) {
+	var it model.CreateContentFromWebsiteInput
+	if obj == nil {
+		return it, nil
+	}
+
+	asMap := map[string]any{}
+	for k, v := range obj.(map[string]any) {
+		asMap[k] = v
+	}
+
+	fieldsInOrder := [...]string{"url"}
+	for _, k := range fieldsInOrder {
+		v, ok := asMap[k]
+		if !ok {
+			continue
+		}
+		switch k {
+		case "url":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("url"))
+			data, err := ec.unmarshalNString2string(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.URL = data
+		}
+	}
+	return it, nil
+}
+
+// UnmarshalCreateContentFromWebsiteInput unmarshals raw into the CreateContentFromWebsiteInput input type, using the
+// unmarshaler bound to ctx's request. Call it from a resolver to decode an input
+// object that was not passed as a field argument.
+//
+// ctx must come from a gqlgen request; outside one there is no unmarshaler to use
+// and the returned error says so.
+func UnmarshalCreateContentFromWebsiteInput(ctx context.Context, raw any) (model.CreateContentFromWebsiteInput, error) {
+	var out model.CreateContentFromWebsiteInput
+	err := graphql.UnmarshalNamedInputFromContext(ctx, "CreateContentFromWebsiteInput", raw, &out)
 	return out, err
 }
 
@@ -23312,6 +23661,146 @@ func UnmarshalSetPrimaryCategoryInput(ctx context.Context, raw any) (model.SetPr
 	return out, err
 }
 
+func (ec *executionContext) unmarshalInputStageImportFromFileInput(ctx context.Context, obj any) (model.StageImportFromFileInput, error) {
+	var it model.StageImportFromFileInput
+	if obj == nil {
+		return it, nil
+	}
+
+	asMap := map[string]any{}
+	for k, v := range obj.(map[string]any) {
+		asMap[k] = v
+	}
+
+	fieldsInOrder := [...]string{"name", "sourceTitle", "websiteUrl", "items"}
+	for _, k := range fieldsInOrder {
+		v, ok := asMap[k]
+		if !ok {
+			continue
+		}
+		switch k {
+		case "name":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("name"))
+			data, err := ec.unmarshalNString2string(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Name = data
+		case "sourceTitle":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("sourceTitle"))
+			data, err := ec.unmarshalOString2ᚖstring(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.SourceTitle = data
+		case "websiteUrl":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("websiteUrl"))
+			data, err := ec.unmarshalOString2ᚖstring(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.WebsiteURL = data
+		case "items":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("items"))
+			data, err := ec.unmarshalNStageImportItemInput2ᚕᚖgithubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋadaptersᚋgraphqlᚋmodelᚐStageImportItemInputᚄ(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Items = data
+		}
+	}
+	return it, nil
+}
+
+// UnmarshalStageImportFromFileInput unmarshals raw into the StageImportFromFileInput input type, using the
+// unmarshaler bound to ctx's request. Call it from a resolver to decode an input
+// object that was not passed as a field argument.
+//
+// ctx must come from a gqlgen request; outside one there is no unmarshaler to use
+// and the returned error says so.
+func UnmarshalStageImportFromFileInput(ctx context.Context, raw any) (model.StageImportFromFileInput, error) {
+	var out model.StageImportFromFileInput
+	err := graphql.UnmarshalNamedInputFromContext(ctx, "StageImportFromFileInput", raw, &out)
+	return out, err
+}
+
+func (ec *executionContext) unmarshalInputStageImportItemInput(ctx context.Context, obj any) (model.StageImportItemInput, error) {
+	var it model.StageImportItemInput
+	if obj == nil {
+		return it, nil
+	}
+
+	asMap := map[string]any{}
+	for k, v := range obj.(map[string]any) {
+		asMap[k] = v
+	}
+
+	fieldsInOrder := [...]string{"externalId", "url", "title", "position", "facts", "details"}
+	for _, k := range fieldsInOrder {
+		v, ok := asMap[k]
+		if !ok {
+			continue
+		}
+		switch k {
+		case "externalId":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("externalId"))
+			data, err := ec.unmarshalNString2string(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.ExternalID = data
+		case "url":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("url"))
+			data, err := ec.unmarshalNString2string(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.URL = data
+		case "title":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("title"))
+			data, err := ec.unmarshalNString2string(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Title = data
+		case "position":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("position"))
+			data, err := ec.unmarshalNInt2int(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Position = data
+		case "facts":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("facts"))
+			data, err := ec.unmarshalNJSON2map(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Facts = data
+		case "details":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("details"))
+			data, err := ec.unmarshalOJSON2map(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Details = data
+		}
+	}
+	return it, nil
+}
+
+// UnmarshalStageImportItemInput unmarshals raw into the StageImportItemInput input type, using the
+// unmarshaler bound to ctx's request. Call it from a resolver to decode an input
+// object that was not passed as a field argument.
+//
+// ctx must come from a gqlgen request; outside one there is no unmarshaler to use
+// and the returned error says so.
+func UnmarshalStageImportItemInput(ctx context.Context, raw any) (model.StageImportItemInput, error) {
+	var out model.StageImportItemInput
+	err := graphql.UnmarshalNamedInputFromContext(ctx, "StageImportItemInput", raw, &out)
+	return out, err
+}
+
 func (ec *executionContext) unmarshalInputUpdateClaimInput(ctx context.Context, obj any) (model.UpdateClaimInput, error) {
 	var it model.UpdateClaimInput
 	if obj == nil {
@@ -24360,6 +24849,17 @@ func (ec *executionContext) _Content(ctx context.Context, sel ast.SelectionSet, 
 			if out.Values[i] == graphql.RequiredNull {
 				atomic.AddUint32(&out.Invalids, 1)
 			}
+		case "parentContentID":
+			out.Values[i] = ec._Content_parentContentID(ctx, field, obj)
+			if out.Values[i] == graphql.RequiredNull {
+				atomic.AddUint32(&out.Invalids, 1)
+			}
+		case "parentContent":
+			out.ResolveConcurrently(ec.OperationContext, &deferred, i,
+				true, false,
+				func(ctx context.Context) graphql.Marshaler {
+					return ec._Content_parentContent(ctx, field, obj)
+				})
 		case "primaryCategory":
 			out.ResolveConcurrently(ec.OperationContext, &deferred, i,
 				true, false,
@@ -26036,6 +26536,13 @@ func (ec *executionContext) _Mutation(ctx context.Context, sel ast.SelectionSet)
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
 			}
+		case "createContentFromWebsite":
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_createContentFromWebsite(ctx, field)
+			})
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
 		case "createContentFromPassage":
 			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
 				return ec._Mutation_createContentFromPassage(ctx, field)
@@ -26242,6 +26749,13 @@ func (ec *executionContext) _Mutation(ctx context.Context, sel ast.SelectionSet)
 		case "closeImportJob":
 			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
 				return ec._Mutation_closeImportJob(ctx, field)
+			})
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "stageImportFromFile":
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_stageImportFromFile(ctx, field)
 			})
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
@@ -28455,6 +28969,11 @@ func (ec *executionContext) unmarshalNCreateContentFromWebPageInput2githubᚗcom
 	return res, graphql.ErrorOnPath(ctx, err)
 }
 
+func (ec *executionContext) unmarshalNCreateContentFromWebsiteInput2githubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋadaptersᚋgraphqlᚋmodelᚐCreateContentFromWebsiteInput(ctx context.Context, v any) (model.CreateContentFromWebsiteInput, error) {
+	res, err := ec.unmarshalInputCreateContentFromWebsiteInput(ctx, v)
+	return res, graphql.ErrorOnPath(ctx, err)
+}
+
 func (ec *executionContext) unmarshalNCreateContentFromYouTubeInput2githubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋadaptersᚋgraphqlᚋmodelᚐCreateContentFromYouTubeInput(ctx context.Context, v any) (model.CreateContentFromYouTubeInput, error) {
 	res, err := ec.unmarshalInputCreateContentFromYouTubeInput(ctx, v)
 	return res, graphql.ErrorOnPath(ctx, err)
@@ -29244,6 +29763,30 @@ func (ec *executionContext) marshalNSortOrder2githubᚗcomᚋCodeWarriorᚑdebug
 		graphql.AddInvalidNullFromMarshaler(ctx, "SortOrder!")
 	}
 	return res
+}
+
+func (ec *executionContext) unmarshalNStageImportFromFileInput2githubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋadaptersᚋgraphqlᚋmodelᚐStageImportFromFileInput(ctx context.Context, v any) (model.StageImportFromFileInput, error) {
+	res, err := ec.unmarshalInputStageImportFromFileInput(ctx, v)
+	return res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) unmarshalNStageImportItemInput2ᚕᚖgithubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋadaptersᚋgraphqlᚋmodelᚐStageImportItemInputᚄ(ctx context.Context, v any) ([]*model.StageImportItemInput, error) {
+	vSlice := graphql.CoerceList(v)
+	var err error
+	res := make([]*model.StageImportItemInput, len(vSlice))
+	for i := range vSlice {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithIndex(i))
+		res[i], err = ec.unmarshalNStageImportItemInput2ᚖgithubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋadaptersᚋgraphqlᚋmodelᚐStageImportItemInput(ctx, vSlice[i])
+		if err != nil {
+			return nil, err
+		}
+	}
+	return res, nil
+}
+
+func (ec *executionContext) unmarshalNStageImportItemInput2ᚖgithubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋadaptersᚋgraphqlᚋmodelᚐStageImportItemInput(ctx context.Context, v any) (*model.StageImportItemInput, error) {
+	res, err := ec.unmarshalInputStageImportItemInput(ctx, v)
+	return &res, graphql.ErrorOnPath(ctx, err)
 }
 
 func (ec *executionContext) unmarshalNString2string(ctx context.Context, v any) (string, error) {

@@ -39,6 +39,8 @@ const cutShortDetail = "The import was cut short. Select it again to retry."
 type importContentCreator interface {
 	CreateFromYouTube(ctx context.Context, url string, userID int) (*domain.Content, error)
 	CreateFromMovie(ctx context.Context, rawURL string, userID int) (*domain.Content, error)
+	CreateFromWebPage(ctx context.Context, in portservices.CreateWebPageInput, userID int) (*domain.Content, error)
+	CreateFromWebsite(ctx context.Context, rawURL string, userID int) (*domain.Content, error)
 }
 
 // slotLimiter hands out a fixed number of slots to concurrent work.
@@ -776,6 +778,10 @@ func (s *ImportService) runImports(jobID, actorID int, items []*domain.ImportIte
 	ctx, cancel := context.WithTimeout(s.bg, s.batchTimeout)
 	defer cancel()
 
+	// Each page source's website is found or created once, before any worker
+	// starts, so concurrent workers never race to create it.
+	sites := s.resolveWebsites(ctx, jobID, actorID, items)
+
 	workers := workersFor(s.workers, len(items))
 	outcomes := make(chan itemOutcome, workers)
 	collected := make(chan struct{})
@@ -808,7 +814,7 @@ func (s *ImportService) runImports(jobID, actorID int, items []*domain.ImportIte
 				if err != nil {
 					return // ctx ended while waiting: the row stays queued, nothing is recorded
 				}
-				out, ok := s.importOne(ctx, actorID, it)
+				out, ok := s.importOne(ctx, actorID, it, sites)
 				release() // before the send, so a slow collector never holds a slot
 				if ok {
 					outcomes <- out
@@ -898,7 +904,7 @@ func importJobIDFrom(ctx context.Context) (int, bool) {
 
 // importOne imports one row and records its outcome; ok is false when it
 // was left queued because the import is shutting down or out of time.
-func (s *ImportService) importOne(ctx context.Context, actorID int, it *domain.ImportItem) (out itemOutcome, ok bool) {
+func (s *ImportService) importOne(ctx context.Context, actorID int, it *domain.ImportItem, sites *pageSites) (out itemOutcome, ok bool) {
 	if ctx.Err() != nil {
 		return itemOutcome{}, false // left queued; a shutdown leaves it for RecoverInterrupted, a timeout for failUnreached
 	}
@@ -912,6 +918,8 @@ func (s *ImportService) importOne(ctx context.Context, actorID int, it *domain.I
 		content, err = s.content.CreateFromYouTube(createCtx, it.CanonicalURL, actorID)
 	case domain.ContentTypeMovie:
 		content, err = s.content.CreateFromMovie(createCtx, it.CanonicalURL, actorID)
+	case domain.ContentTypeWebPage:
+		content, err = s.importWebPage(createCtx, actorID, it, sites)
 	default:
 		err = fmt.Errorf("%w: cannot import %s", domain.ErrInvalidInput, it.DestinationType)
 	}
@@ -979,6 +987,12 @@ func formatThousands(n int) string {
 // error text is never shown (it can carry URLs and keys).
 func importFailureDetail(err error) string {
 	switch {
+	case errors.Is(err, errPageDetails):
+		return "couldn't read the staged page details. Try again later."
+	case errors.Is(err, errWebsiteCreate):
+		return "couldn't create the website"
+	case errors.Is(err, domain.ErrInvalidInput):
+		return "this row was refused as invalid"
 	case errors.Is(err, domain.ErrContentNotAllowed):
 		return domain.ErrContentNotAllowed.Error()
 	case errors.Is(err, domain.ErrNotFound):

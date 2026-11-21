@@ -61,6 +61,28 @@ func (r *mutationResolver) CreateImportJob(ctx context.Context, input model.Crea
 	return importJobToModel(job), nil
 }
 
+// StageImportFromFile is the resolver for the stageImportFromFile field. Admin
+// only (enforced in the service); the whole file is validated before any row is saved.
+func (r *mutationResolver) StageImportFromFile(ctx context.Context, input model.StageImportFromFileInput) (*model.ImportJob, error) {
+	svc, err := r.imports()
+	if err != nil {
+		return nil, err
+	}
+	actor, err := auth.RequireAuth(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("access denied: authentication required")
+	}
+	in, err := modelToStageImportFileInput(input)
+	if err != nil {
+		return nil, importError(err)
+	}
+	job, err := svc.StageImportFromFile(ctx, actor, in)
+	if err != nil {
+		return nil, importError(err)
+	}
+	return importJobToModel(job), nil
+}
+
 // UpdateImportJobDescription is the resolver for the updateImportJobDescription
 // field. Only the requester may edit it; the service enforces that.
 func (r *mutationResolver) UpdateImportJobDescription(ctx context.Context, input model.UpdateImportJobDescriptionInput) (*model.ImportJob, error) {

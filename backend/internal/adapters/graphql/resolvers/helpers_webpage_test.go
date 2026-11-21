@@ -33,6 +33,26 @@ func TestWebPageInputMessage(t *testing.T) {
 			want: "invalid webpage URL: use an http or https link to a public page",
 		},
 		{
+			name: "a site root given as a page",
+			err:  fmt.Errorf("%w: %w", domain.ErrInvalidInput, domain.ErrWebPageIsWebsite),
+			want: "that link is a whole website: add it as a website, not a page",
+		},
+		{
+			name: "parent missing",
+			err:  fmt.Errorf("%w: %w", domain.ErrInvalidInput, domain.ErrParentNotFound),
+			want: "the website to file this page under does not exist",
+		},
+		{
+			name: "parent not a website",
+			err:  fmt.Errorf("%w: %w", domain.ErrInvalidInput, domain.ErrParentNotWebsite),
+			want: "the parent must be a website",
+		},
+		{
+			name: "parent on another host",
+			err:  fmt.Errorf("%w: %w", domain.ErrInvalidInput, domain.ErrParentOtherHost),
+			want: "the parent website is on a different host than this page",
+		},
+		{
 			name: "any other error is not an input error",
 			err:  fmt.Errorf("db down"),
 			want: "",

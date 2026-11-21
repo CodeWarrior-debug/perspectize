@@ -236,6 +236,10 @@ type Content {
   book: JSON
   "Webpage-specific metadata for the grid: siteName, domain, imageUrl, faviconUrl, publishedAt, author, webPageRoles (never null, [] when none); null for other content types."
   webPage: JSON
+  "The WEBSITE row this page is filed under; null when it is not filed under one."
+  parentContentID: Int
+  "The parent content row, batched per request; null when there is none or the viewer cannot read it."
+  parentContent: Content
   primaryCategory: Category
   # The import that created this row. Null for hand-added content, and when that
   # import is closed and the viewer isn't an admin.
@@ -326,6 +330,7 @@ enum ContentType {
   MOVIE
   BOOK
   WEB_PAGE
+  WEBSITE
 }
 
 # Text columns that ContentFilter.search can be scoped to.
@@ -367,6 +372,13 @@ input CreateContentFromWebPageInput {
   url: String!
   # Roles the adder picked. Omitted or [] saves a plain webpage. Never inferred from the page.
   webPageRoles: [WebPageRole!]
+  # File the page under this WEBSITE row (same host). Ignored when the page already exists.
+  parentContentID: IntID
+}
+
+input CreateContentFromWebsiteInput {
+  # Any http(s) URL on the site; the website is stored under its root (https://host/)
+  url: String!
 }
 
 # Outcome of reading a page's <head>. Shown in the Add dialog's import preview.
@@ -510,6 +522,8 @@ input ContentFilter {
   maxBookRating: Float
   # Webpage role filter (webpage rows only; other rows never match). Matches any of these roles (OR'd).
   webPageRoles: [WebPageRole!]
+  # Rows filed under this content (e.g. a website's pages)
+  parentContentID: IntID
   # View/like count filters
   minViewCount: Int
   maxViewCount: Int
@@ -657,6 +671,9 @@ enum ImportSourceType {
   YOUTUBE_CHANNEL
   # A TMDB person's filmography; rows become MOVIE content.
   TMDB_PERSON
+  # A file of candidates an admin supplies (stageImportFromFile); rows become
+  # WEB_PAGE content. Nothing is listed from an outside API.
+  CANDIDATE_FILE
 }
 
 enum ImportPersonRole {
@@ -745,11 +762,12 @@ type ImportItem {
   title: String!
   # Decision facts, shown as sheet columns named after the keys. Keys mean the
   # same thing for every content type; a missing key is unknown, never 0.
-  # kind ("VIDEO" | "SHORT" | "LIVE" | "MOVIE"), summary, publishedAt,
+  # kind ("VIDEO" | "SHORT" | "LIVE" | "MOVIE" | "PAGE"), summary, publishedAt,
   # durationSeconds, viewCount, likeCount (absent when the channel hides likes),
   # commentCount, rating (0-10), ratingCount, ratingSource (e.g. "TMDB"),
   # chapterCount, hasCaptions, genres, topCast (up to 3 top-billed),
-  # popularity (TMDB), reviewCount, revenue and budget (USD), thumbnailUrl.
+  # popularity (TMDB), reviewCount, revenue and budget (USD), thumbnailUrl,
+  # webPageRoles (e.g. ["BLOG_POST"]), wordCount.
   facts: JSON!
   # Marked "don't import" (by anyone, until the import is closed): can't be imported.
   excluded: Boolean!
@@ -885,6 +903,32 @@ type ImportItemsResult {
   excluded: Int!
 }
 
+# One row of a candidates file. facts and details are JSON objects with only the
+# keys of ImportItem.facts and the import item details; an unknown key refuses the file.
+input StageImportItemInput {
+  # At most 64 characters, unique in the file.
+  externalId: String!
+  # http or https; on websiteUrl's host when websiteUrl is set. A bare site root is refused.
+  url: String!
+  # At most 300 characters.
+  title: String!
+  # 0 = newest.
+  position: Int!
+  facts: JSON!
+  details: JSON
+}
+
+input StageImportFromFileInput {
+  # The import's name.
+  name: String!
+  # e.g. "Jordan's Journey".
+  sourceTitle: String
+  # Set: every row must be on this site and is filed under it. Null: standalone pages.
+  websiteUrl: String
+  # 1 to 5,000 rows.
+  items: [StageImportItemInput!]!
+}
+
 type Mutation {
   createContentFromYouTube(input: CreateContentFromYouTubeInput!): CreateContentResult! @auth
   updateContentSourceData(contentId: IntID!): Content! @auth
@@ -897,6 +941,7 @@ type Mutation {
 
   # Webpage mutations
   createContentFromWebPage(input: CreateContentFromWebPageInput!): CreateContentResult! @auth
+  createContentFromWebsite(input: CreateContentFromWebsiteInput!): CreateContentResult! @auth
 
   # Bible passage mutations
   createContentFromPassage(input: CreateContentFromPassageInput!): Content! @auth
@@ -967,6 +1012,9 @@ type Mutation {
   setImportItemsExcluded(input: SetImportItemsExcludedInput!): Int! @auth
   # Admin only: close (hide from non-admins, read-only) or reopen an import.
   closeImportJob(input: CloseImportJobInput!): ImportJob! @auth
+  # Admin only: stage a file of candidates as an approved import with one READY
+  # source. The whole file is checked first; one bad row refuses it, naming the row.
+  stageImportFromFile(input: StageImportFromFileInput!): ImportJob! @auth
   # Queues the picked rows and imports them in the background as the caller.
   importItems(input: ImportItemsInput!): ImportItemsResult! @auth
 }

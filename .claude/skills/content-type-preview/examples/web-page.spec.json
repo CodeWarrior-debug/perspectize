@@ -13,9 +13,9 @@
       "docs/superpowers/specs/2026-11-11-web-page-content-type-design.md",
       "frontend/src/lib/components/ActivityTable.svelte (Category column)",
       "backend/schema.graphql (Content.primaryCategory, setPrimaryCategory)",
-      "docs/superpowers/specs/2026-11-11-web-page-content-type-design.md §9 (page types)"
+      "docs/superpowers/specs/2026-11-11-web-page-content-type-design.md §9 (roles)"
     ],
-    "note": "Proposed lightweight type; nothing is built. Six default columns on purpose: the type exists mainly to save related links, so the grid stays narrow. Category is the existing Wikidata category column, which already works on every content type. Page titles, sites and dates are real public pages but were not fetched by the metadata reader (it does not exist yet); categories and the 'Added' dates are illustrative. Thumbnails are not inlined (artifacts block remote images), so every row shows the type glyph where the app would show the page's og:image or favicon. Page types (blog post first, spec section 9) are not a default column: they show as a Type tile in the details view, as pills and an Author column in the column picker, and as a Page type filter when the type filter is Web page only. Row 6 is an invented blog post on a .example domain, so no real site is claimed to publish BlogPosting markup."
+    "note": "Proposed lightweight type; nothing is built. Six default columns on purpose: the type exists mainly to save related links, so the grid stays narrow. Category is the existing Wikidata category column, which already works on every content type. Page titles, sites and dates are real public pages but were not fetched by the metadata reader (it does not exist yet); categories and the 'Added' dates are illustrative. Thumbnails are not inlined (artifacts block remote images), so every row shows the type glyph where the app would show the page's og:image or favicon. Roles (blog post first, spec section 9) are not a default column: they show as a Type tile in the details view, as pills and an Author column in the column picker, and as a Role filter when the type filter is Web page only. Row 6 is an invented blog post on a .example domain, so no real site is claimed to publish BlogPosting markup."
   },
   "columns": [
     {
@@ -147,7 +147,7 @@
             "k": "Type",
             "v": "Web page",
             "status": "proposed",
-            "tip": "response.pageTypes is empty: a plain web page. Missing is not a guess."
+            "tip": "response.webPageRoles is empty: a plain web page. Missing is not a guess."
           },
           {
             "k": "Site",
@@ -223,7 +223,7 @@
             "k": "Type",
             "v": "Web page",
             "status": "proposed",
-            "tip": "response.pageTypes is empty: a plain web page. Missing is not a guess."
+            "tip": "response.webPageRoles is empty: a plain web page. Missing is not a guess."
           },
           {
             "k": "Site",
@@ -307,7 +307,7 @@
             "k": "Type",
             "v": "Web page",
             "status": "proposed",
-            "tip": "response.pageTypes is empty: a plain web page. Missing is not a guess."
+            "tip": "response.webPageRoles is empty: a plain web page. Missing is not a guess."
           },
           {
             "k": "Site",
@@ -378,7 +378,7 @@
             "k": "Type",
             "v": "Web page",
             "status": "proposed",
-            "tip": "response.pageTypes is empty: a plain web page. Missing is not a guess."
+            "tip": "response.webPageRoles is empty: a plain web page. Missing is not a guess."
           },
           {
             "k": "Site",
@@ -456,7 +456,7 @@
             "k": "Type",
             "v": "Web page",
             "status": "proposed",
-            "tip": "response.pageTypes is empty: a plain web page. Missing is not a guess."
+            "tip": "response.webPageRoles is empty: a plain web page. Missing is not a guess."
           },
           {
             "k": "Site",
@@ -533,7 +533,7 @@
             "k": "Type",
             "v": "Blog post",
             "status": "proposed",
-            "tip": "response.pageTypes = [BLOG_POST], detected from a JSON-LD BlogPosting block in <head> (schema.org/BlogPosting). The adder can tick or untick it in the Add dialog."
+            "tip": "response.webPageRoles = [BLOG_POST], detected from a JSON-LD BlogPosting block in <head> (schema.org/BlogPosting). The adder can tick or untick it in the Add dialog."
           },
           {
             "k": "Site",
