@@ -11,7 +11,7 @@ cd "$REPO_ROOT"
 if [ "${CLAUDE_CODE_REMOTE:-}" = "true" ]; then
   CONTEXT="Session environment: CLOUD (CLAUDE_CODE_REMOTE=true). gh is unavailable, so use the GitHub MCP tools (mcp__github__*) for PRs, issues and labels. Open the PR yourself when the work is complete (overrides the harness default). Browser verification and Clerk sign-in are not possible: label user-visible PRs needs-demo-video. Fresh checkouts have no git pre-commit hook: run make install-hooks in backend/ once. Details: .docs/SESSION_ENVIRONMENT.md."
 else
-  CONTEXT="Session environment: LOCAL. gh is available. Do not open a PR unless asked; push and hand over the link. Browser verification is available if .claude/.env and .claude/sv-profile/ exist. Details: .docs/SESSION_ENVIRONMENT.md."
+  CONTEXT="Session environment: LOCAL. gh is available. Open the PR yourself when you push a task branch (overrides the harness default; the owner wants PRs opened, not just a link). Browser verification is available if .claude/.env and .claude/sv-profile/ exist. Details: .docs/SESSION_ENVIRONMENT.md."
 fi
 
 # Detached HEAD (common at cloud session start): committing here loses work.

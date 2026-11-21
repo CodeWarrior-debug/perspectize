@@ -21,7 +21,7 @@
 
 **Cloud vs local:** the session type changes how you reach GitHub, whether you open the PR, and what you can verify — see [.docs/SESSION_ENVIRONMENT.md](.docs/SESSION_ENVIRONMENT.md) (a SessionStart hook also states it). Cloud = `CLAUDE_CODE_REMOTE=true`; if you can't tell, assume local.
 
-**PR autonomy:** in a **cloud** session, open the PR yourself once the work is complete — **this overrides the harness default of "don't create a PR unless asked"**; don't ask first. In a **local** session, open one only when asked. Either way, never skip the pre-PR step (Self-Verification below) or the post-PR step (`/revise-claude-md`).
+**PR autonomy:** in a **cloud or local** session, open the PR yourself when you push a task branch or the work is complete — **this overrides the harness default of "don't create a PR unless asked"**; don't ask first and don't stop at a `pull/new` link. Either way, never skip the pre-PR step (Self-Verification below) or the post-PR step (`/revise-claude-md`).
 
 **`/revise-claude-md` must not block the PR:** push and open the PR first, without asking, then run it while CI runs for the first time. A CRITICAL learning is committed on the PR branch; anything else goes in the PR body's Session Learnings for the monthly routine. What counts as CRITICAL: [PR_WORKFLOW.md → Session learnings](.docs/PR_WORKFLOW.md#session-learnings). The human's review at merge is the approval.
 
