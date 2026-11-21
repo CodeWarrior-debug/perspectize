@@ -283,15 +283,40 @@ func domainToModel(c *domain.Content) *model.Content {
 				m.Description = &item.Snippet.Description
 			}
 
-			// Extract statistics — empty strings from YouTube API default to 0
-			stats := item.Statistics
-			m.ViewCount = parseStatCount(stats.ViewCount, "viewCount", c.ID)
-			m.LikeCount = parseStatCount(stats.LikeCount, "likeCount", c.ID)
-			m.CommentCount = parseStatCount(stats.CommentCount, "commentCount", c.ID)
+			// Past the retention window (or already cleared) the counts stay
+			// null so a missing number never reads as 0; the response the
+			// client also receives loses its statistics too.
+			if isYouTubeContent(c.ContentType) &&
+				domain.YouTubeStatisticsExpired(c.Response, c.CreatedAt, time.Now(), domain.SourceDataMaxAge()) {
+				m.SourceDataExpired = true
+				stripExpiredStatistics(m.Response)
+			} else {
+				// Extract statistics — empty strings from YouTube API default to 0
+				stats := item.Statistics
+				m.ViewCount = parseStatCount(stats.ViewCount, "viewCount", c.ID)
+				m.LikeCount = parseStatCount(stats.LikeCount, "likeCount", c.ID)
+				m.CommentCount = parseStatCount(stats.CommentCount, "commentCount", c.ID)
+			}
 		}
 	}
 
 	return m
+}
+
+func isYouTubeContent(t domain.ContentType) bool {
+	return t == domain.ContentTypeYouTubeVideo || t == ""
+}
+
+// stripExpiredStatistics removes items[0].statistics from the response map the
+// client receives.
+func stripExpiredStatistics(response map[string]interface{}) {
+	items, ok := response["items"].([]interface{})
+	if !ok || len(items) == 0 {
+		return
+	}
+	if first, ok := items[0].(map[string]interface{}); ok {
+		delete(first, "statistics")
+	}
 }
 
 // parseStatCount parses a YouTube statistics string to *int.

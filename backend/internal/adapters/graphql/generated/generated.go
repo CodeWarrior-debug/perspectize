@@ -117,6 +117,7 @@ type ComplexityRoot struct {
 		PublishedAt             func(childComplexity int) int
 		QualityRatingCount      func(childComplexity int) int
 		Response                func(childComplexity int) int
+		SourceDataExpired       func(childComplexity int) int
 		Tags                    func(childComplexity int) int
 		URL                     func(childComplexity int) int
 		UpdatedAt               func(childComplexity int) int
@@ -389,6 +390,7 @@ type ComplexityRoot struct {
 		MarkOnboardingSeen              func(childComplexity int, version int) int
 		MarkThreadRead                  func(childComplexity int, threadID string, seq int) int
 		MuteThread                      func(childComplexity int, threadID string, muted bool) int
+		PurgeSourceData                 func(childComplexity int, target domain.SourceDataTarget, olderThanDays int) int
 		RemovePrimaryCategory           func(childComplexity int, contentID int) int
 		ReorderUserTodoList             func(childComplexity int, listID int, todoIds []int) int
 		ReviewImportJob                 func(childComplexity int, input model.ReviewImportJobInput) int
@@ -688,6 +690,7 @@ type MessageThreadResolver interface {
 type MutationResolver interface {
 	CreateContentFromYouTube(ctx context.Context, input model.CreateContentFromYouTubeInput) (*model.CreateContentResult, error)
 	UpdateContentSourceData(ctx context.Context, contentID int) (*model.Content, error)
+	PurgeSourceData(ctx context.Context, target domain.SourceDataTarget, olderThanDays int) (int, error)
 	CreateContentFromMovie(ctx context.Context, input model.CreateContentFromMovieInput) (*model.Content, error)
 	CreateContentFromBook(ctx context.Context, input model.CreateContentFromBookInput) (*model.Content, error)
 	CreateContentFromWebPage(ctx context.Context, input model.CreateContentFromWebPageInput) (*model.CreateContentResult, error)
@@ -1139,6 +1142,12 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.Content.Response(childComplexity), true
+	case "Content.sourceDataExpired":
+		if e.ComplexityRoot.Content.SourceDataExpired == nil {
+			break
+		}
+
+		return e.ComplexityRoot.Content.SourceDataExpired(childComplexity), true
 	case "Content.tags":
 		if e.ComplexityRoot.Content.Tags == nil {
 			break
@@ -2423,6 +2432,17 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.Mutation.MuteThread(childComplexity, args["threadId"].(string), args["muted"].(bool)), true
+	case "Mutation.purgeSourceData":
+		if e.ComplexityRoot.Mutation.PurgeSourceData == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_purgeSourceData_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.ComplexityRoot.Mutation.PurgeSourceData(childComplexity, args["target"].(domain.SourceDataTarget), args["olderThanDays"].(int)), true
 	case "Mutation.removePrimaryCategory":
 		if e.ComplexityRoot.Mutation.RemovePrimaryCategory == nil {
 			break
@@ -3935,6 +3955,12 @@ type User {
   updatedAt: String!
 }
 
+# Kinds of stored source-API data a purge can clear.
+enum SourceDataTarget {
+  # View, like and comment counts stored for YouTube videos.
+  YOUTUBE_STATISTICS
+}
+
 # Perspective enums
 enum Privacy {
   PUBLIC
@@ -4135,6 +4161,8 @@ type Content {
   tags: [String!]
   description: String
   response: JSON
+  "True when this row's source numbers (views, likes, comments) are past the retention window or were cleared. They read as null, never 0; refreshing the source data brings them back."
+  sourceDataExpired: Boolean!
   "Movie-specific metadata (the shaped TMDB payload); null for other content types."
   movie: JSON
   "Book-specific metadata (the shaped Open Library payload); null for other content types."
@@ -4793,6 +4821,10 @@ type ImportItemsResult {
 type Mutation {
   createContentFromYouTube(input: CreateContentFromYouTubeInput!): CreateContentResult! @auth
   updateContentSourceData(contentId: IntID!): Content! @auth
+  # Admin only. Deletes stored source counts of the given kind that were fetched
+  # more than olderThanDays days ago (at least 1), keeping the rows themselves.
+  # Returns how many rows were cleared. The scheduled sweep runs the same code.
+  purgeSourceData(target: SourceDataTarget!, olderThanDays: Int!): Int! @auth
 
   # Movie mutations
   createContentFromMovie(input: CreateContentFromMovieInput!): Content! @auth
@@ -5396,6 +5428,8 @@ func (ec *executionContext) childFields_Content(ctx context.Context, field graph
 		return ec.fieldContext_Content_description(ctx, field)
 	case "response":
 		return ec.fieldContext_Content_response(ctx, field)
+	case "sourceDataExpired":
+		return ec.fieldContext_Content_sourceDataExpired(ctx, field)
 	case "movie":
 		return ec.fieldContext_Content_movie(ctx, field)
 	case "book":
@@ -6791,6 +6825,28 @@ func (ec *executionContext) field_Mutation_muteThread_args(ctx context.Context, 
 		return nil, err
 	}
 	args["muted"] = arg1
+	return args, nil
+}
+
+func (ec *executionContext) field_Mutation_purgeSourceData_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "target",
+		func(ctx context.Context, v any) (domain.SourceDataTarget, error) {
+			return ec.unmarshalNSourceDataTarget2githubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋcoreᚋdomainᚐSourceDataTarget(ctx, v)
+		})
+	if err != nil {
+		return nil, err
+	}
+	args["target"] = arg0
+	arg1, err := graphql.ProcessArgField(ctx, rawArgs, "olderThanDays",
+		func(ctx context.Context, v any) (int, error) {
+			return ec.unmarshalNInt2int(ctx, v)
+		})
+	if err != nil {
+		return nil, err
+	}
+	args["olderThanDays"] = arg1
 	return args, nil
 }
 
@@ -8937,6 +8993,29 @@ func (ec *executionContext) _Content_response(ctx context.Context, field graphql
 }
 func (ec *executionContext) fieldContext_Content_response(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	return graphql.NewScalarFieldContext("Content", field, false, false, "JSON")
+}
+
+func (ec *executionContext) _Content_sourceDataExpired(ctx context.Context, field graphql.CollectedField, obj *model.Content) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_Content_sourceDataExpired(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.SourceDataExpired, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v bool) graphql.Marshaler {
+			return ec.marshalNBoolean2bool(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_Content_sourceDataExpired(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("Content", field, false, false, "Boolean")
 }
 
 func (ec *executionContext) _Content_movie(ctx context.Context, field graphql.CollectedField, obj *model.Content) (ret graphql.Marshaler) {
@@ -12990,6 +13069,63 @@ func (ec *executionContext) fieldContext_Mutation_updateContentSourceData(ctx co
 	}()
 	ctx = graphql.WithFieldContext(ctx, fc)
 	if fc.Args, err = ec.field_Mutation_updateContentSourceData_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Mutation_purgeSourceData(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_Mutation_purgeSourceData(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.Resolvers.Mutation().PurgeSourceData(ctx, fc.Args["target"].(domain.SourceDataTarget), fc.Args["olderThanDays"].(int))
+		},
+		func(ctx context.Context, next graphql.Resolver) graphql.Resolver {
+			directive0 := next
+
+			directive1 := func(ctx context.Context) (any, error) {
+				if ec.Directives.Auth == nil {
+					var zeroVal int
+					return zeroVal, errors.New("directive auth is not implemented")
+				}
+				return ec.Directives.Auth(ctx, nil, directive0)
+			}
+
+			next = directive1
+			return next
+		},
+		func(ctx context.Context, selections ast.SelectionSet, v int) graphql.Marshaler {
+			return ec.marshalNInt2int(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_Mutation_purgeSourceData(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Int does not have child fields")
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Mutation_purgeSourceData_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
 		ec.Error(ctx, err)
 		return fc, err
 	}
@@ -24345,6 +24481,11 @@ func (ec *executionContext) _Content(ctx context.Context, sel ast.SelectionSet, 
 			if out.Values[i] == graphql.RequiredNull {
 				atomic.AddUint32(&out.Invalids, 1)
 			}
+		case "sourceDataExpired":
+			out.Values[i] = ec._Content_sourceDataExpired(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				atomic.AddUint32(&out.Invalids, 1)
+			}
 		case "movie":
 			out.Values[i] = ec._Content_movie(ctx, field, obj)
 			if out.Values[i] == graphql.RequiredNull {
@@ -26011,6 +26152,13 @@ func (ec *executionContext) _Mutation(ctx context.Context, sel ast.SelectionSet)
 		case "updateContentSourceData":
 			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
 				return ec._Mutation_updateContentSourceData(ctx, field)
+			})
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "purgeSourceData":
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_purgeSourceData(ctx, field)
 			})
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
@@ -29242,6 +29390,21 @@ func (ec *executionContext) marshalNSortOrder2githubᚗcomᚋCodeWarriorᚑdebug
 	res := graphql.MarshalString(string(v))
 	if res == graphql.Null {
 		graphql.AddInvalidNullFromMarshaler(ctx, "SortOrder!")
+	}
+	return res
+}
+
+func (ec *executionContext) unmarshalNSourceDataTarget2githubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋcoreᚋdomainᚐSourceDataTarget(ctx context.Context, v any) (domain.SourceDataTarget, error) {
+	tmp, err := graphql.UnmarshalString(v)
+	res := domain.SourceDataTarget(tmp)
+	return res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) marshalNSourceDataTarget2githubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋcoreᚋdomainᚐSourceDataTarget(ctx context.Context, sel ast.SelectionSet, v domain.SourceDataTarget) graphql.Marshaler {
+	_ = sel
+	res := graphql.MarshalString(string(v))
+	if res == graphql.Null {
+		graphql.AddInvalidNullFromMarshaler(ctx, "SourceDataTarget!")
 	}
 	return res
 }

@@ -30,6 +30,12 @@ type User {
   updatedAt: String!
 }
 
+# Kinds of stored source-API data a purge can clear.
+enum SourceDataTarget {
+  # View, like and comment counts stored for YouTube videos.
+  YOUTUBE_STATISTICS
+}
+
 # Perspective enums
 enum Privacy {
   PUBLIC
@@ -230,6 +236,8 @@ type Content {
   tags: [String!]
   description: String
   response: JSON
+  "True when this row's source numbers (views, likes, comments) are past the retention window or were cleared. They read as null, never 0; refreshing the source data brings them back."
+  sourceDataExpired: Boolean!
   "Movie-specific metadata (the shaped TMDB payload); null for other content types."
   movie: JSON
   "Book-specific metadata (the shaped Open Library payload); null for other content types."
@@ -888,6 +896,10 @@ type ImportItemsResult {
 type Mutation {
   createContentFromYouTube(input: CreateContentFromYouTubeInput!): CreateContentResult! @auth
   updateContentSourceData(contentId: IntID!): Content! @auth
+  # Admin only. Deletes stored source counts of the given kind that were fetched
+  # more than olderThanDays days ago (at least 1), keeping the rows themselves.
+  # Returns how many rows were cleared. The scheduled sweep runs the same code.
+  purgeSourceData(target: SourceDataTarget!, olderThanDays: Int!): Int! @auth
 
   # Movie mutations
   createContentFromMovie(input: CreateContentFromMovieInput!): Content! @auth

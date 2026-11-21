@@ -62,6 +62,9 @@ models:
   Privacy:
     model:
       - github.com/CodeWarrior-debug/perspectize/backend/internal/core/domain.Privacy
+  SourceDataTarget:
+    model:
+      - github.com/CodeWarrior-debug/perspectize/backend/internal/core/domain.SourceDataTarget
   ContentType:
     model:
       - github.com/CodeWarrior-debug/perspectize/backend/internal/core/domain.ContentType

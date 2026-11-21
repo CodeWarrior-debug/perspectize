@@ -27,6 +27,8 @@ type Resolver struct {
 	// ImportService is set after NewResolver by cmd/server (nil in tests that
 	// don't exercise imports; the import resolvers then report "not configured").
 	ImportService portservices.ImportService
+	// SourceData backs purgeSourceData; set after NewResolver by cmd/server.
+	SourceData portservices.SourceDataPurger
 
 	// Messaging feature dependencies.
 	Messaging portservices.MessagingService

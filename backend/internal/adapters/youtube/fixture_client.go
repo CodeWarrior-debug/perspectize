@@ -4,7 +4,9 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"time"
 
+	"github.com/CodeWarrior-debug/perspectize/backend/internal/core/domain"
 	"github.com/CodeWarrior-debug/perspectize/backend/internal/core/ports/services"
 	"github.com/CodeWarrior-debug/perspectize/backend/internal/demo"
 )
@@ -77,6 +79,6 @@ func FixtureMetadata(v demo.Video) (*services.VideoMetadata, error) {
 		Description: v.Description,
 		Duration:    v.Seconds,
 		ChannelName: v.ChannelTitle,
-		Response:    raw,
+		Response:    domain.StampSourceDataFetchedAt(raw, time.Now()),
 	}, nil
 }

@@ -279,29 +279,29 @@ func TestContentByID_NoStatisticsInResponse(t *testing.T) {
 	server := setupTestServer(repo, &mockYouTubeClient{})
 	defer server.Close()
 
-	result := executeGraphQL(t, server, `{ contentByID(id: "1") { id name viewCount likeCount commentCount } }`)
+	result := executeGraphQL(t, server, `{ contentByID(id: "1") { id name viewCount likeCount commentCount sourceDataExpired } }`)
 
 	assert.Empty(t, result.Errors)
 
 	var data struct {
 		ContentByID struct {
-			ID           string `json:"id"`
-			Name         string `json:"name"`
-			ViewCount    *int   `json:"viewCount"`
-			LikeCount    *int   `json:"likeCount"`
-			CommentCount *int   `json:"commentCount"`
+			ID                string `json:"id"`
+			Name              string `json:"name"`
+			ViewCount         *int   `json:"viewCount"`
+			LikeCount         *int   `json:"likeCount"`
+			CommentCount      *int   `json:"commentCount"`
+			SourceDataExpired bool   `json:"sourceDataExpired"`
 		} `json:"contentByID"`
 	}
 	err := json.Unmarshal(result.Data, &data)
 	require.NoError(t, err)
 
-	// Empty stat strings default to 0
-	require.NotNil(t, data.ContentByID.ViewCount)
-	assert.Equal(t, 0, *data.ContentByID.ViewCount)
-	require.NotNil(t, data.ContentByID.LikeCount)
-	assert.Equal(t, 0, *data.ContentByID.LikeCount)
-	require.NotNil(t, data.ContentByID.CommentCount)
-	assert.Equal(t, 0, *data.ContentByID.CommentCount)
+	// Counts that are missing (cleared, or never fetched) read as null and are
+	// flagged expired; a missing number must never display as 0.
+	assert.Nil(t, data.ContentByID.ViewCount)
+	assert.Nil(t, data.ContentByID.LikeCount)
+	assert.Nil(t, data.ContentByID.CommentCount)
+	assert.True(t, data.ContentByID.SourceDataExpired)
 }
 
 func TestContentByID_EmptyStatisticStrings(t *testing.T) {

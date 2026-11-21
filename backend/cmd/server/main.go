@@ -319,6 +319,17 @@ func main() {
 			"interval_minutes", cfg.MessageRetentionSweepMinutes)
 	}
 
+	// Source-data retention: the window applies to every read; the scheduled
+	// sweep that deletes expired counts is opt-in (SOURCE_DATA_SWEEP_HOURS > 0).
+	domain.SetSourceDataMaxAgeDays(cfg.SourceDataMaxAgeDays)
+	sourceDataRetention := services.NewSourceDataRetention(db)
+	if cfg.SourceDataSweepHours > 0 {
+		go sourceDataRetention.Run(listenerCtx, cfg.SourceDataMaxAgeDays,
+			time.Duration(cfg.SourceDataSweepHours)*time.Hour)
+		slog.Info("source data sweep enabled",
+			"max_age_days", cfg.SourceDataMaxAgeDays, "interval_hours", cfg.SourceDataSweepHours)
+	}
+
 	// Shared Clerk token verifier — reused by HTTP middleware and the
 	// WebSocket InitFunc so both transports resolve identities identically.
 	var tokenVerifier portservices.TokenVerifier = auth.NewClerkTokenVerifier()
@@ -335,6 +346,7 @@ func main() {
 		UserTodoService:     userTodoService,
 		MessagingService:    messagingService,
 		ImportService:       importService,
+		SourceData:          sourceDataRetention,
 		UserRepo:            userRepo,
 		ThreadRepo:          threadRepo,
 		Hub:                 hub,

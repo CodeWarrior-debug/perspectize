@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"time"
 
 	"github.com/CodeWarrior-debug/perspectize/backend/internal/core/domain"
 	"github.com/CodeWarrior-debug/perspectize/backend/internal/core/ports/services"
@@ -146,7 +147,7 @@ func (c *Client) GetVideoMetadata(ctx context.Context, videoID string) (*service
 		Description: item.Snippet.Description,
 		Duration:    duration,
 		ChannelName: item.Snippet.ChannelTitle,
-		Response:    trimmed,
+		Response:    domain.StampSourceDataFetchedAt(trimmed, time.Now()),
 	}, nil
 }
 
