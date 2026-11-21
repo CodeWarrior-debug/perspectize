@@ -93,6 +93,7 @@ Full table: [../.docs/QUERY_BUDGET.md](../.docs/QUERY_BUDGET.md).
 - **Toasts:** svelte-sonner, configured once in `TOASTER_PROPS` (`lib/utils/toast.ts`, spread into both `<Toaster>`s in `+layout.svelte`): 2s default, `expand: true` so simultaneous toasts don't overlap. A toast with an action button uses `toastWithAction` (`ACTION_TOAST_DURATION_MS` = 4s); its `secondary` option adds a second choice.
 - **User-supplied HTML:** sanitize with `sanitizeHtml` (`lib/utils/sanitize.ts`, DOMPurify) and render through `SafeHtml.svelte`; the backend mirrors the same tag set with bluemonday (`services/sanitize.go`). Change both together. See [.docs/SECURITY.md](../.docs/SECURITY.md#user-supplied-html).
 - **Icons:** per-icon imports, `import XIcon from '@lucide/svelte/icons/x'` (kebab-case name). Buttons size icons `size-4`; override with an explicit `size-*`.
+- **Feelings picker data** is `lib/data/feelings.ts` (`FEEL_WHEEL`, `EXTENDED_FEELINGS`, `FAMILY_ORDER`); the TMDB mood comparison and keep/remove decisions are in [docs/feelings-tmdb-comparison.md](../docs/feelings-tmdb-comparison.md). themoviedb.org returns 403 to WebFetch and its Vibes emoji list isn't published, so ask the user for a screenshot rather than searching.
 
 ## Theme tokens and colour
 
