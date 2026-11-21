@@ -2,7 +2,7 @@
 	import { normalizeLinkUrl } from '#lib/utils/linkUrl.js';
 	import { createWritingShortcuts, typographyOptions } from '#lib/utils/writingShortcuts.js';
 	import { createSlashCommand, type SlashItem, type SlashMenuState } from '#lib/utils/slashCommand.js';
-	import { onMount, onDestroy } from 'svelte';
+	import { onMount, onDestroy, tick } from 'svelte';
 	import { Editor } from '@tiptap/core';
 	import StarterKit from '@tiptap/starter-kit';
 	import Underline from '@tiptap/extension-underline';
@@ -24,6 +24,10 @@
 	import ListIcon from '@lucide/svelte/icons/list';
 	import ListOrderedIcon from '@lucide/svelte/icons/list-ordered';
 	import LinkIcon from '@lucide/svelte/icons/link';
+	import UnlinkIcon from '@lucide/svelte/icons/unlink';
+	import CheckIcon from '@lucide/svelte/icons/check';
+	import ExternalLinkIcon from '@lucide/svelte/icons/external-link';
+	import PencilIcon from '@lucide/svelte/icons/pencil';
 	import ImageIcon from '@lucide/svelte/icons/image';
 	import TableIcon from '@lucide/svelte/icons/table';
 	import RowIcon from '@lucide/svelte/icons/rows-2';
@@ -69,6 +73,10 @@
 	let bubbleElement: HTMLDivElement;
 	let slashElement: HTMLDivElement;
 	let slash: SlashMenuState | null = $state(null);
+	// Inline link editor: lives in the selection toolbar instead of the browser's prompt().
+	let linkEditing = $state(false);
+	let linkText = $state('');
+	let linkInput: HTMLInputElement | undefined = $state();
 	let editor: Editor | null = $state(null);
 	// Bumped on every editor transaction so `items`/toolbar active-state
 	// recomputes; Tiptap's Editor instance isn't itself reactive to Svelte.
@@ -129,7 +137,7 @@
 		editor = new Editor({
 			element: editorElement,
 			extensions: [
-				createWritingShortcuts({ onLink: promptForLink }),
+				createWritingShortcuts({ onLink: openLinkEditor }),
 				createSlashCommand({
 					items: slashItems,
 					getMenuElement: () => slashElement,
@@ -163,7 +171,8 @@
 								element: bubbleElement,
 								appendTo: () => wrapperElement,
 								options: { strategy: 'absolute', placement: 'top', offset: 8, flip: true, shift: { padding: 8 } },
-								shouldShow: ({ editor: e, from, to }) => e.isFocused && from !== to && !e.isActive('image'),
+								shouldShow: ({ editor: e, from, to }) =>
+									linkEditing || (e.isFocused && !e.isActive('image') && (from !== to || e.isActive('link'))),
 							}),
 						]),
 				Typography.configure(typographyOptions),
@@ -223,6 +232,62 @@
 		};
 	}
 
+	// Words selected (or the caret inside a link) open the inline editor next to the text; with nothing selected, or on
+	// a phone where the selection toolbar is absent, fall back to the browser prompt.
+	function openLinkEditor() {
+		if (!editor) return;
+		if (editor.isActive('link')) editor.chain().focus().extendMarkRange('link').run();
+		if (isMobile || editor.state.selection.empty) {
+			promptForLink();
+			return;
+		}
+		linkText = (editor.getAttributes('link').href as string | undefined) ?? 'https://';
+		linkEditing = true;
+		void tick().then(() => {
+			linkInput?.focus();
+			linkInput?.select();
+		});
+	}
+
+	function closeLinkEditor() {
+		linkEditing = false;
+		editor?.commands.focus();
+	}
+
+	function applyLinkText() {
+		if (!editor) return;
+		const href = normalizeLinkUrl(linkText);
+		linkEditing = false;
+		if (href === '') editor.chain().focus().extendMarkRange('link').unsetLink().run();
+		else editor.chain().focus().extendMarkRange('link').setLink({ href }).run();
+	}
+
+	function removeLink() {
+		if (!editor) return;
+		linkEditing = false;
+		editor.chain().focus().extendMarkRange('link').unsetLink().run();
+	}
+
+	function onLinkInputKeydown(e: KeyboardEvent) {
+		if (e.isComposing) return;
+		// Keep Enter and Escape from reaching the perspective form and the dialog: Enter would save the
+		// perspective, Escape would close it.
+		if (e.key === 'Enter') {
+			e.preventDefault();
+			e.stopPropagation();
+			applyLinkText();
+		} else if (e.key === 'Escape') {
+			e.preventDefault();
+			e.stopPropagation();
+			closeLinkEditor();
+		}
+	}
+
+	function onLinkInputBlur(e: FocusEvent) {
+		// Clicking Apply or Remove keeps focus in the input (mousedown is prevented), so a blur is a real exit.
+		if (!bubbleElement?.contains(e.relatedTarget as Node | null)) linkEditing = false;
+	}
+
 	function promptForLink() {
 		if (!editor) return;
 		const previousUrl = editor.getAttributes('link').href as string | undefined;
@@ -231,6 +296,15 @@
 		const href = normalizeLinkUrl(url);
 		if (href === '') {
 			editor.chain().focus().extendMarkRange('link').unsetLink().run();
+			return;
+		}
+		if (editor.state.selection.empty && !editor.isActive('link')) {
+			// Nothing selected: a link needs text, so the address itself becomes the link text.
+			editor
+				.chain()
+				.focus()
+				.insertContent({ type: 'text', text: href, marks: [{ type: 'link', attrs: { href } }] })
+				.run();
 			return;
 		}
 		editor.chain().focus().extendMarkRange('link').setLink({ href }).run();
@@ -350,6 +424,27 @@
 				]
 			: [],
 	);
+
+	// What the floating toolbar shows: link editor, link card (caret inside a link), or the format buttons.
+	const bubbleMode = $derived.by<'edit' | 'card' | 'format'>(() => {
+		void updateTick;
+		if (linkEditing) return 'edit';
+		if (editor && editor.state.selection.empty && editor.isActive('link')) return 'card';
+		return 'format';
+	});
+	const linkHref = $derived.by(() => {
+		void updateTick;
+		return (editor?.getAttributes('link').href as string | undefined) ?? '';
+	});
+	const linkOpenable = $derived(/^(https?:|mailto:)/i.test(linkHref));
+
+	// The toolbar changes width with its mode; ask Tiptap to re-centre it once Svelte has rendered the new content.
+	$effect(() => {
+		void bubbleMode;
+		void tick().then(() => {
+			if (editor && !editor.isDestroyed) editor.view.dispatch(editor.state.tr.setMeta('bubbleMenu', 'updatePosition'));
+		});
+	});
 
 	const BUBBLE_IDS = ['bold', 'italic', 'underline', 'link'];
 	const bubbleItems = $derived(items.filter((i) => BUBBLE_IDS.includes(i.id)));
@@ -495,19 +590,87 @@
 			aria-label="Format selection"
 			style="visibility: hidden"
 		>
-			{#each bubbleItems as item (item.id)}
+			{#if bubbleMode === 'edit'}
+				<input
+					bind:this={linkInput}
+					bind:value={linkText}
+					class="bubble-input"
+					type="text"
+					inputmode="url"
+					autocomplete="off"
+					spellcheck="false"
+					aria-label="Link URL"
+					placeholder="Paste or type a link"
+					onkeydown={onLinkInputKeydown}
+					onblur={onLinkInputBlur}
+				/>
 				<button
 					type="button"
 					class="tool-btn"
-					class:active={item.isActive()}
+					aria-label="Apply link"
 					onmousedown={(e) => e.preventDefault()}
-					onclick={toolAction(item.run)}
-					aria-label={`${item.label} (selection)`}
-					aria-pressed={item.toggle ? item.isActive() : undefined}
+					onclick={applyLinkText}
 				>
-					<item.icon size={14} />
+					<CheckIcon size={14} />
 				</button>
-			{/each}
+				{#if linkHref}
+					<button
+						type="button"
+						class="tool-btn"
+						aria-label="Remove link"
+						onmousedown={(e) => e.preventDefault()}
+						onclick={removeLink}
+					>
+						<UnlinkIcon size={14} />
+					</button>
+				{/if}
+			{:else if bubbleMode === 'card'}
+				<span class="bubble-url" title={linkHref}>{linkHref}</span>
+				{#if linkOpenable}
+					<a
+						class="tool-btn"
+						href={linkHref}
+						target="_blank"
+						rel="noopener noreferrer"
+						aria-label="Open link in a new tab"
+						onmousedown={(e) => e.preventDefault()}
+					>
+						<ExternalLinkIcon size={14} />
+					</a>
+				{/if}
+				<button
+					type="button"
+					class="tool-btn"
+					aria-label="Edit link"
+					onmousedown={(e) => e.preventDefault()}
+					onclick={openLinkEditor}
+				>
+					<PencilIcon size={14} />
+				</button>
+				<button
+					type="button"
+					class="tool-btn"
+					aria-label="Remove link"
+					onmousedown={(e) => e.preventDefault()}
+					onclick={removeLink}
+				>
+					<UnlinkIcon size={14} />
+				</button>
+			{:else}
+				{#each bubbleItems as item (item.id)}
+					<button
+						type="button"
+						class="tool-btn"
+						class:active={item.isActive()}
+						onmousedown={(e) => e.preventDefault()}
+						onclick={toolAction(item.run)}
+						aria-label={`${item.label} (selection)`}
+						aria-pressed={item.toggle ? item.isActive() : undefined}
+					>
+						<item.icon size={14} />
+					</button>
+				{/each}
+			{/if}
 		</div>
 	{/if}
 
@@ -542,6 +705,27 @@
 	.tool-btn.active {
 		background: color-mix(in srgb, var(--color-foreground) 16%, transparent);
 		color: var(--color-foreground);
+	}
+
+	.bubble-input {
+		width: 15rem;
+		height: 22px;
+		padding: 0 6px;
+		border: 1px solid var(--color-border);
+		border-radius: 4px;
+		background: var(--color-background);
+		color: var(--color-foreground);
+		font-size: 12px;
+	}
+	.bubble-url {
+		align-self: center;
+		max-width: 14rem;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+		padding: 0 6px;
+		font-size: 12px;
+		color: var(--color-muted-foreground);
 	}
 
 	.slash-menu {
