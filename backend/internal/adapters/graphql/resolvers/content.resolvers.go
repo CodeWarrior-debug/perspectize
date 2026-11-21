@@ -294,7 +294,7 @@ func (r *mutationResolver) CreateContentFromWebPage(ctx context.Context, input m
 		return nil, fmt.Errorf("access denied: authentication required")
 	}
 
-	content, err := r.ContentService.CreateFromWebPage(ctx, input.URL, input.WebPageRoles, authUser.ID)
+	content, err := r.ContentService.CreateFromWebPage(ctx, portservices.CreateWebPageInput{URL: input.URL, Roles: input.WebPageRoles}, authUser.ID)
 	if errors.Is(err, domain.ErrAlreadyExists) && content != nil {
 		return &model.CreateContentResult{Content: domainToModel(content), AlreadyExisted: true}, nil
 	}

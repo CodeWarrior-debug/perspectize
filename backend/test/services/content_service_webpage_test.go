@@ -11,6 +11,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/CodeWarrior-debug/perspectize/backend/internal/core/domain"
+	portservices "github.com/CodeWarrior-debug/perspectize/backend/internal/core/ports/services"
 	"github.com/CodeWarrior-debug/perspectize/backend/internal/core/services"
 )
 
@@ -80,7 +81,7 @@ func TestCreateFromWebPage_HappyPathStoresTitleCanonicalURLAndMeta(t *testing.T)
 	}
 
 	svc := newWebPageService(repo, client)
-	got, err := svc.CreateFromWebPage(context.Background(), "https://www.arxiv.org/abs/1706.03762?utm_source=x", nil, 7)
+	got, err := svc.CreateFromWebPage(context.Background(), portservices.CreateWebPageInput{URL: "https://www.arxiv.org/abs/1706.03762?utm_source=x"}, 7)
 	require.NoError(t, err)
 	// Query budget: one dedupe lookup and one upsert, nothing repeated.
 	assert.Equal(t, 1, lookups)
@@ -111,7 +112,7 @@ func TestCreateFromWebPage_BlockedFetchStillCreatesRowWithHostPathName(t *testin
 	}}
 	repo := &mockContentRepository{}
 
-	got, err := newWebPageService(repo, client).CreateFromWebPage(context.Background(), "https://example.com/private/post", nil, 1)
+	got, err := newWebPageService(repo, client).CreateFromWebPage(context.Background(), portservices.CreateWebPageInput{URL: "https://example.com/private/post"}, 1)
 	require.NoError(t, err)
 
 	assert.Equal(t, "example.com/private/post", got.Name, "no title falls back to host + path")
@@ -130,7 +131,7 @@ func TestCreateFromWebPage_BlockedAddressOrInvalidURLCreatesNoRow(t *testing.T) 
 			return c, false, nil
 		}}
 
-		_, err := newWebPageService(repo, client).CreateFromWebPage(context.Background(), "http://127.0.0.1/", nil, 1)
+		_, err := newWebPageService(repo, client).CreateFromWebPage(context.Background(), portservices.CreateWebPageInput{URL: "http://127.0.0.1/"}, 1)
 		assert.ErrorIs(t, err, domain.ErrInvalidInput)
 		assert.Equal(t, 0, inserts)
 	})
@@ -146,7 +147,7 @@ func TestCreateFromWebPage_BlockedAddressOrInvalidURLCreatesNoRow(t *testing.T) 
 			return c, false, nil
 		}}
 
-		_, err := newWebPageService(repo, client).CreateFromWebPage(context.Background(), "ftp://example.com/x", nil, 1)
+		_, err := newWebPageService(repo, client).CreateFromWebPage(context.Background(), portservices.CreateWebPageInput{URL: "ftp://example.com/x"}, 1)
 		assert.ErrorIs(t, err, domain.ErrInvalidInput)
 		assert.Equal(t, 0, client.calls)
 		assert.Equal(t, 0, inserts)
@@ -170,7 +171,7 @@ func TestCreateFromWebPage_ExistingCanonicalURLSkipsFetchAndInsert(t *testing.T)
 		},
 	}
 
-	got, err := newWebPageService(repo, client).CreateFromWebPage(context.Background(), "https://example.com/post/", nil, 1)
+	got, err := newWebPageService(repo, client).CreateFromWebPage(context.Background(), portservices.CreateWebPageInput{URL: "https://example.com/post/"}, 1)
 	assert.ErrorIs(t, err, domain.ErrAlreadyExists)
 	require.NotNil(t, got)
 	assert.Equal(t, 42, got.ID)
@@ -191,7 +192,7 @@ func TestCreateFromWebPage_DeclaredSameDomainCanonicalExistingReturnsThatRow(t *
 			return &domain.Content{ID: 9, URL: c.URL, ContentType: domain.ContentTypeWebPage}, true, nil
 		}}
 
-		got, err := newWebPageService(repo, client).CreateFromWebPage(context.Background(), "https://example.com/post", nil, 1)
+		got, err := newWebPageService(repo, client).CreateFromWebPage(context.Background(), portservices.CreateWebPageInput{URL: "https://example.com/post"}, 1)
 		assert.ErrorIs(t, err, domain.ErrAlreadyExists)
 		assert.Equal(t, "https://example.com/canonical-post", keyed)
 		require.NotNil(t, got)
@@ -210,7 +211,7 @@ func TestCreateFromWebPage_DeclaredSameDomainCanonicalExistingReturnsThatRow(t *
 			return c, false, nil
 		}}
 
-		_, err := newWebPageService(repo, client).CreateFromWebPage(context.Background(), "https://attacker.substack.com/x", nil, 1)
+		_, err := newWebPageService(repo, client).CreateFromWebPage(context.Background(), portservices.CreateWebPageInput{URL: "https://attacker.substack.com/x"}, 1)
 		require.NoError(t, err)
 		assert.Equal(t, "https://attacker.substack.com/x", keyed)
 	})
@@ -227,7 +228,7 @@ func TestCreateFromWebPage_DeclaredSameDomainCanonicalExistingReturnsThatRow(t *
 			return c, false, nil
 		}}
 
-		_, err := newWebPageService(repo, client).CreateFromWebPage(context.Background(), "https://example.com/a", nil, 1)
+		_, err := newWebPageService(repo, client).CreateFromWebPage(context.Background(), portservices.CreateWebPageInput{URL: "https://example.com/a"}, 1)
 		require.NoError(t, err)
 		assert.Equal(t, "https://example.com/a", keyed)
 	})
@@ -249,7 +250,7 @@ func TestCreateFromWebPage_PageRolesStoredInOrderAndDeduped(t *testing.T) {
 			client := &mockWebPageClient{fetchFn: func(_ context.Context, _ string) (domain.WebPageMeta, error) {
 				return okWebPage("https://example.com/p", "P"), nil
 			}}
-			got, err := newWebPageService(&mockContentRepository{}, client).CreateFromWebPage(context.Background(), "https://example.com/p", tt.input, 1)
+			got, err := newWebPageService(&mockContentRepository{}, client).CreateFromWebPage(context.Background(), portservices.CreateWebPageInput{URL: "https://example.com/p", Roles: tt.input}, 1)
 			require.NoError(t, err)
 			assert.Equal(t, tt.want, decodeStoredWebPage(t, got).Roles)
 		})
@@ -262,8 +263,8 @@ func TestCreateFromWebPage_UnknownRoleIsInvalidInput(t *testing.T) {
 		return domain.WebPageMeta{}, nil
 	}}
 
-	_, err := newWebPageService(&mockContentRepository{}, client).CreateFromWebPage(context.Background(), "https://example.com/p",
-		[]domain.WebPageRole{domain.WebPageRole("ARTICLE")}, 1)
+	_, err := newWebPageService(&mockContentRepository{}, client).CreateFromWebPage(context.Background(),
+		portservices.CreateWebPageInput{URL: "https://example.com/p", Roles: []domain.WebPageRole{domain.WebPageRole("ARTICLE")}}, 1)
 	assert.ErrorIs(t, err, domain.ErrInvalidInput)
 	assert.ErrorIs(t, err, domain.ErrUnknownWebPageRole, "the role error names the role, not the URL")
 	assert.Equal(t, 0, client.calls)
@@ -342,7 +343,7 @@ func TestCreateFromWebPage_FetchesAsPastedButStoresCanonical(t *testing.T) {
 				return c, false, nil
 			}}
 
-			_, err := newWebPageService(repo, client).CreateFromWebPage(context.Background(), tt.pasted, nil, 1)
+			_, err := newWebPageService(repo, client).CreateFromWebPage(context.Background(), portservices.CreateWebPageInput{URL: tt.pasted}, 1)
 			require.NoError(t, err)
 			assert.Equal(t, tt.wantFetch, client.lastURL)
 			assert.Equal(t, tt.wantKey, keyed)
@@ -362,7 +363,7 @@ func TestPreviewWebPage_FetchesAsPasted(t *testing.T) {
 func TestWebPage_UnconfiguredClientIsUnavailable(t *testing.T) {
 	svc := services.NewContentService(&mockContentRepository{}, nil, nil)
 
-	_, err := svc.CreateFromWebPage(context.Background(), "https://example.com/p", nil, 1)
+	_, err := svc.CreateFromWebPage(context.Background(), portservices.CreateWebPageInput{URL: "https://example.com/p"}, 1)
 	assert.True(t, errors.Is(err, services.ErrWebPageClientUnavailable))
 
 	_, err = svc.PreviewWebPage(context.Background(), "https://example.com/p")
