@@ -72,13 +72,15 @@ jobs:
       # isolated copy of backend/ (`mutate-preflight`) and applies the skip list for tests
       # that read files outside backend/. Without those, every mutant "dies" of the same
       # unrelated failure and Gremlins reports a bogus 100% score.
+      # No --workers: Gremlins' default in integration mode is half the runner's cores, which
+      # scales with the runner instead of being pinned to two.
       - name: Run Gremlins on changed lines
         if: steps.changes.outputs.changed == 'true'
         run: |
           set -o pipefail
           make mutate-diff \
             MUTATE_BASE="origin/${{ github.base_ref }}" \
-            GREMLINS_ARGS="--workers 2 -o $RUNNER_TEMP/gremlins.json" 2>&1 | tee "$RUNNER_TEMP/gremlins.log"
+            GREMLINS_ARGS="-o $RUNNER_TEMP/gremlins.json" 2>&1 | tee "$RUNNER_TEMP/gremlins.log"
 
       - name: Summarize
         if: always() && steps.changes.outputs.changed == 'true'
