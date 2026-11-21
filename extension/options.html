@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<title>Perspectize extension options</title>
+		<style>
+			body { font: 14px system-ui, sans-serif; max-width: 32rem; margin: 2rem auto; padding: 0 1rem; }
+			input { width: 100%; padding: 0.4rem; box-sizing: border-box; }
+			button { margin: 0.5rem 0.5rem 0 0; }
+		</style>
+	</head>
+	<body>
+		<h1>Perspectize</h1>
+		<label for="base-url">Open the add form on</label>
+		<input id="base-url" type="url" autocomplete="off" />
+		<button id="save" type="button">Save</button>
+		<button id="use-production" type="button">Production</button>
+		<button id="use-local" type="button">localhost:5173</button>
+		<p id="status" role="status"></p>
+		<script type="module" src="dist/options.js"></script>
+	</body>
+</html>
