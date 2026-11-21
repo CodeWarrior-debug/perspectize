@@ -12,6 +12,25 @@ import (
 	"github.com/CodeWarrior-debug/perspectize/backend/internal/core/domain"
 )
 
+type SavedItem interface {
+	IsSavedItem()
+	GetID() string
+	GetType() domain.SavedItemType
+	GetName() string
+	GetPrivacy() domain.Privacy
+	GetOrigin() domain.SavedItemOrigin
+	// Source item of a copy or link. Null when the source is no longer readable.
+	GetSourceID() *string
+	// False when a copy or link's source is private or deleted.
+	GetSourceAvailable() bool
+	GetPayloadVersion() int
+	GetUser() *User
+	// ISO timestamp.
+	GetCreatedAt() string
+	// ISO timestamp.
+	GetUpdatedAt() string
+}
+
 type ThreadEvent interface {
 	IsThreadEvent()
 }
@@ -250,6 +269,14 @@ type CreatePerspectiveInput struct {
 	RelatedPerspectiveIDs []int                     `json:"relatedPerspectiveIDs,omitempty"`
 	CustomFields          map[string]any            `json:"customFields,omitempty"`
 	Review                *string                   `json:"review,omitempty"`
+}
+
+type CreateSavedFormulaInput struct {
+	Name string `json:"name"`
+	// Formula expression tree, validated by the backend.
+	Payload map[string]any `json:"payload"`
+	// Defaults to PRIVATE.
+	Privacy *domain.Privacy `json:"privacy,omitempty"`
 }
 
 type CreateTodoActionInput struct {
@@ -526,6 +553,12 @@ type PaginatedPerspectives struct {
 	TotalCount *int           `json:"totalCount,omitempty"`
 }
 
+type PaginatedSavedFormulas struct {
+	Items      []*SavedFormula `json:"items"`
+	PageInfo   *PageInfo       `json:"pageInfo"`
+	TotalCount *int            `json:"totalCount,omitempty"`
+}
+
 type PaginatedUserTodos struct {
 	Items      []*UserTodo `json:"items"`
 	PageInfo   *PageInfo   `json:"pageInfo"`
@@ -614,6 +647,48 @@ type ReviewImportJobInput struct {
 	Approve bool    `json:"approve"`
 	Note    *string `json:"note,omitempty"`
 }
+
+type SavedFormula struct {
+	ID      string                 `json:"id"`
+	Type    domain.SavedItemType   `json:"type"`
+	Name    string                 `json:"name"`
+	Privacy domain.Privacy         `json:"privacy"`
+	Origin  domain.SavedItemOrigin `json:"origin"`
+	// Source item of a copy or link. Null when the source is no longer readable.
+	SourceID *string `json:"sourceId,omitempty"`
+	// False when a copy or link's source is private or deleted.
+	SourceAvailable bool  `json:"sourceAvailable"`
+	PayloadVersion  int   `json:"payloadVersion"`
+	User            *User `json:"user"`
+	// ISO timestamp.
+	CreatedAt string `json:"createdAt"`
+	// ISO timestamp.
+	UpdatedAt string `json:"updatedAt"`
+	// Expression tree plus display options. Null for a link whose source is unreadable.
+	Payload map[string]any `json:"payload,omitempty"`
+	UserID  int            `json:"-"`
+}
+
+func (SavedFormula) IsSavedItem()                           {}
+func (this SavedFormula) GetID() string                     { return this.ID }
+func (this SavedFormula) GetType() domain.SavedItemType     { return this.Type }
+func (this SavedFormula) GetName() string                   { return this.Name }
+func (this SavedFormula) GetPrivacy() domain.Privacy        { return this.Privacy }
+func (this SavedFormula) GetOrigin() domain.SavedItemOrigin { return this.Origin }
+
+// Source item of a copy or link. Null when the source is no longer readable.
+func (this SavedFormula) GetSourceID() *string { return this.SourceID }
+
+// False when a copy or link's source is private or deleted.
+func (this SavedFormula) GetSourceAvailable() bool { return this.SourceAvailable }
+func (this SavedFormula) GetPayloadVersion() int   { return this.PayloadVersion }
+func (this SavedFormula) GetUser() *User           { return this.User }
+
+// ISO timestamp.
+func (this SavedFormula) GetCreatedAt() string { return this.CreatedAt }
+
+// ISO timestamp.
+func (this SavedFormula) GetUpdatedAt() string { return this.UpdatedAt }
 
 type SendMessageInput struct {
 	ThreadID    string `json:"threadId"`
@@ -728,6 +803,14 @@ type UpdatePerspectiveInput struct {
 	CustomFields graphql.Omittable[map[string]any] `json:"customFields,omitempty"`
 	// Omit = unchanged; null = clear.
 	Review graphql.Omittable[*string] `json:"review,omitempty"`
+}
+
+// Partial update: omit a field to leave it unchanged. The payload cannot be
+// cleared, and a link has no payload to change.
+type UpdateSavedFormulaInput struct {
+	ID      int            `json:"id"`
+	Name    *string        `json:"name,omitempty"`
+	Payload map[string]any `json:"payload,omitempty"`
 }
 
 type UpdateUserInput struct {
