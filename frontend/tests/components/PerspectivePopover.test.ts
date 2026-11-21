@@ -860,6 +860,39 @@ describe('PerspectivePopover component', () => {
 			}
 		});
 
+		it('says where the draft is kept once it is stored, and clears the note on the next keystroke', async () => {
+			vi.useFakeTimers();
+			try {
+				mocks.mockSaveDraft.mockReturnValue(true);
+				renderPopover();
+				await tick();
+				const editor = screen.getByLabelText('Comment');
+				await fireEvent.input(editor, { target: { value: '<p>hello</p>' } });
+				expect(screen.getByTestId('editor-status').textContent).toBe('');
+				await vi.advanceTimersByTimeAsync(1000);
+				expect(screen.getByTestId('editor-status')).toHaveTextContent('Draft saved on this device');
+				await fireEvent.input(editor, { target: { value: '<p>hello again</p>' } });
+				expect(screen.getByTestId('editor-status').textContent).toBe('');
+			} finally {
+				vi.useRealTimers();
+			}
+		});
+
+		it('does not claim the draft was saved when the browser refused to store it', async () => {
+			vi.useFakeTimers();
+			try {
+				mocks.mockSaveDraft.mockReturnValue(false);
+				renderPopover();
+				await tick();
+				await fireEvent.input(screen.getByLabelText('Comment'), { target: { value: '<p>hello</p>' } });
+				await vi.advanceTimersByTimeAsync(1000);
+				expect(mocks.mockSaveDraft).toHaveBeenCalled();
+				expect(screen.getByTestId('editor-status').textContent).toBe('');
+			} finally {
+				vi.useRealTimers();
+			}
+		});
+
 		it('pagehide writes the pending draft at once (reload or tab close inside the debounce window)', async () => {
 			vi.useFakeTimers();
 			try {

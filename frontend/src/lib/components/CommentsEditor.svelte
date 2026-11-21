@@ -52,6 +52,7 @@
 		isMobile = false,
 		toolbar = 'full',
 		autofocus = false,
+		status = '',
 	}: {
 		value?: string;
 		onChange: (html: string) => void;
@@ -66,6 +67,8 @@
 		toolbar?: 'full' | 'basic';
 		/** Put the caret in the writing area on mount (desktop dialogs; a phone would raise its keyboard unasked). */
 		autofocus?: boolean;
+		/** Quiet note beside the word count (e.g. where the draft is kept). */
+		status?: string;
 	} = $props();
 
 	let editorElement: HTMLDivElement;
@@ -674,11 +677,13 @@
 		</div>
 	{/if}
 
-	<!-- Quiet word count: appears with the first word so an empty editor stays clean. -->
-	{#if wordCount > 0}
-		<div class="word-count" data-testid="word-count" aria-live="off">
-			{wordCount}
-			{wordCount === 1 ? 'word' : 'words'}
+	<!-- Quiet footer: appears with the first word (or a status) so an empty editor stays clean. -->
+	{#if wordCount > 0 || status}
+		<div class="editor-footer">
+			<span class="editor-status" role="status">{status}</span>
+			{#if wordCount > 0}
+				<span data-testid="word-count">{wordCount} {wordCount === 1 ? 'word' : 'words'}</span>
+			{/if}
 		</div>
 	{/if}
 </div>
@@ -780,10 +785,12 @@
 		box-shadow: 0 4px 14px color-mix(in srgb, var(--color-foreground) 18%, transparent);
 	}
 
-	.word-count {
+	.editor-footer {
+		display: flex;
+		justify-content: space-between;
+		gap: 12px;
 		padding: 2px 10px 3px;
 		font-size: 11px;
-		text-align: right;
 		color: var(--color-muted-foreground);
 		border-top: 1px solid var(--color-border);
 		font-variant-numeric: tabular-nums;

@@ -58,6 +58,16 @@ describe('CommentsEditor', () => {
 		expect(screen.queryByTestId('word-count')).toBeNull();
 	});
 
+	it('shows a status note even before any word is written, and the word count beside it', async () => {
+		const { rerender } = render(CommentsEditor, {
+			props: { value: '', onChange: vi.fn(), status: 'Draft saved on this device' },
+		});
+		expect(await screen.findByRole('status')).toHaveTextContent('Draft saved on this device');
+		expect(screen.queryByTestId('word-count')).toBeNull();
+		await rerender({ value: '<p>two words</p>', onChange: vi.fn(), status: 'Draft saved on this device' });
+		await waitFor(() => expect(screen.getByTestId('word-count')).toHaveTextContent('2 words'));
+	});
+
 	it('counts the words of an existing review, singular for one', async () => {
 		const { rerender } = render(CommentsEditor, {
 			props: { value: '<p>one two three</p><ul><li>four</li></ul>', onChange: vi.fn() },

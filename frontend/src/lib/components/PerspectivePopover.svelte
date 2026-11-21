@@ -100,6 +100,8 @@
 	let comment = $state('');
 	let commentExpanded = $state(false);
 	let restoredFromDraft = $state(false);
+	// Shown under the writing area once the draft is stored in this browser; cleared by the next keystroke.
+	let draftStatus = $state('');
 	let draftSaveTimer: ReturnType<typeof setTimeout> | undefined;
 	// Latest HTML awaiting the debounced draft save (null when nothing is pending).
 	let pendingDraft: string | null = null;
@@ -275,8 +277,8 @@
 	function flushPendingDraft() {
 		const html = pendingDraft;
 		cancelPendingDraft();
-		if (html !== null) {
-			saveDraft(draftKey(contentId, userId), html, existingPerspective?.review ?? '');
+		if (html !== null && saveDraft(draftKey(contentId, userId), html, existingPerspective?.review ?? '')) {
+			draftStatus = 'Draft saved on this device';
 		}
 	}
 
@@ -286,6 +288,7 @@
 	function handleCommentChange(html: string) {
 		comment = html;
 		restoredFromDraft = false;
+		draftStatus = '';
 		pendingDraft = html;
 		if (draftSaveTimer) clearTimeout(draftSaveTimer);
 		draftSaveTimer = setTimeout(flushPendingDraft, 1000);
@@ -296,6 +299,7 @@
 		clearDraft(draftKey(contentId, userId));
 		comment = existingPerspective?.review ?? '';
 		restoredFromDraft = false;
+		draftStatus = '';
 	}
 
 	// Build customFields payload from dynamic (non-core) field values.
@@ -718,6 +722,7 @@
 						commentExpanded = !commentExpanded;
 					}}
 					isMobile={mobile}
+					status={draftStatus}
 				/>
 			</div>
 		{/if}
