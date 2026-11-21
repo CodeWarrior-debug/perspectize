@@ -224,6 +224,49 @@ type UserTodoModel struct {
 // TableName returns the table name for UserTodoModel
 func (UserTodoModel) TableName() string { return "user_todos" }
 
+// SavedItemModel is the GORM persistence model for user_saved_items, used by
+// writes (INSERT/UPDATE ... RETURNING). A LINK's payload column is NULL; the
+// resolved payload comes from SavedItemReadModel.
+type SavedItemModel struct {
+	ID             int             `gorm:"primaryKey;autoIncrement"`
+	UserID         int             `gorm:"column:user_id;not null"`
+	Type           string          `gorm:"column:type;not null"`
+	Name           string          `gorm:"column:name;not null"`
+	Payload        json.RawMessage `gorm:"column:payload;type:jsonb"`
+	PayloadVersion int             `gorm:"column:payload_version;not null;default:1"`
+	Privacy        string          `gorm:"column:privacy;not null"`
+	Origin         string          `gorm:"column:origin;not null"`
+	SourceID       *int            `gorm:"column:source_id"`
+	DeletedAt      *time.Time      `gorm:"column:deleted_at"`
+	CreatedAt      time.Time       `gorm:"autoCreateTime"`
+	UpdatedAt      time.Time       `gorm:"autoUpdateTime"`
+}
+
+// TableName returns the table name for SavedItemModel
+func (SavedItemModel) TableName() string { return "user_saved_items" }
+
+// SavedItemReadModel is the read shape of a saved item: the row selected as s,
+// with its source joined as src. ResolvedPayload and ResolvedPayloadVersion are
+// the payload to show (a LINK's come from its source), and SourceAvailable is
+// computed in SQL. Read-only: it is never written.
+type SavedItemReadModel struct {
+	ID                     int             `gorm:"column:id"`
+	UserID                 int             `gorm:"column:user_id"`
+	Type                   string          `gorm:"column:type"`
+	Name                   string          `gorm:"column:name"`
+	ResolvedPayload        json.RawMessage `gorm:"column:resolved_payload"`
+	ResolvedPayloadVersion int             `gorm:"column:resolved_payload_version"`
+	Privacy                string          `gorm:"column:privacy"`
+	Origin                 string          `gorm:"column:origin"`
+	SourceID               *int            `gorm:"column:source_id"`
+	SourceAvailable        bool            `gorm:"column:source_available"`
+	CreatedAt              time.Time       `gorm:"column:created_at"`
+	UpdatedAt              time.Time       `gorm:"column:updated_at"`
+}
+
+// TableName returns the table name for SavedItemReadModel
+func (SavedItemReadModel) TableName() string { return "user_saved_items" }
+
 // ImportJobModel is the GORM persistence model for the import_jobs table
 type ImportJobModel struct {
 	ID            int        `gorm:"primaryKey;autoIncrement"`

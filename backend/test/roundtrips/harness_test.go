@@ -148,6 +148,7 @@ func newHarnessWithPool(t *testing.T, pool database.PoolConfig) *harness {
 	todoRepo := postgres.NewGormUserTodoRepository(db)
 	todoListRepo := postgres.NewGormUserTodoListRepository(db)
 	todoActionRepo := cached.NewTodoActionRepository(postgres.NewGormTodoActionRepository(db), cached.DefaultTodoActionTTL)
+	savedItemRepo := postgres.NewGormSavedItemRepository(db)
 
 	// Import staging: a static lister, and background work collected rather
 	// than run, so a round-trip count covers only the request itself.
@@ -164,6 +165,7 @@ func newHarnessWithPool(t *testing.T, pool database.PoolConfig) *harness {
 		PerspectiveService: services.NewPerspectiveService(perspectiveRepo, userRepo, services.WithContentRepository(h.contentRepo)),
 		CategoryService:    services.NewCategoryService(categoryRepo, h.contentRepo, noWikidata{}),
 		UserTodoService:    services.NewUserTodoService(todoRepo, todoListRepo, todoActionRepo),
+		SavedItemService:   services.NewSavedItemService(savedItemRepo),
 		MessagingService:   services.NewMessagingService(threadRepo, messageRepo, hub, services.NewSlidingWindowLimiter(1000, time.Second)),
 		ImportService:      importService,
 		UserRepo:           userRepo,
@@ -317,6 +319,9 @@ func (h *harness) cleanup() {
 		_ = db.Exec("DELETE FROM message_threads WHERE created_by IN ?", h.userIDs).Error
 		_ = db.Exec("DELETE FROM messages WHERE sender_id IN ?", h.userIDs).Error
 		_ = db.Exec("DELETE FROM thread_participants WHERE user_id IN ?", h.userIDs).Error
+		// Copies and links reference their source with RESTRICT, so they go first.
+		_ = db.Exec("DELETE FROM user_saved_items WHERE user_id IN ? AND source_id IS NOT NULL", h.userIDs).Error
+		_ = db.Exec("DELETE FROM user_saved_items WHERE user_id IN ?", h.userIDs).Error
 	}
 	if len(h.contentIDs) > 0 {
 		_ = db.Exec("DELETE FROM perspectives WHERE content_id IN ?", h.contentIDs).Error

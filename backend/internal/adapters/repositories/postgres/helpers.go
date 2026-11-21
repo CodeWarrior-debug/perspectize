@@ -496,3 +496,49 @@ func buildUserTodoSortRules(sortBy domain.UserTodoSortBy, order domain.SortOrder
 
 	return []paginator.Rule{primaryRule, {Key: "ID", Order: paginatorOrder}}
 }
+
+// savedItemTypeToDBValue converts a domain SavedItemType to lowercase for database storage
+func savedItemTypeToDBValue(t domain.SavedItemType) string {
+	return strings.ToLower(string(t))
+}
+
+// savedItemTypeFromDBValue converts a lowercase database value to a domain SavedItemType
+func savedItemTypeFromDBValue(s string) domain.SavedItemType {
+	return domain.SavedItemType(strings.ToUpper(s))
+}
+
+// savedItemOriginToDBValue converts a domain SavedItemOrigin to lowercase for database storage
+func savedItemOriginToDBValue(o domain.SavedItemOrigin) string {
+	return strings.ToLower(string(o))
+}
+
+// savedItemOriginFromDBValue converts a lowercase database value to a domain SavedItemOrigin
+func savedItemOriginFromDBValue(s string) domain.SavedItemOrigin {
+	return domain.SavedItemOrigin(strings.ToUpper(s))
+}
+
+// buildSavedItemSortRules builds paginator rules for saved item lists: the
+// requested column, then an ID tie-breaker in the same direction. Each rule
+// names its column with the s. alias, because the read joins the source
+// (src) and an unqualified name would be ambiguous. An unknown sortBy falls
+// back to CreatedAt DESC.
+func buildSavedItemSortRules(sortBy domain.SavedItemSortBy, order domain.SortOrder) []paginator.Rule {
+	paginatorOrder := paginator.DESC
+	if order == domain.SortOrderAsc {
+		paginatorOrder = paginator.ASC
+	}
+
+	var primaryRule paginator.Rule
+	switch sortBy {
+	case domain.SavedItemSortByName:
+		primaryRule = paginator.Rule{Key: "Name", Order: paginatorOrder, SQLRepr: "s.name"}
+	case domain.SavedItemSortByUpdatedAt:
+		primaryRule = paginator.Rule{Key: "UpdatedAt", Order: paginatorOrder, SQLRepr: "s.updated_at"}
+	case domain.SavedItemSortByCreatedAt:
+		primaryRule = paginator.Rule{Key: "CreatedAt", Order: paginatorOrder, SQLRepr: "s.created_at"}
+	default:
+		primaryRule = paginator.Rule{Key: "CreatedAt", Order: paginator.DESC, SQLRepr: "s.created_at"}
+	}
+
+	return []paginator.Rule{primaryRule, {Key: "ID", Order: paginatorOrder, SQLRepr: "s.id"}}
+}

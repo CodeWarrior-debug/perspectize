@@ -252,6 +252,7 @@ func main() {
 	bibleReferenceRepo := postgres.NewGormBibleReferenceRepository(db)
 	buildInfoRepo := postgres.NewGormBuildInfoRepository(db)
 	importRepo := postgres.NewGormImportJobRepository(db)
+	savedItemRepo := postgres.NewGormSavedItemRepository(db)
 
 	// Initialize services
 	// The webpage reader is SSRF-safe on every connection (adapters/webpage). It has no
@@ -259,10 +260,11 @@ func main() {
 	contentOpts := []services.ContentServiceOption{services.WithBibleReference(bibleReferenceRepo), services.WithYouTubeTrending(trendingClient), services.WithMovieSearch(movieSearchClient), services.WithMovieTrending(movieTrendingClient), services.WithWebPageClient(webpage.NewClient(webpage.Options{}))}
 	contentService := services.NewContentService(contentRepo, youtubeClient, movieClient, append(contentOpts, bookServiceOptions()...)...)
 	userService := services.NewUserService(userRepo, contentRepo, perspectiveRepo, todoRepo, todoListRepo, todoActionRepo,
-		services.WithImportJobRepository(importRepo))
+		services.WithImportJobRepository(importRepo), services.WithSavedItemRepository(savedItemRepo))
 	perspectiveService := services.NewPerspectiveService(perspectiveRepo, userRepo, services.WithContentRepository(contentRepo))
 	categoryService := services.NewCategoryService(categoryRepo, contentRepo, wikidataClient)
 	userTodoService := services.NewUserTodoService(todoRepo, todoListRepo, todoActionRepo)
+	savedItemService := services.NewSavedItemService(savedItemRepo)
 	buildInfoService := services.NewBuildInfoService(buildInfoRepo)
 
 	// Import staging runs listing and imports in background goroutines tied to
@@ -333,6 +335,7 @@ func main() {
 		PerspectiveService:  perspectiveService,
 		CategoryService:     categoryService,
 		UserTodoService:     userTodoService,
+		SavedItemService:    savedItemService,
 		MessagingService:    messagingService,
 		ImportService:       importService,
 		UserRepo:            userRepo,
