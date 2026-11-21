@@ -117,6 +117,10 @@ export interface ContentItem {
 	// WEB_PAGE rows only: the shaped page fields for list rows (same split as `movie`/`book`; the raw
 	// `response` is never selected in lists). Null for every other type. Read it through webPage.ts.
 	webPage?: WebPageListMeta | null;
+	// The WEBSITE a WEB_PAGE is filed under, and a WEBSITE's own id. Selected by the details query
+	// only (GET_CONTENT_DETAILS), so list rows don't carry them. Null/absent when not filed.
+	parentContentID?: number | null;
+	parentContent?: { id: string; name: string; url: string | null } | null;
 	primaryCategory: {
 		id: string;
 		wikidataQid: string;
@@ -347,6 +351,12 @@ export const GET_CONTENT_DETAILS = gql`
 			movie
 			customFields
 			book
+			parentContentID
+			parentContent {
+				id
+				name
+				url
+			}
 			primaryCategory {
 				id
 				wikidataQid
@@ -363,6 +373,37 @@ export const GET_CONTENT_DETAILS = gql`
 
 export interface ContentDetailsResponse {
 	contentByID: ContentItem | null;
+}
+
+/** How many of a website's pages the details view lists; `totalCount` covers the rest. */
+export const WEBSITE_PAGES_LIMIT = 50;
+
+// The pages filed under one WEBSITE, newest first (the website's details view). One request per
+// opened website; `totalCount` is the whole filed set, not just the capped list.
+export const LIST_WEBSITE_PAGES = gql`
+	query ListWebsitePages($parentContentID: IntID!, $first: Int!) {
+		content(
+			first: $first
+			sortBy: PUBLISHED_AT
+			sortOrder: DESC
+			filter: { parentContentID: $parentContentID }
+			includeTotalCount: true
+		) {
+			items {
+				id
+				name
+				url
+				contentType
+				publishedAt
+				webPage
+			}
+			totalCount
+		}
+	}
+`;
+
+export interface WebsitePagesResponse {
+	content: { items: ContentItem[]; totalCount: number };
 }
 
 // perspectiveCount/averageRating are computed aggregates over a content's
