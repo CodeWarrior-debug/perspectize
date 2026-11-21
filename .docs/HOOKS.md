@@ -30,7 +30,7 @@ Two independent hook systems. The root [CLAUDE.md](../CLAUDE.md) keeps only what
 
 ## Shared git pre-commit hook
 
-`.hooks/pre-commit`, a real `core.hooksPath` hook — not a Claude Code hook. It auto-formats staged `backend/*.go` (gofmt) and `frontend/src/*.{svelte,ts,js}` (prettier) files and re-stages them on every `git commit`, regardless of what tool/human is committing. It also **blocks** (does not auto-fix) new raw hex/rgb colour literals in frontend components — see [frontend/CLAUDE.md](../frontend/CLAUDE.md).
+`.hooks/pre-commit`, a real `core.hooksPath` hook — not a Claude Code hook. It auto-formats staged `backend/*.go` and `ai-tooling/*.go` (gofmt) and `frontend/src/*.{svelte,ts,js}` (prettier) files and re-stages them on every `git commit`, regardless of what tool/human is committing. It also **blocks** (does not auto-fix) new raw hex/rgb colour literals in frontend components — see [frontend/CLAUDE.md](../frontend/CLAUDE.md).
 
 ### Pre-push comment hygiene
 

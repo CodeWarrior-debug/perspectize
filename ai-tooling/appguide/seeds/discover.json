@@ -1,0 +1,17 @@
+[
+  { "question": "How do I search for a video to add to Perspectize?", "expect_ids": ["discover.search"], "must_not_claim": [] },
+  { "question": "Can I see YouTube search results inside Perspectize without leaving the page?", "expect_ids": ["discover.search"], "must_not_claim": ["results appear on Discover", "results load inside Perspectize", "searches YouTube in the app"] },
+  { "question": "I found a video on YouTube. How do I add it to Perspectize?", "expect_ids": ["discover.paste-video-link"], "must_not_claim": [] },
+  { "question": "Can I filter Discover results by video length or upload date?", "expect_ids": ["discover.browse-trending"], "must_not_claim": ["duration filter", "upload date filter", "Clear Filters", "sort by view count"] },
+  { "question": "Does clicking a YouTube video card on Discover open YouTube in a new tab?", "expect_ids": ["discover.watch-inline"], "must_not_claim": ["clicking a card opens YouTube in a new tab", "navigates to YouTube"] },
+  { "question": "How do I see more results on Discover?", "expect_ids": ["discover.load-more"], "must_not_claim": [] },
+  { "question": "How do I add a trending video from Discover to the Library?", "expect_ids": ["discover.add-video"], "must_not_claim": [] },
+  { "question": "A Discover card says In Library. How do I write a perspective on it?", "expect_ids": ["discover.in-library-actions"], "must_not_claim": [] },
+  { "question": "How do I switch between movies and books on Discover?", "expect_ids": ["discover.switch-source"], "must_not_claim": [] },
+  { "question": "How do I add a movie from an IMDb link?", "expect_ids": ["discover.search-movies"], "must_not_claim": [] },
+  { "question": "Can I see the movies trending today instead of this week?", "expect_ids": ["discover.browse-trending-movies"], "must_not_claim": [] },
+  { "question": "Can I paste an Open Library link into the Discover book search to add the book?", "expect_ids": ["discover.search-books"], "must_not_claim": ["book search adds a pasted link"] },
+  { "question": "Where can I see trending books?", "expect_ids": ["discover.browse-trending-books"], "must_not_claim": [] },
+  { "question": "How do I add a book by its ISBN?", "expect_ids": ["discover.add-book-by-isbn"], "must_not_claim": [] },
+  { "question": "Does Cmd+K focus the ISBN box on the Books tab?", "expect_ids": ["discover.keyboard-shortcuts"], "must_not_claim": ["Cmd+K works on the ISBN tab"] }
+]
