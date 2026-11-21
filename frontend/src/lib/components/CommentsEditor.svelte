@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { normalizeLinkUrl } from '#lib/utils/linkUrl.js';
-	import { createWritingShortcuts } from '#lib/utils/writingShortcuts.js';
+	import { createWritingShortcuts, typographyOptions } from '#lib/utils/writingShortcuts.js';
 	import { onMount, onDestroy } from 'svelte';
 	import { Editor } from '@tiptap/core';
 	import StarterKit from '@tiptap/starter-kit';
@@ -106,7 +106,7 @@
 								shouldShow: ({ editor: e, from, to }) => e.isFocused && from !== to && !e.isActive('image'),
 							}),
 						]),
-				Typography,
+				Typography.configure(typographyOptions),
 				Link.configure({ openOnClick: false, autolink: false }),
 				Image,
 				Table.configure({ resizable: false }),

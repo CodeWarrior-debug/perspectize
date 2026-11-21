@@ -28,3 +28,27 @@ export function createWritingShortcuts(options: { onLink: () => void }) {
 		},
 	});
 }
+
+/**
+ * Typography keeps the typeset punctuation writers expect (curly quotes, an em dash for `--`, an
+ * ellipsis for `...`) and drops the symbol swaps, which would rewrite plain text a reviewer typed on
+ * purpose (`(c)` to a copyright sign, `->` to an arrow, `1/2` to a fraction).
+ */
+export const typographyOptions = {
+	copyright: false,
+	trademark: false,
+	servicemark: false,
+	registeredTrademark: false,
+	leftArrow: false,
+	rightArrow: false,
+	plusMinus: false,
+	notEqual: false,
+	laquo: false,
+	raquo: false,
+	multiplication: false,
+	superscriptTwo: false,
+	superscriptThree: false,
+	oneHalf: false,
+	oneQuarter: false,
+	threeQuarters: false,
+} as const;

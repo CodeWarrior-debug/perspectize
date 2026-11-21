@@ -1,14 +1,19 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { Editor } from '@tiptap/core';
 import StarterKit from '@tiptap/starter-kit';
-import { createWritingShortcuts } from '#lib/utils/writingShortcuts.js';
+import Typography from '@tiptap/extension-typography';
+import { createWritingShortcuts, typographyOptions } from '#lib/utils/writingShortcuts.js';
 
 let editor: Editor | null = null;
 
 function makeEditor(content: string, onLink = vi.fn()) {
 	editor = new Editor({
 		element: document.createElement('div'),
-		extensions: [createWritingShortcuts({ onLink }), StarterKit.configure({ heading: { levels: [2, 3] } })],
+		extensions: [
+			createWritingShortcuts({ onLink }),
+			Typography.configure(typographyOptions),
+			StarterKit.configure({ heading: { levels: [2, 3] } }),
+		],
 		content,
 	});
 	return { editor, onLink };
@@ -69,5 +74,21 @@ describe('writing shortcuts', () => {
 		const handled = e.view.someProp('handleKeyDown', (f) => f(e.view, event));
 		expect(handled).toBe(true);
 		expect(onLink).toHaveBeenCalledTimes(1);
+	});
+});
+
+describe('typography', () => {
+	it('typesets quotes, double hyphens and ellipses', () => {
+		const { editor: e } = makeEditor('<p></p>');
+		e.commands.focus('end');
+		typeText(e, '"hi" it\'s a -- b...');
+		expect(e.state.doc.textContent).toBe('\u201chi\u201d it\u2019s a \u2014 b\u2026');
+	});
+
+	it('leaves symbol look-alikes as typed', () => {
+		const { editor: e } = makeEditor('<p></p>');
+		e.commands.focus('end');
+		typeText(e, '(c) a -> b 1/2 (tm) +/-');
+		expect(e.state.doc.textContent).toBe('(c) a -> b 1/2 (tm) +/-');
 	});
 });
