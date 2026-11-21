@@ -197,8 +197,8 @@ The end goal above covers every content type in the Activity grid. Delivery is s
 
 ## Downstream
 
-- Spec: <!-- docs/superpowers/specs/YYYY-MM-DD-calculated-columns-design.md -->
-- Plan(s): <!-- link(s) -->
+- Spec: [custom columns and saved items](../../docs/superpowers/specs/2026-11-20-custom-columns-and-saved-items-design.md). It narrows this intent: formulas are evaluated in the browser only, so the Go-to-SQL compiler, parity fixtures and server-side sort/filter (open questions 1, 2, 5b and 8) are out of scope for it. Saved formulas live in one `user_saved_items` table instead of `metric_definitions`.
+- Plan(s): [custom columns and saved items](../../docs/superpowers/plans/2026-11-20-custom-columns-and-saved-items.md)
 - Integration branch: <!-- feature/calculated-columns -->
 - PRs (one line each, add as they open; tick on merge):
   - [x] Intent: calculated columns — https://github.com/CodeWarrior-debug/perspectize/pull/601 — merged
