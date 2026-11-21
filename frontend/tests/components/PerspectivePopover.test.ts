@@ -824,6 +824,39 @@ describe('PerspectivePopover component', () => {
 			}
 		});
 
+		it('pagehide writes the pending draft at once (reload or tab close inside the debounce window)', async () => {
+			vi.useFakeTimers();
+			try {
+				renderPopover();
+				await tick();
+				await fireEvent.input(screen.getByLabelText('Comment'), { target: { value: '<p>quick</p>' } });
+				expect(mocks.mockSaveDraft).not.toHaveBeenCalled();
+				window.dispatchEvent(new Event('pagehide'));
+				expect(mocks.mockSaveDraft).toHaveBeenCalledWith('draft:1:42', '<p>quick</p>', '');
+			} finally {
+				vi.useRealTimers();
+			}
+		});
+
+		it('backgrounding the page (visibility hidden) writes the pending draft; becoming visible does not', async () => {
+			vi.useFakeTimers();
+			try {
+				renderPopover();
+				await tick();
+				await fireEvent.input(screen.getByLabelText('Comment'), { target: { value: '<p>away</p>' } });
+				const vis = vi.spyOn(document, 'visibilityState', 'get');
+				vis.mockReturnValue('visible');
+				document.dispatchEvent(new Event('visibilitychange'));
+				expect(mocks.mockSaveDraft).not.toHaveBeenCalled();
+				vis.mockReturnValue('hidden');
+				document.dispatchEvent(new Event('visibilitychange'));
+				expect(mocks.mockSaveDraft).toHaveBeenCalledWith('draft:1:42', '<p>away</p>', '');
+				vis.mockRestore();
+			} finally {
+				vi.useRealTimers();
+			}
+		});
+
 		it('reopening with an existing draft shows the restore banner and populates the editor', async () => {
 			mocks.mockLoadDraft.mockReturnValue('<p>draft content</p>');
 			renderPopover();

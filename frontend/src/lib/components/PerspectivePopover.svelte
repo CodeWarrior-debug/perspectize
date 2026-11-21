@@ -708,6 +708,14 @@
 {/snippet}
 
 <!-- Desktop: centered dialog -->
+<!-- A reload, tab close or app switch skips onDestroy, so write the pending draft as the page hides. -->
+<svelte:window onpagehide={flushPendingDraft} />
+<svelte:document
+	onvisibilitychange={() => {
+		if (document.visibilityState === 'hidden') flushPendingDraft();
+	}}
+/>
+
 {#if !isMobile.current}
 	<Dialog
 		bind:open
