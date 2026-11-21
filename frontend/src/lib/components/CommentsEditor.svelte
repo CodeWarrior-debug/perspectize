@@ -7,7 +7,7 @@
 	import StarterKit from '@tiptap/starter-kit';
 	import Underline from '@tiptap/extension-underline';
 	import Placeholder from '@tiptap/extension-placeholder';
-	import { CharacterCount } from '@tiptap/extensions';
+	import { CharacterCount, Focus } from '@tiptap/extensions';
 	import Typography from '@tiptap/extension-typography';
 	import BubbleMenu from '@tiptap/extension-bubble-menu';
 	import Link from '@tiptap/extension-link';
@@ -28,6 +28,7 @@
 	import CheckIcon from '@lucide/svelte/icons/check';
 	import ExternalLinkIcon from '@lucide/svelte/icons/external-link';
 	import PencilIcon from '@lucide/svelte/icons/pencil';
+	import FocusIcon from '@lucide/svelte/icons/focus';
 	import ImageIcon from '@lucide/svelte/icons/image';
 	import TableIcon from '@lucide/svelte/icons/table';
 	import RowIcon from '@lucide/svelte/icons/rows-2';
@@ -76,6 +77,8 @@
 	let bubbleElement: HTMLDivElement | undefined = $state();
 	let slashElement: HTMLDivElement;
 	let slash: SlashMenuState | null = $state(null);
+	// Focus mode (iA Writer): in the expanded editor, every block but the one being written is dimmed.
+	let focusMode = $state(false);
 	// Inline link editor: lives in the selection toolbar instead of the browser's prompt().
 	let linkEditing = $state(false);
 	let linkText = $state('');
@@ -165,6 +168,8 @@
 				Underline,
 				Placeholder.configure({ placeholder }),
 				CharacterCount,
+				// Marks the block being written so focus mode can dim the rest.
+				Focus.configure({ className: 'has-focus', mode: 'shallowest' }),
 				// Floating selection toolbar (Medium / Notion / Substack): format the words you just selected without
 				// travelling to the top toolbar. Desktop only: a phone's own selection menu occupies the same spot.
 				...(isMobile
@@ -499,6 +504,7 @@
 	bind:this={wrapperElement}
 	class="comment-editor-wrapper relative border border-input rounded-lg bg-card flex flex-col w-full min-w-0"
 	class:overflow-clip={!slash}
+	data-focus-mode={expanded && focusMode}
 	style:--pe-min-height={expanded ? 'min(60dvh, 560px)' : `${minHeight}px`}
 	style:--pe-max-height={expanded ? 'min(60dvh, 560px)' : `max(${minHeight}px, min(40dvh, 320px))`}
 	data-expanded={expanded}
@@ -527,6 +533,23 @@
 				<item.icon size={14} />
 			</button>
 		{/each}
+
+		{#if showPopout && onPopout && expanded}
+			<button
+				type="button"
+				class="absolute top-1.5 right-8 p-1 border-none bg-transparent text-muted-foreground cursor-pointer rounded hover:opacity-70"
+				class:text-foreground={focusMode}
+				onmousedown={(e) => e.preventDefault()}
+				onclick={() => {
+					focusMode = !focusMode;
+					editor?.commands.focus();
+				}}
+				aria-label="Focus mode"
+				aria-pressed={focusMode}
+			>
+				<FocusIcon class="size-3.5" />
+			</button>
+		{/if}
 
 		{#if showPopout && onPopout}
 			<button
@@ -854,6 +877,13 @@
 		border: 1px solid var(--color-border);
 		padding: 4px 8px;
 		text-align: left;
+	}
+	/* Focus mode: the block being written stays at full strength. */
+	.comment-editor-wrapper[data-focus-mode='true'] :global(.tiptap-content > *:not(.has-focus)) {
+		opacity: 0.35;
+	}
+	:global(.tiptap-content > *) {
+		transition: opacity 0.15s;
 	}
 	:global(.tiptap-content p.is-editor-empty:first-child::before) {
 		content: attr(data-placeholder);

@@ -177,6 +177,27 @@ describe('CommentsEditor', () => {
 		await waitFor(() => expect(onChange).toHaveBeenLastCalledWith('<p>hello world</p>'));
 	});
 
+	it('offers focus mode only in the expanded editor, off until chosen, and drops it on collapse', async () => {
+		const props = { value: '<p>one</p><p>two</p>', onChange: vi.fn(), showPopout: true, onPopout: vi.fn() };
+		const { container, rerender } = render(CommentsEditor, { props });
+		await screen.findByRole('textbox', { name: 'Comment' });
+		const frame = container.querySelector('.comment-editor-wrapper') as HTMLElement;
+		expect(screen.queryByLabelText('Focus mode')).toBeNull();
+
+		await rerender({ ...props, expanded: true });
+		const toggle = await screen.findByLabelText('Focus mode');
+		expect(toggle.getAttribute('aria-pressed')).toBe('false');
+		expect(frame.dataset.focusMode).toBe('false');
+
+		await fireEvent.click(toggle);
+		expect(toggle.getAttribute('aria-pressed')).toBe('true');
+		expect(frame.dataset.focusMode).toBe('true');
+
+		await rerender({ ...props, expanded: false });
+		expect(screen.queryByLabelText('Focus mode')).toBeNull();
+		expect(frame.dataset.focusMode).toBe('false');
+	});
+
 	it('renders the default toolbar buttons', async () => {
 		render(CommentsEditor, { props: { value: '', onChange: vi.fn() } });
 
