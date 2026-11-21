@@ -991,6 +991,8 @@ func importFailureDetail(err error) string {
 		return "couldn't read the staged page details. Try again later."
 	case errors.Is(err, errWebsiteCreate):
 		return "couldn't create the website"
+	case errors.Is(err, domain.ErrInvalidInput):
+		return "this row was refused as invalid"
 	case errors.Is(err, domain.ErrContentNotAllowed):
 		return domain.ErrContentNotAllowed.Error()
 	case errors.Is(err, domain.ErrNotFound):

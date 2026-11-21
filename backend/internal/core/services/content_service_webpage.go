@@ -35,7 +35,7 @@ func (s *ContentService) CreateFromWebPage(ctx context.Context, in portservices.
 		return nil, err
 	}
 	if webpage.IsSiteRoot(canonical) {
-		return nil, fmt.Errorf("%w: that link is a website, not a page", domain.ErrInvalidInput)
+		return nil, fmt.Errorf("%w: %w", domain.ErrInvalidInput, domain.ErrWebPageIsWebsite)
 	}
 	roles, err := normaliseWebPageRoles(in.Roles)
 	if err != nil {
@@ -46,7 +46,7 @@ func (s *ContentService) CreateFromWebPage(ctx context.Context, in portservices.
 		return existing, orAlreadyExists(err)
 	}
 
-	if in.ParentContentID != nil {
+	if in.ParentContentID != nil && !in.ParentValidated {
 		if err := s.validateWebsiteParent(ctx, *in.ParentContentID, canonical); err != nil {
 			return nil, err
 		}
@@ -152,15 +152,15 @@ func (s *ContentService) validateWebsiteParent(ctx context.Context, parentID int
 	parent, err := s.repo.GetByID(ctx, parentID)
 	if err != nil {
 		if errors.Is(err, domain.ErrNotFound) {
-			return fmt.Errorf("%w: the parent website does not exist", domain.ErrInvalidInput)
+			return fmt.Errorf("%w: %w", domain.ErrInvalidInput, domain.ErrParentNotFound)
 		}
 		return fmt.Errorf("failed to load parent website: %w", err)
 	}
 	if parent == nil || parent.ContentType != domain.ContentTypeWebsite {
-		return fmt.Errorf("%w: the parent must be a website", domain.ErrInvalidInput)
+		return fmt.Errorf("%w: %w", domain.ErrInvalidInput, domain.ErrParentNotWebsite)
 	}
 	if parent.URL == nil || !webpage.SameSite(*parent.URL, pageCanonical) {
-		return fmt.Errorf("%w: the parent website is on a different host", domain.ErrInvalidInput)
+		return fmt.Errorf("%w: %w", domain.ErrInvalidInput, domain.ErrParentOtherHost)
 	}
 	return nil
 }

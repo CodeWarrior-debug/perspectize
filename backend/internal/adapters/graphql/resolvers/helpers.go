@@ -29,6 +29,14 @@ func webPageInputMessage(err error) string {
 	switch {
 	case errors.Is(err, domain.ErrUnknownWebPageRole):
 		return "unknown webpage role"
+	case errors.Is(err, domain.ErrWebPageIsWebsite):
+		return "that link is a whole website: add it as a website, not a page"
+	case errors.Is(err, domain.ErrParentNotFound):
+		return "the website to file this page under does not exist"
+	case errors.Is(err, domain.ErrParentNotWebsite):
+		return "the parent must be a website"
+	case errors.Is(err, domain.ErrParentOtherHost):
+		return "the parent website is on a different host than this page"
 	case errors.Is(err, domain.ErrInvalidInput):
 		return "invalid webpage URL: use an http or https link to a public page"
 	}

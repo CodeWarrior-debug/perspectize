@@ -3,7 +3,9 @@ package services_test
 import (
 	"context"
 	"errors"
+	"fmt"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -26,6 +28,8 @@ type pageCreator struct {
 	// existingPages maps a page url to the id of the row already saved for it.
 	existingPages map[string]int
 	nextPageID    int
+	// pageErr, when set, is what every CreateFromWebPage returns.
+	pageErr error
 }
 
 func (c *pageCreator) CreateFromWebsite(_ context.Context, rawURL string, _ int) (*domain.Content, error) {
@@ -36,13 +40,16 @@ func (c *pageCreator) CreateFromWebsite(_ context.Context, rawURL string, _ int)
 	if c.website != nil {
 		return c.website(call, rawURL)
 	}
-	return &domain.Content{ID: 700}, nil
+	return &domain.Content{ID: 700, ContentType: domain.ContentTypeWebsite}, nil
 }
 
 func (c *pageCreator) CreateFromWebPage(_ context.Context, in portservices.CreateWebPageInput, _ int) (*domain.Content, error) {
 	c.pmu.Lock()
 	defer c.pmu.Unlock()
 	c.pageCalls = append(c.pageCalls, in)
+	if c.pageErr != nil {
+		return nil, c.pageErr
+	}
 	if id, ok := c.existingPages[in.URL]; ok {
 		return &domain.Content{ID: id}, domain.ErrAlreadyExists
 	}
@@ -78,7 +85,7 @@ func stagePages(t *testing.T, repo *fakeImportRepo, siteURLs []*string, n int) (
 	for i, src := range job.Sources {
 		var batch []*domain.ImportItemWithDetails
 		for j := range n {
-			ext := string(rune('a'+i)) + string(rune('0'+j))
+			ext := fmt.Sprintf("%c%d", 'a'+i, j)
 			summary := "summary " + ext
 			thumb := "https://img.example/" + ext + ".jpg"
 			published := pagePublished
@@ -211,10 +218,10 @@ func TestImportWebPage_ConcurrentBatchesShareTheWebsite(t *testing.T) {
 		once.Do(func() { first = true })
 		if first {
 			<-arrived // hold until the other batch is also creating
-			return &domain.Content{ID: 700}, nil
+			return &domain.Content{ID: 700, ContentType: domain.ContentTypeWebsite}, nil
 		}
 		close(arrived)
-		return &domain.Content{ID: 700}, domain.ErrAlreadyExists
+		return &domain.Content{ID: 700, ContentType: domain.ContentTypeWebsite}, domain.ErrAlreadyExists
 	}
 	job, ids := stagePages(t, repo, []*string{strPtr("https://sitea.com/")}, 4)
 	var wg sync.WaitGroup
@@ -245,7 +252,7 @@ func TestImportWebPage_WebsiteFailureFailsOnlyThatSource(t *testing.T) {
 		if url == "https://siteb.com/" {
 			return nil, errors.New("database is down")
 		}
-		return &domain.Content{ID: 700}, nil
+		return &domain.Content{ID: 700, ContentType: domain.ContentTypeWebsite}, nil
 	}
 	job, ids := stagePages(t, repo, []*string{strPtr("https://sitea.com/"), strPtr("https://siteb.com/")}, 2)
 	svc := newPageImportService(repo, creator)
@@ -263,4 +270,122 @@ func TestImportWebPage_WebsiteFailureFailsOnlyThatSource(t *testing.T) {
 	}
 	_, pages := creator.calls()
 	assert.Len(t, pages, 2, "no page of the failed source was created")
+}
+
+func TestImportWebPage_InvalidRowFailsWithAClearMessage(t *testing.T) {
+	repo := newFakeImportRepo()
+	creator := &pageCreator{fakeCreator: &fakeCreator{}}
+	creator.pageErr = fmt.Errorf("%w: unknown webpage role", domain.ErrInvalidInput)
+	job, ids := stagePages(t, repo, []*string{strPtr("https://sitea.com/")}, 1)
+	svc := newPageImportService(repo, creator)
+
+	_, err := svc.ImportItems(context.Background(), importAdmin, job.ID, ids[0])
+	require.NoError(t, err)
+
+	item := repo.items[ids[0][0]].Item
+	assert.Equal(t, domain.ImportItemStatusFailed, *item.ImportStatus)
+	assert.Equal(t, "this row was refused as invalid", *item.ImportError)
+}
+
+func TestImportWebPage_WebsiteURLHoldingAPageFailsTheSource(t *testing.T) {
+	repo := newFakeImportRepo()
+	creator := &pageCreator{fakeCreator: &fakeCreator{}}
+	creator.website = func(_ int, _ string) (*domain.Content, error) {
+		return &domain.Content{ID: 31, ContentType: domain.ContentTypeWebPage}, domain.ErrAlreadyExists
+	}
+	job, ids := stagePages(t, repo, []*string{strPtr("https://sitea.com/")}, 2)
+	svc := newPageImportService(repo, creator)
+
+	_, err := svc.ImportItems(context.Background(), importAdmin, job.ID, ids[0])
+	require.NoError(t, err)
+
+	for _, id := range ids[0] {
+		item := repo.items[id].Item
+		assert.Equal(t, domain.ImportItemStatusFailed, *item.ImportStatus)
+		assert.Equal(t, "couldn't create the website", *item.ImportError)
+	}
+	_, pages := creator.calls()
+	assert.Empty(t, pages, "no page is filed under a row that is not a website")
+}
+
+func TestImportWebPage_RowOfAMissingSourceFailsInsteadOfImportingUnfiled(t *testing.T) {
+	repo := newFakeImportRepo()
+	creator := &pageCreator{fakeCreator: &fakeCreator{}}
+	job, ids := stagePages(t, repo, []*string{strPtr("https://sitea.com/")}, 1)
+	repo.items[ids[0][0]].Item.SourceID = 99999
+	svc := newPageImportService(repo, creator)
+
+	_, err := svc.ImportItems(context.Background(), importAdmin, job.ID, ids[0])
+	require.NoError(t, err)
+
+	item := repo.items[ids[0][0]].Item
+	assert.Equal(t, domain.ImportItemStatusFailed, *item.ImportStatus)
+	_, pages := creator.calls()
+	assert.Empty(t, pages)
+}
+
+// realPageCreator sends page creates to a real ContentService (over a mock
+// repository that counts GetByID) and website creates to a fixed website row.
+type realPageCreator struct {
+	*fakeCreator
+	content *services.ContentService
+}
+
+func (c *realPageCreator) CreateFromWebsite(context.Context, string, int) (*domain.Content, error) {
+	return &domain.Content{ID: 700, ContentType: domain.ContentTypeWebsite}, nil
+}
+
+func (c *realPageCreator) CreateFromWebPage(ctx context.Context, in portservices.CreateWebPageInput, userID int) (*domain.Content, error) {
+	return c.content.CreateFromWebPage(ctx, in, userID)
+}
+
+func TestImportWebPage_ParentIsNotReadPerPage(t *testing.T) {
+	site := "https://sitea.com/"
+	parent := &domain.Content{ID: 700, ContentType: domain.ContentTypeWebsite, URL: &site}
+	for _, n := range []int{1, 50} {
+		t.Run(fmt.Sprintf("%d rows", n), func(t *testing.T) {
+			// Workers run concurrently, so the counters are atomic.
+			var getByID, inserts atomic.Int64
+			mock := &mockContentRepository{
+				getByURLFn: func(context.Context, string) (*domain.Content, error) { return nil, domain.ErrNotFound },
+				getByIDFn: func(context.Context, int) (*domain.Content, error) {
+					getByID.Add(1)
+					return parent, nil
+				},
+				getOrCreateByURLFn: func(_ context.Context, c *domain.Content, _ bool) (*domain.Content, bool, error) {
+					inserts.Add(1)
+					return c, false, nil
+				},
+			}
+			content := newWebPageService(mock, okSite(t))
+			repo := newFakeImportRepo()
+			job, ids := stagePages(t, repo, []*string{&site}, n)
+			svc := services.NewImportService(repo, nil, &realPageCreator{fakeCreator: &fakeCreator{}, content: content}, inline, fixedNow)
+
+			_, err := svc.ImportItems(context.Background(), importAdmin, job.ID, ids[0])
+			require.NoError(t, err)
+
+			assert.Equal(t, int64(n), inserts.Load(), "every page was saved")
+			assert.Zero(t, getByID.Load(), "the parent is not read for any page")
+			for _, id := range ids[0] {
+				assert.Equal(t, domain.ImportItemStatusImported, *repo.items[id].Item.ImportStatus)
+			}
+		})
+	}
+}
+
+func TestCreateFromWebPage_PublicPathStillValidatesTheParent(t *testing.T) {
+	site := "https://sitea.com/"
+	parent := &domain.Content{ID: 700, ContentType: domain.ContentTypeWebsite, URL: &site}
+	var getByID, inserts int
+	content := newWebPageService(websiteParentRepo(parent, &getByID, &inserts), okSite(t))
+	pid := 700
+
+	_, err := content.CreateFromWebPage(context.Background(), portservices.CreateWebPageInput{URL: "https://sitea.com/a", ParentContentID: &pid}, 1)
+	require.NoError(t, err)
+	assert.Equal(t, 1, getByID, "an unvalidated parent is read once")
+
+	other := 701 // not a stored row
+	_, err = content.CreateFromWebPage(context.Background(), portservices.CreateWebPageInput{URL: "https://sitea.com/b", ParentContentID: &other}, 1)
+	require.ErrorIs(t, err, domain.ErrParentNotFound)
 }

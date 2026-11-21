@@ -77,7 +77,11 @@ func (s *ImportService) resolveWebsites(ctx context.Context, jobID, actorID int,
 	createCtx := WithImportJobID(ctx, jobID)
 	for _, id := range sourceIDs {
 		src := sites.sources[id]
-		if src == nil || src.URL == nil {
+		if src == nil {
+			sites.failed[id] = fmt.Errorf("%w: the source is missing", errWebsiteCreate)
+			continue
+		}
+		if src.URL == nil {
 			continue
 		}
 		site, err := s.content.CreateFromWebsite(createCtx, *src.URL, actorID)
@@ -86,6 +90,9 @@ func (s *ImportService) resolveWebsites(ctx context.Context, jobID, actorID int,
 		}
 		if err == nil && site == nil {
 			err = errors.New("no website returned")
+		}
+		if err == nil && site.ContentType != domain.ContentTypeWebsite {
+			err = errors.New("a page already exists at the site root")
 		}
 		if err != nil {
 			slog.Warn("import website not created", "jobID", jobID, "sourceID", id, "error", err)
@@ -130,6 +137,7 @@ func (s *ImportService) importWebPage(ctx context.Context, actorID int, it *doma
 		URL:             it.CanonicalURL,
 		Roles:           roles,
 		ParentContentID: sites.websiteIDs[it.SourceID],
+		ParentValidated: true, // resolveWebsites made the parent; staging checked the host
 		Prefetched:      s.prefetchedPage(it, details, siteName),
 	}, actorID)
 }

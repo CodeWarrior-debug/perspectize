@@ -163,6 +163,8 @@ func TestStageImportFromFile_RefusesWholeFile(t *testing.T) {
 			r[1].Details.People = []domain.ImportPerson{{Name: strings.Repeat("a", 201), Role: "author"}}
 		})}, "row 2"},
 		{"too many tags", domain.StageImportFileInput{Name: "x", Items: with(func(r []domain.StageImportFileItem) { r[1].Details.Tags = make([]string, 21) })}, "row 2"},
+		{"unknown role", domain.StageImportFileInput{Name: "x", Items: with(func(r []domain.StageImportFileItem) { r[1].Facts.WebPageRoles = []string{"BLOG_POST", "NEWS"} })}, "row 2"},
+		{"lowercase role", domain.StageImportFileInput{Name: "x", Items: with(func(r []domain.StageImportFileItem) { r[2].Facts.WebPageRoles = []string{"blog_post"} })}, "row 3"},
 		{"bad website url", domain.StageImportFileInput{Name: "x", WebsiteURL: &bad, Items: fileRows(1)}, ""},
 		{"blank name", domain.StageImportFileInput{Name: " ", Items: fileRows(1)}, ""},
 	}

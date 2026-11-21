@@ -158,6 +158,11 @@ func validateFileRow(n int, in domain.StageImportFileItem, websiteURL *string) (
 	if facts.Summary != nil && utf8.RuneCountInString(*facts.Summary) > maxFileSummaryChars {
 		return nil, bad("summary is at most %d characters", maxFileSummaryChars)
 	}
+	for _, r := range facts.WebPageRoles {
+		if !domain.WebPageRole(r).Valid() {
+			return nil, bad("webPageRoles has an unknown role %q", r)
+		}
+	}
 	details := in.Details
 	if len(details.Tags) > maxFileTags {
 		return nil, bad("at most %d tags", maxFileTags)

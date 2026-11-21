@@ -28,6 +28,10 @@ type CreateWebPageInput struct {
 	Roles []domain.WebPageRole
 	// ParentContentID files the page under a WEBSITE row on the same host.
 	ParentContentID *int
+	// ParentValidated is set only by the import worker, after it found or created
+	// the parent website itself and staging checked every row is on that site. It
+	// skips the per-page parent read. Public mutations must never set it.
+	ParentValidated bool
 	// Prefetched, when set, replaces the network fetch (import files carry the facts).
 	Prefetched *domain.WebPageMeta
 }
