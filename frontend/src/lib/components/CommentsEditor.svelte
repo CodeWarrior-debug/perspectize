@@ -334,7 +334,12 @@
 			<button
 				type="button"
 				class="absolute top-1.5 right-1.5 p-1 border-none bg-transparent text-muted-foreground cursor-pointer rounded hover:opacity-70"
-				onclick={onPopout}
+				onmousedown={(e) => e.preventDefault()}
+				onclick={() => {
+					onPopout?.();
+					// Expanding is part of writing: the caret stays in the text so typing carries on.
+					editor?.commands.focus();
+				}}
 				aria-label={expanded ? 'Collapse comment' : 'Expand comment'}
 				aria-pressed={expanded}
 			>

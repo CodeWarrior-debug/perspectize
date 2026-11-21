@@ -34,6 +34,15 @@ describe('CommentsEditor', () => {
 		expect(frame.classList.contains('overflow-hidden')).toBe(false);
 	});
 
+	it('keeps the caret in the writing area when the expand button is used', async () => {
+		const onPopout = vi.fn();
+		render(CommentsEditor, { props: { value: '', onChange: vi.fn(), showPopout: true, onPopout } });
+		const box = await screen.findByRole('textbox', { name: 'Comment' });
+		await fireEvent.click(screen.getByLabelText('Expand comment'));
+		expect(onPopout).toHaveBeenCalledTimes(1);
+		await waitFor(() => expect(document.activeElement).toBe(box));
+	});
+
 	it('renders the default toolbar buttons', async () => {
 		render(CommentsEditor, { props: { value: '', onChange: vi.fn() } });
 
