@@ -20,6 +20,13 @@
 		extractVideoIdFromUrl,
 		getSourceDataCooldown,
 	} from '#lib/utils/formatting.js';
+	import {
+		SOURCE_DATA_REFRESH_LABEL,
+		sourceDataCellState,
+		sourceDataCellText,
+		sourceDataExpiredHint,
+	} from '#lib/utils/sourceDataExpiry.js';
+	import { useAuthState } from '#lib/auth/useAuthState.js';
 	import { useUpdateSourceData } from '#lib/queries/content/useUpdateSourceData.js';
 	import { useContentAggregates } from '#lib/queries/content/useContentAggregates.js';
 	import { ratingToDisplay } from '#lib/utils/ratings.js';
@@ -46,6 +53,7 @@
 		contentType?: string;
 		primaryCategory?: { label: string; wikipediaUrl?: string | null } | null;
 		viewCount: number | null;
+		sourceDataExpired?: boolean;
 		likeCount: number | null;
 		length: number | null;
 		lengthUnits: string | null;
@@ -137,9 +145,23 @@
 	// that's explained upfront instead of a "success" toast that changes
 	// nothing. See getSourceDataCooldown's doc comment for why this is a UX
 	// estimate, not the actual enforcement.
-	const cooldown = $derived(content ? getSourceDataCooldown(content.updatedAt) : { active: false, remainingMs: 0 });
+	// An aged-out row is always refreshable: its updatedAt can be recent from an
+	// unrelated edit, which must not keep its numbers hidden behind the cooldown.
+	const cooldown = $derived(
+		content && !content.sourceDataExpired
+			? getSourceDataCooldown(content.updatedAt)
+			: { active: false, remainingMs: 0 },
+	);
 
 	const updateSourceData = useUpdateSourceData();
+	const auth = useAuthState();
+	const sourceState = $derived(
+		sourceDataCellState({
+			expired: content?.sourceDataExpired,
+			signedIn: !!auth.userId,
+			refreshing: updateSourceData.isPending,
+		}),
+	);
 
 	// Lazy-loaded on demand — see useContentAggregates's doc comment. Keyed off
 	// the currently-open content's id, so it only fetches while the modal is
@@ -369,7 +391,7 @@
 							<div
 								class="mt-0.5 font-slot-cell font-[family-name:var(--font-family-serif)] text-[15px] font-bold text-foreground"
 							>
-								{formatCount(content.viewCount)}
+								{sourceDataCellText(sourceState, formatCount(content.viewCount))}
 							</div>
 						</div>
 						<div class="rounded-lg border border-border bg-muted px-3 py-2.5">
@@ -377,7 +399,7 @@
 							<div
 								class="mt-0.5 font-slot-cell font-[family-name:var(--font-family-serif)] text-[15px] font-bold text-foreground"
 							>
-								{formatCount(content.likeCount)}
+								{sourceDataCellText(sourceState, formatCount(content.likeCount))}
 							</div>
 						</div>
 						<div class="rounded-lg border border-border bg-muted px-3 py-2.5">
@@ -471,10 +493,15 @@
 								{:else}
 									<RefreshCwIcon />
 								{/if}
-								Update source data
+								{content.sourceDataExpired ? SOURCE_DATA_REFRESH_LABEL : 'Update source data'}
 							</button>
 						{/if}
 					</div>
+					{#if !isPassage && !isWebPage && sourceState !== 'fresh'}
+						<div class="mt-1.5 text-[11px] text-muted-foreground" data-testid="source-data-expired-hint">
+							{sourceDataExpiredHint(sourceState !== 'expired-signed-out')}
+						</div>
+					{/if}
 					{#if !isPassage && !isWebPage && cooldown.active}
 						<div class="mt-1.5 text-[11px] text-muted-foreground">
 							This was updated recently. Check back in {formatRemainingTime(cooldown.remainingMs)} to refresh again.

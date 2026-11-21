@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { SOURCE_DATA_EXPIRED_CELL } from '#lib/utils/sourceDataExpiry.js';
 	import type { LengthDisplay, WebPageListMeta } from '#lib/queries/content/index.js';
 	import {
 		webPageAuthor,
@@ -47,6 +48,7 @@
 		// only on mobile.
 		primaryCategory?: { label: string } | null;
 		viewCount?: number | null;
+		sourceDataExpired?: boolean;
 		likeCount?: number | null;
 		contentType?: string;
 		// MOVIE rows carry TMDB data in their JSON `response` (or `movie`); see formatting.ts.
@@ -259,7 +261,11 @@
 							<span class="rounded bg-muted px-1.5 py-0.5 text-foreground">{row.primaryCategory.label}</span>
 						{/if}
 					</div>
-					{#if row.viewCount != null || row.likeCount != null}
+					{#if row.sourceDataExpired}
+						<div class="mt-1 text-xs text-muted-foreground italic" data-testid="source-data-expired">
+							{SOURCE_DATA_EXPIRED_CELL}
+						</div>
+					{:else if row.viewCount != null || row.likeCount != null}
 						<div class="mt-1 flex items-center gap-2 text-xs text-muted-foreground">
 							{#if row.viewCount != null}
 								<span>{formatCount(row.viewCount)} views</span>

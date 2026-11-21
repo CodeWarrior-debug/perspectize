@@ -87,6 +87,7 @@
 		textOrEmpty,
 		EMPTY_VALUE,
 	} from '#lib/utils/formatting.js';
+	import { sourceDataCellState, sourceDataCellText } from '#lib/utils/sourceDataExpiry.js';
 	import { headerMinWidth } from '#lib/utils/grid-header-width.js';
 	import {
 		capitalizeContentType,
@@ -983,7 +984,12 @@
 				maxWidth: 130,
 
 				filter: 'agNumberColumnFilter',
-				valueFormatter: (params) => formatCount(params.value),
+				valueFormatter: (params) =>
+					sourceDataCellText(
+						sourceDataCellState({ expired: params.data?.sourceDataExpired, signedIn: true }),
+						formatCount(params.value),
+					),
+				cellClass: (params) => (params.data?.sourceDataExpired ? 'text-muted-foreground italic' : ''),
 				context: { tooltipSpec: ACTIVITY_TOOLTIP_SPECS.views },
 				headerTooltip: 'View count from YouTube API',
 			},
@@ -995,7 +1001,12 @@
 				maxWidth: 130,
 
 				filter: 'agNumberColumnFilter',
-				valueFormatter: (params) => formatCount(params.value),
+				valueFormatter: (params) =>
+					sourceDataCellText(
+						sourceDataCellState({ expired: params.data?.sourceDataExpired, signedIn: true }),
+						formatCount(params.value),
+					),
+				cellClass: (params) => (params.data?.sourceDataExpired ? 'text-muted-foreground italic' : ''),
 				context: { tooltipSpec: ACTIVITY_TOOLTIP_SPECS.likes },
 				headerTooltip: 'Like count from YouTube API',
 			},
