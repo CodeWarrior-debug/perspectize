@@ -29,6 +29,7 @@
 	import ExternalLinkIcon from '@lucide/svelte/icons/external-link';
 	import PencilIcon from '@lucide/svelte/icons/pencil';
 	import FocusIcon from '@lucide/svelte/icons/focus';
+	import QuoteIcon from '@lucide/svelte/icons/quote';
 	import ImageIcon from '@lucide/svelte/icons/image';
 	import TableIcon from '@lucide/svelte/icons/table';
 	import RowIcon from '@lucide/svelte/icons/rows-2';
@@ -119,6 +120,13 @@
 			run: (e) => e.chain().focus().toggleOrderedList().run(),
 		},
 		{
+			id: 'quote',
+			label: 'Quote',
+			hint: '>',
+			keywords: ['blockquote', 'cite', 'passage'],
+			run: (e) => e.chain().focus().toggleBlockquote().run(),
+		},
+		{
 			id: 'link',
 			label: 'Link',
 			hint: isMobile ? 'by URL' : /Mac|iPhone|iPad/.test(navigator.platform) ? '⌘K' : 'Ctrl K',
@@ -152,7 +160,6 @@
 				}),
 				StarterKit.configure({
 					codeBlock: false,
-					blockquote: false,
 					horizontalRule: false,
 					heading: { levels: [2, 3] },
 					// StarterKit v3 bundles Link and Underline; we register our own
@@ -383,6 +390,14 @@
 						run: () => editor!.chain().focus().toggleOrderedList().run(),
 					},
 					{
+						id: 'quote',
+						toggle: true,
+						label: 'Quote',
+						icon: QuoteIcon,
+						isActive: () => editor!.isActive('blockquote'),
+						run: () => editor!.chain().focus().toggleBlockquote().run(),
+					},
+					{
 						id: 'link',
 						toggle: true,
 						label: 'Link',
@@ -454,7 +469,7 @@
 		});
 	});
 
-	const BUBBLE_IDS = ['bold', 'italic', 'underline', 'link'];
+	const BUBBLE_IDS = ['bold', 'italic', 'underline', 'quote', 'link'];
 	const bubbleItems = $derived(items.filter((i) => BUBBLE_IDS.includes(i.id)));
 
 	const BASIC_TOOLBAR_IDS = new Set(['bold', 'italic', 'underline', 'bulletList', 'orderedList', 'link']);
@@ -848,6 +863,12 @@
 	:global(.tiptap-content a) {
 		color: var(--color-primary);
 		text-decoration: underline;
+	}
+	:global(.tiptap-content blockquote) {
+		margin: 6px 0;
+		padding-left: 12px;
+		border-left: 3px solid var(--color-border);
+		color: var(--color-muted-foreground);
 	}
 	:global(.tiptap-content li) {
 		margin: 2px 0;

@@ -91,7 +91,7 @@ describe('CommentsEditor', () => {
 		expect(screen.queryByRole('toolbar', { name: 'Format selection' })).toBeNull();
 	});
 
-	it('shows Bold, Italic, Underline and Link next to selected words and formats them', async () => {
+	it('shows Bold, Italic, Underline, Quote and Link next to selected words and formats them', async () => {
 		const onChange = vi.fn();
 		render(CommentsEditor, { props: { value: '<p>hello world</p>', onChange } });
 		const box = await screen.findByRole('textbox', { name: 'Comment' });
@@ -105,7 +105,7 @@ describe('CommentsEditor', () => {
 		selection.addRange(range);
 		document.dispatchEvent(new Event('selectionchange'));
 		const bar = await screen.findByRole('toolbar', { name: 'Format selection' }, { timeout: 2000 });
-		expect(bar.querySelectorAll('button')).toHaveLength(4);
+		expect(bar.querySelectorAll('button')).toHaveLength(5);
 		await fireEvent.click(screen.getByLabelText('Bold (selection)'));
 		await waitFor(() => expect(onChange).toHaveBeenLastCalledWith('<p><strong>hello</strong> world</p>'));
 	});
@@ -196,6 +196,34 @@ describe('CommentsEditor', () => {
 		await rerender({ ...props, expanded: false });
 		expect(screen.queryByLabelText('Focus mode')).toBeNull();
 		expect(frame.dataset.focusMode).toBe('false');
+	});
+
+	it('quotes the paragraph with the Quote button and reports it as pressed', async () => {
+		const onChange = vi.fn();
+		render(CommentsEditor, { props: { value: '<p>a passage</p>', onChange } });
+		const box = await screen.findByRole('textbox', { name: 'Comment' });
+		box.focus();
+		const quote = screen.getByLabelText('Quote');
+		expect(quote.getAttribute('aria-pressed')).toBe('false');
+		await fireEvent.click(quote);
+		await waitFor(() => expect(onChange).toHaveBeenLastCalledWith('<blockquote><p>a passage</p></blockquote><p></p>'));
+		await waitFor(() => expect(screen.getByLabelText('Quote').getAttribute('aria-pressed')).toBe('true'));
+		await fireEvent.click(screen.getByLabelText('Quote'));
+		await waitFor(() => expect(onChange).toHaveBeenLastCalledWith('<p>a passage</p><p></p>'));
+	});
+
+	it('keeps an existing quote when a review is loaded', async () => {
+		render(CommentsEditor, {
+			props: { value: '<blockquote><p>said</p></blockquote><p>I reply</p>', onChange: vi.fn() },
+		});
+		const box = await screen.findByRole('textbox', { name: 'Comment' });
+		expect(box.querySelector('blockquote p')?.textContent).toBe('said');
+	});
+
+	it('leaves the quote button out of the basic toolbar', async () => {
+		render(CommentsEditor, { props: { value: '', onChange: vi.fn(), toolbar: 'basic' } });
+		await screen.findByLabelText('Bold');
+		expect(screen.queryByLabelText('Quote')).toBeNull();
 	});
 
 	it('renders the default toolbar buttons', async () => {
