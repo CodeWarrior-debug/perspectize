@@ -361,6 +361,34 @@ func (r *GormImportJobRepository) GetItemWithDetails(ctx context.Context, itemID
 	return out, nil
 }
 
+// GetItemDetailsByIDs returns the detail payloads of the rows of jobID among
+// ids, keyed by row id, in one query. A row with no payload maps to empty
+// details; ids of other jobs and unknown ids are absent.
+func (r *GormImportJobRepository) GetItemDetailsByIDs(ctx context.Context, jobID int, ids []int) (map[int]*domain.ImportItemDetails, error) {
+	out := make(map[int]*domain.ImportItemDetails, len(ids))
+	if len(ids) == 0 {
+		return out, nil
+	}
+	var models []ImportItemModel
+	if err := r.db.WithContext(ctx).
+		Table("import_job_items").
+		Select("id, details").
+		Where("job_id = ? AND id = ANY(CAST(? AS bigint[]))", jobID, intsToArray(ids)).
+		Scan(&models).Error; err != nil {
+		return nil, fmt.Errorf("failed to get import item details: %w", err)
+	}
+	for i := range models {
+		details := &domain.ImportItemDetails{}
+		if len(models[i].Details) > 0 {
+			if err := json.Unmarshal(models[i].Details, details); err != nil {
+				return nil, fmt.Errorf("failed to decode import item details: %w", err)
+			}
+		}
+		out[models[i].ID] = details
+	}
+	return out, nil
+}
+
 // MarkQueued queues never-imported or failed rows and returns the ids it changed.
 func (r *GormImportJobRepository) MarkQueued(ctx context.Context, jobID int, ids []int) ([]int, error) {
 	if len(ids) == 0 {

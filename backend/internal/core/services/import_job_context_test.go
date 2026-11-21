@@ -9,6 +9,7 @@ import (
 
 	"github.com/CodeWarrior-debug/perspectize/backend/internal/core/domain"
 	"github.com/CodeWarrior-debug/perspectize/backend/internal/core/ports/repositories"
+	portservices "github.com/CodeWarrior-debug/perspectize/backend/internal/core/ports/services"
 )
 
 // jobIDRecordingCreator records the import job id each create call's context carries.
@@ -32,6 +33,14 @@ func (c *jobIDRecordingCreator) CreateFromMovie(ctx context.Context, _ string, _
 	return c.record(ctx)
 }
 
+func (c *jobIDRecordingCreator) CreateFromWebPage(ctx context.Context, _ portservices.CreateWebPageInput, _ int) (*domain.Content, error) {
+	return c.record(ctx)
+}
+
+func (c *jobIDRecordingCreator) CreateFromWebsite(ctx context.Context, _ string, _ int) (*domain.Content, error) {
+	return c.record(ctx)
+}
+
 // outcomeOnlyRepo is an ImportJobRepository whose only method importOne uses is RecordOutcome.
 type outcomeOnlyRepo struct {
 	repositories.ImportJobRepository // nil: any other method panics
@@ -47,8 +56,8 @@ func TestImportOne_PassesJobIDToContentCreate(t *testing.T) {
 
 	video := &domain.ImportItem{ID: 3, JobID: 42, DestinationType: domain.ContentTypeYouTubeVideo, CanonicalURL: "https://www.youtube.com/watch?v=x"}
 	movie := &domain.ImportItem{ID: 4, JobID: 42, DestinationType: domain.ContentTypeMovie, CanonicalURL: "https://www.themoviedb.org/movie/1"}
-	_, _ = s.importOne(context.Background(), 9, video)
-	_, _ = s.importOne(context.Background(), 9, movie)
+	_, _ = s.importOne(context.Background(), 9, video, nil)
+	_, _ = s.importOne(context.Background(), 9, movie, nil)
 
 	require.Len(t, creator.jobIDs, 2)
 	assert.Equal(t, []int{42, 42}, creator.jobIDs, "every create made for a row names the row's import")

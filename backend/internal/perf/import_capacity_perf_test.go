@@ -464,6 +464,14 @@ func (c *timedCreator) CreateFromMovie(ctx context.Context, rawURL string, userI
 	return c.inner.CreateFromMovie(ctx, rawURL, userID)
 }
 
+func (c *timedCreator) CreateFromWebPage(ctx context.Context, in portservices.CreateWebPageInput, userID int) (*domain.Content, error) {
+	return c.inner.CreateFromWebPage(ctx, in, userID)
+}
+
+func (c *timedCreator) CreateFromWebsite(ctx context.Context, rawURL string, userID int) (*domain.Content, error) {
+	return c.inner.CreateFromWebsite(ctx, rawURL, userID)
+}
+
 // ---- probe and sampler ---------------------------------------------------------
 
 var probeBody, _ = json.Marshal(map[string]any{"query": listContentQuery, "variables": map[string]any{"first": 50}})

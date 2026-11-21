@@ -7,12 +7,15 @@ import (
 	"time"
 
 	"github.com/CodeWarrior-debug/perspectize/backend/internal/core/domain"
+	portservices "github.com/CodeWarrior-debug/perspectize/backend/internal/core/ports/services"
 )
 
 // importContentCreator is what the import workers call for each row.
 type importContentCreator interface {
 	CreateFromYouTube(ctx context.Context, url string, userID int) (*domain.Content, error)
 	CreateFromMovie(ctx context.Context, rawURL string, userID int) (*domain.Content, error)
+	CreateFromWebPage(ctx context.Context, in portservices.CreateWebPageInput, userID int) (*domain.Content, error)
+	CreateFromWebsite(ctx context.Context, rawURL string, userID int) (*domain.Content, error)
 }
 
 // maxDemoImportDelay caps DEMO_IMPORT_DELAY_MS so a typo can't stall a demo for minutes per row.
@@ -63,4 +66,15 @@ func (c slowImportCreator) CreateFromMovie(ctx context.Context, rawURL string, u
 		return nil, err
 	}
 	return c.inner.CreateFromMovie(ctx, rawURL, userID)
+}
+
+func (c slowImportCreator) CreateFromWebPage(ctx context.Context, in portservices.CreateWebPageInput, userID int) (*domain.Content, error) {
+	if err := c.wait(ctx); err != nil {
+		return nil, err
+	}
+	return c.inner.CreateFromWebPage(ctx, in, userID)
+}
+
+func (c slowImportCreator) CreateFromWebsite(ctx context.Context, rawURL string, userID int) (*domain.Content, error) {
+	return c.inner.CreateFromWebsite(ctx, rawURL, userID)
 }
