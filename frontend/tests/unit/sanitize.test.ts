@@ -63,4 +63,14 @@ describe('sanitizeHtml', () => {
 	it('returns an empty string for empty input', () => {
 		expect(sanitizeHtml('')).toBe('');
 	});
+
+	it('keeps a blockquote and the formatting inside it', () => {
+		const html = '<blockquote><p>a <strong>quoted</strong> line</p></blockquote><p>my reply</p>';
+		expect(sanitizeHtml(html)).toBe(html);
+	});
+
+	it('strips attributes and scripts from inside a blockquote', () => {
+		const dirty = '<blockquote onclick="alert(1)" style="x:y"><p>q</p><script>alert(1)</script></blockquote>';
+		expect(sanitizeHtml(dirty)).toBe('<blockquote><p>q</p></blockquote>');
+	});
 });

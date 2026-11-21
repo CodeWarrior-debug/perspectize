@@ -13,12 +13,14 @@ export function draftKey(contentId: string | number, userId: string | number): s
  * (`''` for a brand-new perspective). It lets loadDraft() tell a genuine
  * unsaved draft from one that a newer save elsewhere has since superseded.
  */
-export function saveDraft(key: string, html: string, baseline = ''): void {
+export function saveDraft(key: string, html: string, baseline = ''): boolean {
 	try {
 		localStorage.setItem(key, JSON.stringify({ html, baseline, savedAt: Date.now() }));
+		return true;
 	} catch {
 		// localStorage unavailable (private browsing, quota) — draft persistence
-		// is a nice-to-have, never block editing on it.
+		// is a nice-to-have, never block editing on it. The caller can tell the writer nothing was kept.
+		return false;
 	}
 }
 
