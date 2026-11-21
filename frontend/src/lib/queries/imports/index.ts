@@ -317,6 +317,19 @@ export const IMPORT_ITEMS = gql`
 	}
 `;
 
+/** Admin: stage a candidates file as an approved import (no listing call). Returns the new job's id. */
+export const STAGE_IMPORT_FROM_FILE = gql`
+	mutation StageImportFromFile($input: StageImportFromFileInput!) {
+		stageImportFromFile(input: $input) {
+			id
+		}
+	}
+`;
+
+export interface StageImportFromFileResponse {
+	stageImportFromFile: { id: string };
+}
+
 export const CREATE_IMPORT_JOB = gql`
 	${IMPORT_JOB_FIELDS}
 	mutation CreateImportJob($input: CreateImportJobInput!) {

@@ -10,6 +10,7 @@ import type {
 	ImportSourceType,
 } from '#lib/queries/imports/index.js';
 import { EMPTY_VALUE, formatCount, formatCountExact, formatDurationSeconds, typeCellRenderer } from './formatting';
+import { webPageRoleLabel } from './webPage';
 import { contentTypeLabel } from './grid-config';
 import { sanitizeHtml } from './sanitize';
 
@@ -54,6 +55,21 @@ export function prettifyKey(key: string): string {
 	return text.charAt(0).toUpperCase() + text.slice(1);
 }
 
+/**
+ * Column headers that differ from the key's prettified form. `durationSeconds` is "Reading time" only when the
+ * rows are webpages: a YouTube sheet keeps its "Duration seconds" column.
+ */
+const FACT_HEADERS: Readonly<Record<string, string>> = {
+	wordCount: 'Words',
+	commentCount: 'Comments',
+	webPageRoles: 'Roles',
+};
+
+export function factHeader(key: string, rows: readonly Pick<ImportItem, 'facts'>[]): string {
+	if (key === 'durationSeconds' && rows.some((r) => r.facts?.kind === 'PAGE')) return 'Reading time';
+	return FACT_HEADERS[key] ?? prettifyKey(key);
+}
+
 /** The facts keys present in any row, as sheet columns: the shared ones first, then A–Z. */
 export function factKeys(rows: readonly Pick<ImportItem, 'facts'>[]): string[] {
 	const keys = new Set<string>();
@@ -88,6 +104,8 @@ const isSecondsKey = (key: string) => key.endsWith('Seconds');
  */
 export function formatFact(key: string, value: ImportFactValue | null | undefined): string {
 	if (value === null || value === undefined) return EMPTY_VALUE;
+	if (key === 'webPageRoles' && Array.isArray(value))
+		return value.length ? value.map((r) => webPageRoleLabel(String(r))).join(', ') : EMPTY_VALUE;
 	if (Array.isArray(value)) return value.length ? value.join(', ') : EMPTY_VALUE;
 	if (typeof value === 'boolean') return value ? 'Yes' : 'No';
 	if (typeof value === 'number') {
@@ -346,6 +364,15 @@ export function titleCellRenderer(params: { data?: ImportRow }): HTMLElement | s
 		img.src = thumbnail;
 		img.alt = '';
 		img.loading = 'lazy';
+		// The image host isn't told which page the sheet came from.
+		img.referrerPolicy = 'no-referrer';
+		// A thumbnail that won't load shows a plain block in its place, not a broken-image icon.
+		img.addEventListener('error', () => {
+			const fallback = document.createElement('div');
+			fallback.dataset.thumbnailFallback = '';
+			fallback.className = `${img.className} bg-muted`;
+			img.replaceWith(fallback);
+		});
 		img.className =
 			row.destinationType === 'MOVIE'
 				? 'h-10 w-7 shrink-0 rounded object-cover'
@@ -419,7 +446,7 @@ function sampleValue(rows: readonly ImportRow[], key: string): ImportFactValue |
 /** A facts key's column: header from the key, filter from its values, cell text from formatFact. */
 export function factColumnDef(key: string, rows: readonly ImportRow[]): ColDef<ImportRow> {
 	const sample = sampleValue(rows, key);
-	const header = prettifyKey(key);
+	const header = factHeader(key, rows);
 	const base: ColDef<ImportRow> = {
 		colId: `fact:${key}`,
 		headerName: header,

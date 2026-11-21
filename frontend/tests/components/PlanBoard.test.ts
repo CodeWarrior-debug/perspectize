@@ -129,6 +129,9 @@ vi.mock('#lib/auth/useAuthState.js', () => ({
 vi.mock('#lib/queries/content/useContentAggregates.js', () => ({
 	useContentAggregates: vi.fn(() => ({ data: undefined, isLoading: false })),
 }));
+vi.mock('#lib/queries/content/useWebsitePages.js', () => ({
+	useWebsitePages: vi.fn(() => ({ data: undefined, isPending: false, isError: false })),
+}));
 vi.mock('#lib/queries/content/useUpdateSourceData.js', () => ({
 	useUpdateSourceData: vi.fn(() => ({ mutate: vi.fn(), isPending: false })),
 }));

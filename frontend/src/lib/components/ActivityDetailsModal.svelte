@@ -29,7 +29,9 @@
 	import BookBody from '#lib/components/BookBody.svelte';
 	import WebPageTiles from '#lib/components/WebPageTiles.svelte';
 	import WebPageBody from '#lib/components/WebPageBody.svelte';
-	import { webPageSite } from '#lib/utils/webPage.js';
+	import { webPageRolesLabel, webPageRolesOf, webPageSite } from '#lib/utils/webPage.js';
+	import { useWebsitePages } from '#lib/queries/content/useWebsitePages.js';
+	import { libraryContentHref } from '#lib/utils/contentLinks.js';
 	import { useContentDetails } from '#lib/queries/content/useContentDetails.js';
 	import { bookAuthors, bookResponse, openLibraryCoverUrl } from '#lib/utils/bookFormatting.js';
 	import PassageText from '#lib/components/PassageText.svelte';
@@ -64,6 +66,8 @@
 		book?: unknown;
 		// WEB_PAGE rows: the shaped list payload (site, published, roles, og image).
 		webPage?: WebPageListMeta | null;
+		// The WEBSITE a page is filed under; set by the details query (absent on list rows).
+		parentContent?: { id: string; name: string; url: string | null } | null;
 		response?: unknown;
 	}
 
@@ -105,6 +109,14 @@
 	function withWebPageDetails(row: ModalContent): ModalContent {
 		return { ...row, response: row.response ?? webPageDetails.data?.contentByID?.response ?? null };
 	}
+	// The WEBSITE a page is filed under. The details query (fetched above for a list-row page) carries it;
+	// a row that already came from the details query has it on the row itself.
+	const parentSite = $derived(
+		isWebPage ? (content?.parentContent ?? webPageDetails.data?.contentByID?.parentContent ?? null) : null,
+	);
+	// A website lists its filed pages. One request per opened website; `null` keeps every other row off the network.
+	const isWebsite = $derived(content?.contentType === 'WEBSITE');
+	const websitePages = useWebsitePages(() => (open && isWebsite && content ? content.id : null));
 	const isPassage = $derived(content?.contentType === 'BIBLE_PASSAGE');
 	const hasVerseRange = $derived(isPassage && content?.verseStartID != null && content?.verseEndID != null);
 	const setPassageTitle = useSetPassageDisplayTitle();
@@ -502,6 +514,50 @@
 
 				{#if isBook}
 					<BookBody row={content} />
+				{/if}
+
+				{#if isWebPage && parentSite}
+					<p class="mt-3.5 border-t border-border pt-3.5 text-[13px] text-muted-foreground">
+						Part of
+						<a class="text-primary underline underline-offset-2" href={libraryContentHref(parentSite.id)}
+							>{parentSite.name}</a
+						>
+					</p>
+				{/if}
+
+				{#if isWebsite}
+					<section class="mt-3.5 border-t border-border pt-3.5" aria-label="Pages in this site">
+						<h3 class="text-[11px] tracking-wide text-muted-foreground uppercase">Pages in this site</h3>
+						{#if websitePages.isPending}
+							<p class="mt-2 text-[13px] text-muted-foreground">Loading pages…</p>
+						{:else if websitePages.isError}
+							<p class="mt-2 text-[13px] text-muted-foreground">Couldn't load this site's pages.</p>
+						{:else if websitePages.data && websitePages.data.content.items.length === 0}
+							<p class="mt-2 text-[13px] text-muted-foreground">No pages saved from this site yet</p>
+						{:else if websitePages.data}
+							<ul class="mt-2 flex flex-col gap-2">
+								{#each websitePages.data.content.items as page (page.id)}
+									<li class="flex flex-wrap items-baseline gap-x-2 text-[13px]">
+										<a class="text-primary underline underline-offset-2" href={libraryContentHref(page.id)}
+											>{page.name}</a
+										>
+										{#if page.publishedAt}
+											<span class="text-muted-foreground">{formatDate(page.publishedAt)}</span>
+										{/if}
+										{#if webPageRolesOf({ url: page.url, webPage: page.webPage }).length}
+											<span class="text-muted-foreground"
+												>{webPageRolesLabel(webPageRolesOf({ url: page.url, webPage: page.webPage }))}</span
+											>
+										{/if}
+									</li>
+								{/each}
+							</ul>
+							<p class="mt-2 text-[13px] text-muted-foreground">
+								{websitePages.data.content.totalCount}
+								{websitePages.data.content.totalCount === 1 ? 'page' : 'pages'} in total
+							</p>
+						{/if}
+					</section>
 				{/if}
 
 				{#if isWebPage}
