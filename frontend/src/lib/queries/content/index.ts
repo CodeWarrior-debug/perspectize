@@ -101,6 +101,8 @@ export interface ContentItem {
 	/** Where `length` came from and its precision; format to it (MINUTES -> h:mm). */
 	lengthDisplay?: LengthDisplay | null;
 	viewCount: number | null;
+	/** Numbers from the source have aged out (counts read null, never 0); refresh restores them. */
+	sourceDataExpired?: boolean;
 	likeCount: number | null;
 	channelTitle: string | null;
 	publishedAt: string | null;
@@ -195,6 +197,7 @@ export const LIST_CONTENT = gql`
 					precision
 				}
 				viewCount
+				sourceDataExpired
 				likeCount
 				channelTitle
 				publishedAt
@@ -309,6 +312,7 @@ export const GET_CONTENT = gql`
 				precision
 			}
 			viewCount
+			sourceDataExpired
 			likeCount
 			commentCount
 			response
@@ -338,6 +342,7 @@ export const GET_CONTENT_DETAILS = gql`
 				precision
 			}
 			viewCount
+			sourceDataExpired
 			likeCount
 			channelTitle
 			publishedAt
@@ -416,6 +421,7 @@ export const CREATE_CONTENT_FROM_YOUTUBE = gql`
 					precision
 				}
 				viewCount
+				sourceDataExpired
 				likeCount
 				channelTitle
 				publishedAt
@@ -548,6 +554,7 @@ export const UPDATE_CONTENT_SOURCE_DATA = gql`
 				precision
 			}
 			viewCount
+			sourceDataExpired
 			likeCount
 			channelTitle
 			publishedAt

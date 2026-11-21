@@ -1,4 +1,5 @@
 import type { CellCtx, ColTooltipSpec } from './tooltipSpec';
+import { SOURCE_DATA_EXPIRED_GRID_HINT } from './sourceDataExpiry';
 import {
 	authorValueGetter,
 	bookAuthors,
@@ -47,11 +48,13 @@ export const ACTIVITY_TOOLTIP_SPECS = {
 		copyValue: (c: CellCtx) => durationValueGetter({ data: c.data }),
 	},
 	views: {
-		text: (c: CellCtx) => formatCountExact(c.data?.viewCount ?? null),
+		text: (c: CellCtx) =>
+			c.data?.sourceDataExpired ? SOURCE_DATA_EXPIRED_GRID_HINT : formatCountExact(c.data?.viewCount ?? null),
 		copyValue: (c: CellCtx) => c.data?.viewCount,
 	},
 	likes: {
-		text: (c: CellCtx) => formatCountExact(c.data?.likeCount ?? null),
+		text: (c: CellCtx) =>
+			c.data?.sourceDataExpired ? SOURCE_DATA_EXPIRED_GRID_HINT : formatCountExact(c.data?.likeCount ?? null),
 		copyValue: (c: CellCtx) => c.data?.likeCount,
 	},
 	percentLiked: {
