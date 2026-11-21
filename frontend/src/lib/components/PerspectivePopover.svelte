@@ -658,14 +658,18 @@
 {/snippet}
 
 {#snippet commentRows(mobile: boolean)}
+	{@const stackedEditor = mobile && commentExpanded}
 	<!-- Overall + Comment row -->
 	<!-- On desktop this row sits outside the form, so it carries its own Cmd/Ctrl+Enter handler. -->
 	<div
-		class="shrink-0 flex items-center gap-3.5 px-5 py-3.5 border-b border-border"
+		class="shrink-0 flex gap-3.5 px-5 py-3.5 border-b border-border {stackedEditor
+			? 'flex-col items-stretch'
+			: 'items-center'}"
 		onkeydown={submitOnModEnter}
 		role="presentation"
 	>
-		<div class="flex flex-col items-center gap-1.5 flex-shrink-0">
+		<!-- A phone's open editor gets the full sheet width: the thumbs sit in a row above it instead of beside it. -->
+		<div class="flex items-center gap-1.5 flex-shrink-0 {stackedEditor ? 'flex-row gap-3' : 'flex-col'}">
 			<span class="font-sans text-[11px] font-medium text-muted-foreground uppercase tracking-[0.06em]"> Overall </span>
 			<Thumbs
 				value={likeValue}
