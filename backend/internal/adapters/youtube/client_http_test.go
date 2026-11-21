@@ -3,6 +3,7 @@ package youtube
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -45,8 +46,19 @@ func TestClient_GetVideoMetadata_Success(t *testing.T) {
 	assert.Equal(t, "D", meta.Description)
 	assert.Equal(t, "C", meta.ChannelName)
 	assert.Equal(t, 90, meta.Duration)
+	// The stored response carries when it was fetched so counts can age out.
+	var stored map[string]json.RawMessage
+	require.NoError(t, json.Unmarshal(meta.Response, &stored))
+	var fetchedAt string
+	require.NoError(t, json.Unmarshal(stored[domain.SourceDataFetchedAtKey], &fetchedAt))
+	at, err := time.Parse(time.RFC3339, fetchedAt)
+	require.NoError(t, err)
+	assert.WithinDuration(t, time.Now(), at, time.Minute)
+	delete(stored, domain.SourceDataFetchedAtKey)
+	rest, err := json.Marshal(stored)
+	require.NoError(t, err)
 	assert.JSONEq(t, `{"items":[{"snippet":{"title":"T","description":"D","channelTitle":"C","publishedAt":"2020-01-01T00:00:00Z","tags":null},`+
-		`"contentDetails":{"duration":"PT1M30S"},"statistics":{"viewCount":"1","likeCount":"2","commentCount":"3"}}]}`, string(meta.Response))
+		`"contentDetails":{"duration":"PT1M30S"},"statistics":{"viewCount":"1","likeCount":"2","commentCount":"3"}}]}`, string(rest))
 }
 
 func TestClient_GetVideoMetadata_NonOKStatusIsYouTubeAPIError(t *testing.T) {

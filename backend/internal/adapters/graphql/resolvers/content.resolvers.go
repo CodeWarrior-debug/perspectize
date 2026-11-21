@@ -477,6 +477,26 @@ func passageTitleError(err error) error {
 	return fmt.Errorf("failed to update passage title")
 }
 
+// PurgeSourceData is the resolver for the purgeSourceData field.
+func (r *mutationResolver) PurgeSourceData(ctx context.Context, target domain.SourceDataTarget, olderThanDays int) (int, error) {
+	actor, err := auth.RequireAuth(ctx)
+	if err != nil {
+		return 0, err
+	}
+	if r.SourceData == nil {
+		return 0, fmt.Errorf("source data purge is not configured")
+	}
+	n, err := r.SourceData.Purge(ctx, actor, target, olderThanDays)
+	if err != nil {
+		if errors.Is(err, domain.ErrForbidden) || errors.Is(err, domain.ErrInvalidInput) {
+			return 0, err
+		}
+		slog.Error("purge source data failed", "target", target, "error", err)
+		return 0, fmt.Errorf("failed to purge source data")
+	}
+	return int(n), nil
+}
+
 // UpdateContentSourceData is the resolver for the updateContentSourceData field.
 func (r *mutationResolver) UpdateContentSourceData(ctx context.Context, contentID int) (*model.Content, error) {
 	// The mutation is @auth, so a viewer is normally present. Viewer 0 is the

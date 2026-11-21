@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"os"
 	"strconv"
+
+	"github.com/CodeWarrior-debug/perspectize/backend/internal/core/domain"
 )
 
 // Config represents the application configuration
@@ -26,6 +28,16 @@ type Config struct {
 	// MessageRetentionSweepMinutes is how often the retention sweep runs when
 	// enabled. Defaults to 15. Set via MESSAGE_RETENTION_SWEEP_MINUTES.
 	MessageRetentionSweepMinutes int `json:"message_retention_sweep_minutes"`
+
+	// SourceDataMaxAgeDays is how old fetched source counts (YouTube views,
+	// likes, comments) may get before they are hidden and swept. Default 30.
+	// Set via SOURCE_DATA_MAX_AGE_DAYS.
+	SourceDataMaxAgeDays int `json:"source_data_max_age_days"`
+
+	// SourceDataSweepHours is how often the scheduled sweep clears counts older
+	// than SourceDataMaxAgeDays. 0 (the default) disables the schedule; the
+	// admin purgeSourceData mutation still works. Set via SOURCE_DATA_SWEEP_HOURS.
+	SourceDataSweepHours int `json:"source_data_sweep_hours"`
 }
 
 // DefaultMessageRetentionSweepMinutes is the sweep cadence when retention is
@@ -148,6 +160,18 @@ func Load(configPath string) (*Config, error) {
 	if v := os.Getenv("MESSAGE_RETENTION_SWEEP_MINUTES"); v != "" {
 		if n, err := strconv.Atoi(v); err == nil && n > 0 {
 			cfg.MessageRetentionSweepMinutes = n
+		}
+	}
+
+	cfg.SourceDataMaxAgeDays = domain.DefaultSourceDataMaxAgeDays
+	if v := os.Getenv("SOURCE_DATA_MAX_AGE_DAYS"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil && n >= 1 {
+			cfg.SourceDataMaxAgeDays = n
+		}
+	}
+	if v := os.Getenv("SOURCE_DATA_SWEEP_HOURS"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil && n > 0 {
+			cfg.SourceDataSweepHours = n
 		}
 	}
 

@@ -91,6 +91,8 @@ type Content struct {
 	Tags          []string              `json:"tags,omitempty"`
 	Description   *string               `json:"description,omitempty"`
 	Response      map[string]any        `json:"response,omitempty"`
+	// True when this row's source numbers (views, likes, comments) are past the retention window or were cleared. They read as null, never 0; refreshing the source data brings them back.
+	SourceDataExpired bool `json:"sourceDataExpired"`
 	// Movie-specific metadata (the shaped TMDB payload); null for other content types.
 	Movie map[string]any `json:"movie,omitempty"`
 	// Book-specific metadata (the shaped Open Library payload); null for other content types.
