@@ -304,7 +304,7 @@
 	data-expanded={expanded}
 >
 	<!-- Toolbar -->
-	<div class="flex items-center gap-0.5 px-1.5 py-1 border-b border-border bg-accent relative flex-wrap">
+	<div class="flex items-center gap-0.5 px-1.5 py-1 border-b border-border bg-muted relative flex-wrap">
 		<select class="heading-select" value={headingValue} onchange={onHeadingChange} aria-label="Text style">
 			{#each headingLevels as level (level.value)}
 				<option value={level.value}>{level.label}</option>
@@ -367,11 +367,13 @@
 		align-items: center;
 		justify-content: center;
 	}
+	/* The toolbar sits on --color-muted, so hover/active are a foreground wash: the accent is a
+	   bold brand colour in many themes and made the icons unreadable. */
 	.tool-btn:hover {
-		background: var(--color-muted);
+		background: color-mix(in srgb, var(--color-foreground) 10%, transparent);
 	}
 	.tool-btn.active {
-		background: var(--color-muted);
+		background: color-mix(in srgb, var(--color-foreground) 16%, transparent);
 		color: var(--color-foreground);
 	}
 
@@ -385,7 +387,7 @@
 		cursor: pointer;
 	}
 	.heading-select:hover {
-		background: var(--color-muted);
+		background: color-mix(in srgb, var(--color-foreground) 10%, transparent);
 	}
 
 	/* Tiptap content styles */

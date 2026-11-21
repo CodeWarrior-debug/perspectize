@@ -697,7 +697,7 @@
 
 	{#if restoredFromDraft}
 		<div
-			class="shrink-0 flex items-center justify-between gap-2 px-5 py-2 border-b border-border bg-accent text-[12px] text-muted-foreground"
+			class="shrink-0 flex items-center justify-between gap-2 px-5 py-2 border-b border-border bg-muted text-[12px] text-muted-foreground"
 		>
 			<span>Restored unsaved draft</span>
 			<button type="button" class="text-muted-foreground underline hover:opacity-70" onclick={discardDraft}>
