@@ -297,6 +297,8 @@ describe('useCreatePerspective hook', () => {
 		it('shows generic message with a Retry action for unknown errors', () => {
 			capturedMutationOptions.onError(new Error('connection timeout'), { userID: 42, contentID: 10, quality: 7500 });
 			expect(mockToastError).toHaveBeenCalledWith('Failed to add perspective.', {
+				duration: Infinity,
+				closeButton: true,
 				action: { label: 'Retry', onClick: expect.any(Function) },
 			});
 		});
