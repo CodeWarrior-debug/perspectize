@@ -1,4 +1,5 @@
 import type { UserTodosArgs } from './userTodos';
+import type { SavedFormulaListArgs } from './savedFormulas';
 
 /**
  * Centralized query key factory for type-safe, hierarchical cache invalidation.
@@ -104,6 +105,20 @@ export const queryKeys = {
 		actions: () => [...queryKeys.userTodos.all(), 'actions'] as const,
 		todoListsAll: () => [...queryKeys.userTodos.all(), 'todoLists'] as const,
 		todoLists: (userId: number | null) => [...queryKeys.userTodos.todoListsAll(), { userId }] as const,
+	},
+
+	// Saved formulas. The viewer id is in every list key (ADR 0002 threat 5): a signed-out
+	// viewer is 'anonymous', so no two viewers ever share an entry. `mineFor` and `sharedFor`
+	// are prefixes that cover every page of one viewer's list; `sharedAll` covers all viewers.
+	savedFormulas: {
+		all: () => [...queryKeys.all, 'savedFormulas'] as const,
+		mineFor: (viewerId: string | null) => [...queryKeys.savedFormulas.all(), 'mine', viewerId ?? 'anonymous'] as const,
+		mine: (viewerId: string | null, vars: SavedFormulaListArgs) =>
+			[...queryKeys.savedFormulas.mineFor(viewerId), vars] as const,
+		sharedAll: () => [...queryKeys.savedFormulas.all(), 'shared'] as const,
+		sharedFor: (viewerId: string | null) => [...queryKeys.savedFormulas.sharedAll(), viewerId ?? 'anonymous'] as const,
+		shared: (viewerId: string | null, vars: SavedFormulaListArgs) =>
+			[...queryKeys.savedFormulas.sharedFor(viewerId), vars] as const,
 	},
 
 	// Import staging. `detail(id)` is one import's sheet (job + every row);

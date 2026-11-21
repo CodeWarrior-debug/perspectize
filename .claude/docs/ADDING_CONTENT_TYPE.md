@@ -58,6 +58,7 @@ The Movie type (PR #565) shipped without column filters even though the designer
 | **Content policy** ✱ | Adult / rating gate and the exact message (Movie: NC-17 and TMDB `adult: true` are rejected with `CONTENT_NOT_ALLOWED`). | Service tests per rejected input; frontend test showing the server message |
 | **Licensing / attribution** | Required attribution text, logo, API terms of use? | Details-modal attribution test |
 | **Formatting edge values** ✱ | null, 0, huge ($1T, not $1000B), tiny (<1%, not 0%). | `formatting.test.ts` cases for each |
+| **Formula operands** | Which numeric fields can a custom column read? Add each to the operand catalogue in `frontend/src/lib/customColumns/operands.ts` (key, label, unit, aliases, `get`, missing = null, never 0). No YouTube statistics (views, likes, comments). Derived values from third-party data need the terms check in the spec. | `operands.test.ts`: values per field, null for non-matching types, no banned labels |
 | **Rollout** | API token per environment? Deploy backend before frontend? Migration number collisions with other branches? Indexes? Evidence on a throwaway Neon branch with a recorded clip. | Checklist in the PR body; never run `make migrate-*` against the shared DB |
 
 ---

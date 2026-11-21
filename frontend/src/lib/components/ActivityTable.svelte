@@ -110,6 +110,7 @@
 		showColumnRelevanceCallout,
 		NUMERIC_COL_IDS,
 		liveGridApi,
+		isMovieOnlyTypeFilter,
 	} from '#lib/utils/grid-config.js';
 	import { ACTIVITY_GRID_THEME } from '#lib/utils/grid-theme.js';
 	import { emptyCellClassRules } from '#lib/utils/grid-empty.js';
@@ -124,7 +125,7 @@
 	import { isExportDisabled, readExportTable, type ExportGridApi } from '#lib/utils/exportGrid.js';
 	import type { ExportTable } from '#lib/utils/exportTable.js';
 	import { copyLibraryTable, downloadLibraryCsv } from '#lib/utils/exportActions.js';
-	import { copyWithToast, downloadWithToast } from '#lib/utils/toast.js';
+	import { copyWithToast, downloadWithToast, toastWithAction } from '#lib/utils/toast.js';
 	import { addLandscapePageStyle, removeLandscapePageStyle, runPrint } from '#lib/utils/printing.js';
 	import ColumnChartPopover from '#lib/components/charts/ColumnChartPopover.svelte';
 	import { CHART_ELIGIBLE_COLS, isChartEligible } from '#lib/utils/columnCharts.js';
@@ -135,6 +136,7 @@
 		clearLayout,
 		columnViewFor,
 		defaultLayout,
+		dropAbsentCustomColumns,
 		loadLayout,
 		planColumnSwitch,
 		saveLayout,
@@ -182,6 +184,22 @@
 	import CategoryTypeahead from '#lib/components/CategoryTypeahead.svelte';
 	import { useSetPrimaryCategory } from '#lib/queries/categories/useSetPrimaryCategory.js';
 	import type { WikidataSearchResult } from '#lib/queries/categories/index.js';
+	import type { SavedFormula } from '#lib/queries/savedFormulas/index.js';
+	import { useMySavedFormulas } from '#lib/queries/savedFormulas/useMySavedFormulas.js';
+	import { useDeleteSavedItem } from '#lib/queries/savedFormulas/useDeleteSavedItem.js';
+	import { useRestoreSavedItem } from '#lib/queries/savedFormulas/useRestoreSavedItem.js';
+	import CustomColumnBuilder from '#lib/components/customColumns/CustomColumnBuilder.svelte';
+	import SharedColumnsDialog from '#lib/components/customColumns/SharedColumnsDialog.svelte';
+	import {
+		buildCustomColDefs,
+		customColId,
+		customColumnValues,
+		customPickerRows,
+		isCustomColId,
+		toOperandRow,
+		hasZscore,
+		type CustomValues,
+	} from '#lib/utils/customColumnDefs.js';
 
 	// Popover state for Perspectize column
 	let popoverOpen = $state(false);
@@ -285,7 +303,8 @@
 		if (!gridApi) return out;
 		const allowed = new Set(togglableColIds(meCtx.isAdmin));
 		for (const colState of gridApi.getColumnState()) {
-			if (colState.colId && allowed.has(colState.colId)) out[colState.colId] = !colState.hide;
+			const colId = colState.colId;
+			if (colId && (allowed.has(colId) || isCustomColId(colId))) out[colId] = !colState.hide;
 		}
 		return out;
 	}
@@ -421,7 +440,9 @@
 	}
 
 	function applyLayout(api: GridApi, layout: ColumnLayout) {
-		const entries = Object.entries(layout);
+		// A custom column absent from the grid (deleted, or not offered in this view) is skipped here,
+		// not dropped from storage, so one still loading keeps its saved visibility.
+		const entries = Object.entries(dropAbsentCustomColumns(layout, (colId) => api.getColumn(colId) != null));
 		api.setColumnsVisible(
 			entries.filter(([, v]) => v).map(([c]) => c),
 			true,
@@ -656,6 +677,103 @@
 		...(personFilter ? { [PERSON_FILTER_KEY]: { filterType: 'person', filter: personChipLabel } } : {}),
 	});
 	const hasActiveFilters = $derived(Object.keys(filters).length > 0 || searchText !== '');
+
+	// ---------------------------------------------------------------------------
+	// Custom columns (saved formulas, see utils/customColumnDefs.ts). Offered only with the Movie
+	// type; values are computed here in the browser and read by the colDefs through grid context.
+	// ---------------------------------------------------------------------------
+
+	const savedFormulasQuery = useMySavedFormulas();
+	const deleteSavedItem = useDeleteSavedItem();
+	const restoreSavedItem = useRestoreSavedItem();
+	let builderOpen = $state(false);
+	let builderFormula = $state<SavedFormula | null>(null);
+	let sharedColumnsOpen = $state(false);
+	/** Bumps after the custom colDefs are pushed into the grid, so the layout effect re-applies visibility. */
+	let customDefsVersion = $state(0);
+	/** The customDefsKey last pushed into the current grid. Plain, not $state: written only by the effect that guards it. */
+	let appliedCustomKey = '';
+
+	const customEnabled = $derived(isMovieOnlyTypeFilter(filters.type));
+	const viewerId = $derived(meCtx.me?.id ?? null);
+	const customFormulas = $derived(savedFormulasQuery.data?.mySavedFormulas.items ?? []);
+	const customSet = $derived(buildCustomColDefs(customFormulas, { mode, viewerId, rowCount: rowData.length }));
+	const customColDefs = $derived(customEnabled ? customSet.colDefs : []);
+	const customColIds = $derived(customColDefs.map((d) => String(d.colId)));
+	const customPicker = $derived(
+		customPickerRows(
+			customFormulas.filter((f) => f.payload !== null),
+			customSet.unavailable,
+			viewerId,
+		),
+	);
+	// Rebuild the colDefs only when what they show changes: the formulas, the mode, the viewer, and the
+	// loaded row count (z-score headers quote it). Values update through the context, not here.
+	const customDefsKey = $derived(
+		customEnabled
+			? JSON.stringify([
+					mode,
+					viewerId,
+					customFormulas.map((f) => [f.id, f.name, f.privacy, f.origin, f.user.id, f.payload]),
+					customFormulas.some((f) => f.payload && hasZscore(f.payload.expression)) ? rowData.length : 0,
+				])
+			: '',
+	);
+	const operandRows = $derived(rowData.map((item) => toOperandRow(item, perspectivesByContentId.get(String(item.id)))));
+	const customValues: CustomValues = $derived(
+		customEnabled
+			? customColumnValues(
+					customPicker.available.map((r) => r.formula),
+					operandRows,
+					mode,
+				)
+			: new Map(),
+	);
+	// Owned-set for the shared-columns dialog: the viewer's own items and the sources they copied or linked.
+	const ownedIds = $derived(new Set(customFormulas.flatMap((f) => (f.sourceId ? [f.id, f.sourceId] : [f.id]))));
+
+	function handleAddCustomColumn() {
+		columnPickerOpen = false;
+		builderFormula = null;
+		builderOpen = true;
+	}
+
+	function handleEditCustomColumn(formula: SavedFormula) {
+		columnPickerOpen = false;
+		builderFormula = formula;
+		builderOpen = true;
+	}
+
+	function handleBrowseSharedColumns() {
+		columnPickerOpen = false;
+		sharedColumnsOpen = true;
+	}
+
+	/** Soft delete with an Undo toast. Works for own formulas and for links (the picker's "Remove"). */
+	function handleDeleteCustomColumn(formula: SavedFormula) {
+		deleteSavedItem.mutate(
+			{ id: formula.id, privacy: formula.privacy },
+			{
+				onSuccess: () =>
+					toastWithAction(`Deleted ${formula.name}`, {
+						label: 'Undo',
+						onClick: () => restoreSavedItem.mutate(formula.id),
+					}),
+				onError: () => toast.error(`Could not delete ${formula.name}`),
+			},
+		);
+	}
+
+	/** A new or edited formula is switched on for this view, so the user sees what they just saved. */
+	function handleCustomColumnSaved(formula: SavedFormula) {
+		builderOpen = false;
+		handleColumnToggle(customColId(formula.id), true);
+	}
+
+	function handleCustomColumnAdded(formula: SavedFormula) {
+		sharedColumnsOpen = false;
+		handleColumnToggle(customColId(formula.id), true);
+	}
 
 	// ---------------------------------------------------------------------------
 	// Mode switch handler
@@ -1524,6 +1642,8 @@
 			gridApi = null;
 			gridReady = false;
 			displayedRowCount = null;
+			// A new grid starts from the built-in columnDefs, so the custom ones must be pushed again.
+			appliedCustomKey = '';
 		},
 		onSortChanged: (event: SortChangedEvent) => {
 			hover.close();
@@ -1643,12 +1763,33 @@
 		syncItemHeader(gridApi, headerName);
 	});
 
-	// Restore AG Grid filter state from URL on mount and mode changes
+	// Push the custom colDefs into the grid once per change of what they show. Pushed after the grid is
+	// ready (a remount starts from the built-in columnDefs again), and in a frame, not inside onGridReady,
+	// where column APIs throw. The bump afterwards re-applies the column visibility layout.
+	$effect(() => {
+		const key = customDefsKey;
+		const defs = customColDefs;
+		if (!gridApi || !gridReady || key === appliedCustomKey) return;
+		const api = gridApi;
+		requestAnimationFrame(() => {
+			if (api.isDestroyed() || key === appliedCustomKey) return;
+			appliedCustomKey = key;
+			api.setGridOption('columnDefs', [...columnDefs, ...defs]);
+			customDefsVersion++;
+		});
+	});
+
+	// Restore AG Grid filter state from URL on mount and mode changes. Custom-column filters are not in
+	// the URL, so they are kept from the live model rather than cleared.
 	$effect(() => {
 		const api = liveGridApi(gridApi);
 		if (!api || !gridReady) return;
 		const filterModel = urlParamsToFilter(gridParams.filters);
-		api.setFilterModel(Object.keys(filterModel).length > 0 ? filterModel : null);
+		const customPart = Object.fromEntries(
+			Object.entries(api.getFilterModel() ?? {}).filter(([colId]) => isCustomColId(colId)),
+		);
+		const merged = { ...filterModel, ...customPart };
+		api.setFilterModel(Object.keys(merged).length > 0 ? merged : null);
 	});
 
 	// Re-run the grid's filters when the person filter changes (external filters aren't tracked by the model).
@@ -1698,8 +1839,19 @@
 			gridApi.setGridOption('context', {
 				perspectivesByContentId,
 				onOpenDetails: handleOpenDetails,
+				customValues,
 			});
-			gridApi.refreshCells({ columns: ['perspectize', 'myQuality', 'myImportance', 'myAgreement'], force: true });
+			// Custom values change with the loaded rows and the viewer's ratings, so their cells redraw too.
+			gridApi.refreshCells({
+				columns: [
+					'perspectize',
+					'myQuality',
+					'myImportance',
+					'myAgreement',
+					...customColIds.filter((colId) => gridApi?.getColumn(colId) != null),
+				],
+				force: true,
+			});
 		}
 	});
 
@@ -1721,9 +1873,12 @@
 		}
 		const api = gridApi;
 		void layoutVersion;
+		// Re-run once custom colDefs land in the grid, so their saved visibility applies.
+		void customDefsVersion;
 		// Read synchronously, before the rAF, so this effect re-runs when they change.
 		const tier = responsiveTier;
 		const view = columnView;
+		const customIds = customColIds;
 		// Read synchronously too: a change of the one type named (youtube -> bible_passage) keeps the
 		// view but moves Type's visibility, so the effect must re-run on it.
 		const solo = soloTypeFilter(filters.type);
@@ -1735,7 +1890,7 @@
 			view,
 			current,
 			saved: loadLayout(view),
-			defaults: defaultLayout(tier, view, solo),
+			defaults: defaultLayout(tier, view, solo, customIds),
 		});
 		requestAnimationFrame(() => {
 			if (api.isDestroyed()) return; // Grid may have been destroyed before rAF fires
@@ -2108,6 +2263,31 @@
 		chartColumns={pickerChartColumns}
 		chartFlags={pickerChartFlags}
 		onChartChange={handleChartChange}
+		customColumns={customPicker}
+		{customEnabled}
+		signedIn={meCtx.me !== null}
+		onNewCustomColumn={handleAddCustomColumn}
+		onBrowseSharedColumns={handleBrowseSharedColumns}
+		onEditCustomColumn={handleEditCustomColumn}
+		onDeleteCustomColumn={handleDeleteCustomColumn}
+	/>
+{/if}
+
+<!-- Custom column builder and shared-columns browser: mounted only while open, never stacked on the picker. -->
+{#if builderOpen}
+	<CustomColumnBuilder
+		bind:open={builderOpen}
+		formula={builderFormula}
+		previewRows={operandRows}
+		onSaved={handleCustomColumnSaved}
+	/>
+{/if}
+{#if sharedColumnsOpen}
+	<SharedColumnsDialog
+		bind:open={sharedColumnsOpen}
+		previewRows={operandRows}
+		{ownedIds}
+		onAdded={handleCustomColumnAdded}
 	/>
 {/if}
 

@@ -436,6 +436,15 @@ Then update `formatting.test.ts` if reusing an existing formatter with new edge 
 
 ---
 
+## Custom columns
+
+Saved-formula custom columns (`custom:<id>`, see `frontend/src/lib/utils/customColumnDefs.ts`) are
+built dynamically from the viewer's saved formulas. They need **no** `COLUMNS` entry, no
+`columnDefs` literal and no tier-list entry: `ActivityTable.svelte` appends their colDefs to the
+grid at runtime, and they are hidden by default until the picker's "Custom columns" group turns
+them on. Their values come from `context.customValues`, not from a `valueGetter` over the row.
+Only the Movie type offers them, and sorting and filtering work in Loaded mode only.
+
 ## Verification
 
 After adding a column:
