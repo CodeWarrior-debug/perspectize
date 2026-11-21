@@ -1,0 +1,17 @@
+{
+	"manifest_version": 3,
+	"name": "Add to Perspectize",
+	"version": "0.1.0",
+	"description": "Add the page you are on to Perspectize.",
+	"icons": { "192": "icons/icon-192.png", "512": "icons/icon-512.png" },
+	"permissions": ["activeTab", "contextMenus", "storage"],
+	"action": { "default_title": "Add to Perspectize" },
+	"background": { "service_worker": "dist/background.js", "type": "module" },
+	"options_page": "options.html",
+	"commands": {
+		"_execute_action": {
+			"suggested_key": { "default": "Alt+Shift+P" },
+			"description": "Add this page to Perspectize"
+		}
+	}
+}
