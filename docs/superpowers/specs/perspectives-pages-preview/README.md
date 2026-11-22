@@ -2,7 +2,7 @@
 
 A throwaway, interactive mockup of the new **Perspectives** pages, desktop and phone, in three themes. It is a design artifact, not product code: fake data, nothing wired to the app, no backend or query budget.
 
-It answers the UI-design gate of [#751](https://github.com/CodeWarrior-debug/perspectize/issues/751) (Perspectives Library with switchable aggregators) and [#752](https://github.com/CodeWarrior-debug/perspectize/issues/752) (one row per perspective), which ask for "a throwaway interactive preview (single HTML page) reviewed before any code". Neither issue is closed by this. Nothing here is decided: every choice below is a proposal to argue with.
+It answers the UI-design gate of [#751](https://github.com/CodeWarrior-debug/perspectize/issues/751) (Perspectives Library with switchable aggregators) and [#752](https://github.com/CodeWarrior-debug/perspectize/issues/752) (one row per perspective), which ask for "a throwaway interactive preview (single HTML page) reviewed before any code". Neither issue is closed by this. Only the minimum sample is decided (none, for now); every other choice below is a proposal to argue with.
 
 ## Open it
 
@@ -52,7 +52,7 @@ On a phone the list is a card list (as the Library's is below 860px). The aggreg
 | Question | Proposal drawn here |
 |---|---|
 | #751 Q2: which aggregators | Average, spread (standard deviation), lowest, highest, count. Sum is listed but disabled for the four rating dimensions ("not for ratings"): adding 0–10 ratings means nothing. Median and percentiles later. |
-| #751 Q3: minimum contributors | Three people before average, spread, lowest or highest show. Below that the cell shows a dash and "2 so far". Count always shows. "Just mine" has no minimum. The number is a placeholder for the spec. |
+| #751 Q3: minimum contributors | **None for now (the owner's call).** Every value shows from the first rating, with its own `n` beside it. Spread is the one exception: a single rating has no spread, so one person shows a dash and `n 1`. The cost is that with one other rater, their rating can be read from the average, lowest and highest. A floor can be added later without changing the layout. |
 | #751 Q4: whose perspectives | "Everyone" counts every public perspective plus your own private ones (what you can read, not what exists). "Just mine" is your own. Friends and share lists wait for the sharing model ([ADR 0002](../../../adr/0002-sharing-model.md)). Defaults: Everyone on By content, Just mine on By perspective (as #752 says). |
 | #751 Q5: name and nav | "Perspectives", beside Library. The other candidate was "Insights". Where it lives belongs to the flow-based navigation work ([#722](https://github.com/CodeWarrior-debug/perspectize/issues/722)); the phone header ignores the overflow in [#840](https://github.com/CodeWarrior-debug/perspectize/issues/840) on purpose. |
 | One vote per person (ADR 0002 §7) | Someone with a public and a private perspective on one item counts once, public first. Cells say `n` for people, not perspectives. "Forty Years of One Tree" shows five perspectives and four people. |

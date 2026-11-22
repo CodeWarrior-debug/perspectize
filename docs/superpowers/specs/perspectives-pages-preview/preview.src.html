@@ -257,8 +257,8 @@ span.mc{display:block}
     <li>Median and percentiles are left for later.</li>
   </ul>
 
-  <h3>Minimum number of people</h3>
-  <p>Average, spread, lowest and highest show only once three people have rated that metric. Below that the cell shows a dash and how many so far, because one person's value would otherwise be readable from the number. Count is always shown. "Just mine" has no minimum. The number three is a placeholder for the spec.</p>
+  <h3>No minimum sample</h3>
+  <p>Decided for now: there is no minimum number of people. Every value shows from the first rating, with its own "n" beside it so a reader can see how few people it rests on. Spread is the one exception, because a single rating has no spread: one person shows a dash and "n 1". The cost of having no floor is that when one other person has rated an item, their rating can be read from the average, lowest and highest. A floor can be added later without changing the layout.</p>
 
   <h3>Whose perspectives</h3>
   <p>"Everyone" counts the public perspectives plus your own private ones: what you can read, not what exists. "Just mine" is your own. Friends and share lists wait for the sharing model (ADR 0002). Defaults: Everyone on "By content", Just mine on "By perspective" (as #752 says).</p>
@@ -386,7 +386,6 @@ const PERSP = [
 const pById = id => PERSP.find(p => p.id === id);
 
 /* ---------- Aggregation ---------- */
-const MIN_N = 3;
 const AGGS = [
   { key: 'avg', label: 'Average', short: 'avg' },
   { key: 'sd', label: 'Spread (std deviation)', short: 'spread' },
@@ -410,13 +409,13 @@ function votes(cid, scope) {
 function cell(cid, m, agg, scope) {
   const vs = votes(cid, scope).map(p => p[m]).filter(v => v != null).map(v => v / 1000);
   const n = vs.length;
-  const minN = scope === 'mine' ? 1 : MIN_N;
   if (n === 0 && agg !== 'count') return { state: 'empty', n, value: null };
-  if (agg !== 'count' && n < minN) return { state: 'withheld', n, value: null };
+  // No minimum sample: every value shows from the first rating. Spread alone needs two, since one rating has none.
+  if (agg === 'sd' && n < 2) return { state: 'alone', n, vs, value: null };
   const mean = n ? vs.reduce((s, v) => s + v, 0) / n : null;
   const sd = n ? Math.sqrt(vs.reduce((s, v) => s + (v - mean) ** 2, 0) / n) : null;
   const value = { avg: mean, sd, min: n ? Math.min(...vs) : null, max: n ? Math.max(...vs) : null, count: n }[agg];
-  return { state: 'ok', n, vs, mean, sd, value, split: n >= MIN_N && sd >= 2.25 };
+  return { state: 'ok', n, vs, mean, sd, value, split: sd != null && sd >= 2.25 };
 }
 const fmt3 = v => (v == null ? '—' : v.toFixed(3));
 const fmtVal = (cl, agg) => (agg === 'count' ? String(cl.value) : fmt3(cl.value));
@@ -446,10 +445,7 @@ function metricCell(cid, m, w = 132, tag = 'td') {
   const scope = state.scope.content;
   const cl = cell(cid, m.key, agg, scope);
   if (cl.state === 'empty') return `<${tag} class="mc dim"><span class="top"><span class="num">—</span><span class="n">n 0</span></span><span class="gap"></span></${tag}>`;
-  if (cl.state === 'withheld') {
-    const tip = `${cl.n} ${cl.n === 1 ? 'person has' : 'people have'} rated this. Values show from ${MIN_N}.`;
-    return `<${tag} class="mc dim" title="${tip}"><span class="top"><span class="num">—</span><span class="n">${cl.n} so far</span></span><span class="gap"></span></${tag}>`;
-  }
+  if (cl.state === 'alone') return `<${tag} class="mc dim" title="Spread needs at least two people."><span class="top"><span class="num">—</span><span class="n">n ${cl.n}</span></span>${ruler(cl.vs, { w })}</${tag}>`;
   const split = cl.split ? `<span class="split" title="Standard deviation ${fmt3(cl.sd)}">split</span>` : '';
   return `<${tag} class="mc"><span class="top"><span class="num">${fmtVal(cl, agg)}</span><span class="n">n ${cl.n}</span>${split}</span>${aggRuler(cl, agg, w)}</${tag}>`;
 }
@@ -561,8 +557,8 @@ function pageContentDesktop() {
     ${METRICS.map(m => metricCell(c.id, m)).join('')}
     <td class="r num ${people ? '' : 'soft'}">${people || '—'}</td></tr>`).join('');
   const foot = sc === 'everyone'
-    ? `Counting people, not perspectives: someone with a public and a private perspective counts once, public first. You are counting what you can read, which is every public perspective plus your own private ones. Values show from ${MIN_N} people; dashes are not zeros. Dashed buttons are the Library's pickers and are not drawn here.`
-    : 'Just your own perspectives, so there is no minimum. Dashes mean you left that rating blank.';
+    ? `Counting people, not perspectives: someone with a public and a private perspective counts once, public first. You are counting what you can read, which is every public perspective plus your own private ones. Each value shows how many people it rests on (n); dashes are not zeros. Dashed buttons are the Library's pickers and are not drawn here.`
+    : 'Just your own perspectives. Dashes mean you left that rating blank.';
   return `${header()}${pageHead()}
     <div class="tb">${searchBox('Search content')}<span class="pill">YouTube video</span><span class="grow"></span>${scopeSeg('content')}
       <span class="btn ghost" title="Same sort dialog as the Library">Sort</span><span class="btn ghost" title="Same column picker as the Library">Columns</span><span class="btn ghost" title="Print, CSV, copy. See #800">Export</span></div>
@@ -582,7 +578,7 @@ function pageContentPhone() {
       <div class="row"><button class="btn" data-act="sheet" data-sheet="agg">Showing ${aggAllLabel().toLowerCase().replace(' (std deviation)', '')}${ico('caret', 'sm')}</button>
         <button class="btn" data-act="sheet" data-sheet="sort">Sort${ico('caret', 'sm')}</button><span class="btn ghost">Columns</span></div></div>
     <div class="cards">${cards || '<p class="empty">Nothing in the Library matches that.</p>'}
-      <p class="foot" style="padding:14px 0 0">${state.scope.content === 'everyone' ? `Counted by person. Values show from ${MIN_N} people.` : 'Just your own perspectives.'}</p></div>`;
+      <p class="foot" style="padding:14px 0 0">${state.scope.content === 'everyone' ? 'Counted by person. n is how many people each value rests on.' : 'Just your own perspectives.'}</p></div>`;
 }
 
 /* ---------- Page 2: by perspective ---------- */
@@ -719,7 +715,7 @@ function overlayHTML() {
   let inner = '';
   if (state.sheet === 'agg') {
     const cur = aggAllLabel();
-    inner = `<h2>How to combine each rating</h2><p>Applies to all four columns. Needs ${MIN_N} people before a value shows.</p>${AGGS.map(a => {
+    inner = `<h2>How to combine each rating</h2><p>Applies to all four columns.</p>${AGGS.map(a => {
       const on = cur === a.label;
       return `<button class="opt" data-act="aggAllSheet" data-agg="${a.key}" ${a.disabled ? 'disabled' : ''}><span class="chk">${on ? ico('check') : ''}</span>${a.label}${a.disabled ? '<span class="why">not for ratings</span>' : ''}</button>`;
     }).join('')}`;
