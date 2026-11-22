@@ -159,6 +159,14 @@ describe('ActivityDetailsModal', () => {
 		expect(screen.queryByText('YouTube Video')).not.toBeInTheDocument();
 	});
 
+	it('shows the claim type icon, not an empty box, where the thumbnail goes for a CLAIM', () => {
+		render(ActivityDetailsModal, {
+			props: { content: { ...content, contentType: 'CLAIM', url: null }, open: true, onClose: vi.fn() },
+		});
+		expect(document.querySelector('[data-icon="claim"]')).not.toBeNull();
+		expect(document.querySelector('img')).toBeNull();
+	});
+
 	it('falls back to "YouTube Video" when contentType is not provided (backward compatibility)', () => {
 		const { contentType, ...withoutType } = content;
 		render(ActivityDetailsModal, { props: { content: withoutType, open: true, onClose: vi.fn() } });
