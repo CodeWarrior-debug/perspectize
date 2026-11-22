@@ -368,6 +368,29 @@ describe('ActivityCardList', () => {
 			expect(screen.queryByTestId('card-play-badge')).not.toBeInTheDocument();
 		});
 
+		it('claim: type icon on the card colour, not an empty grey tile, no image, no play badge', () => {
+			render(ActivityCardList, {
+				props: {
+					rowData: [
+						{
+							id: '8',
+							name: 'Remote work makes teams more productive',
+							url: null,
+							channelTitle: null,
+							length: null,
+							lengthUnits: null,
+							contentType: 'CLAIM',
+						},
+					],
+					onOpenDetails: vi.fn(),
+				},
+			});
+			expect(thumb('8').querySelector('[data-icon="claim"]')).not.toBeNull();
+			expect(thumb('8').querySelector('img')).toBeNull();
+			expect(screen.queryByTestId('card-play-badge')).not.toBeInTheDocument();
+			expect(thumb('8').className).not.toContain('bg-muted');
+		});
+
 		it('movie runtime shows to its reported precision (h:mm for MINUTES)', () => {
 			render(ActivityCardList, {
 				props: {
