@@ -10,7 +10,6 @@
 		CellClickedEvent,
 		CellMouseOverEvent,
 	} from '@ag-grid-community/core';
-	import { tick } from 'svelte';
 	import { createQuery, hashKey, keepPreviousData } from '@tanstack/svelte-query';
 	import { page } from '$app/state';
 	import { goto } from '$app/navigation';
@@ -66,12 +65,7 @@
 	import ExportMenu from '#lib/components/ExportMenu.svelte';
 	import PrintListView from '#lib/components/PrintListView.svelte';
 	import PrintOptionsDialog from '#lib/components/PrintOptionsDialog.svelte';
-	import type { PrintSpacing } from '#lib/components/PrintOptionsDialog.svelte';
-	import { isExportDisabled, readExportTable, type ExportGridApi } from '#lib/utils/exportGrid.js';
-	import type { ExportTable } from '#lib/utils/exportTable.js';
-	import { copyLibraryTable, downloadLibraryCsv } from '#lib/utils/exportActions.js';
-	import { copyWithToast, downloadWithToast } from '#lib/utils/toast.js';
-	import { addLandscapePageStyle, removeLandscapePageStyle, runPrint } from '#lib/utils/printing.js';
+	import { isExportDisabled } from '#lib/utils/exportGrid.js';
 	import ColumnChartPopover from '#lib/components/charts/ColumnChartPopover.svelte';
 	import { CHART_ELIGIBLE_COLS, isChartEligible } from '#lib/utils/columnCharts.js';
 	import { isChartOn, loadChartFlags, setChartFlag } from '#lib/utils/columnChartSettings.js';
@@ -102,6 +96,7 @@
 	import LibraryCardList from '#lib/components/library/LibraryCardList.svelte';
 	import { buildLibraryColumnDefs } from '#lib/components/library/columns.js';
 	import { createGridHandle } from '#lib/utils/gridHandle.svelte.js';
+	import { createLibraryExport } from '#lib/components/library/libraryExport.svelte.js';
 	import AddToPlanDialog from '#lib/components/plan/AddToPlanDialog.svelte';
 	import CategoryTypeahead from '#lib/components/CategoryTypeahead.svelte';
 	import { useSetPrimaryCategory } from '#lib/queries/categories/useSetPrimaryCategory.js';
@@ -186,9 +181,10 @@
 
 	// Mobile card-list breakpoint (< 860px) — replaces the AG Grid entirely, per design handoff.
 	const card = useCardMode();
+	const grid = createGridHandle<ContentItem>();
+	const exporter = createLibraryExport({ grid, normalDomLayout: () => normalDomLayout });
 	// Export's As-seen print keeps the grid mounted even though a Letter page matches the card query.
-	let printingAsSeen = $state(false);
-	const cardMode = $derived(card.current && !printingAsSeen);
+	const cardMode = $derived(card.current && !exporter.printingAsSeen);
 
 	// Signed-in user — drives the admin-only "Internal" group in the column picker.
 	const meCtx = useMe();
@@ -427,7 +423,6 @@
 	// Grid state
 	// ---------------------------------------------------------------------------
 
-	const grid = createGridHandle<ContentItem>();
 	const gridApi = $derived(grid.api);
 	const gridReady = $derived(grid.ready);
 	let displayedRowCount = $state<number | null>(null);
@@ -990,73 +985,9 @@
 
 	// Export: the grid is read at click time, so the output matches what the toolbar shows.
 	const exportDisabled = $derived(isExportDisabled({ gridReady, loading, displayedRows: loadedItemsCount }));
-	let printOptionsOpen = $state(false);
-	let printList = $state<{ table: ExportTable; title: string; spacing: PrintSpacing } | null>(null);
 
 	// The grid's resting layout; a print run restores this, not a fixed value.
 	const normalDomLayout = $derived(isMobile ? 'autoHeight' : 'normal');
-
-	function reportPrintFailure(err: unknown) {
-		toast.error(err instanceof Error ? `Could not print: ${err.message}` : 'Could not print');
-	}
-
-	function exportApi(): ExportGridApi | null {
-		return grid.live() as unknown as ExportGridApi | null;
-	}
-
-	function handleDownloadCsv() {
-		const api = exportApi();
-		if (api) downloadWithToast(() => downloadLibraryCsv(api));
-	}
-
-	function handleCopy() {
-		const api = exportApi();
-		if (api) void copyWithToast(() => copyLibraryTable(api));
-	}
-
-	async function handlePrintAsSeen() {
-		const api = gridApi;
-		if (!api) return;
-		try {
-			await runPrint('grid', {
-				before: async () => {
-					printingAsSeen = true;
-					addLandscapePageStyle();
-					api.setGridOption('domLayout', 'print');
-					// AG Grid lays out the rows on a later frame; printing sooner can print a half-rendered grid.
-					await new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));
-					if (api.isDestroyed()) throw new Error('The table was closed before printing');
-				},
-				after: () => {
-					printingAsSeen = false;
-					removeLandscapePageStyle();
-					if (!api.isDestroyed()) api.setGridOption('domLayout', normalDomLayout);
-				},
-			});
-		} catch (err) {
-			reportPrintFailure(err);
-		}
-	}
-
-	async function handlePrintAsList({ title, spacing }: { title: string; spacing: PrintSpacing }) {
-		const api = gridApi;
-		if (!api) return;
-		try {
-			const table = readExportTable(api as unknown as ExportGridApi, 'print');
-			await runPrint('list', {
-				before: async () => {
-					printList = { table, title, spacing };
-					await tick();
-				},
-				after: () => {
-					printList = null;
-				},
-			});
-		} catch (err) {
-			printList = null;
-			reportPrintFailure(err);
-		}
-	}
 
 	// Switch to autoHeight on mobile — eliminates empty gap below last row
 	$effect(() => {
@@ -1254,10 +1185,10 @@
 			{#if !cardMode}
 				<ExportMenu
 					disabled={exportDisabled}
-					onDownloadCsv={handleDownloadCsv}
-					onCopy={handleCopy}
-					onPrintAsSeen={handlePrintAsSeen}
-					onPrintAsList={() => (printOptionsOpen = true)}
+					onDownloadCsv={exporter.downloadCsv}
+					onCopy={exporter.copy}
+					onPrintAsSeen={exporter.printAsSeen}
+					onPrintAsList={() => (exporter.printOptionsOpen = true)}
 				/>
 			{/if}
 			{#if mode === 'all'}
@@ -1373,13 +1304,17 @@
 {/if}
 
 <!-- Print setup for "Print as list": mounted only while open, like the pickers. -->
-{#if printOptionsOpen}
-	<PrintOptionsDialog bind:open={printOptionsOpen} onPrint={handlePrintAsList} />
+{#if exporter.printOptionsOpen}
+	<PrintOptionsDialog bind:open={exporter.printOptionsOpen} onPrint={exporter.printAsList} />
 {/if}
 
 <!-- The print-only list; it portals itself to <body> and shows only under html[data-print='list']. -->
-{#if printList}
-	<PrintListView table={printList.table} title={printList.title} spacing={printList.spacing} />
+{#if exporter.printList}
+	<PrintListView
+		table={exporter.printList.table}
+		title={exporter.printList.title}
+		spacing={exporter.printList.spacing}
+	/>
 {/if}
 
 <!-- Sort picker — works identically on mobile and desktop, and in both data modes;
