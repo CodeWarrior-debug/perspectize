@@ -31,6 +31,7 @@
 		ratingValueGetter,
 	} from '#lib/utils/bookFormatting.js';
 	import BiblePassageIcon from '#lib/components/BiblePassageIcon.svelte';
+	import CardFacts, { type CardFact } from '#lib/components/CardFacts.svelte';
 	import AddToPlanButton from '#lib/components/plan/AddToPlanButton.svelte';
 
 	interface CardRow {
@@ -88,10 +89,35 @@
 	const isBook = (row: CardRow) => row.contentType === 'BOOK';
 	const isWebPage = (row: CardRow) => row.contentType === 'WEB_PAGE';
 
+	const plain = (texts: string[]): CardFact[] => texts.map((text) => ({ text }));
+
+	/** The row's category as a pill fact, or nothing. */
+	function categoryFact(row: CardRow): CardFact[] {
+		return row.primaryCategory ? [{ text: row.primaryCategory.label, pill: 'category' }] : [];
+	}
+
 	/** Site and published year for a webpage card (unknown parts are skipped). */
 	function webPageFacts(row: CardRow): string[] {
 		const published = webPagePublished(row);
 		return [webPageSite(row), published ? published.slice(0, 4) : null].filter((f): f is string => !!f);
+	}
+
+	/** A webpage's site and year, then one pill per role. */
+	function webPageCardFacts(row: CardRow): CardFact[] {
+		return [
+			...plain(webPageFacts(row)),
+			...webPageRolesOf(row).map((role) => ({ text: webPageRoleLabel(role), pill: 'role' as const })),
+		];
+	}
+
+	/** Duration, category, views and likes for a video (or any row without a type-specific line). */
+	function videoFacts(row: CardRow): CardFact[] {
+		return [
+			...(row.length ? plain([formatDuration(row.length, row.lengthUnits, row.lengthDisplay?.precision)]) : []),
+			...categoryFact(row),
+			...(row.viewCount != null ? plain([`${formatCount(row.viewCount)} views`]) : []),
+			...(row.likeCount != null ? plain([`${formatCount(row.likeCount)} likes`]) : []),
+		];
 	}
 
 	/** Year, rating, runtime and TMDB score for a movie card (unknown parts are skipped). */
@@ -145,7 +171,8 @@
 	}
 </script>
 
-<div data-testid="activity-card-list" class="flex flex-col gap-2.5 px-2 py-2">
+<!-- pb-20 leaves the last card clear of the floating chat button (56px + its 20px inset). -->
+<div data-testid="activity-card-list" class="flex flex-col gap-2.5 px-2 pt-2 pb-20">
 	{#each rowData as row (row.id)}
 		<div class="flex items-center gap-3 rounded-lg border border-border bg-card p-2.5 hover:bg-primary/[0.06]">
 			<button
@@ -202,15 +229,7 @@
 						</div>
 					{/if}
 					{#if bookFacts(row).length}
-						<div
-							data-testid={`card-book-facts-${row.id}`}
-							class="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground"
-						>
-							{#each bookFacts(row) as fact, i (i)}
-								{#if i > 0}<span>&middot;</span>{/if}
-								<span>{fact}</span>
-							{/each}
-						</div>
+						<CardFacts testid={`card-book-facts-${row.id}`} facts={plain(bookFacts(row))} class="mt-1.5" />
 					{/if}
 				{:else if isWebPage(row)}
 					{#if webPageAuthor(row)}
@@ -218,89 +237,55 @@
 							{webPageAuthor(row)}
 						</div>
 					{/if}
-					<div
-						data-testid={`card-webpage-facts-${row.id}`}
-						class="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground"
-					>
-						{#each webPageFacts(row) as fact, i (i)}
-							{#if i > 0}<span>&middot;</span>{/if}
-							<span>{fact}</span>
-						{/each}
-						{#each webPageRolesOf(row) as role (role)}
-							<span class="rounded-full border border-border bg-muted px-2 py-px text-foreground"
-								>{webPageRoleLabel(role)}</span
-							>
-						{/each}
-					</div>
+					<CardFacts testid={`card-webpage-facts-${row.id}`} facts={webPageCardFacts(row)} class="mt-1.5" />
 				{:else if isMovie(row)}
-					<div
-						data-testid={`card-movie-facts-${row.id}`}
-						class="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground"
-					>
-						{#each movieFacts(row) as fact, i (i)}
-							{#if i > 0}<span>&middot;</span>{/if}
-							<span>{fact}</span>
-						{/each}
-						{#if row.primaryCategory}
-							<span class="rounded bg-muted px-1.5 py-0.5 text-foreground">{row.primaryCategory.label}</span>
-						{/if}
-					</div>
+					<CardFacts
+						testid={`card-movie-facts-${row.id}`}
+						facts={[...plain(movieFacts(row)), ...categoryFact(row)]}
+						class="mt-1.5"
+					/>
 				{:else}
-					<div class="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
-						{#if row.channelTitle}
-							<span>{row.channelTitle}</span>
-						{/if}
-						{#if row.length}
-							{#if row.channelTitle}<span>&middot;</span>{/if}
-							<span>{formatDuration(row.length, row.lengthUnits, row.lengthDisplay?.precision)}</span>
-						{/if}
-						{#if row.primaryCategory}
-							{#if row.channelTitle || row.length}<span>&middot;</span>{/if}
-							<span class="rounded bg-muted px-1.5 py-0.5 text-foreground">{row.primaryCategory.label}</span>
-						{/if}
-					</div>
-					{#if row.viewCount != null || row.likeCount != null}
-						<div class="mt-1 flex items-center gap-2 text-xs text-muted-foreground">
-							{#if row.viewCount != null}
-								<span>{formatCount(row.viewCount)} views</span>
-							{/if}
-							{#if row.viewCount != null && row.likeCount != null}
-								<span>&middot;</span>
-							{/if}
-							{#if row.likeCount != null}
-								<span>{formatCount(row.likeCount)} likes</span>
-							{/if}
+					{@const facts = videoFacts(row)}
+					{#if row.channelTitle}
+						<div data-testid={`card-channel-${row.id}`} class="mt-1 line-clamp-1 text-xs text-muted-foreground">
+							{row.channelTitle}
 						</div>
+					{/if}
+					{#if facts.length}
+						<CardFacts testid={`card-facts-${row.id}`} {facts} class="mt-1.5" />
 					{/if}
 				{/if}
 			</button>
 
-			{#if perspectiveContentIds.has(String(row.id))}
-				<button
-					type="button"
-					data-testid={`card-perspective-${row.id}`}
-					title="Edit your perspective"
-					aria-label="Edit your perspective"
-					class="flex size-9 flex-none items-center justify-center rounded-md text-primary hover:bg-primary/10"
-					onclick={(e) => handleAddPerspective(row, e)}
-				>
-					<GlassesIcon class="size-4" />
-				</button>
-			{:else}
-				<button
-					type="button"
-					data-testid={`card-perspective-${row.id}`}
-					title="Add a perspective"
-					aria-label="Add a perspective"
-					class="flex size-9 flex-none items-center justify-center rounded-md text-muted-foreground hover:bg-primary/10 hover:text-primary"
-					onclick={(e) => handleAddPerspective(row, e)}
-				>
-					<PlusIcon class="size-4" />
-				</button>
-			{/if}
-			{#if onAddToPlan}
-				<AddToPlanButton variant="icon" onclick={() => onAddToPlan(String(row.id))} />
-			{/if}
+			<!-- One column, not a row: on a phone two side-by-side buttons took ~84px of a ~150px text column. -->
+			<div data-testid={`card-actions-${row.id}`} class="flex flex-none flex-col items-center">
+				{#if perspectiveContentIds.has(String(row.id))}
+					<button
+						type="button"
+						data-testid={`card-perspective-${row.id}`}
+						title="Edit your perspective"
+						aria-label="Edit your perspective"
+						class="flex size-9 flex-none items-center justify-center rounded-md text-primary hover:bg-primary/10"
+						onclick={(e) => handleAddPerspective(row, e)}
+					>
+						<GlassesIcon class="size-4" />
+					</button>
+				{:else}
+					<button
+						type="button"
+						data-testid={`card-perspective-${row.id}`}
+						title="Add a perspective"
+						aria-label="Add a perspective"
+						class="flex size-9 flex-none items-center justify-center rounded-md text-muted-foreground hover:bg-primary/10 hover:text-primary"
+						onclick={(e) => handleAddPerspective(row, e)}
+					>
+						<PlusIcon class="size-4" />
+					</button>
+				{/if}
+				{#if onAddToPlan}
+					<AddToPlanButton variant="icon" onclick={() => onAddToPlan(String(row.id))} />
+				{/if}
+			</div>
 		</div>
 	{/each}
 </div>
