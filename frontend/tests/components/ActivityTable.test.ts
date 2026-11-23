@@ -135,6 +135,33 @@ describe('ActivityTable', () => {
 		expect(container).toBeTruthy();
 	});
 
+	// The footer is the same on a phone and a desktop; these pin the parts that go wrong at 320-390px.
+	describe('footer controls', () => {
+		it('Edit sorts shows the up/down arrows, the universal sort glyph', () => {
+			renderWithQuery();
+			const icon = screen.getByRole('button', { name: 'Edit sorts' }).querySelector('svg');
+			expect(icon?.getAttribute('class')).toContain('lucide-arrow-up-down');
+		});
+
+		it('Clear sorts shows the same "clear" glyph as the filter bar, not a sort glyph', () => {
+			renderWithQuery();
+			const icon = screen.getByRole('button', { name: 'Clear sorts' }).querySelector('svg');
+			expect(icon?.getAttribute('class')).toContain('lucide-list-x');
+			expect(icon?.getAttribute('class')).not.toContain('lucide-arrow-up-down');
+		});
+
+		it('keeps "N total" on one line', () => {
+			renderWithQuery();
+			expect(screen.getByText(/\d+ total/).className).toContain('whitespace-nowrap');
+		});
+
+		it('lets the controls wrap onto a second row instead of squeezing their labels', () => {
+			renderWithQuery();
+			const controls = screen.getByRole('button', { name: 'Edit sorts' }).parentElement;
+			expect(controls?.className).toContain('flex-wrap');
+		});
+	});
+
 	it('imports TanStack Query dependencies correctly', () => {
 		// Verify imports work (createQuery, keepPreviousData, queryKeys)
 		// This is a compile-time check - if these imports fail, the test file won't load
