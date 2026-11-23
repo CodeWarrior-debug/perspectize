@@ -10,28 +10,12 @@
 		CellClickedEvent,
 		CellMouseOverEvent,
 	} from '@ag-grid-community/core';
-	import { createQuery, hashKey, keepPreviousData } from '@tanstack/svelte-query';
 	import { page } from '$app/state';
 	import { goto } from '$app/navigation';
-	import { graphqlRequest } from '#lib/queries/client.js';
-	import {
-		LIBRARY_LIST_STALE_TIME_MS,
-		cursorsAfterPage,
-		LIST_CONTENT,
-		libraryListRequest,
-		type ContentItem,
-		type ContentResponse,
-	} from '#lib/queries/content/index.js';
+	import type { ContentItem } from '#lib/queries/content/index.js';
 	import { useContentDetails } from '#lib/queries/content/useContentDetails.js';
 	import { OPEN_CONTENT_PARAM } from '#lib/utils/contentLinks.js';
-	import { createRowOrderMemory } from '#lib/utils/rowOrder.js';
-	import {
-		LIST_PERSPECTIVES_BY_USER,
-		MAX_PERSPECTIVES_PER_LIST,
-		type ListPerspectivesByUserResponse,
-		type PerspectiveItem,
-	} from '#lib/queries/perspectives/index.js';
-	import { queryKeys } from '#lib/queries/keys.js';
+	import type { PerspectiveItem } from '#lib/queries/perspectives/index.js';
 	import {
 		parseGridParams,
 		serializeGridParams,
@@ -60,7 +44,6 @@
 	import { emptyCellClassRules } from '#lib/utils/grid-empty.js';
 	import { useCardMode, useResponsiveTier } from '#lib/utils/responsive.svelte.js';
 	import { useMe } from '#lib/queries/users/useMe.svelte.js';
-	import { useUsernames } from '#lib/queries/users/useUsernames.svelte.js';
 	import ColumnPickerDialog from '#lib/components/ColumnPickerDialog.svelte';
 	import ExportMenu from '#lib/components/ExportMenu.svelte';
 	import PrintListView from '#lib/components/PrintListView.svelte';
@@ -84,7 +67,7 @@
 	import ArrowUpDownIcon from '@lucide/svelte/icons/arrow-up-down';
 	import CellPopover, { type PopoverState } from '#lib/components/CellPopover.svelte';
 	import { buildPopoverState, createHoverController } from '#lib/utils/tooltipHover.js';
-	import { onDestroy, untrack } from 'svelte';
+	import { onDestroy } from 'svelte';
 	import ListOrderedIcon from '@lucide/svelte/icons/list-ordered';
 	import DataModeToggle from '#lib/components/DataModeToggle.svelte';
 	import FilterChips from '#lib/components/FilterChips.svelte';
@@ -95,6 +78,8 @@
 	import { createGridHandle } from '#lib/utils/gridHandle.svelte.js';
 	import { createLibraryExport } from '#lib/components/library/libraryExport.svelte.js';
 	import { createColumnCharts } from '#lib/components/library/columnCharts.svelte.js';
+	import { useLibraryList } from '#lib/queries/content/useLibraryList.svelte.js';
+	import { useMyPerspectives } from '#lib/queries/perspectives/useMyPerspectives.js';
 	import AddToPlanDialog from '#lib/components/plan/AddToPlanDialog.svelte';
 	import CategoryTypeahead from '#lib/components/CategoryTypeahead.svelte';
 	import { useSetPrimaryCategory } from '#lib/queries/categories/useSetPrimaryCategory.js';
@@ -281,7 +266,7 @@
 	/** Filter to movies crediting this person (clicking a name in the Cast cell). */
 	function filterByPerson(personId: string) {
 		hover.close();
-		cursors = [null];
+		list.resetCursors();
 		updateUrl({ filters: { ...gridParams.filters, [PERSON_FILTER_KEY]: personId }, page: 1 });
 	}
 
@@ -325,17 +310,8 @@
 	// the +/glasses affordance reflects the signed-in user as soon as `me` resolves.
 	const currentUserId = $derived(meCtx.me ? parseInt(meCtx.me.id, 10) : null);
 
-	// TanStack Query for user's perspectives — used to determine +/glasses icon per row
-	const perspectivesQuery = createQuery(() => ({
-		queryKey: queryKeys.perspectives.listByUser(currentUserId ?? 0),
-		queryFn: () =>
-			graphqlRequest<ListPerspectivesByUserResponse>(LIST_PERSPECTIVES_BY_USER, {
-				userID: currentUserId,
-				first: MAX_PERSPECTIVES_PER_LIST,
-			}),
-		enabled: currentUserId !== null,
-		staleTime: 60 * 1000,
-	}));
+	// The user's perspectives — used to determine +/glasses icon per row
+	const perspectivesQuery = useMyPerspectives(() => currentUserId);
 
 	// O(1) lookup map: contentID → PerspectiveItem
 	const perspectivesByContentId = $derived(
@@ -353,69 +329,15 @@
 	// list so it can show the glasses (edit) vs "+" (add) affordance, matching the grid.
 	const perspectiveContentIds = $derived(new Set(perspectivesByContentId.keys()));
 
-	// Cursor stack for cursor-based pagination
-	// Index = page number (1-indexed: cursors[0] = null for page 1, cursors[1] = cursor for page 2, etc.)
-	let cursors = $state<(string | null)[]>([null]);
-	const currentCursor = $derived(cursors[pageNum - 1] ?? null); // 1-indexed page → 0-indexed cursor array
-
-	// ---------------------------------------------------------------------------
-	// Data fetching (mode-conditional)
-	// ---------------------------------------------------------------------------
-
-	// Key and LIST_CONTENT variables come from one builder (lib/queries/content/libraryList.ts),
-	// so the cache key cannot drift from the request. Captured in the options getter so queryFn
-	// sends the variables its key was built from.
-	const libraryRequest = $derived(libraryListRequest(gridParams, currentCursor));
-
-	const contentQuery = createQuery(() => {
-		const request = libraryRequest;
-		return {
-			queryKey: request.queryKey,
-			queryFn: async () => {
-				return graphqlRequest<ContentResponse>(LIST_CONTENT, request.variables);
-			},
-			placeholderData: keepPreviousData,
-			staleTime: LIBRARY_LIST_STALE_TIME_MS,
-		};
-	});
-
-	// Advance the cursor stack from the loaded page, not from inside queryFn: a cache hit (the route
-	// prefetch, or a remount inside staleTime) never runs queryFn, so Next would stall on page 1.
-	// Placeholder data (keepPreviousData: the previous page while this one loads) is skipped.
-	$effect(() => {
-		const data = contentQuery.data;
-		const placeholder = contentQuery.isPlaceholderData;
-		const isAll = mode === 'all';
-		const page = pageNum;
-		if (!data || placeholder || !isAll) return;
-		const pageInfo = data.content.pageInfo;
-		untrack(() => {
-			cursors = cursorsAfterPage(cursors, page, pageInfo);
-		});
-	});
-
-	// Derived values from query
-	// Rows get their adder's username from the cached users list (see useUsernames).
-	const usernames = useUsernames();
-	// The default server order (updatedAt desc) can put an edited row first on a refetch, so the row
-	// jumps out of view. Keep rows where they were while the list (its query key) stays the same.
-	const rowOrder = createRowOrderMemory();
-	const rowData = $derived(
-		rowOrder.apply(
-			hashKey(libraryRequest.queryKey),
-			(contentQuery.data?.content.items ?? []).map((item) => ({
-				...item,
-				addedByUsername: usernames.byId.get(item.addedByUserID) ?? null,
-			})),
-			contentQuery.isPlaceholderData,
-		),
-	);
+	// The content list for the current URL params: rows, counts, and the cursor stack for "All" mode.
+	const list = useLibraryList(() => gridParams);
+	const rowData = $derived(list.rows);
 	const detailsModalRow = $derived(rowData.find((item) => String(item.id) === detailsModalContentId) ?? null);
 	// A deep-linked item (`?open=<id>`, e.g. from a "Go to" toast or a verse jump) is
 	// often not on the loaded page — fetch just that row so the modal can still open.
 	const detailsFallbackQuery = useContentDetails(
 		() => detailsModalContentId,
-		() => detailsModalRow === null && !contentQuery.isPending,
+		() => detailsModalRow === null && !list.isPending,
 	);
 	const detailsModalContent = $derived(detailsModalRow ?? detailsFallbackQuery.data?.contentByID ?? null);
 
@@ -430,7 +352,7 @@
 		const search = params.toString();
 		goto(search ? `?${search}` : page.url.pathname, { replace: true, reset: false });
 	});
-	const totalCount = $derived(contentQuery.data?.content.totalCount ?? 0);
+	const totalCount = $derived(list.totalCount);
 	// The grid reports its displayed (post-filter) row count through onModelUpdated, which also
 	// fires when row data is replaced under an active filter; the count is cleared on grid teardown.
 	$effect(() => {
@@ -438,7 +360,7 @@
 		hover.close(); // AG Grid recycles cell DOM; a stale anchor would mislead
 	});
 	const loadedItemsCount = $derived(displayedRowCount ?? rowData.length);
-	const loading = $derived(contentQuery.isLoading || contentQuery.isPlaceholderData);
+	const loading = $derived(list.loading);
 	// Chip text for the person filter: the name from any loaded row, else the bare TMDB id.
 	const personChipLabel = $derived.by(() => {
 		if (!personFilter) return '';
@@ -499,7 +421,7 @@
 			clientSorts = [];
 			gridApi?.applyColumnState({ defaultState: { sort: null } });
 		} else {
-			cursors = [null];
+			list.resetCursors();
 			updateUrl({ sorts: [], page: 1 });
 		}
 	}
@@ -513,7 +435,7 @@
 	 */
 	function handleSortsApply(newSorts: SortSpec[]) {
 		if (mode === 'all') {
-			cursors = [null];
+			list.resetCursors();
 			updateUrl({ sorts: newSorts, page: 1 });
 			return;
 		}
@@ -526,7 +448,7 @@
 
 	function handleModeToggle(newMode: DataMode) {
 		// Reset pagination when switching modes
-		cursors = [null];
+		list.resetCursors();
 		if (newMode === 'loaded') clientSorts = [];
 
 		// When switching Loaded → All: sync AG Grid filter state to URL params
@@ -559,7 +481,7 @@
 	}
 
 	function handlePageSizeChange(newSize: number) {
-		cursors = [null];
+		list.resetCursors();
 		updateUrl({ pageSize: newSize, page: 1 });
 	}
 
@@ -694,7 +616,7 @@
 				dir: col.sort === 'asc' ? 'asc' : 'desc',
 			}));
 
-			cursors = [null]; // Reset cursor stack
+			list.resetCursors();
 			updateUrl({ sorts: newSorts.length > 0 ? newSorts : [], page: 1 });
 		},
 		// The person filter has no column, so "Loaded" mode applies it here, alongside the column filters.
@@ -724,7 +646,7 @@
 					updateUrl({ filters: urlFilters });
 					return;
 				}
-				cursors = [null];
+				list.resetCursors();
 				updateUrl({ filters: urlFilters, page: 1 });
 			}, 500);
 		},
@@ -906,15 +828,15 @@
 		onRemove={(colId) => {
 			const next = { ...gridParams.filters };
 			delete next[colId];
-			cursors = [null];
+			list.resetCursors();
 			updateUrl({ filters: next, page: 1 });
 		}}
 		onClearAll={() => {
-			cursors = [null];
+			list.resetCursors();
 			updateUrl({ filters: {}, page: 1 });
 		}}
 		onClearAllButType={() => {
-			cursors = [null];
+			list.resetCursors();
 			const { type } = gridParams.filters;
 			updateUrl({ filters: type ? { type } : {}, page: 1 });
 		}}
@@ -931,7 +853,7 @@
 	{/if}
 
 	<!-- Error State -->
-	{#if contentQuery.isError}
+	{#if list.isError}
 		<div class="flex-1 min-h-0 flex items-center justify-center">
 			<div class="text-center py-12 px-4">
 				<p class="text-muted-foreground mb-2">Failed to load content. Please try again.</p>
@@ -941,7 +863,7 @@
 					</p>
 				{/if}
 				<button
-					onclick={() => contentQuery.refetch()}
+					onclick={() => list.refetch()}
 					class="px-4 py-2 text-sm font-medium border border-input rounded-md bg-background hover:bg-accent"
 				>
 					Retry

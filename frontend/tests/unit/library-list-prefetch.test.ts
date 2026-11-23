@@ -10,6 +10,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { hashKey, QueryObserver, type QueryClient } from '@tanstack/svelte-query';
 import { libraryListRequest, type ContentFilterInput } from '#lib/queries/content/index.js';
 import { prefetchLibraryList, isViewerScoped } from '#lib/queries/content/prefetchLibraryList.js';
+import { libraryListQueryOptions } from '#lib/queries/content/useLibraryList.svelte.js';
 import { LIST_CONTENT, type ContentResponse } from '#lib/queries/content/index.js';
 import { graphqlRequest, graphqlRequestAnonymous } from '#lib/queries/client.js';
 import { getAuthToken } from '#lib/auth/index.js';
@@ -48,12 +49,8 @@ const response: ContentResponse = {
 
 const request = (qs: string) => libraryListRequest(parseGridParams(new URLSearchParams(qs)), null);
 
-/** Options a component's useX would pass: same key, same variables, authenticated fetch. */
-const consumerOptions = (req: ReturnType<typeof request>) => ({
-	queryKey: req.queryKey,
-	queryFn: () => graphqlRequest<ContentResponse>(LIST_CONTENT, req.variables),
-	staleTime: 60 * 1000,
-});
+/** The options useLibraryList runs the list query with: same key, same variables, authenticated fetch. */
+const consumerOptions = (req: ReturnType<typeof request>) => libraryListQueryOptions(req);
 
 let client: QueryClient;
 
