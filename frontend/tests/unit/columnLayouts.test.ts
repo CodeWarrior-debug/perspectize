@@ -7,6 +7,7 @@ import {
 	saveLayout,
 	clearLayout,
 	defaultLayout,
+	dropAbsentCustomColumns,
 	planColumnSwitch,
 } from '#lib/utils/columnLayouts.js';
 import { togglableColIds } from '#lib/utils/grid-config.js';
@@ -198,5 +199,51 @@ describe('planColumnSwitch', () => {
 			defaults: movieDefaults,
 		});
 		expect(plan.toast).toBe(false);
+	});
+});
+
+describe('custom columns in a saved layout', () => {
+	beforeEach(() => localStorage.clear());
+
+	it('loads a layout saved before custom columns existed, unchanged', () => {
+		const old = { tags: true, views: false, item: true };
+		localStorage.setItem(COLUMN_LAYOUTS_KEY, JSON.stringify({ movie: old }));
+		expect(loadLayout('movie')).toEqual(old);
+	});
+
+	it('round-trips a layout that names custom columns (no key bump needed)', () => {
+		const layout = { tags: true, 'custom:42': true, 'custom:43': false };
+		saveLayout('movie', layout);
+		expect(loadLayout('movie')).toEqual(layout);
+	});
+
+	it('keeps custom column visibility scoped to its view', () => {
+		saveLayout('movie', { 'custom:42': true });
+		saveLayout('general', { views: true });
+		expect(loadLayout('movie')).toEqual({ 'custom:42': true });
+		expect(loadLayout('general')).toEqual({ views: true });
+	});
+
+	it('defaultLayout hides every custom column it is told about', () => {
+		const layout = defaultLayout('lg', 'movie', 'movie', ['custom:42', 'custom:43']);
+		expect(layout['custom:42']).toBe(false);
+		expect(layout['custom:43']).toBe(false);
+		expect(layout.views).toBe(defaultLayout('lg', 'movie', 'movie').views);
+	});
+
+	it('defaultLayout without custom ids has no custom keys', () => {
+		expect(defaultLayout('lg', 'movie', 'movie')).not.toHaveProperty('custom:42');
+	});
+
+	it('drops only the custom keys that are not present, keeping built-ins and present customs', () => {
+		const layout = { tags: true, 'custom:42': true, 'custom:99': true };
+		const shown = dropAbsentCustomColumns(layout, (colId) => colId === 'custom:42');
+		expect(shown).toEqual({ tags: true, 'custom:42': true });
+	});
+
+	it('does not rewrite storage when it drops an absent custom key', () => {
+		saveLayout('movie', { 'custom:99': true, tags: true });
+		dropAbsentCustomColumns(loadLayout('movie') ?? {}, () => false);
+		expect(loadLayout('movie')).toEqual({ 'custom:99': true, tags: true });
 	});
 });

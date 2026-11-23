@@ -1,4 +1,5 @@
 import { defaultColumnVisibility, togglableColIds, type ColumnView, type ResponsiveTier } from './grid-config';
+import { isCustomColId } from './customColumnDefs';
 
 export { columnViewFor, type ColumnView } from './grid-config';
 
@@ -79,12 +80,33 @@ export function clearLayout(view: ColumnView): void {
  * (admin ones included) so applying it also hides picker-only columns such as
  * Date Added that a previous custom layout turned on.
  */
-export function defaultLayout(tier: ResponsiveTier, view: ColumnView, soloType: string | null = null): ColumnLayout {
+export function defaultLayout(
+	tier: ResponsiveTier,
+	view: ColumnView,
+	soloType: string | null = null,
+	customColIds: readonly string[] = [],
+): ColumnLayout {
 	const { visible } = defaultColumnVisibility(tier, view, soloType);
 	const shown = new Set(visible);
 	const layout: ColumnLayout = {};
 	for (const colId of new Set([...togglableColIds(true), ...visible])) layout[colId] = shown.has(colId);
+	// Custom columns are hidden by default, so a reset (or a switch into this view) hides them too.
+	for (const colId of customColIds) layout[colId] = false;
 	return layout;
+}
+
+/**
+ * A saved layout without the custom columns that are not in the grid now (deleted, unavailable, or
+ * not offered in this view). Dropped at apply time only: the stored layout is not rewritten, so a
+ * formula that is merely still loading keeps its saved visibility.
+ */
+export function dropAbsentCustomColumns(layout: ColumnLayout, isPresent: (colId: string) => boolean): ColumnLayout {
+	const out: ColumnLayout = {};
+	for (const [colId, visible] of Object.entries(layout)) {
+		if (isCustomColId(colId) && !isPresent(colId)) continue;
+		out[colId] = visible;
+	}
+	return out;
 }
 
 /**
