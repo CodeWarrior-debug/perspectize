@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { render, screen } from '@testing-library/svelte';
+import { render, screen, fireEvent } from '@testing-library/svelte';
 import Header from '#lib/components/Header.svelte';
 import { mockPageState } from '../setup';
 
@@ -233,5 +233,71 @@ describe('Header component', () => {
 	it('does not render a Messages nav link (messaging entry point is the floating widget)', () => {
 		renderHeader();
 		expect(screen.queryByRole('link', { name: /messages/i })).not.toBeInTheDocument();
+	});
+
+	// On a phone the six links scroll inside the nav. These keep that from looking broken or hiding the
+	// page you are on.
+	describe('nav scrolling on a narrow screen', () => {
+		const original = Element.prototype.scrollIntoView;
+
+		afterEach(() => {
+			Element.prototype.scrollIntoView = original;
+			mockPageState.url = new URL('http://localhost/');
+		});
+
+		/** jsdom does no layout, so scroll geometry is faked on the nav element. */
+		async function setScroll(nav: HTMLElement, m: { scrollLeft: number; scrollWidth: number; clientWidth: number }) {
+			for (const [key, value] of Object.entries(m)) {
+				Object.defineProperty(nav, key, { value, configurable: true, writable: true });
+			}
+			await fireEvent.scroll(nav);
+		}
+
+		it('scrolls the current page link into view, so it is never hidden off-screen', () => {
+			const scrolled: Element[] = [];
+			Element.prototype.scrollIntoView = function (this: Element) {
+				scrolled.push(this);
+			};
+			mockPageState.url = new URL('http://localhost/import');
+			render(Header);
+			expect(scrolled).toEqual([screen.getByRole('link', { name: 'Import' })]);
+		});
+
+		it('scrolls nothing when no nav link is current (the home page)', () => {
+			const scrolled: Element[] = [];
+			Element.prototype.scrollIntoView = function (this: Element) {
+				scrolled.push(this);
+			};
+			mockPageState.url = new URL('http://localhost/');
+			render(Header);
+			expect(scrolled).toEqual([]);
+		});
+
+		it('fades the clipped right end of the nav while more links are off-screen, so a cut-off link reads as scrollable', async () => {
+			render(Header);
+			const nav = screen.getByRole('navigation');
+			await setScroll(nav, { scrollLeft: 0, scrollWidth: 500, clientWidth: 200 });
+			expect(nav.style.getPropertyValue('mask-image')).toContain('transparent 100%');
+			expect(nav.style.getPropertyValue('mask-image')).not.toContain('transparent 0');
+		});
+
+		it('fades both ends in the middle, and only the left once it reaches the end', async () => {
+			render(Header);
+			const nav = screen.getByRole('navigation');
+			await setScroll(nav, { scrollLeft: 100, scrollWidth: 500, clientWidth: 200 });
+			expect(nav.style.getPropertyValue('mask-image')).toContain('transparent 0');
+			expect(nav.style.getPropertyValue('mask-image')).toContain('transparent 100%');
+
+			await setScroll(nav, { scrollLeft: 300, scrollWidth: 500, clientWidth: 200 });
+			expect(nav.style.getPropertyValue('mask-image')).toContain('transparent 0');
+			expect(nav.style.getPropertyValue('mask-image')).not.toContain('transparent 100%');
+		});
+
+		it('applies no mask when every link fits (desktop)', async () => {
+			render(Header);
+			const nav = screen.getByRole('navigation');
+			await setScroll(nav, { scrollLeft: 0, scrollWidth: 400, clientWidth: 400 });
+			expect(nav.style.getPropertyValue('mask-image')).toBe('');
+		});
 	});
 });

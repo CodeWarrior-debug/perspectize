@@ -9,6 +9,7 @@
 	import { createThemeStore } from '#lib/theme/store.svelte.js';
 	import { createFontStore } from '#lib/fonts/store.svelte.js';
 	import { LIBRARY_PATH } from '#lib/utils/contentLinks.js';
+	import { scrollEdges, scrollFadeMask } from '#lib/utils/scrollFade.js';
 
 	const themeStore = createThemeStore();
 	const fontStore = createFontStore();
@@ -31,6 +32,36 @@
 	function isActive(href: string): boolean {
 		return page.url.pathname.startsWith(href);
 	}
+
+	let nav = $state<HTMLElement | null>(null);
+	let canScrollLeft = $state(false);
+	let canScrollRight = $state(false);
+
+	function measure() {
+		if (!nav) return;
+		const edges = scrollEdges(nav);
+		canScrollLeft = edges.canScrollLeft;
+		canScrollRight = edges.canScrollRight;
+	}
+
+	// At phone width the links scroll inside the nav. Bring the current page's link into view on every
+	// route change, or a page like Import sits off-screen with nothing in the nav marked as current.
+	$effect(() => {
+		if (!nav) return;
+		void page.url.pathname;
+		nav.querySelector('[aria-current="page"]')?.scrollIntoView?.({ block: 'nearest', inline: 'center' });
+		measure();
+		if (typeof ResizeObserver === 'undefined') return;
+		const observer = new ResizeObserver(measure);
+		observer.observe(nav);
+		return () => observer.disconnect();
+	});
+
+	// Fade a clipped end so a cut-off link reads as "scroll for more", not as a broken label. No mask at
+	// all while every link fits (desktop).
+	const fadeMask = $derived(
+		canScrollLeft || canScrollRight ? scrollFadeMask(canScrollLeft, canScrollRight, '1.5rem') : undefined,
+	);
 </script>
 
 <header class="h-16 border-b border-border bg-primary text-primary-foreground sticky top-0 z-50">
@@ -43,7 +74,13 @@
 				Perspectize
 			</a>
 			<!-- min-w-0 + overflow-x-auto: at phone width the links scroll inside the nav instead of running under the right-hand buttons. py/px padding keeps the focus ring from being clipped. -->
-			<nav class="flex items-center gap-0.5 sm:gap-2 min-w-0 overflow-x-auto py-1 -my-1 px-1 -mx-1">
+			<nav
+				bind:this={nav}
+				class="flex items-center gap-0.5 sm:gap-2 min-w-0 overflow-x-auto py-1 -my-1 px-1 -mx-1"
+				style:mask-image={fadeMask}
+				style:-webkit-mask-image={fadeMask}
+				onscroll={measure}
+			>
 				{#each navLinks as link (link.href)}
 					<a
 						href={link.href}
