@@ -146,7 +146,7 @@ vi.mock('#lib/queries/content/useContentPicker.js', () => ({
 // PlanBoard renders these through {#await import(...)}. Load them up front, so a
 // findBy* below waits on the UI, not on Vite transforming the module (#728).
 preloadLazy(
-	() => import('#lib/components/ActivityDetailsModal.svelte'),
+	() => import('#lib/components/ContentDetailsModal.svelte'),
 	() => import('#lib/components/PerspectivePopover.svelte'),
 );
 

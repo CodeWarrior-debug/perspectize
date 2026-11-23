@@ -29,7 +29,7 @@ that type filtered in**:
   "2h 47m"). Genres and keywords use the multi-mode checklist. A dashed footer
   in each popover shows the planner notes (source path, unit, appearance).
 - **The content details view** — click a title (or "Open … details view") for
-  a mock of `ActivityDetailsModal` built from `src/details.ts`: media, breadcrumb,
+  a mock of `ContentDetailsModal` built from `src/details.ts`: media, breadcrumb,
   tiles, sections, prev/next, TMDB attribution. Tiles have tooltips too;
   **Show field sources** annotates every value with where it comes from.
 
@@ -112,7 +112,7 @@ Sections 4–6 show the new type the way a user would meet it:
   works offline and inside a claude.ai artifact (its CSP blocks remote
   images). Re-run it after adding a sample `img`.
 - **Row details & perspective** (section 5): mockups of
-  `ActivityDetailsModal.svelte` and `PerspectivePopover.svelte`, built from
+  `ContentDetailsModal.svelte` and `PerspectivePopover.svelte`, built from
   the bindings, the type's `detailOnly` fields and the focused row. They follow
   the row fill state, so Minimum shows the sparsest details view.
 - **Add Content card** (section 6): a live input that runs `src/detect.ts`.

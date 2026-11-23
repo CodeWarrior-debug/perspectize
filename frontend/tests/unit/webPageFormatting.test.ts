@@ -6,7 +6,7 @@ import {
 	webSiteCellRenderer,
 } from '#lib/utils/webPageFormatting.js';
 import { typeCellRenderer } from '#lib/utils/formatting.js';
-import { activityItemCellRenderer } from '#lib/utils/activityItemCellRenderer.js';
+import { libraryItemCellRenderer } from '#lib/utils/libraryItemCellRenderer.js';
 
 const page = (overrides: Record<string, unknown> = {}, url = 'https://www.example.com/post') =>
 	({
@@ -98,20 +98,20 @@ describe('item cell for a webpage row', () => {
 	});
 
 	it('shows the title with no play overlay (a page is not a video)', () => {
-		const el = activityItemCellRenderer({ data: data() as never }) as HTMLElement;
+		const el = libraryItemCellRenderer({ data: data() as never }) as HTMLElement;
 		expect(el.querySelector('[data-testid="item-title"]')?.textContent).toBe('A post title');
 		expect(el.innerHTML).not.toContain('polygon');
 	});
 
 	it('loads the favicon without a referrer', () => {
-		const el = activityItemCellRenderer({ data: data() as never }) as HTMLElement;
+		const el = libraryItemCellRenderer({ data: data() as never }) as HTMLElement;
 		const img = el.querySelector('img') as HTMLImageElement;
 		expect(img.getAttribute('src')).toBe('https://www.example.com/favicon.ico');
 		expect(img.referrerPolicy).toBe('no-referrer');
 	});
 
 	it('leaves the thumbnail slot empty when there is no favicon', () => {
-		const el = activityItemCellRenderer({ data: data({ webPage: null }) as never }) as HTMLElement;
+		const el = libraryItemCellRenderer({ data: data({ webPage: null }) as never }) as HTMLElement;
 		expect(el.querySelector('img')).toBeNull();
 		expect(el.querySelector('[data-testid="item-thumb"]')).not.toBeNull();
 	});

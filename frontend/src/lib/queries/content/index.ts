@@ -8,7 +8,7 @@ export interface LengthDisplay {
 }
 
 export type { ContentFilterInput } from '#lib/utils/gridUrlState.js';
-export { activityListRequest, cursorsAfterPage, ACTIVITY_LIST_STALE_TIME_MS, LOADED_MODE_FIRST } from './activityList';
+export { libraryListRequest, cursorsAfterPage, LIBRARY_LIST_STALE_TIME_MS, LOADED_MODE_FIRST } from './libraryList';
 
 // Values the API returns in Content.contentType (a String, not a GraphQL enum).
 export type ContentType = 'YOUTUBE_VIDEO' | 'CLAIM' | 'BIBLE_PASSAGE' | 'MOVIE' | 'BOOK' | 'WEB_PAGE';
@@ -86,7 +86,7 @@ export interface ContentItem {
 	id: string;
 	name: string;
 	addedByUserID: string;
-	// Client-side only (not in the GraphQL selection): ActivityTable fills it from the
+	// Client-side only (not in the GraphQL selection): ContentLibrary fills it from the
 	// cached users list, so the User column can render/sort/filter without a per-row join.
 	addedByUsername?: string | null;
 	url: string | null;

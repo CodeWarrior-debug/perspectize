@@ -1,5 +1,5 @@
 /**
- * Row order across refetches of the Library list. These pin each state ActivityTable relies on:
+ * Row order across refetches of the Library list. These pin each state ContentLibrary relies on:
  * a refetch of the same list keeps rows in place, new rows lead, removed rows drop out, a different
  * list starts from the server order, and placeholder data is neither applied nor recorded.
  */

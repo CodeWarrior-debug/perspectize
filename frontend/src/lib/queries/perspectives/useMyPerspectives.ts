@@ -4,7 +4,7 @@ import { LIST_PERSPECTIVES_BY_USER, MAX_PERSPECTIVES_PER_LIST, type ListPerspect
 import { queryKeys } from '../keys';
 
 /**
- * The signed-in user's perspectives, shared with ActivityTable (same key, same
+ * The signed-in user's perspectives, shared with ContentLibrary (same key, same
  * request), so a caller can tell whether a perspective already exists for a content id.
  * Disabled while `userId()` is null.
  */

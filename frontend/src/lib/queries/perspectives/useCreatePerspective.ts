@@ -73,7 +73,7 @@ export function useCreatePerspective() {
 	const queryClient = useQueryClient();
 	// Only the creator's own by-user list gets an optimistic row: it's the one cached
 	// list guaranteed to hold the same PerspectiveItem shape the mutation returns, and
-	// it's what drives the ActivityTable/OnboardingCoach +/glasses affordance. Every
+	// it's what drives the ContentLibrary/OnboardingCoach +/glasses affordance. Every
 	// other cached perspective list (other users' listByUser, any listByContent) is
 	// unrelated to the creator — those are invalidated in onSuccess below instead of
 	// patched, so a create never inserts a wrongly-scoped row into them.

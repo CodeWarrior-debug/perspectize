@@ -5,7 +5,7 @@
  *  1. De-duplication: N consumers of one key cost one network call.
  *  2. Freshness: a consumer mounting inside staleTime costs zero calls.
  *  3. Key hygiene: every variable a queryFn sends changes the key hash (the
- *     ActivityTable search-box bug), and equal inputs hash equal (no needless
+ *     ContentLibrary search-box bug), and equal inputs hash equal (no needless
  *     refetch from an unstable key).
  *  4. Eviction: a mutation's onSuccess evicts exactly the affected entries —
  *     and nothing else.

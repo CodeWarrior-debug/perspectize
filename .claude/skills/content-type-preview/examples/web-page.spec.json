@@ -11,7 +11,7 @@
     "date": "2026-11-11",
     "sources": [
       "docs/superpowers/specs/2026-11-11-web-page-content-type-design.md",
-      "frontend/src/lib/components/ActivityTable.svelte (Category column)",
+      "frontend/src/lib/components/library/ContentLibrary.svelte (Category column)",
       "backend/schema.graphql (Content.primaryCategory, setPrimaryCategory)",
       "docs/superpowers/specs/2026-11-11-web-page-content-type-design.md §9 (roles)"
     ],
