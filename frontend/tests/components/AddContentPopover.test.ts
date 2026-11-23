@@ -64,6 +64,12 @@ describe('AddContentPopover component', () => {
 		expect(screen.getByRole('button', { name: /add content/i })).toBeInTheDocument();
 	});
 
+	// Below the md breakpoint the text label is display:none, so the name must come from aria-label.
+	it('trigger carries its own accessible name for icon-only widths', () => {
+		render(AddContentPopover);
+		expect(screen.getByRole('button', { name: /add content/i }).getAttribute('aria-label')).toBe('Add Content');
+	});
+
 	it('button has plus icon', () => {
 		render(AddContentPopover);
 		expect(screen.getByRole('button', { name: /add content/i }).querySelector('svg')).toBeInTheDocument();

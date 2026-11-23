@@ -101,13 +101,20 @@
 		const input = e.currentTarget as HTMLInputElement;
 		const raw = input.value;
 		const parsed = parseFloat(raw);
-		if (!isNaN(parsed) && parsed >= RATING_MIN && parsed <= RATING_MAX) {
-			setDisplay(parsed);
-		}
+		// An out-of-range entry is clamped (setDisplay) rather than left in the box: a stray
+		// "11" would otherwise stay on screen while native validation silently blocked Save.
+		if (!isNaN(parsed)) setDisplay(parsed);
+		// Re-sync the box even when the stored value didn't change (e.g. 11 typed over 10).
+		input.value = hasInteracted ? displayValue.toFixed(3) : RATING_DEFAULT_DISPLAY.toFixed(3);
 	}
 
-	function handleFocus() {
+	function handleFocus(e: FocusEvent) {
 		hasInteracted = true;
+		// Select the whole number so typing "7" replaces "8.500" instead of editing it into
+		// "8.5007". Deferred a frame because the mouseup that follows a click would
+		// otherwise collapse the selection again.
+		const input = e.currentTarget as HTMLInputElement;
+		requestAnimationFrame(() => input.select());
 	}
 
 	function handleProgressBarClick(e: MouseEvent) {

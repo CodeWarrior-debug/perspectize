@@ -112,7 +112,11 @@ export function useCreatePerspective() {
 			} else {
 				// The popover has already closed (it doesn't wait for the server), so
 				// offer the retry here rather than making the user re-enter everything.
+				// Persistent: the form has closed and the work is only safe in a draft, so the
+				// Retry must not vanish after the 2s default.
 				toast.error('Failed to add perspective.', {
+					duration: Infinity,
+					closeButton: true,
 					action: { label: 'Retry', onClick: () => mutation.mutate(input) },
 				});
 			}
