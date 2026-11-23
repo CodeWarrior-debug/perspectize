@@ -4,6 +4,7 @@
 	import ChevronRightIcon from '@lucide/svelte/icons/chevron-right';
 	import ChevronDownIcon from '@lucide/svelte/icons/chevron-down';
 	import { otherTypeOptionsWhenOne } from '#lib/utils/gridUrlState.js';
+	import { scrollEdges, scrollFadeMask } from '#lib/utils/scrollFade.js';
 
 	let {
 		filters,
@@ -16,8 +17,6 @@
 
 	/** The searchable "All types" list appears once the row would be too long to scan by eye. */
 	const SEARCH_THRESHOLD = 8;
-	/** Distance in px from an end at which that end counts as reached (sub-pixel scroll positions). */
-	const EDGE_SLACK = 2;
 	/** One arrow press scrolls this fraction of the visible width, so the last pill stays in view. */
 	const PAGE_FRACTION = 0.8;
 
@@ -30,9 +29,9 @@
 
 	function measure() {
 		if (!scroller) return;
-		const { scrollLeft, scrollWidth, clientWidth } = scroller;
-		canScrollLeft = scrollLeft > EDGE_SLACK;
-		canScrollRight = scrollLeft + clientWidth < scrollWidth - EDGE_SLACK;
+		const edges = scrollEdges(scroller);
+		canScrollLeft = edges.canScrollLeft;
+		canScrollRight = edges.canScrollRight;
 	}
 
 	function page(direction: -1 | 1) {
@@ -58,11 +57,7 @@
 	});
 
 	// Fade the clipped ends so a cut-off pill reads as "more this way", not as a glitch.
-	const fadeMask = $derived(
-		`linear-gradient(to right, ${canScrollLeft ? 'transparent 0, black 2.5rem' : 'black 0, black 0'}, ${
-			canScrollRight ? 'black calc(100% - 2.5rem), transparent 100%' : 'black 100%, black 100%'
-		})`,
-	);
+	const fadeMask = $derived(scrollFadeMask(canScrollLeft, canScrollRight));
 
 	let search = $state('');
 	let moreOpen = $state(false);
