@@ -42,13 +42,7 @@
 		nonGridFilters,
 	} from '#lib/utils/gridUrlState.js';
 	import type { DataMode, GridParams, SortSpec } from '#lib/utils/gridUrlState.js';
-	import {
-		perspectiveCellRenderer,
-		formatDurationMinutes,
-		contentRowId,
-		moviePeople,
-		PERSON_ID_ATTR,
-	} from '#lib/utils/formatting.js';
+	import { formatDurationMinutes, contentRowId, moviePeople, PERSON_ID_ATTR } from '#lib/utils/formatting.js';
 	import {
 		itemColumnHeader,
 		soloTypeFilter,
@@ -62,7 +56,6 @@
 		parsePersonFilter,
 		rowMatchesPerson,
 		showColumnRelevanceCallout,
-		liveGridApi,
 	} from '#lib/utils/grid-config.js';
 	import { LIBRARY_GRID_THEME } from '#lib/utils/grid-theme.js';
 	import { emptyCellClassRules } from '#lib/utils/grid-empty.js';
@@ -108,6 +101,7 @@
 	import ContentDetailsModal from '#lib/components/ContentDetailsModal.svelte';
 	import LibraryCardList from '#lib/components/library/LibraryCardList.svelte';
 	import { buildLibraryColumnDefs } from '#lib/components/library/columns.js';
+	import { createGridHandle } from '#lib/utils/gridHandle.svelte.js';
 	import AddToPlanDialog from '#lib/components/plan/AddToPlanDialog.svelte';
 	import CategoryTypeahead from '#lib/components/CategoryTypeahead.svelte';
 	import { useSetPrimaryCategory } from '#lib/queries/categories/useSetPrimaryCategory.js';
@@ -433,8 +427,9 @@
 	// Grid state
 	// ---------------------------------------------------------------------------
 
-	let gridApi = $state<GridApi | null>(null);
-	let gridReady = $state(false);
+	const grid = createGridHandle<ContentItem>();
+	const gridApi = $derived(grid.api);
+	const gridReady = $derived(grid.ready);
 	let displayedRowCount = $state<number | null>(null);
 	let debounceTimer: ReturnType<typeof setTimeout>;
 	let skipNextSortEvent = $state(false);
@@ -780,17 +775,7 @@
 				categoryPopoverOpen = true;
 			}
 		},
-		onGridReady: (params) => {
-			gridApi = params.api;
-			gridReady = true;
-		},
-		// Fires synchronously before any grid teardown (cardMode, error state, navigation), so
-		// effects flushed afterwards see no grid instead of calling a destroyed Grid API.
-		onGridPreDestroyed: () => {
-			gridApi = null;
-			gridReady = false;
-			displayedRowCount = null;
-		},
+		...grid.options({ onDetach: () => (displayedRowCount = null) }),
 		onSortChanged: (event: SortChangedEvent) => {
 			hover.close();
 			// In "Loaded" mode, AG Grid handles client-side sort (including multi-column
@@ -911,8 +896,8 @@
 
 	// Restore AG Grid filter state from URL on mount and mode changes
 	$effect(() => {
-		const api = liveGridApi(gridApi);
-		if (!api || !gridReady) return;
+		const api = grid.live();
+		if (!api) return;
 		const filterModel = urlParamsToFilter(gridParams.filters);
 		api.setFilterModel(Object.keys(filterModel).length > 0 ? filterModel : null);
 	});
@@ -940,22 +925,16 @@
 		gridApi.setGridOption('overlayNoRowsTemplate', template);
 	});
 
-	// Null out gridApi on destroy to prevent $effect callbacks hitting a destroyed grid
+	// Drop the grid API on destroy to prevent $effect callbacks hitting a destroyed grid
 	$effect(() => {
-		return () => {
-			gridApi = null;
-			gridReady = false;
-		};
+		return () => grid.detach();
 	});
 
 	// cardMode unmounts AgGridSvelte5Component (destroying the grid) without the above
 	// teardown running — clear the stale reference so other $effects' `!gridApi` guards
 	// don't call methods on an already-destroyed grid instance.
 	$effect(() => {
-		if (cardMode) {
-			gridApi = null;
-			gridReady = false;
-		}
+		if (cardMode) grid.detach();
 	});
 
 	// Update AG Grid context reactively so perspectiveCellRenderer can access the map
@@ -985,7 +964,6 @@
 			lastColumnView = null;
 			return;
 		}
-		const api = gridApi;
 		void layoutVersion;
 		// Read synchronously, before the rAF, so this effect re-runs when they change.
 		const tier = responsiveTier;
@@ -1003,8 +981,8 @@
 			saved: loadLayout(view),
 			defaults: defaultLayout(tier, view, solo),
 		});
-		requestAnimationFrame(() => {
-			if (api.isDestroyed()) return; // Grid may have been destroyed before rAF fires
+		// Not cancelled on re-run: a superseded run's toast offer must still show.
+		grid.afterFrame((api) => {
 			applyLayout(api, plan.apply);
 			if (plan.toast) showColumnSwitchToast(view, current);
 		});
@@ -1023,7 +1001,7 @@
 	}
 
 	function exportApi(): ExportGridApi | null {
-		return gridApi && !gridApi.isDestroyed() ? (gridApi as unknown as ExportGridApi) : null;
+		return grid.live() as unknown as ExportGridApi | null;
 	}
 
 	function handleDownloadCsv() {
@@ -1103,13 +1081,11 @@
 	// switch, mode, card mode, type filter); the header component re-reads chartIconVisible.
 	$effect(() => {
 		if (!gridApi || !gridReady) return;
-		const api = gridApi;
 		void layoutVersion;
 		void mode;
 		void cardMode;
 		void filters.type;
-		requestAnimationFrame(() => {
-			if (api.isDestroyed()) return; // Grid may have been destroyed before rAF fires
+		grid.afterFrame((api) => {
 			api.refreshHeader();
 			// Show/hide each chart button to match its column's current state.
 			gridContainer?.querySelectorAll<HTMLElement>('[data-chart-col]').forEach((btn) => {
