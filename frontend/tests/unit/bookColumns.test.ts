@@ -13,7 +13,7 @@ import { columnViewFor as columnViewForFromLayouts } from '#lib/utils/columnLayo
 import { urlParamsToGraphQLFilter } from '#lib/utils/gridUrlState.js';
 import { headerMinWidth } from '#lib/utils/grid-header-width.js';
 import { LIBRARY_TOOLTIP_SPECS } from '#lib/utils/libraryTooltipSpecs.js';
-import contentLibrarySource from '#lib/components/library/ContentLibrary.svelte?raw';
+import libraryColumnsSource from '#lib/components/library/columns.ts?raw';
 
 const TIERS: ResponsiveTier[] = ['xs', 'sm', 'md', 'lg'];
 
@@ -215,16 +215,16 @@ describe('Published, Pages and Book rating filters', () => {
 	});
 });
 
-// The grid's colDefs live in ContentLibrary.svelte (AG Grid does not render in jsdom), so these
+// The grid's colDefs live in library/columns.ts (AG Grid does not render in jsdom), so these
 // read its source, as the Movie column tests do.
 describe('Book colDefs in ContentLibrary', () => {
-	const blocks = contentLibrarySource.split(/(?=colId:\s*')/g);
+	const blocks = libraryColumnsSource.split(/(?=colId:\s*')/g);
 	const block = (colId: string): string => {
 		const b = blocks.find((x) => x.startsWith(`colId: '${colId}'`));
 		if (!b) throw new Error(`no colDef for ${colId}`);
 		return b;
 	};
-	// Mirrors ContentLibrary's colDef map: an explicit minWidth only raises the header floor.
+	// Mirrors buildLibraryColumnDefs' colDef map: an explicit minWidth only raises the header floor.
 	function minWidth(colId: string): number {
 		const b = block(colId);
 		const explicit = Number(b.match(/\n\s*minWidth:\s*(\d+)/)?.[1] ?? 0);

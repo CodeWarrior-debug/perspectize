@@ -24,7 +24,8 @@ UI), not a silent, separately-drifting list — see `.docs/UI_THOROUGHNESS_CHECK
 
 | File | Purpose |
 |------|---------|
-| `frontend/src/lib/components/library/ContentLibrary.svelte` | Column definitions (`columnDefs`), the responsive `$effect`, click/hover handlers |
+| `frontend/src/lib/components/library/columns.ts` | Column definitions (`buildLibraryColumnDefs`) |
+| `frontend/src/lib/components/library/ContentLibrary.svelte` | The responsive `$effect`, click/hover handlers |
 | `frontend/src/lib/utils/formatting.ts` | Cell renderers, value formatters, value getters |
 | `frontend/src/lib/utils/libraryTooltipSpecs.ts` | Hover-popover specs (`LIBRARY_TOOLTIP_SPECS`) |
 | `frontend/src/lib/utils/grid-config.ts` | `COLUMNS`/`ColumnMeta` — the single source of truth. `DATA_COLUMNS`/`INTERNAL_COLUMNS` (column picker), `SORTABLE_COLUMNS`/`SORT_VALUE_GETTERS` (sort picker + client-side sort), `COL_TO_SORT`/`SORT_TO_COL` (server sort), `COL_TO_FILTER_KEY`/`COLUMN_LABELS` (URL filter keys + filter-chip labels), `compareContentBySorts`/`filterContentRows` — all derived from `COLUMNS` |

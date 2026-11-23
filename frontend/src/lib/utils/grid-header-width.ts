@@ -43,7 +43,7 @@ export interface HeaderWidthOptions {
  * The sort arrow and the multi-sort order number are reserved even while unsorted, so sorting a
  * column (alone or alongside others) never truncates it.
  *
- * Every Activity column's `minWidth` is at least this (see ContentLibrary's column defs), and
+ * Every Library column's `minWidth` is at least this (see library/columns.ts), and
  * `tests/unit/gridHeaderWidth.test.ts` checks that for every column.
  */
 export function headerMinWidth(

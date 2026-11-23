@@ -111,7 +111,7 @@ Tokens live in `src/app.css` under `@theme` (no external pipeline), consumed via
 
 Uses `ag-grid-svelte5` (bundles AG Grid v32.x). **Do NOT install `ag-grid-community` separately.** Import from `@ag-grid-community/*`, use `AgGridSvelte5Component`, style via `withParams()` on a base theme (Activity and Plan: `themeBalham`). Setup: [docs/AG_GRID.md](docs/AG_GRID.md).
 
-**Column visibility gotcha:** `ContentLibrary.svelte` sets visibility in TWO places; update BOTH: `hide: true` in the colDef (initial default) and the `$effect` with `setColumnsVisible()` (responsive override, runs on gridReady, always wins). Tiers: xs (<445px), sm (445-639px), md (640-899px), lg (900px+); choose which show the new column. See [ADDING_AG_GRID_COLUMN.md](../.claude/docs/ADDING_AG_GRID_COLUMN.md) Decision 7.
+**Column visibility gotcha:** visibility is set in TWO places; update BOTH: `hide: true` in the colDef (`library/columns.ts`, initial default) and the `$effect` with `setColumnsVisible()` in `ContentLibrary.svelte` (responsive override, runs on gridReady, always wins). Tiers: xs (<445px), sm (445-639px), md (640-899px), lg (900px+); choose which show the new column. See [ADDING_AG_GRID_COLUMN.md](../.claude/docs/ADDING_AG_GRID_COLUMN.md) Decision 7.
 
 **Column metadata lives in one place:** `src/lib/utils/grid-config.ts`'s `COLUMNS: readonly ColumnMeta[]` derives the column picker, sort picker, server/client sort maps, URL filter keys and filter-chip labels. Add a column as one `COLUMNS` entry; never edit `DATA_COLUMNS`/`SORTABLE_COLUMNS`/`COL_TO_SORT`/`COL_TO_FILTER_KEY`/`COLUMN_LABELS` individually.
 

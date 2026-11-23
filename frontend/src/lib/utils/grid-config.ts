@@ -170,7 +170,7 @@ export function releasedComparator(
  * those places by mistake (see .docs/UI_THOROUGHNESS_CHECKLIST.md §3.1).
  *
  * `colId` and `label` must match the `colId`/`headerName` on the
- * corresponding ColDef in ContentLibrary.svelte — column-registry-parity.test.ts
+ * corresponding ColDef in library/columns.ts — column-registry-parity.test.ts
  * and column-label-parity.test.ts read that file's source and fail if they
  * don't (kept as an extra guard even though this refactor makes the drift
  * this project actually hit — a column present in one list but not

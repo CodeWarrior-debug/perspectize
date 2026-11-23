@@ -23,7 +23,7 @@ Content types use a **discriminator pattern** — a single `Content` table/type 
 | Wiring | `backend/cmd/server/main.go` | Dependency injection |
 | Frontend types | `frontend/src/lib/queries/content.ts` | TS types, GraphQL queries |
 | Frontend UI | `frontend/src/lib/components/AddVideoPopover.svelte` | Content creation form |
-| Frontend table | `frontend/src/lib/components/library/ContentLibrary.svelte` | Column definitions |
+| Frontend table | `frontend/src/lib/components/library/columns.ts` | Column definitions |
 | Frontend render | `frontend/src/lib/utils/formatting.ts` | Cell renderers |
 | Frontend validate | `frontend/src/lib/utils/youtube.ts` | URL validation |
 | Frontend hooks | `frontend/src/lib/queries/hooks/useAddVideo.ts` | Mutation hook |

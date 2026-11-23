@@ -30,7 +30,7 @@ A column, field, filter, sort, setting or content type touches some of these lay
 
 ### C. Grid (ContentLibrary)
 Until the column-metadata refactor in §3 lands, a new column has to be added to **every** one of these by hand:
-- [ ] Column definition in `ContentLibrary.svelte`: `colId`, `headerName`, `hide`, `sortable`, `filter`.
+- [ ] Column definition in `library/columns.ts`: `colId`, `headerName`, `hide`, `sortable`, `filter`.
 - [ ] Renderer or formatter in `formatting.ts`, **using theme tokens only** (see F).
 - [ ] Tooltip/copy spec in `libraryTooltipSpecs.ts` (#390 popover), or a note that the column doesn't need one.
 - [ ] The responsive tier lists in the `ContentLibrary` effect (`smCols` / `mdCols` / …).

@@ -538,7 +538,7 @@ export function buildSpec(state: DraftState): string {
     ...(d.detailOnly?.length
       ? [`Frontend: \`ContentDetailsModal.svelte\` — a ${d.label} branch with the bound fields as tiles and ${d.detailOnly.map((f) => f.label).join(', ')} in a details list.`]
       : []),
-    `Frontend: column defs + tooltips in \`ContentLibrary.svelte\` per section 5, with the alias swap from the per-type header table.`,
+    `Frontend: column defs + tooltips in \`library/columns.ts\` per section 5, with the alias swap from the per-type header table.`,
     'Tests: domain enum, service create paths, resolver mutation + filter-by-type, per-filter repo/resolver tests with Loaded/All parity, 2-page cursor pagination, formatting renderers, query definitions.',
     'Verify: `go build ./...`, `go test ./...`, `pnpm run test:run`.'
   ];
