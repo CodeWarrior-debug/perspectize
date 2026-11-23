@@ -17,8 +17,12 @@ function ready(
 	handle.options(hooks).onGridReady?.({ api } as GridReadyEvent<Row>);
 }
 
-function preDestroy(handle: ReturnType<typeof createGridHandle<Row>>, hooks?: Parameters<typeof handle.options>[0]) {
-	handle.options(hooks).onGridPreDestroyed?.({} as GridPreDestroyedEvent<Row>);
+function preDestroy(
+	handle: ReturnType<typeof createGridHandle<Row>>,
+	api: GridApi<Row>,
+	hooks?: Parameters<typeof handle.options>[0],
+) {
+	handle.options(hooks).onGridPreDestroyed?.({ api } as GridPreDestroyedEvent<Row>);
 }
 
 describe('createGridHandle', () => {
@@ -45,12 +49,26 @@ describe('createGridHandle', () => {
 
 	it('drops the API before teardown, and calls onDetach after', () => {
 		const handle = createGridHandle<Row>();
-		ready(handle, fakeApi());
+		const api = fakeApi();
+		ready(handle, api);
 		const onDetach = vi.fn(() => expect(handle.api).toBeNull());
-		preDestroy(handle, { onDetach });
+		preDestroy(handle, api, { onDetach });
 		expect(handle.api).toBeNull();
 		expect(handle.ready).toBe(false);
 		expect(onDetach).toHaveBeenCalledOnce();
+	});
+
+	it("ignores an old grid's teardown that arrives after a remounted grid is ready", () => {
+		const handle = createGridHandle<Row>();
+		const oldApi = fakeApi();
+		const newApi = fakeApi();
+		const onDetach = vi.fn();
+		ready(handle, oldApi);
+		ready(handle, newApi);
+		preDestroy(handle, oldApi, { onDetach });
+		expect(handle.api).toBe(newApi);
+		expect(handle.ready).toBe(true);
+		expect(onDetach).not.toHaveBeenCalled();
 	});
 
 	it('detach() forgets the API without a grid event (card mode hides the grid)', () => {

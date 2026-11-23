@@ -73,8 +73,11 @@ export function createGridHandle<TData>(): GridHandle<TData> {
 					hooks.onReady?.(params.api);
 				},
 				// Fires synchronously before any grid teardown, so effects flushed afterwards
-				// see no grid instead of calling a destroyed Grid API.
-				onGridPreDestroyed: () => {
+				// see no grid instead of calling a destroyed Grid API. Only the held grid's
+				// teardown counts: in a keyed remount the new grid can be ready before the
+				// old one's teardown event arrives, and that must not drop the new API.
+				onGridPreDestroyed: (event) => {
+					if (event.api !== api) return;
 					detach();
 					hooks.onDetach?.();
 				},
