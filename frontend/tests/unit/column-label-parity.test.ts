@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import activityTableSource from '#lib/components/ActivityTable.svelte?raw';
+import contentLibrarySource from '#lib/components/library/ContentLibrary.svelte?raw';
 import { DATA_COLUMNS, INTERNAL_COLUMNS, SORTABLE_COLUMNS } from '#lib/utils/grid-config.js';
 
 /**
@@ -11,9 +11,9 @@ import { DATA_COLUMNS, INTERNAL_COLUMNS, SORTABLE_COLUMNS } from '#lib/utils/gri
  */
 function gridHeaderLabels(): Record<string, string> {
 	const labels: Record<string, string> = {};
-	// Each colDef in ActivityTable.svelte has `colId: '...'` immediately followed
+	// Each colDef in ContentLibrary.svelte has `colId: '...'` immediately followed
 	// (a few lines later) by `headerName: '...'` — pull both per block.
-	const blocks = activityTableSource.split(/(?=colId:\s*')/g);
+	const blocks = contentLibrarySource.split(/(?=colId:\s*')/g);
 	for (const block of blocks) {
 		const colId = block.match(/^colId:\s*'([^']+)'/)?.[1];
 		const headerName = block.match(/headerName:\s*'([^']*)'/)?.[1];

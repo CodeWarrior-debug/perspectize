@@ -23,7 +23,7 @@ Content types use a **discriminator pattern** — a single `Content` table/type 
 | Wiring | `backend/cmd/server/main.go` | Dependency injection |
 | Frontend types | `frontend/src/lib/queries/content.ts` | TS types, GraphQL queries |
 | Frontend UI | `frontend/src/lib/components/AddVideoPopover.svelte` | Content creation form |
-| Frontend table | `frontend/src/lib/components/ActivityTable.svelte` | Column definitions |
+| Frontend table | `frontend/src/lib/components/library/ContentLibrary.svelte` | Column definitions |
 | Frontend render | `frontend/src/lib/utils/formatting.ts` | Cell renderers |
 | Frontend validate | `frontend/src/lib/utils/youtube.ts` | URL validation |
 | Frontend hooks | `frontend/src/lib/queries/hooks/useAddVideo.ts` | Mutation hook |
@@ -37,7 +37,7 @@ Content types use a **discriminator pattern** — a single `Content` table/type 
 | Resolver | `backend/test/resolvers/content_resolver_test.go` | GraphQL queries, mutations, pagination, filtering |
 | Formatting | `frontend/tests/unit/formatting.test.ts` | Cell renderers, formatters, value getters |
 | Queries | `frontend/tests/unit/queries-content.test.ts` | GraphQL query definitions, TS type exports |
-| Component | `frontend/tests/components/ActivityTable.test.ts` | AG Grid component rendering |
+| Component | `frontend/tests/components/ContentLibrary.test.ts` | AG Grid component rendering |
 
 ## Per-type surface checklist
 
@@ -47,12 +47,12 @@ The Movie type (PR #565) shipped without column filters even though the designer
 
 | Surface | Questions to answer (answer, or n/a because …) | Test that pins it |
 |---|---|---|
-| **Grid columns** ✱ | Per-type header label in the single-type view (e.g. "Item" becomes "Film")? Does it fit the 1212px min-width budget? Do unknown/null values sort last in both directions? Do long values truncate with a tooltip? | `grid-config` / `formatting` unit tests; ActivityTable component test for the header swap |
+| **Grid columns** ✱ | Per-type header label in the single-type view (e.g. "Item" becomes "Film")? Does it fit the 1212px min-width budget? Do unknown/null values sort last in both directions? Do long values truncate with a tooltip? | `grid-config` / `formatting` unit tests; ContentLibrary component test for the header swap |
 | **Sort** ✱ | Server sort key, or client-only (then disable it in All Items mode)? Are computed sort keys scanned so cursor pagination encodes the real value, not the zero value (C-02: page 2 repeated page 1)? | Resolver/repo test paging across 2+ pages in both directions; query-count test |
 | **Filters** ✱ | Per filterable column: filter kind (text / number / date / set), `ContentFilter` field(s), identical results in Loaded (client) and All Items (server) modes, URL key, chip label, index needed? Derived columns with no backend field: say "no filter" — do not ship a Loaded-only filter. | Repo condition test, resolver mapping test, `filterContentRows` parity test, `gridUrlState` round-trip, FilterChips label test |
 | **Data modes** ✱ | In Loaded mode (100-row cap) does the Type filter reach the server, and does the footer total reflect it? | Component/unit test on the Loaded-mode request filter and footer total |
 | **Search** | Which fields does the search box cover for this type? Does the scope picker need new options? | `ContentSearchField` repo test + scope-picker test |
-| **Details modal** ✱ | Type-specific layout; no YouTube-only controls (embed, channel link, etc.). | ActivityDetailsModal test per type state |
+| **Details modal** ✱ | Type-specific layout; no YouTube-only controls (embed, channel link, etc.). | ContentDetailsModal test per type state |
 | **Mobile card list** ✱ | Which facts replace views / likes / channel? | Card-list component test for this type |
 | **Add form** ✱ | A new type joins the existing Add Content window (`AddContentPopover`); **never a new header button or popover.** How does `detectContentType` recognise this type's input (link patterns / reference syntax)? What label does it get in the type select? Which extra fields or notices appear only for this type (e.g. attribution)? Accepted inputs, and which ones the description/placeholder names (common forms only; don't advertise niche ones such as bare ids)? Duplicate-add feedback (surface the `already existed` flag, not a silent success)? Specific error messages per failure? Does the window close on success? | `detectContentType` unit cases; `AddContentPopover` states: autodetect ("Detected: <type>"), manual select via "Change type", submit calls the type's mutation, success closes, each error, type-only notice shown only for this type |
 | **Content policy** ✱ | Adult / rating gate and the exact message (Movie: NC-17 and TMDB `adult: true` are rejected with `CONTENT_NOT_ALLOWED`). | Service tests per rejected input; frontend test showing the server message |
@@ -416,7 +416,7 @@ If the type introduces new columns, see [ADDING_AG_GRID_COLUMN.md](./ADDING_AG_G
 **`frontend/tests/unit/grid-config.test.ts` / `gridUrlState.test.ts`**:
 - For each filterable column: URL round-trip (`filterToUrlParams` / `urlParamsToFilter`), `urlParamsToGraphQLFilter` mapping, `filterContentRows` returns the same rows the server filter would (Loaded/All parity), chip label
 
-**`frontend/tests/components/ActivityTable.test.ts`**:
+**`frontend/tests/components/ContentLibrary.test.ts`**:
 - Currently limited by JSDOM — update if new props or state logic introduced
 
 ---

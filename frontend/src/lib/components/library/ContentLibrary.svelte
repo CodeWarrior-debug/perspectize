@@ -17,10 +17,10 @@
 	import { goto } from '$app/navigation';
 	import { graphqlRequest } from '#lib/queries/client.js';
 	import {
-		ACTIVITY_LIST_STALE_TIME_MS,
+		LIBRARY_LIST_STALE_TIME_MS,
 		cursorsAfterPage,
 		LIST_CONTENT,
-		activityListRequest,
+		libraryListRequest,
 		type ContentItem,
 		type ContentResponse,
 	} from '#lib/queries/content/index.js';
@@ -111,7 +111,7 @@
 		NUMERIC_COL_IDS,
 		liveGridApi,
 	} from '#lib/utils/grid-config.js';
-	import { ACTIVITY_GRID_THEME } from '#lib/utils/grid-theme.js';
+	import { LIBRARY_GRID_THEME } from '#lib/utils/grid-theme.js';
 	import { emptyCellClassRules } from '#lib/utils/grid-empty.js';
 	import { useCardMode, useResponsiveTier } from '#lib/utils/responsive.svelte.js';
 	import { useMe } from '#lib/queries/users/useMe.svelte.js';
@@ -147,7 +147,7 @@
 	import ArrowUpDownIcon from '@lucide/svelte/icons/arrow-up-down';
 	import CellPopover, { type PopoverState } from '#lib/components/CellPopover.svelte';
 	import { buildPopoverState, createHoverController } from '#lib/utils/tooltipHover.js';
-	import { ACTIVITY_TOOLTIP_SPECS } from '#lib/utils/activityTooltipSpecs.js';
+	import { LIBRARY_TOOLTIP_SPECS } from '#lib/utils/libraryTooltipSpecs.js';
 	import {
 		authorCellRenderer,
 		authorValueGetter,
@@ -166,10 +166,10 @@
 	import FilterChips from '#lib/components/FilterChips.svelte';
 	import ColumnRelevanceCallout from '#lib/components/ColumnRelevanceCallout.svelte';
 	import { ContentTypeFilter, AgeRatingFilter, WebRoleFilter } from '#lib/utils/contentTypeFilter.js';
-	import ActivityDetailsModal from '#lib/components/ActivityDetailsModal.svelte';
-	import ActivityCardList from '#lib/components/ActivityCardList.svelte';
+	import ContentDetailsModal from '#lib/components/ContentDetailsModal.svelte';
+	import LibraryCardList from '#lib/components/library/LibraryCardList.svelte';
 	import AddToPlanDialog from '#lib/components/plan/AddToPlanDialog.svelte';
-	import { activityItemCellRenderer } from '#lib/utils/activityItemCellRenderer.js';
+	import { libraryItemCellRenderer } from '#lib/utils/libraryItemCellRenderer.js';
 	import {
 		webAuthorCellRenderer,
 		webPublishedFilterValueGetter,
@@ -565,20 +565,20 @@
 	// Data fetching (mode-conditional)
 	// ---------------------------------------------------------------------------
 
-	// Key and LIST_CONTENT variables come from one builder (lib/queries/content/activityList.ts),
+	// Key and LIST_CONTENT variables come from one builder (lib/queries/content/libraryList.ts),
 	// so the cache key cannot drift from the request. Captured in the options getter so queryFn
 	// sends the variables its key was built from.
-	const activityRequest = $derived(activityListRequest(gridParams, currentCursor));
+	const libraryRequest = $derived(libraryListRequest(gridParams, currentCursor));
 
 	const contentQuery = createQuery(() => {
-		const request = activityRequest;
+		const request = libraryRequest;
 		return {
 			queryKey: request.queryKey,
 			queryFn: async () => {
 				return graphqlRequest<ContentResponse>(LIST_CONTENT, request.variables);
 			},
 			placeholderData: keepPreviousData,
-			staleTime: ACTIVITY_LIST_STALE_TIME_MS,
+			staleTime: LIBRARY_LIST_STALE_TIME_MS,
 		};
 	});
 
@@ -605,7 +605,7 @@
 	const rowOrder = createRowOrderMemory();
 	const rowData = $derived(
 		rowOrder.apply(
-			hashKey(activityRequest.queryKey),
+			hashKey(libraryRequest.queryKey),
 			(contentQuery.data?.content.items ?? []).map((item) => ({
 				...item,
 				addedByUsername: usernames.byId.get(item.addedByUserID) ?? null,
@@ -772,7 +772,7 @@
 
 	const modules = [ClientSideRowModelModule];
 
-	const theme = ACTIVITY_GRID_THEME;
+	const theme = LIBRARY_GRID_THEME;
 
 	// flex = clamp-like: proportional sizing with min/max constraints
 	// minWidth is auto-derived from headerName unless explicitly set (e.g. Item = 200)
@@ -794,7 +794,7 @@
 				resizable: false,
 				cellRenderer: perspectiveCellRenderer,
 				cellStyle: { display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', padding: 0 },
-				context: { tooltipSpec: ACTIVITY_TOOLTIP_SPECS.perspectize },
+				context: { tooltipSpec: LIBRARY_TOOLTIP_SPECS.perspectize },
 			},
 			{
 				colId: 'item',
@@ -806,9 +806,9 @@
 
 				filter: 'agTextColumnFilter',
 				filterValueGetter: (params) => params.data?.name ?? '',
-				cellRenderer: activityItemCellRenderer,
+				cellRenderer: libraryItemCellRenderer,
 				cellStyle: { padding: 0 },
-				context: { tooltipSpec: ACTIVITY_TOOLTIP_SPECS.item },
+				context: { tooltipSpec: LIBRARY_TOOLTIP_SPECS.item },
 				headerTooltip: 'Video title and thumbnail from YouTube API',
 			},
 			{
@@ -833,7 +833,7 @@
 				valueGetter: (params) => params.data?.primaryCategory?.label ?? null,
 				comparator: labelComparator,
 				cellRenderer: categoryCellRenderer,
-				context: { tooltipSpec: ACTIVITY_TOOLTIP_SPECS.category },
+				context: { tooltipSpec: LIBRARY_TOOLTIP_SPECS.category },
 				hide: true,
 			},
 			// Claim date columns (Content.customFields). Hidden by default; the responsive effect
@@ -852,7 +852,7 @@
 				comparator: releasedComparator,
 				valueGetter: (params) => params.data?.customFields?.effectiveDate ?? null,
 				valueFormatter: (params) => formatClaimDate(params.value),
-				context: { tooltipSpec: ACTIVITY_TOOLTIP_SPECS.effectiveDate },
+				context: { tooltipSpec: LIBRARY_TOOLTIP_SPECS.effectiveDate },
 				hide: true,
 			},
 			{
@@ -869,7 +869,7 @@
 				comparator: releasedComparator,
 				valueGetter: (params) => params.data?.customFields?.evaluateBy ?? null,
 				valueFormatter: (params) => formatClaimDate(params.value),
-				context: { tooltipSpec: ACTIVITY_TOOLTIP_SPECS.evaluateBy },
+				context: { tooltipSpec: LIBRARY_TOOLTIP_SPECS.evaluateBy },
 				hide: true,
 			},
 			// The viewer's own ratings (0-100). Read from the perspective map in the grid context;
@@ -952,7 +952,7 @@
 				cellRenderer: castCellRenderer,
 				// Tighter cell padding so the two-line cast cell has room for names beside +N.
 				cellStyle: { '--ag-cell-horizontal-padding': '8px' },
-				context: { tooltipSpec: ACTIVITY_TOOLTIP_SPECS.cast },
+				context: { tooltipSpec: LIBRARY_TOOLTIP_SPECS.cast },
 				headerTooltip:
 					'Directors lead (marked dir.), then billed cast. Only the top 15 cast are stored, so only they are searchable.',
 				hide: true,
@@ -972,7 +972,7 @@
 				valueGetter: durationValueGetter,
 				filterValueGetter: durationFilterValueGetter,
 				comparator: durationComparator,
-				context: { tooltipSpec: ACTIVITY_TOOLTIP_SPECS.duration },
+				context: { tooltipSpec: LIBRARY_TOOLTIP_SPECS.duration },
 				headerTooltip: 'Length of the item.',
 			},
 			{
@@ -984,7 +984,7 @@
 
 				filter: 'agNumberColumnFilter',
 				valueFormatter: (params) => formatCount(params.value),
-				context: { tooltipSpec: ACTIVITY_TOOLTIP_SPECS.views },
+				context: { tooltipSpec: LIBRARY_TOOLTIP_SPECS.views },
 				headerTooltip: 'View count from YouTube API',
 			},
 			{
@@ -996,7 +996,7 @@
 
 				filter: 'agNumberColumnFilter',
 				valueFormatter: (params) => formatCount(params.value),
-				context: { tooltipSpec: ACTIVITY_TOOLTIP_SPECS.likes },
+				context: { tooltipSpec: LIBRARY_TOOLTIP_SPECS.likes },
 				headerTooltip: 'Like count from YouTube API',
 			},
 			{
@@ -1008,7 +1008,7 @@
 				filter: false,
 				valueGetter: percentLikedValueGetter,
 				valueFormatter: (params) => formatPercentLiked(params.value),
-				context: { tooltipSpec: ACTIVITY_TOOLTIP_SPECS.percentLiked },
+				context: { tooltipSpec: LIBRARY_TOOLTIP_SPECS.percentLiked },
 				comparator: (_valueA, _valueB, nodeA, nodeB) => {
 					const a = percentLikedValueGetter({ data: nodeA?.data }) ?? -1;
 					const b = percentLikedValueGetter({ data: nodeB?.data }) ?? -1;
@@ -1039,7 +1039,7 @@
 				valueGetter: boxOfficeValueGetter,
 				comparator: unknownLastComparator,
 				valueFormatter: (params) => formatBoxOffice(params.value),
-				context: { tooltipSpec: ACTIVITY_TOOLTIP_SPECS.boxOffice },
+				context: { tooltipSpec: LIBRARY_TOOLTIP_SPECS.boxOffice },
 				headerTooltip: 'Worldwide gross (USD) from TMDB. A dash means TMDB has no figure.',
 				hide: true,
 			},
@@ -1052,7 +1052,7 @@
 				valueGetter: vsBudgetValueGetter,
 				comparator: unknownLastComparator,
 				valueFormatter: (params) => formatVsBudgetCell(params.value),
-				context: { tooltipSpec: ACTIVITY_TOOLTIP_SPECS.vsBudget },
+				context: { tooltipSpec: LIBRARY_TOOLTIP_SPECS.vsBudget },
 				headerTooltip: 'Box Office Take / Budget',
 				hide: true,
 			},
@@ -1071,7 +1071,7 @@
 					'ag-right-aligned-cell',
 					...(hasLowVoteCount({ data: params.data }) ? ['text-muted-foreground'] : []),
 				],
-				context: { tooltipSpec: ACTIVITY_TOOLTIP_SPECS.tmdbScore },
+				context: { tooltipSpec: LIBRARY_TOOLTIP_SPECS.tmdbScore },
 				headerTooltip: 'TMDB user score out of 10. Muted when fewer than 50 votes.',
 				hide: true,
 			},
@@ -1122,7 +1122,7 @@
 				valueGetter: (params) => contentTags(params.data),
 				filterValueGetter: (params) => formatTags(contentTags(params.data)),
 				valueFormatter: (params) => formatTags(params.value),
-				context: { tooltipSpec: ACTIVITY_TOOLTIP_SPECS.tags },
+				context: { tooltipSpec: LIBRARY_TOOLTIP_SPECS.tags },
 				headerTooltip: 'Tags from YouTube API, or TMDB keywords for movies',
 			},
 			{
@@ -1133,7 +1133,7 @@
 				sortable: false,
 				filter: 'agTextColumnFilter',
 				valueFormatter: (params) => truncateDescription(params.value, 80),
-				context: { tooltipSpec: ACTIVITY_TOOLTIP_SPECS.description },
+				context: { tooltipSpec: LIBRARY_TOOLTIP_SPECS.description },
 				headerTooltip: 'Video description from YouTube API',
 				hide: true,
 			},
@@ -1151,7 +1151,7 @@
 				filterValueGetter: (params) =>
 					webPageSite({ url: params.data?.url ?? null, webPage: params.data?.webPage }) ?? '',
 				cellRenderer: webSiteCellRenderer,
-				context: { tooltipSpec: ACTIVITY_TOOLTIP_SPECS.webSite },
+				context: { tooltipSpec: LIBRARY_TOOLTIP_SPECS.webSite },
 				headerTooltip: 'Site name the page declares, or its domain',
 				hide: true,
 			},
@@ -1165,7 +1165,7 @@
 				valueGetter: (params) => webPublishedValueGetter({ data: params.data }),
 				filterValueGetter: (params) => webPublishedFilterValueGetter({ data: params.data }),
 				valueFormatter: (params) => formatWebPublished(params.value),
-				context: { tooltipSpec: ACTIVITY_TOOLTIP_SPECS.webPublished },
+				context: { tooltipSpec: LIBRARY_TOOLTIP_SPECS.webPublished },
 				headerTooltip: 'Date the page declares it was published',
 				hide: true,
 			},
@@ -1177,7 +1177,7 @@
 				sortable: false,
 				filter: WebRoleFilter,
 				cellRenderer: webRolesCellRenderer,
-				context: { tooltipSpec: ACTIVITY_TOOLTIP_SPECS.webRoles },
+				context: { tooltipSpec: LIBRARY_TOOLTIP_SPECS.webRoles },
 				headerTooltip: 'What the page is for, as set by whoever added it',
 				hide: true,
 			},
@@ -1191,7 +1191,7 @@
 				filterValueGetter: (params) =>
 					webPageAuthor({ url: params.data?.url ?? null, webPage: params.data?.webPage }) ?? '',
 				cellRenderer: webAuthorCellRenderer,
-				context: { tooltipSpec: ACTIVITY_TOOLTIP_SPECS.webAuthor },
+				context: { tooltipSpec: LIBRARY_TOOLTIP_SPECS.webAuthor },
 				headerTooltip: 'Author the page declares',
 				hide: true,
 			},
@@ -1207,7 +1207,7 @@
 				valueGetter: authorValueGetter,
 				filterValueGetter: (params) => authorValueGetter({ data: params.data }) ?? '',
 				cellRenderer: authorCellRenderer,
-				context: { tooltipSpec: ACTIVITY_TOOLTIP_SPECS.author },
+				context: { tooltipSpec: LIBRARY_TOOLTIP_SPECS.author },
 				headerTooltip: 'Author(s) from Open Library',
 				hide: true,
 			},
@@ -1256,7 +1256,7 @@
 				valueFormatter: (params) => formatBookRating(params.value),
 				// Muted when the rating rests on fewer than 5 ratings.
 				cellClass: (params) => (hasLowRatingCount({ data: params.data }) ? 'text-muted-foreground' : ''),
-				context: { tooltipSpec: ACTIVITY_TOOLTIP_SPECS.rating },
+				context: { tooltipSpec: LIBRARY_TOOLTIP_SPECS.rating },
 				headerTooltip: 'Open Library community rating out of 5. Muted when fewer than 5 ratings.',
 				hide: true,
 			},
@@ -1285,7 +1285,7 @@
 				valueGetter: readersValueGetter,
 				comparator: unknownLastComparator,
 				valueFormatter: (params) => formatReaders(params.value),
-				context: { tooltipSpec: ACTIVITY_TOOLTIP_SPECS.readers },
+				context: { tooltipSpec: LIBRARY_TOOLTIP_SPECS.readers },
 				headerTooltip: 'Open Library members who want to read this. Open Library users only, not readers in general.',
 				hide: true,
 			},
@@ -1299,7 +1299,7 @@
 				filter: false,
 				valueGetter: budgetValueGetter,
 				valueFormatter: (params) => formatBoxOffice(params.value),
-				context: { tooltipSpec: ACTIVITY_TOOLTIP_SPECS.budget },
+				context: { tooltipSpec: LIBRARY_TOOLTIP_SPECS.budget },
 				headerTooltip: 'Production budget (USD) from TMDB. A dash means TMDB has no figure.',
 				hide: true,
 			},
@@ -1335,7 +1335,7 @@
 				filter: false,
 				valueGetter: synopsisValueGetter,
 				valueFormatter: (params) => truncateDescription(params.value, 80),
-				context: { tooltipSpec: ACTIVITY_TOOLTIP_SPECS.synopsis },
+				context: { tooltipSpec: LIBRARY_TOOLTIP_SPECS.synopsis },
 				headerTooltip: 'Plot overview from TMDB',
 				hide: true,
 			},
@@ -1938,7 +1938,7 @@
 		</div>
 	{:else if cardMode}
 		<div class="flex-1 min-h-0 overflow-y-auto">
-			<ActivityCardList
+			<LibraryCardList
 				rowData={sortedRowData}
 				{perspectiveContentIds}
 				onOpenDetails={handleOpenDetails}
@@ -2081,7 +2081,7 @@
 {/if}
 
 <!-- Activity item details modal — rendered outside the grid for correct portal behavior -->
-<ActivityDetailsModal
+<ContentDetailsModal
 	content={detailsModalContent}
 	open={detailsModalContentId !== null}
 	onClose={handleCloseDetails}

@@ -4,8 +4,8 @@
 	// `ClerkLoaded`, so awaiting the import from the template would start the AG Grid
 	// download only after Clerk finished: two serial network steps on the LCP path.
 	// The page still handles failure below via `{:catch}`.
-	const activityTableImport = import('#lib/components/ActivityTable.svelte');
-	activityTableImport.catch(() => {}); // avoid an unhandled-rejection reload before the template awaits it
+	const contentLibraryImport = import('#lib/components/library/ContentLibrary.svelte');
+	contentLibraryImport.catch(() => {}); // avoid an unhandled-rejection reload before the template awaits it
 </script>
 
 <script lang="ts">
@@ -165,7 +165,7 @@
 		</div>
 	</div>
 
-	<!-- ColumnRelevanceCallout (rendered by ActivityTable) moves itself here: above the card's top-right
+	<!-- ColumnRelevanceCallout (rendered by ContentLibrary) moves itself here: above the card's top-right
 	     corner, outside the table frame. Collapses to nothing when empty. -->
 	<div
 		id="activity-callout-slot"
@@ -174,8 +174,8 @@
 
 	<!-- Content Card -->
 	<!-- pb-4 (not pb-20: that reserved an ~80px dead strip that cost a grid row). The fixed Messages
-	     button is cleared by the pagination bar's own right padding instead (ActivityTable).
-	     ActivityTable is dynamically imported (kicked off in the module script above): this route's own
+	     button is cleared by the pagination bar's own right padding instead (ContentLibrary).
+	     ContentLibrary is dynamically imported (kicked off in the module script above): this route's own
 	     module is what SvelteKit's client router loads up front to resolve this route,
 	     before the root layout's ClerkLoading/ClerkLoaded gate even decides whether
 	     to render this page at all — so a static import here forces every visitor
@@ -183,8 +183,8 @@
 	     (~800KB) before anything paints. -->
 	<div class="flex-1 min-h-0 w-full max-w-screen-xl mx-auto px-4 md:px-6 lg:px-8 pb-4">
 		<div class="border border-border rounded-lg shadow-sm overflow-hidden h-full flex flex-col">
-			{#await activityTableImport then { default: ActivityTable }}
-				<ActivityTable />
+			{#await contentLibraryImport then { default: ContentLibrary }}
+				<ContentLibrary />
 			{:catch}
 				<LazyLoadError what="the library table" />
 			{/await}

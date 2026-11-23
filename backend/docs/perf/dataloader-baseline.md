@@ -11,7 +11,7 @@
 
 Builds the real resolver chain (GORM repos → core services → gqlgen executable
 schema → `handler.New`), then issues the exact `ListContent` query the SvelteKit
-`ActivityTable` sends — including the `primaryCategory { … }` sub-selection that
+`ContentLibrary` sends — including the `primaryCategory { … }` sub-selection that
 triggers the N+1 — via the gqlgen test `client`, `first: 50`, 12 iterations.
 
 SQL statements per request are counted with a GORM `Query`/`Row` callback

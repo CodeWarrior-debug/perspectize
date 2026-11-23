@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { buildPopoverState, createHoverController } from '#lib/utils/tooltipHover.js';
 import { formatCountExact, percentLikedTooltip, percentLikedValueGetter } from '#lib/utils/formatting.js';
-import { ACTIVITY_TOOLTIP_SPECS } from '#lib/utils/activityTooltipSpecs.js';
+import { LIBRARY_TOOLTIP_SPECS } from '#lib/utils/libraryTooltipSpecs.js';
 import type { PopoverState } from '#lib/components/CellPopover.svelte';
 
 const cellEl = document.createElement('div');
@@ -33,13 +33,13 @@ describe('buildPopoverState', () => {
 	});
 });
 
-describe('ACTIVITY_TOOLTIP_SPECS (real column specs)', () => {
-	const S = ACTIVITY_TOOLTIP_SPECS;
+describe('LIBRARY_TOOLTIP_SPECS (real column specs)', () => {
+	const S = LIBRARY_TOOLTIP_SPECS;
 	const mk = (key: keyof typeof S, data: any, value: unknown = undefined, valueFormatted: string | null = null) =>
 		buildPopoverState({ colDef: { context: { tooltipSpec: S[key] } }, value, valueFormatted, data, cellEl });
 
 	it('has an entry for every specced column id', () => {
-		// Limitation: asserts the map, not that ActivityTable columnDefs reference it (AG Grid does not render in jsdom).
+		// Limitation: asserts the map, not that ContentLibrary columnDefs reference it (AG Grid does not render in jsdom).
 		expect(Object.keys(S).sort()).toEqual(
 			[
 				'author',

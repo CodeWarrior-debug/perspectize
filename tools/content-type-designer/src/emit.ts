@@ -508,7 +508,7 @@ export function buildSpec(state: DraftState): string {
           ...(mixedSorts.some((rc) => rc.col.id === 'length')
             ? [
                 'Repository: in `helpers.go`, make `ContentSortByLength` emit two paginator rules, `length_units` then `length`, both in the requested order, so server-side Length sorts group by unit. No new sort enum.',
-                'Frontend: in `ActivityTable.svelte`, `compareContentBySorts` compares `lengthUnits` before `length`.'
+                'Frontend: in `ContentLibrary.svelte`, `compareContentBySorts` compares `lengthUnits` before `length`.'
               ]
             : []),
           ...(mixedSorts.some((rc) => rc.col.id !== 'length')
@@ -519,7 +519,7 @@ export function buildSpec(state: DraftState): string {
                   .join(', ')} has no unit-grouping rule yet. Decide one before that column is sorted server-side.`
               ]
             : []),
-          `Frontend: in \`ActivityTable.svelte\`, when the primary sort column mixes units across the loaded rows (${mixedSorts
+          `Frontend: in \`ContentLibrary.svelte\`, when the primary sort column mixes units across the loaded rows (${mixedSorts
             .map((rc) => rc.header || rc.col.generic)
             .join(', ')}), group rows by unit before comparing values. Insert a synthetic divider row per unit into \`sortedRowData\`, rendered via \`isFullWidthRow\` + \`fullWidthCellRenderer\`, and show the dismissible sort note with "Show only <type>" shortcuts.`
         ]
@@ -534,11 +534,11 @@ export function buildSpec(state: DraftState): string {
         ]
       : []),
     ...discoverSteps(d),
-    `Frontend: \`typeCellRenderer\` icon (${d.icon}) in \`src/lib/utils/formatting.ts\`; Item cell tile (${d.thumbnail}) in \`src/lib/utils/activityItemCellRenderer.ts\`.`,
+    `Frontend: \`typeCellRenderer\` icon (${d.icon}) in \`src/lib/utils/formatting.ts\`; Item cell tile (${d.thumbnail}) in \`src/lib/utils/libraryItemCellRenderer.ts\`.`,
     ...(d.detailOnly?.length
-      ? [`Frontend: \`ActivityDetailsModal.svelte\` — a ${d.label} branch with the bound fields as tiles and ${d.detailOnly.map((f) => f.label).join(', ')} in a details list.`]
+      ? [`Frontend: \`ContentDetailsModal.svelte\` — a ${d.label} branch with the bound fields as tiles and ${d.detailOnly.map((f) => f.label).join(', ')} in a details list.`]
       : []),
-    `Frontend: column defs + tooltips in \`ActivityTable.svelte\` per section 5, with the alias swap from the per-type header table.`,
+    `Frontend: column defs + tooltips in \`ContentLibrary.svelte\` per section 5, with the alias swap from the per-type header table.`,
     'Tests: domain enum, service create paths, resolver mutation + filter-by-type, per-filter repo/resolver tests with Loaded/All parity, 2-page cursor pagination, formatting renderers, query definitions.',
     'Verify: `go build ./...`, `go test ./...`, `pnpm run test:run`.'
   ];

@@ -117,7 +117,7 @@
 		const shown = new Set(planColumnsForTier(tier));
 		const api = gridApi;
 		if (!api || !gridReady) return;
-		// A frame later, as ActivityTable does: called straight from gridReady the column API
+		// A frame later, as ContentLibrary does: called straight from gridReady the column API
 		// throws ("setColumnMovingCss" of undefined) because the body controller isn't up yet.
 		const frame = requestAnimationFrame(() => {
 			if (api.isDestroyed()) return;

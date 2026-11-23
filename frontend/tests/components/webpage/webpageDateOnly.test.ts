@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen } from '@testing-library/svelte';
 import WebPageTiles from '#lib/components/WebPageTiles.svelte';
-import ActivityCardList from '#lib/components/ActivityCardList.svelte';
+import LibraryCardList from '#lib/components/library/LibraryCardList.svelte';
 
 // The arXiv page declares its date as '2017-06-12' (no time). It must read Jun 12, 2017 in the details
 // tile, and the card must show 2017. Run under TZ=America/New_York to see the off-by-one.
@@ -31,7 +31,7 @@ describe('date-only publish date in the details tile', () => {
 
 describe('date-only publish date on the card', () => {
 	it('shows the year of the stated day', () => {
-		render(ActivityCardList, {
+		render(LibraryCardList, {
 			props: {
 				rowData: [
 					{

@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/svelte';
-import ActivityCardList from '#lib/components/ActivityCardList.svelte';
+import LibraryCardList from '#lib/components/library/LibraryCardList.svelte';
 
 // The "Add to plan" button reads the auth facade; the real module needs Clerk, so stub it.
 const authState = vi.hoisted(() => ({ userId: null as string | null }));
@@ -34,9 +34,9 @@ const rowData = [
 	},
 ];
 
-describe('ActivityCardList', () => {
+describe('LibraryCardList', () => {
 	it('renders one card per row with title, channel, and duration', () => {
-		render(ActivityCardList, { props: { rowData, onOpenDetails: vi.fn() } });
+		render(LibraryCardList, { props: { rowData, onOpenDetails: vi.fn() } });
 
 		expect(screen.getByText(rowData[0].name)).toBeInTheDocument();
 		expect(screen.getByText('Jordan Peterson')).toBeInTheDocument();
@@ -45,7 +45,7 @@ describe('ActivityCardList', () => {
 	});
 
 	it('has the activity-card-list test id at its root', () => {
-		render(ActivityCardList, { props: { rowData, onOpenDetails: vi.fn() } });
+		render(LibraryCardList, { props: { rowData, onOpenDetails: vi.fn() } });
 		expect(screen.getByTestId('activity-card-list')).toBeInTheDocument();
 	});
 
@@ -53,7 +53,7 @@ describe('ActivityCardList', () => {
 		const onOpenDetails = vi.fn();
 		const openSpy = vi.spyOn(window, 'open').mockImplementation(() => null);
 
-		render(ActivityCardList, { props: { rowData, onOpenDetails } });
+		render(LibraryCardList, { props: { rowData, onOpenDetails } });
 		fireEvent.click(screen.getByTestId('card-thumb-1'));
 
 		expect(openSpy).toHaveBeenCalledWith('https://youtube.com/watch?v=abc123', '_blank', 'noopener,noreferrer');
@@ -63,7 +63,7 @@ describe('ActivityCardList', () => {
 
 	it('opens details when the title/body area is clicked', async () => {
 		const onOpenDetails = vi.fn();
-		render(ActivityCardList, { props: { rowData, onOpenDetails } });
+		render(LibraryCardList, { props: { rowData, onOpenDetails } });
 
 		await fireEvent.click(screen.getByText(rowData[0].name));
 		expect(onOpenDetails).toHaveBeenCalledWith('1');
@@ -72,7 +72,7 @@ describe('ActivityCardList', () => {
 	it('renders an add-perspective button per card and calls onAddPerspective with the row id, without opening details', async () => {
 		const onOpenDetails = vi.fn();
 		const onAddPerspective = vi.fn();
-		render(ActivityCardList, { props: { rowData, onOpenDetails, onAddPerspective } });
+		render(LibraryCardList, { props: { rowData, onOpenDetails, onAddPerspective } });
 
 		const buttons = screen.getAllByRole('button', { name: 'Add a perspective' });
 		expect(buttons).toHaveLength(rowData.length);
@@ -91,7 +91,7 @@ describe('ActivityCardList', () => {
 			authState.userId = 'user_1';
 			const onAddToPlan = vi.fn();
 			const onOpenDetails = vi.fn();
-			render(ActivityCardList, { props: { rowData, onOpenDetails, onAddToPlan } });
+			render(LibraryCardList, { props: { rowData, onOpenDetails, onAddToPlan } });
 
 			const buttons = screen.getAllByRole('button', { name: 'Add to plan' });
 			expect(buttons).toHaveLength(rowData.length);
@@ -102,13 +102,13 @@ describe('ActivityCardList', () => {
 		});
 
 		it('hides Add to plan for a signed-out user', () => {
-			render(ActivityCardList, { props: { rowData, onOpenDetails: vi.fn(), onAddToPlan: vi.fn() } });
+			render(LibraryCardList, { props: { rowData, onOpenDetails: vi.fn(), onAddToPlan: vi.fn() } });
 			expect(screen.queryByRole('button', { name: 'Add to plan' })).toBeNull();
 		});
 
 		it('renders no Add to plan action when the parent does not handle it', () => {
 			authState.userId = 'user_1';
-			render(ActivityCardList, { props: { rowData, onOpenDetails: vi.fn() } });
+			render(LibraryCardList, { props: { rowData, onOpenDetails: vi.fn() } });
 			expect(screen.queryByRole('button', { name: 'Add to plan' })).toBeNull();
 		});
 	});
@@ -116,7 +116,7 @@ describe('ActivityCardList', () => {
 	// Gap #13 in the UI gap audit: the card used to show only name/channel/
 	// duration — 2 of the grid's DATA_COLUMNS. These cover the three added.
 	it('shows category, views, and likes when present', () => {
-		render(ActivityCardList, {
+		render(LibraryCardList, {
 			props: {
 				rowData: [
 					{
@@ -136,7 +136,7 @@ describe('ActivityCardList', () => {
 	});
 
 	it('omits category, views, and likes when absent, without leaving stray separators', () => {
-		render(ActivityCardList, { props: { rowData, onOpenDetails: vi.fn() } });
+		render(LibraryCardList, { props: { rowData, onOpenDetails: vi.fn() } });
 		expect(screen.queryByText(/views/)).not.toBeInTheDocument();
 		expect(screen.queryByText(/likes/)).not.toBeInTheDocument();
 	});
@@ -145,7 +145,7 @@ describe('ActivityCardList', () => {
 	// duration segment, showing a bare "—" for missing length; it now hides the
 	// whole segment instead.
 	it('hides the duration segment entirely (no "—") when length is missing', () => {
-		render(ActivityCardList, {
+		render(LibraryCardList, {
 			props: {
 				rowData: [{ ...rowData[0], length: null, lengthUnits: null }],
 				onOpenDetails: vi.fn(),
@@ -155,12 +155,12 @@ describe('ActivityCardList', () => {
 	});
 
 	it('shows the duration segment when length is present', () => {
-		render(ActivityCardList, { props: { rowData, onOpenDetails: vi.fn() } });
+		render(LibraryCardList, { props: { rowData, onOpenDetails: vi.fn() } });
 		expect(screen.getByText('49:15')).toBeInTheDocument();
 	});
 
 	it('shows the "Edit your perspective" affordance for rows the user already has a perspective on', () => {
-		render(ActivityCardList, {
+		render(LibraryCardList, {
 			props: {
 				rowData,
 				onOpenDetails: vi.fn(),
@@ -193,7 +193,7 @@ describe('ActivityCardList', () => {
 		};
 
 		it('shows year, rating, runtime and TMDB score instead of channel/views/likes', () => {
-			render(ActivityCardList, {
+			render(LibraryCardList, {
 				props: { rowData: [{ ...movie, channelTitle: 'Some Channel' }], onOpenDetails: vi.fn() },
 			});
 			const facts = screen.getByTestId('card-movie-facts-5');
@@ -207,7 +207,7 @@ describe('ActivityCardList', () => {
 		});
 
 		it('skips facts TMDB does not have (no stray separators or dashes)', () => {
-			render(ActivityCardList, {
+			render(LibraryCardList, {
 				props: {
 					rowData: [{ ...movie, length: null, lengthUnits: null, response: { releaseDate: '1999-03-31' } }],
 					onOpenDetails: vi.fn(),
@@ -219,7 +219,7 @@ describe('ActivityCardList', () => {
 		});
 
 		it('still renders YouTube rows with channel, views and likes', () => {
-			render(ActivityCardList, {
+			render(LibraryCardList, {
 				props: { rowData: [{ ...rowData[0], viewCount: 1300000, likeCount: 26500 }], onOpenDetails: vi.fn() },
 			});
 			expect(screen.queryByTestId(/card-movie-facts/)).not.toBeInTheDocument();
@@ -249,7 +249,7 @@ describe('ActivityCardList', () => {
 		});
 
 		it('shows the author, then the year, pages and rating in place of channel/views/likes', () => {
-			render(ActivityCardList, { props: { rowData: [eastOfEden], onOpenDetails: vi.fn() } });
+			render(LibraryCardList, { props: { rowData: [eastOfEden], onOpenDetails: vi.fn() } });
 			expect(screen.getByTestId('card-book-author-40')).toHaveTextContent('John Steinbeck');
 			const facts = screen.getByTestId('card-book-facts-40');
 			expect(facts).toHaveTextContent('1952');
@@ -259,14 +259,14 @@ describe('ActivityCardList', () => {
 		});
 
 		it('shows the cover fitted (not cropped), at the medium size', () => {
-			render(ActivityCardList, { props: { rowData: [eastOfEden], onOpenDetails: vi.fn() } });
+			render(LibraryCardList, { props: { rowData: [eastOfEden], onOpenDetails: vi.fn() } });
 			const img = screen.getByTestId('card-thumb-40').querySelector('img');
 			expect(img?.getAttribute('src')).toBe('https://covers.openlibrary.org/b/id/11386937-M.jpg');
 			expect(img?.className).toContain('object-contain');
 		});
 
 		it('skips facts Open Library does not have, with no stray separators or dashes (Brainscan: no rating)', () => {
-			render(ActivityCardList, {
+			render(LibraryCardList, {
 				props: {
 					rowData: [
 						book('41', {
@@ -289,7 +289,7 @@ describe('ActivityCardList', () => {
 		});
 
 		it('renders no facts line and no author line for a book with neither (Make a zine!)', () => {
-			render(ActivityCardList, {
+			render(LibraryCardList, {
 				props: {
 					rowData: [
 						book('42', {
@@ -324,7 +324,7 @@ describe('ActivityCardList', () => {
 		const thumb = (id: string) => screen.getByTestId(`card-thumb-${id}`);
 
 		it('movie with a poster: TMDB poster fitted (not cropped), no play badge, no grey tile', () => {
-			render(ActivityCardList, { props: { rowData: [film], onOpenDetails: vi.fn() } });
+			render(LibraryCardList, { props: { rowData: [film], onOpenDetails: vi.fn() } });
 			const img = thumb('6').querySelector('img');
 			expect(img?.getAttribute('src')).toBe('https://image.tmdb.org/t/p/w154/poster.jpg');
 			expect(img?.className).toContain('object-contain');
@@ -333,14 +333,14 @@ describe('ActivityCardList', () => {
 		});
 
 		it('movie without a poster: grey placeholder slot, no image, no play badge', () => {
-			render(ActivityCardList, { props: { rowData: [{ ...film, response: {} }], onOpenDetails: vi.fn() } });
+			render(LibraryCardList, { props: { rowData: [{ ...film, response: {} }], onOpenDetails: vi.fn() } });
 			expect(thumb('6').querySelector('img')).toBeNull();
 			expect(screen.queryByTestId('card-play-badge')).not.toBeInTheDocument();
 			expect(thumb('6').className).toContain('bg-muted');
 		});
 
 		it('video: YouTube thumbnail cropped to fill, with the play badge', () => {
-			render(ActivityCardList, { props: { rowData: [rowData[0]], onOpenDetails: vi.fn() } });
+			render(LibraryCardList, { props: { rowData: [rowData[0]], onOpenDetails: vi.fn() } });
 			const img = thumb('1').querySelector('img');
 			expect(img?.getAttribute('src')).toBe('https://i.ytimg.com/vi/abc123/hqdefault.jpg');
 			expect(img?.className).toContain('object-cover');
@@ -348,7 +348,7 @@ describe('ActivityCardList', () => {
 		});
 
 		it('passage: book icon on the card colour, no grey tile, no play badge', () => {
-			render(ActivityCardList, {
+			render(LibraryCardList, {
 				props: {
 					rowData: [
 						{
@@ -369,7 +369,7 @@ describe('ActivityCardList', () => {
 		});
 
 		it('claim: type icon on the card colour, not an empty grey tile, no image, no play badge', () => {
-			render(ActivityCardList, {
+			render(LibraryCardList, {
 				props: {
 					rowData: [
 						{
@@ -392,7 +392,7 @@ describe('ActivityCardList', () => {
 		});
 
 		it('movie runtime shows to its reported precision (h:mm for MINUTES)', () => {
-			render(ActivityCardList, {
+			render(LibraryCardList, {
 				props: {
 					rowData: [{ ...film, lengthDisplay: { source: 'tmdb', precision: 'MINUTES' } }],
 					onOpenDetails: vi.fn(),
@@ -416,7 +416,7 @@ describe('ActivityCardList', () => {
 		};
 
 		it('renders an icon tile with the reference as the title, not a video thumbnail', () => {
-			render(ActivityCardList, { props: { rowData: [passage], onOpenDetails: vi.fn() } });
+			render(LibraryCardList, { props: { rowData: [passage], onOpenDetails: vi.fn() } });
 
 			const thumb = screen.getByTestId('card-thumb-3');
 			expect(thumb.querySelector('[data-icon="bible-passage"]')).not.toBeNull();
@@ -427,7 +427,7 @@ describe('ActivityCardList', () => {
 		});
 
 		it('shows the display title as primary text with the reference as a subtitle once one is set', () => {
-			render(ActivityCardList, {
+			render(LibraryCardList, {
 				props: { rowData: [{ ...passage, displayTitle: 'For God so loved the world' }], onOpenDetails: vi.fn() },
 			});
 
@@ -436,7 +436,7 @@ describe('ActivityCardList', () => {
 		});
 
 		it('does not show a duration/channel line for a passage', () => {
-			render(ActivityCardList, { props: { rowData: [passage], onOpenDetails: vi.fn() } });
+			render(LibraryCardList, { props: { rowData: [passage], onOpenDetails: vi.fn() } });
 			expect(screen.getByTestId('activity-card-list')).not.toHaveTextContent('—');
 		});
 
@@ -444,7 +444,7 @@ describe('ActivityCardList', () => {
 			const onOpenDetails = vi.fn();
 			const openSpy = vi.spyOn(window, 'open').mockImplementation(() => null);
 
-			render(ActivityCardList, { props: { rowData: [passage], onOpenDetails } });
+			render(LibraryCardList, { props: { rowData: [passage], onOpenDetails } });
 			await fireEvent.click(screen.getByTestId('card-thumb-3'));
 
 			expect(openSpy).toHaveBeenCalledWith(passage.url, '_blank', 'noopener,noreferrer');
@@ -453,7 +453,7 @@ describe('ActivityCardList', () => {
 		});
 
 		it('leaves video rows unchanged when mixed in with passages', () => {
-			render(ActivityCardList, { props: { rowData: [...rowData, passage], onOpenDetails: vi.fn() } });
+			render(LibraryCardList, { props: { rowData: [...rowData, passage], onOpenDetails: vi.fn() } });
 
 			expect(screen.getByTestId('card-thumb-1').querySelector('[data-icon="bible-passage"]')).toBeNull();
 			expect(screen.getByTestId('card-thumb-1').querySelector('svg.lucide-play')).not.toBeNull();

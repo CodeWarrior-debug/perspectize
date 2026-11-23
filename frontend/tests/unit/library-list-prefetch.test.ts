@@ -8,8 +8,8 @@
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { hashKey, QueryObserver, type QueryClient } from '@tanstack/svelte-query';
-import { activityListRequest, type ContentFilterInput } from '#lib/queries/content/index.js';
-import { prefetchActivityList, isViewerScoped } from '#lib/queries/content/prefetchActivityList.js';
+import { libraryListRequest, type ContentFilterInput } from '#lib/queries/content/index.js';
+import { prefetchLibraryList, isViewerScoped } from '#lib/queries/content/prefetchLibraryList.js';
 import { LIST_CONTENT, type ContentResponse } from '#lib/queries/content/index.js';
 import { graphqlRequest, graphqlRequestAnonymous } from '#lib/queries/client.js';
 import { getAuthToken } from '#lib/auth/index.js';
@@ -46,7 +46,7 @@ const response: ContentResponse = {
 	},
 } as unknown as ContentResponse;
 
-const request = (qs: string) => activityListRequest(parseGridParams(new URLSearchParams(qs)), null);
+const request = (qs: string) => libraryListRequest(parseGridParams(new URLSearchParams(qs)), null);
 
 /** Options a component's useX would pass: same key, same variables, authenticated fetch. */
 const consumerOptions = (req: ReturnType<typeof request>) => ({
@@ -66,7 +66,7 @@ beforeEach(() => {
 	env.browser = true;
 });
 
-describe('key parity: the prefetched entry is the one ActivityTable reads', () => {
+describe('key parity: the prefetched entry is the one ContentLibrary reads', () => {
 	it.each([
 		['default (Loaded, first load)', ''],
 		['"All" mode with a sort', 'mode=all&sort=views.desc'],
@@ -75,7 +75,7 @@ describe('key parity: the prefetched entry is the one ActivityTable reads', () =
 		['"Loaded" mode', 'mode=loaded'],
 	])('%s: the consumer key finds the prefetched data', async (_name, qs) => {
 		const req = request(qs);
-		await prefetchActivityList(client, req);
+		await prefetchLibraryList(client, req);
 
 		const consumerKey = request(qs).queryKey;
 		expect(hashKey(consumerKey)).toBe(hashKey(req.queryKey));
@@ -86,7 +86,7 @@ describe('key parity: the prefetched entry is the one ActivityTable reads', () =
 describe('call budget', () => {
 	it('prefetch then two mounts inside staleTime cost exactly one list request', async () => {
 		const req = request('');
-		await prefetchActivityList(client, req);
+		await prefetchLibraryList(client, req);
 		const stop = await mountConsumers(client, consumerOptions(req), 2);
 
 		expect(requestMock).toHaveBeenCalledTimes(1);
@@ -98,7 +98,7 @@ describe('call budget', () => {
 		let resolve!: (value: ContentResponse) => void;
 		requestMock.mockImplementationOnce(() => new Promise<ContentResponse>((r) => (resolve = r)));
 
-		const prefetching = prefetchActivityList(client, req);
+		const prefetching = prefetchLibraryList(client, req);
 		const observer = new QueryObserver(client, consumerOptions(req));
 		const unsubscribe = observer.subscribe(() => {});
 		expect(requestMock).toHaveBeenCalledTimes(1);
@@ -120,7 +120,7 @@ describe('skips', () => {
 		};
 
 		expect(isViewerScoped(scoped)).toBe(true);
-		await prefetchActivityList(client, scoped);
+		await prefetchLibraryList(client, scoped);
 		expect(requestMock).not.toHaveBeenCalled();
 		expect(client.getQueryCache().getAll()).toHaveLength(0);
 	});
@@ -132,7 +132,7 @@ describe('skips', () => {
 
 describe('anonymous fetch', () => {
 	it('the prefetch sends no Authorization header and never asks Clerk for a token', async () => {
-		await prefetchActivityList(client, request(''));
+		await prefetchLibraryList(client, request(''));
 
 		const headers = requestMock.mock.calls[0][2] as Record<string, string>;
 		expect(headers).not.toHaveProperty('Authorization');
@@ -157,7 +157,7 @@ describe('failed prefetch', () => {
 		const req = request('');
 		requestMock.mockRejectedValueOnce(new Error('network down'));
 
-		await expect(prefetchActivityList(client, req)).resolves.toBeUndefined();
+		await expect(prefetchLibraryList(client, req)).resolves.toBeUndefined();
 		expect(client.getQueryData(req.queryKey)).toBeUndefined();
 		expect(client.getQueryState(req.queryKey)?.status).toBe('error');
 

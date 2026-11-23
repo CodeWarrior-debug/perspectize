@@ -688,7 +688,7 @@ export function categoryCellRenderer(params: {
 	const category = params.data?.primaryCategory;
 	if (category) {
 		// Label links out to Wikipedia when available; clicking elsewhere in the
-		// cell still opens the category-edit popover (see ActivityTable's grid
+		// cell still opens the category-edit popover (see ContentLibrary's grid
 		// cell click handler).
 		const label: HTMLElement = category.wikipediaUrl ? document.createElement('a') : document.createElement('span');
 		label.textContent = category.label;
@@ -821,7 +821,7 @@ export function moviePeople(row: MovieRow | null | undefined): MoviePerson[] {
 export const CAST_CELL_MAX_DIRECTORS = 2;
 export const CAST_CELL_MAX_CAST = 3;
 
-/** Attribute on a clickable cast/director name; its value is the TMDB person id (read by ActivityTable's cell click). */
+/** Attribute on a clickable cast/director name; its value is the TMDB person id (read by ContentLibrary's cell click). */
 export const PERSON_ID_ATTR = 'data-person-id';
 
 /** The names, comma separated, each wrapped in a span carrying its person id so a click can filter by that person. */
