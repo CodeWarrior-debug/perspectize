@@ -209,6 +209,15 @@ type CreateContentFromYouTubeInput struct {
 	UserID int    `json:"userId"`
 }
 
+type CreateContentInput struct {
+	Youtube *CreateContentFromYouTubeInput `json:"youtube,omitempty"`
+	WebPage *CreateContentFromWebPageInput `json:"webPage,omitempty"`
+	Website *CreateContentFromWebsiteInput `json:"website,omitempty"`
+	Movie   *CreateContentFromMovieInput   `json:"movie,omitempty"`
+	Book    *CreateContentFromBookInput    `json:"book,omitempty"`
+	Passage *CreateContentFromPassageInput `json:"passage,omitempty"`
+}
+
 type CreateContentResult struct {
 	Content        *Content `json:"content"`
 	AlreadyExisted bool     `json:"alreadyExisted"`
