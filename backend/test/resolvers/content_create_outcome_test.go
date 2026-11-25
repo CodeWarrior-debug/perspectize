@@ -12,10 +12,10 @@ import (
 	portservices "github.com/CodeWarrior-debug/perspectize/backend/internal/core/ports/services"
 )
 
-const movieResultMutation = `mutation { createContentResultFromMovie(input: { url: "https://www.themoviedb.org/movie/603" }) { alreadyExisted content { id name } } }`
+const movieResultMutation = `mutation { createContent(input: { movie: { url: "https://www.themoviedb.org/movie/603" } }) { alreadyExisted content { id name } } }`
 
-// A duplicate movie reports alreadyExisted on the additive mutation and returns the stored row.
-func TestCreateContentResultFromMovie_DuplicateReportsAlreadyExisted(t *testing.T) {
+// A duplicate movie reports alreadyExisted through createContent and returns the stored row.
+func TestCreateContent_MovieDuplicateReportsAlreadyExisted(t *testing.T) {
 	existing := &domain.Content{ID: 7, Name: "The Matrix", ContentType: domain.ContentTypeMovie}
 	repo := &mockContentRepository{getByURLFn: func(ctx context.Context, url string) (*domain.Content, error) {
 		return existing, nil
@@ -30,16 +30,16 @@ func TestCreateContentResultFromMovie_DuplicateReportsAlreadyExisted(t *testing.
 	result := executeGraphQL(t, server, movieResultMutation)
 	require.Empty(t, result.Errors)
 	var data struct {
-		CreateContentResultFromMovie struct {
+		CreateContent struct {
 			AlreadyExisted bool `json:"alreadyExisted"`
 			Content        struct {
 				Name string `json:"name"`
 			} `json:"content"`
-		} `json:"createContentResultFromMovie"`
+		} `json:"createContent"`
 	}
 	require.NoError(t, json.Unmarshal(result.Data, &data))
-	assert.True(t, data.CreateContentResultFromMovie.AlreadyExisted)
-	assert.Equal(t, "The Matrix", data.CreateContentResultFromMovie.Content.Name)
+	assert.True(t, data.CreateContent.AlreadyExisted)
+	assert.Equal(t, "The Matrix", data.CreateContent.Content.Name)
 }
 
 // The deprecated mutation keeps returning the bare Content for a duplicate, as before.
