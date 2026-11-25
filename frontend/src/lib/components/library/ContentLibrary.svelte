@@ -79,7 +79,7 @@
 	import { createLibraryExport } from '#lib/components/library/libraryExport.svelte.js';
 	import { createColumnCharts } from '#lib/components/library/columnCharts.svelte.js';
 	import { useLibraryList } from '#lib/queries/content/useLibraryList.svelte.js';
-	import { useMyPerspectives } from '#lib/queries/perspectives/useMyPerspectives.js';
+	import { useViewerPerspectives } from '#lib/queries/perspectives/viewerPerspectives.js';
 	import AddToPlanDialog from '#lib/components/plan/AddToPlanDialog.svelte';
 	import CategoryTypeahead from '#lib/components/CategoryTypeahead.svelte';
 	import { useSetPrimaryCategory } from '#lib/queries/categories/useSetPrimaryCategory.js';
@@ -133,7 +133,7 @@
 	function openPerspective(contentId: string, name: string) {
 		popoverContentId = parseInt(contentId, 10);
 		popoverContentName = name;
-		popoverExistingPerspective = perspectivesByContentId.get(contentId) ?? null;
+		popoverExistingPerspective = perspectivesByContentId.get(contentId)?.[0] ?? null;
 		popoverOpen = true;
 	}
 
@@ -311,23 +311,20 @@
 	const currentUserId = $derived(meCtx.me ? parseInt(meCtx.me.id, 10) : null);
 
 	// The user's perspectives — used to determine +/glasses icon per row
-	const perspectivesQuery = useMyPerspectives(() => currentUserId);
+	const perspectives = useViewerPerspectives(() => currentUserId);
 
-	// O(1) lookup map: contentID → PerspectiveItem
-	const perspectivesByContentId = $derived(
-		(() => {
-			const map = new Map<string, PerspectiveItem>();
-			const items = perspectivesQuery.data?.perspectives?.items ?? [];
-			for (const p of items) {
-				if (p.contentID) map.set(p.contentID, p);
-			}
-			return map;
-		})(),
-	);
+	// contentID → the viewer's perspectives on that item, latest first
+	const perspectivesByContentId = $derived(perspectives.byContent);
 
 	// Set of content ids the user has a perspective on — passed to the mobile card
 	// list so it can show the glasses (edit) vs "+" (add) affordance, matching the grid.
 	const perspectiveContentIds = $derived(new Set(perspectivesByContentId.keys()));
+	// The AG Grid cell renderers read one perspective per row; the first entry is the most recently updated.
+	const gridPerspectivesByContentId = $derived(
+		new Map<string, PerspectiveItem>(
+			[...perspectivesByContentId].map(([contentId, list]) => [contentId, list[0]] as const),
+		),
+	);
 
 	// The content list for the current URL params: rows, counts, and the cursor stack for "All" mode.
 	const list = useLibraryList(() => gridParams);
@@ -746,7 +743,7 @@
 	$effect(() => {
 		if (gridApi) {
 			gridApi.setGridOption('context', {
-				perspectivesByContentId,
+				perspectivesByContentId: gridPerspectivesByContentId,
 				onOpenDetails: handleOpenDetails,
 			});
 			gridApi.refreshCells({ columns: ['perspectize', 'myQuality', 'myImportance', 'myAgreement'], force: true });
