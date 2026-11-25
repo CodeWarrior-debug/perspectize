@@ -9,12 +9,16 @@ import (
 
 	"github.com/CodeWarrior-debug/perspectize/backend/internal/core/domain"
 	repositories "github.com/CodeWarrior-debug/perspectize/backend/internal/core/ports/repositories"
+	portservices "github.com/CodeWarrior-debug/perspectize/backend/internal/core/ports/services"
 	svixwebhook "github.com/svix/svix-webhooks/go"
 )
 
-// WebhookHandler processes Clerk webhook events for user synchronization.
+// WebhookHandler processes Clerk webhook events. Provisioning goes through the
+// identity resolver, so a webhook for a user HTTP sign-in already created is
+// a success, not an error.
 type WebhookHandler struct {
 	WebhookSecret string
+	Resolver      portservices.IdentityResolver
 	UserRepo      repositories.UserRepository
 }
 
@@ -35,33 +39,16 @@ type clerkUserData struct {
 	PrimaryEmailAddressID string `json:"primary_email_address_id"`
 }
 
-// primaryEmail extracts the primary email from Clerk user data.
-func (d *clerkUserData) primaryEmail() string {
+// profile maps the webhook payload to the identity profile the resolver uses.
+func (d *clerkUserData) profile() domain.ClerkProfile {
+	p := domain.ClerkProfile{ClerkID: d.ID, PrimaryEmailID: d.PrimaryEmailAddressID}
+	if d.Username != nil {
+		p.Username = *d.Username
+	}
 	for _, ea := range d.EmailAddresses {
-		if ea.ID == d.PrimaryEmailAddressID {
-			return ea.EmailAddress
-		}
+		p.Emails = append(p.Emails, domain.ClerkEmail{ID: ea.ID, Address: ea.EmailAddress})
 	}
-	if len(d.EmailAddresses) > 0 {
-		return d.EmailAddresses[0].EmailAddress
-	}
-	return ""
-}
-
-// username returns the username or falls back to email prefix.
-func (d *clerkUserData) username() string {
-	if d.Username != nil && *d.Username != "" {
-		return *d.Username
-	}
-	email := d.primaryEmail()
-	if email != "" {
-		for i, c := range email {
-			if c == '@' {
-				return email[:i]
-			}
-		}
-	}
-	return d.ID
+	return p
 }
 
 func (h *WebhookHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -110,31 +97,28 @@ func (h *WebhookHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	ctx := r.Context()
+	profile := userData.profile()
 
 	switch event.Type {
 	case "user.created":
-		_, err = h.UserRepo.CreateFromClerk(ctx, userData.ID, userData.username(), userData.primaryEmail())
-		if err != nil {
-			slog.Error("webhook: failed to create user", "clerk_id", userData.ID, "error", err)
+		if _, err := h.Resolver.Provision(ctx, profile); err != nil && !acknowledgeConflict(userData.ID, err) {
 			http.Error(w, "failed to create user", http.StatusInternalServerError)
 			return
 		}
-		slog.Info("webhook: user created", "clerk_id", userData.ID, "username", userData.username())
+		slog.Info("webhook: user created", "clerk_id", userData.ID, "username", profile.LocalUsername())
 
 	case "user.updated":
-		err = h.UserRepo.UpdateByClerkID(ctx, userData.ID, userData.username(), userData.primaryEmail())
-		if err != nil {
-			if errors.Is(err, domain.ErrNotFound) {
-				slog.Warn("webhook: user not found for update, creating", "clerk_id", userData.ID)
-				_, err = h.UserRepo.CreateFromClerk(ctx, userData.ID, userData.username(), userData.primaryEmail())
-				if err != nil {
-					slog.Error("webhook: failed to create user on update", "clerk_id", userData.ID, "error", err)
-				}
-			} else {
-				slog.Error("webhook: failed to update user", "clerk_id", userData.ID, "error", err)
-				http.Error(w, "failed to update user", http.StatusInternalServerError)
+		err = h.UserRepo.UpdateByClerkID(ctx, userData.ID, profile.LocalUsername(), profile.PrimaryEmail())
+		if errors.Is(err, domain.ErrNotFound) {
+			slog.Warn("webhook: user not found for update, provisioning", "clerk_id", userData.ID)
+			if _, err = h.Resolver.Provision(ctx, profile); err != nil && !acknowledgeConflict(userData.ID, err) {
+				http.Error(w, "failed to create user on update", http.StatusInternalServerError)
 				return
 			}
+		} else if err != nil {
+			slog.Error("webhook: failed to update user", "clerk_id", userData.ID, "error", err)
+			http.Error(w, "failed to update user", http.StatusInternalServerError)
+			return
 		}
 		slog.Info("webhook: user updated", "clerk_id", userData.ID)
 
@@ -153,4 +137,18 @@ func (h *WebhookHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	w.WriteHeader(http.StatusOK)
 	w.Write([]byte(`{"status":"ok"}`))
+}
+
+// acknowledgeConflict reports whether a failed provision may be answered with
+// 200. A permanent conflict (a username or email that retrying cannot resolve)
+// is acknowledged so Svix stops redelivering it. Anything else is transient and
+// must be a 500 so Svix retries.
+func acknowledgeConflict(clerkID string, err error) bool {
+	if errors.Is(err, domain.ErrAlreadyExists) {
+		slog.Error("webhook: identity conflict cannot be resolved, acknowledged so it is not redelivered",
+			"clerk_id", clerkID, "error", err)
+		return true
+	}
+	slog.Error("webhook: failed to provision user", "clerk_id", clerkID, "error", err)
+	return false
 }

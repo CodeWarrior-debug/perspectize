@@ -64,6 +64,11 @@ func TestClerkProfile_DisambiguatedUsernameTruncatesBase(t *testing.T) {
 	assert.Equal(t, "abcdefghijklmnopq-klmnop", got)
 }
 
+func TestClerkProfile_LocalUsernameEmailWithoutAtFallsBackToClerkID(t *testing.T) {
+	p := domain.ClerkProfile{ClerkID: "user_abc", PrimaryEmailID: "e1", Emails: []domain.ClerkEmail{{ID: "e1", Address: "no-at-sign"}}}
+	assert.Equal(t, "user_abc", p.LocalUsername())
+}
+
 func TestClerkProfile_UsernameConflictSentinelsWrapAlreadyExists(t *testing.T) {
 	for _, err := range []error{domain.ErrUsernameTaken, domain.ErrEmailTaken, domain.ErrClerkIDTaken} {
 		assert.ErrorIs(t, err, domain.ErrAlreadyExists)

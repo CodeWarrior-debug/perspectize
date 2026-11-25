@@ -25,7 +25,7 @@ func captureSlog(t *testing.T) *bytes.Buffer {
 }
 
 // When user.updated arrives for an unknown user the handler creates it. A
-// failure of that fallback create is logged (but the webhook still acks 200);
+// failure of that fallback create is logged and the webhook answers 500 so Svix retries;
 // a success must not be logged as a failure.
 func TestWebhook_UserUpdated_NotFound_CreateFallback(t *testing.T) {
 	body := `{"type":"user.updated","data":{"id":"user_abc","username":"alice"}}`
@@ -60,8 +60,8 @@ func TestWebhook_UserUpdated_NotFound_CreateFallback(t *testing.T) {
 			rec := serveWebhook(t, repo, testWebhookSecret, signedWebhookRequest(t, body))
 
 			require.True(t, created, "an unknown user on update must be created")
-			assert.Equal(t, http.StatusOK, rec.Code)
-			assert.Equal(t, tt.wantErrorLog, bytes.Contains(logs.Bytes(), []byte("failed to create user on update")),
+			assert.Equal(t, map[bool]int{true: http.StatusInternalServerError, false: http.StatusOK}[tt.wantErrorLog], rec.Code)
+			assert.Equal(t, tt.wantErrorLog, bytes.Contains(logs.Bytes(), []byte("failed to provision user")),
 				"logs: %s", logs.String())
 		})
 	}
