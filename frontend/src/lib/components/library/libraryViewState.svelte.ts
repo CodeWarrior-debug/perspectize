@@ -123,7 +123,7 @@ export function createLibraryViewState({ url, resetCursors }: LibraryViewDeps): 
 		const params = current();
 		const urlFilters = { ...filterToUrlParams(model as Record<string, unknown>), ...nonGridFilters(params.filters) };
 		if (filtersEqual(urlFilters, params.filters)) return;
-		// Loaded mode filters on the grid only: the URL keeps its page, as it always has.
+		// Loaded mode filters on the grid only, so a filter commit leaves the page and cursors as they are.
 		if (params.mode === 'loaded') {
 			write({ filters: urlFilters });
 			return;
@@ -208,7 +208,7 @@ export function createLibraryViewState({ url, resetCursors }: LibraryViewDeps): 
 				loadedSorts = sorts;
 				return;
 			}
-			// The grid echoes the sorts this module just wrote (or the server sorts on a mode switch); those are no-ops.
+			// An echo of the sorts already sent to the server (the grid reports them back after a write or a mode switch) is a no-op.
 			if (sameSorts(sorts, serverSortsOf(current().sorts))) return;
 			reorder({ sorts });
 		},
