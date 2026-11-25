@@ -10,6 +10,7 @@ import {
 	OPTIMISTIC_PREFIX,
 } from './index';
 import { queryKeys } from '../keys';
+import { classifyPerspectiveWriteError, perspectiveWriteFailureMessage } from './writeError';
 
 export interface FeelingInput {
 	emoji: string;
@@ -102,13 +103,9 @@ export function useCreatePerspective() {
 			// Roll the optimistic insert back.
 			context?.previous?.forEach(([key, data]) => queryClient.setQueryData(key, data));
 
-			const message = err.message.toLowerCase();
-			if (message.includes('no user selected') || message.includes('user not found')) {
-				toast.error('No user selected');
-			} else if (message.includes('invalid rating')) {
-				toast.error('Invalid rating value');
-			} else if (message.includes('at least one field')) {
-				toast.error('Please fill in at least one field');
+			const failure = classifyPerspectiveWriteError(err);
+			if (failure.kind !== 'retryable') {
+				toast.error(perspectiveWriteFailureMessage(failure));
 			} else {
 				// The popover has already closed (it doesn't wait for the server), so
 				// offer the retry here rather than making the user re-enter everything.
