@@ -33,6 +33,24 @@ var (
 // The check does not cover the acting user, the ownership rules or the
 // attached content: those belong to the service, which knows the actor.
 func ValidatePerspective(p *Perspective) error {
+	return ValidatePerspectiveScoped(p, AllLists)
+}
+
+// ListScope says which capped lists ValidatePerspectiveScoped checks. An
+// update checks only the lists its patch sets, so a stored row that already
+// exceeds a cap can still be edited in other fields.
+type ListScope struct {
+	Related  bool
+	Feelings bool
+}
+
+// AllLists checks every capped list. Create uses it, since a new row holds
+// only what the request sent.
+var AllLists = ListScope{Related: true, Feelings: true}
+
+// ValidatePerspectiveScoped is ValidatePerspective with the capped lists limited
+// to scope. Everything else is checked in full.
+func ValidatePerspectiveScoped(p *Perspective, scope ListScope) error {
 	ratings := []struct {
 		name  string
 		value *int
@@ -57,16 +75,18 @@ func ValidatePerspective(p *Perspective) error {
 		return fmt.Errorf("%w: at least one field must be provided", ErrInvalidInput)
 	}
 
-	if len(p.RelatedPerspectiveIDs) > MaxRelatedPerspectiveIDs {
+	if scope.Related && len(p.RelatedPerspectiveIDs) > MaxRelatedPerspectiveIDs {
 		return fmt.Errorf("%w: related_perspective_ids cannot exceed %d entries", ErrInvalidInput, MaxRelatedPerspectiveIDs)
 	}
 
-	if len(p.Feelings) > MaxFeelings {
-		return fmt.Errorf("%w: feelings cannot exceed %d entries", ErrInvalidInput, MaxFeelings)
-	}
-	for _, f := range p.Feelings {
-		if !ValidateFeelingEntry(f) {
-			return fmt.Errorf("%w: feeling %q has an invalid emoji or intensity %d", ErrInvalidInput, f.Emoji, f.Intensity)
+	if scope.Feelings {
+		if len(p.Feelings) > MaxFeelings {
+			return fmt.Errorf("%w: feelings cannot exceed %d entries", ErrInvalidInput, MaxFeelings)
+		}
+		for _, f := range p.Feelings {
+			if !ValidateFeelingEntry(f) {
+				return fmt.Errorf("%w: feeling %q has an invalid emoji or intensity %d", ErrInvalidInput, f.Emoji, f.Intensity)
+			}
 		}
 	}
 	return nil

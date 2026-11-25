@@ -321,8 +321,11 @@ func (s *PerspectiveService) Update(ctx context.Context, input portservices.Upda
 		existing.Review = &s
 	}
 
-	// The same rules Create applies, to the state this update would store.
-	if err := domain.ValidatePerspective(existing); err != nil {
+	// The same rules Create applies, to the state this update would store. The
+	// related-ID and feelings caps are checked only when the patch sets that list,
+	// so a stored row already over a cap can still be edited in other fields.
+	scope := domain.ListScope{Related: input.RelatedPerspectiveIDs != nil, Feelings: input.Feelings != nil}
+	if err := domain.ValidatePerspectiveScoped(existing, scope); err != nil {
 		return nil, err
 	}
 	if err := s.requireReadableLinks(ctx, linked, actorUserID); err != nil {

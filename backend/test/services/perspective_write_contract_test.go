@@ -128,6 +128,46 @@ func TestPerspectiveWriteContract_CreateAndUpdateAgree(t *testing.T) {
 	}
 }
 
+// A stored row already over the related-ID cap (written before the cap was
+// enforced on every write path) can still be edited in a field the patch does
+// not touch, but a patch that sets the list is still refused.
+func TestPerspectiveWriteContract_LegacyRowOverCapEditsOtherFields(t *testing.T) {
+	legacy := func() *domain.Perspective {
+		p := emptyExistingPerspective()
+		p.Description = strPtr("old view")
+		p.RelatedPerspectiveIDs = make([]int, domain.MaxRelatedPerspectiveIDs+1)
+		return p
+	}
+
+	t.Run("edit to a different field succeeds", func(t *testing.T) {
+		repo := &mockPerspectiveRepository{
+			getByIDFn: func(_ context.Context, _ int) (*domain.Perspective, error) { return legacy(), nil },
+			updateFn:  func(_ context.Context, p *domain.Perspective, _ int) (*domain.Perspective, error) { return p, nil },
+		}
+		svc := services.NewPerspectiveService(repo, &mockUserRepoForPerspective{})
+
+		updated, err := svc.Update(context.Background(), portservices.UpdatePerspectiveInput{ID: 1, Description: strPtr("new view")}, 1)
+
+		require.NoError(t, err)
+		assert.Equal(t, "new view", *updated.Description)
+		assert.Len(t, updated.RelatedPerspectiveIDs, domain.MaxRelatedPerspectiveIDs+1)
+	})
+
+	t.Run("setting the over-cap list is still refused", func(t *testing.T) {
+		repo := &mockPerspectiveRepository{
+			getByIDFn: func(_ context.Context, _ int) (*domain.Perspective, error) { return legacy(), nil },
+		}
+		svc := services.NewPerspectiveService(repo, &mockUserRepoForPerspective{})
+
+		_, err := svc.Update(context.Background(), portservices.UpdatePerspectiveInput{
+			ID:                    1,
+			RelatedPerspectiveIDs: make([]int, domain.MaxRelatedPerspectiveIDs+1),
+		}, 1)
+
+		assert.ErrorIs(t, err, domain.ErrInvalidInput)
+	})
+}
+
 func TestPerspectiveWriteContract_OwnerCannotSetReviewStatus(t *testing.T) {
 	updated := false
 	repo := &mockPerspectiveRepository{
