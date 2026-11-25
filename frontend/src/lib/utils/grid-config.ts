@@ -2,7 +2,8 @@
  * Extracted AG Grid configuration logic from ContentLibrary.svelte.
  * Pure functions and constants that can be unit-tested without a browser.
  */
-import type { ContentItem, ContentType } from '#lib/queries/content/index.js';
+import type { ContentItem } from '#lib/queries/content/index.js';
+import { CONTENT_TYPES, descriptorFor } from '#lib/contentTypes/registry.js';
 import {
 	formatTags,
 	contentTags,
@@ -26,34 +27,19 @@ import {
 import { webPageAuthor, webPagePublished, webPageSite } from './webPage';
 
 /**
- * Display label for a content type — used by the type column valueGetter.
- * Known types use CONTENT_TYPE_LABELS; others get first letter capitalized, rest lowercased.
+ * Display label for a content type, used by the type column valueGetter. Known types use the registry's
+ * label; others get the first letter capitalized, rest lowercased.
  */
 export function capitalizeContentType(contentType: string | undefined): string {
 	if (!contentType) return '';
-	const label = CONTENT_TYPE_LABELS[contentType.toUpperCase() as ContentType];
-	if (label) return label;
-	return contentType.charAt(0).toUpperCase() + contentType.slice(1).toLowerCase();
+	return descriptorFor(contentType).label;
 }
 
-/**
- * Every content type, in the order the Type column's checkbox filter lists them.
- * Hardcoded on purpose (mirrors the backend ContentType enum) — the Record forces
- * a new ContentType to be given a label here.
- */
-const CONTENT_TYPE_LABELS: Partial<Record<ContentType, string>> = {
-	YOUTUBE_VIDEO: 'YouTube Video',
-	CLAIM: 'Claim',
-	BIBLE_PASSAGE: 'Bible Passage',
-	MOVIE: 'Movie',
-	BOOK: 'Book',
-	WEB_PAGE: 'Webpage',
-};
-
-/** Type-filter options. `value` is the lowercased form used in the filter model and `f.type=` URL param. */
-export const CONTENT_TYPE_OPTIONS: readonly { value: string; label: string }[] = Object.entries(
-	CONTENT_TYPE_LABELS,
-).map(([type, label]) => ({ value: type.toLowerCase(), label }));
+/** Type-filter options, in registry order. `value` is the lowercased form used in the filter model and `f.type=` URL param. */
+export const CONTENT_TYPE_OPTIONS: readonly { value: string; label: string }[] = CONTENT_TYPES.map((type) => ({
+	value: type.toLowerCase(),
+	label: descriptorFor(type).label,
+}));
 
 /** Rated-filter options: the standard US certifications. `value` is lowercased like every set-filter URL value; the server gets it uppercased. */
 export const AGE_RATING_OPTIONS: readonly { value: string; label: string }[] = [

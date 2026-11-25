@@ -16,17 +16,12 @@ export type TypeIcon =
  * The add-form hook a type is saved through. The add form still picks the flow by type; this names the
  * hook so a later switch to a generic create mutation is a change to one descriptor.
  */
-export type AddFlowHook =
-	| 'useAddVideo'
-	| 'useAddPassage'
-	| 'useAddMovie'
-	| 'useAddBook'
-	| 'useCreateWebPage';
+export type AddFlowHook = 'useAddVideo' | 'useAddPassage' | 'useAddMovie' | 'useAddBook' | 'useCreateWebPage';
 
 /**
- * One content type's facts, the single place a surface learns them from. Core fields only: nothing
- * here imports Svelte components or the query layer, so formatting helpers can import the registry
- * without an import cycle.
+ * One content type's facts, the single place a surface learns them from. Core fields only, and no
+ * Svelte components: the registry can then be imported by formatting helpers without an import cycle.
+ * (The one import, of the ContentType union, is type-only and erased at build time.)
  */
 export interface ContentTypeDescriptor {
 	/** The backend ContentType value. */

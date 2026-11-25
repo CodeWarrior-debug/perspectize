@@ -31,6 +31,7 @@
 	import WebPageTiles from '#lib/components/WebPageTiles.svelte';
 	import WebPageBody from '#lib/components/WebPageBody.svelte';
 	import { webPageRolesLabel, webPageRolesOf, webPageSite } from '#lib/utils/webPage.js';
+	import { descriptorFor } from '#lib/contentTypes/registry.js';
 	import { useWebsitePages } from '#lib/queries/content/useWebsitePages.js';
 	import { libraryContentHref } from '#lib/utils/contentLinks.js';
 	import { useContentDetails } from '#lib/queries/content/useContentDetails.js';
@@ -40,6 +41,7 @@
 	import PassageLinks from '#lib/components/PassageLinks.svelte';
 	import { useSetPassageDisplayTitle } from '#lib/queries/bible/useSetPassageDisplayTitle.js';
 	import AddToPlanButton from '#lib/components/plan/AddToPlanButton.svelte';
+	import TypeGlyph from '#lib/components/contentTypes/TypeGlyph.svelte';
 
 	interface ModalContent {
 		id: string;
@@ -88,6 +90,8 @@
 		onAddPerspective?: (content: ModalContent) => void;
 	} = $props();
 
+	// The row's type facts (label, refreshability, whether it is a video). An absent type reads as YouTube.
+	const descriptor = $derived(descriptorFor(content?.contentType));
 	const isMovie = $derived(content?.contentType === 'MOVIE');
 	const isBook = $derived(content?.contentType === 'BOOK');
 	const isWebPage = $derived(content?.contentType === 'WEB_PAGE');
@@ -131,7 +135,7 @@
 		setPassageTitle.mutate({ contentID: content.id, title });
 	}
 
-	const videoId = $derived(content ? extractVideoIdFromUrl(content.url) : null);
+	const videoId = $derived(descriptor.isVideo && content ? extractVideoIdFromUrl(content.url) : null);
 	const thumbSrc = $derived(videoId ? `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg` : null);
 	const movie = $derived(content ? movieResponse(content) : null);
 	const posterSrc = $derived(movie?.posterPath ? `https://image.tmdb.org/t/p/w342${movie.posterPath}` : null);
@@ -151,7 +155,9 @@
 	// that's explained upfront instead of a "success" toast that changes
 	// nothing. See getSourceDataCooldown's doc comment for why this is a UX
 	// estimate, not the actual enforcement.
-	const cooldown = $derived(content ? getSourceDataCooldown(content.updatedAt) : { active: false, remainingMs: 0 });
+	const cooldown = $derived(
+		content && descriptor.refreshable ? getSourceDataCooldown(content.updatedAt) : { active: false, remainingMs: 0 },
+	);
 
 	const updateSourceData = useUpdateSourceData();
 
@@ -183,7 +189,7 @@
 	}
 
 	function handleUpdateSourceData() {
-		if (!content || cooldown.active) return;
+		if (!content || !descriptor.refreshable || cooldown.active) return;
 		updateSourceData.mutate(content.id);
 	}
 </script>
@@ -193,17 +199,7 @@
 		<DialogContent showCloseButton={false} class="max-w-[560px] gap-0 overflow-hidden rounded-xl p-0">
 			<div class="flex items-start justify-between gap-3 bg-primary px-[22px] py-[18px]">
 				<DialogTitle class="text-xs font-semibold tracking-wide text-primary-foreground/70 uppercase">
-					{content.contentType === 'CLAIM'
-						? 'Claim'
-						: isPassage
-							? 'Bible Passage'
-							: isMovie
-								? 'Movie'
-								: isBook
-									? 'Book'
-									: isWebPage
-										? 'Webpage'
-										: 'YouTube Video'}
+					{descriptor.label}
 				</DialogTitle>
 				<DialogClose class="text-primary-foreground/80 hover:text-primary-foreground">
 					<XIcon class="size-[18px]" />
@@ -297,7 +293,12 @@
 								<div class="flex h-full w-full items-center justify-center text-primary">
 									<MessageSquareTextIcon data-icon="claim" class="size-8" />
 								</div>
-							{:else if thumbSrc}
+							{:else if isWebsite}
+								<!-- A website has no image of its own, so its type icon fills the box, as a claim's does. -->
+								<div class="flex h-full w-full items-center justify-center text-primary">
+									<TypeGlyph icon={descriptor.icon} class="size-8" />
+								</div>
+							{:else if descriptor.isVideo && thumbSrc}
 								<img
 									src={thumbSrc}
 									alt=""
@@ -383,30 +384,32 @@
 					{:else if isWebPage}
 						<WebPageTiles row={withWebPageDetails(content)} loading={webPageState === 'loading'} />
 					{:else if !isPassage}
-						<div class="rounded-lg border border-border bg-muted px-3 py-2.5">
-							<div class="text-[11px] tracking-wide text-muted-foreground uppercase">Views</div>
-							<div
-								class="mt-0.5 font-slot-cell font-[family-name:var(--font-family-serif)] text-[15px] font-bold text-foreground"
-							>
-								{formatCount(content.viewCount)}
+						{#if descriptor.isVideo}
+							<div class="rounded-lg border border-border bg-muted px-3 py-2.5">
+								<div class="text-[11px] tracking-wide text-muted-foreground uppercase">Views</div>
+								<div
+									class="mt-0.5 font-slot-cell font-[family-name:var(--font-family-serif)] text-[15px] font-bold text-foreground"
+								>
+									{formatCount(content.viewCount)}
+								</div>
 							</div>
-						</div>
-						<div class="rounded-lg border border-border bg-muted px-3 py-2.5">
-							<div class="text-[11px] tracking-wide text-muted-foreground uppercase">Likes</div>
-							<div
-								class="mt-0.5 font-slot-cell font-[family-name:var(--font-family-serif)] text-[15px] font-bold text-foreground"
-							>
-								{formatCount(content.likeCount)}
+							<div class="rounded-lg border border-border bg-muted px-3 py-2.5">
+								<div class="text-[11px] tracking-wide text-muted-foreground uppercase">Likes</div>
+								<div
+									class="mt-0.5 font-slot-cell font-[family-name:var(--font-family-serif)] text-[15px] font-bold text-foreground"
+								>
+									{formatCount(content.likeCount)}
+								</div>
 							</div>
-						</div>
-						<div class="rounded-lg border border-border bg-muted px-3 py-2.5">
-							<div class="text-[11px] tracking-wide text-muted-foreground uppercase">Duration</div>
-							<div
-								class="mt-0.5 font-slot-cell font-[family-name:var(--font-family-serif)] text-[15px] font-bold text-foreground"
-							>
-								{formatDuration(content.length, content.lengthUnits, content.lengthDisplay?.precision)}
+							<div class="rounded-lg border border-border bg-muted px-3 py-2.5">
+								<div class="text-[11px] tracking-wide text-muted-foreground uppercase">Duration</div>
+								<div
+									class="mt-0.5 font-slot-cell font-[family-name:var(--font-family-serif)] text-[15px] font-bold text-foreground"
+								>
+									{formatDuration(content.length, content.lengthUnits, content.lengthDisplay?.precision)}
+								</div>
 							</div>
-						</div>
+						{/if}
 						<div class="rounded-lg border border-border bg-muted px-3 py-2.5">
 							<div class="text-[11px] tracking-wide text-muted-foreground uppercase">Date</div>
 							<div
@@ -477,7 +480,7 @@
 						{#if onAddToPlan}
 							<AddToPlanButton variant="text" class="grow basis-36" onclick={() => onAddToPlan(content)} />
 						{/if}
-						{#if !isPassage && !isWebPage}
+						{#if descriptor.refreshable}
 							<button
 								type="button"
 								disabled={updateSourceData.isPending || cooldown.active}
@@ -494,7 +497,7 @@
 							</button>
 						{/if}
 					</div>
-					{#if !isPassage && !isWebPage && cooldown.active}
+					{#if descriptor.refreshable && cooldown.active}
 						<div class="mt-1.5 text-[11px] text-muted-foreground">
 							This was updated recently. Check back in {formatRemainingTime(cooldown.remainingMs)} to refresh again.
 						</div>
