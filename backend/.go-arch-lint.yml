@@ -1,0 +1,96 @@
+# Architecture rules B1 (core isolation) and B3 (adapter isolation and wiring).
+# Run: backend/scripts/arch-check.sh   (wraps go-arch-lint with a baseline of known violations)
+# An allow-list: any import edge not listed under `deps` is a violation, including future ones.
+version: 3
+workdir: .
+allow:
+  depOnAnyVendor: false
+  deepScan: true
+
+excludeFiles:
+  - ".*_test\\.go$"
+  - "^internal/adapters/graphql/generated/.*"
+  - "^internal/adapters/graphql/model/models_gen\\.go$"
+
+vendors:
+  bluemonday:
+    in: github.com/microcosm-cc/bluemonday
+
+components:
+  domain:        { in: internal/core/domain/** }
+  ports:         { in: internal/core/ports/** }
+  services:      { in: internal/core/services/** }
+  gql:           { in: internal/adapters/graphql/** }
+  auth:          { in: internal/adapters/auth/** }
+  repo-postgres: { in: internal/adapters/repositories/postgres/** }
+  repo-cached:   { in: internal/adapters/repositories/cached/** }
+  realtime:      { in: internal/adapters/realtime/** }
+  tmdb:          { in: internal/adapters/tmdb/** }
+  youtube:       { in: internal/adapters/youtube/** }
+  webpage:       { in: internal/adapters/webpage/** }
+  wikidata:      { in: internal/adapters/wikidata/** }
+  openlibrary:   { in: internal/adapters/openlibrary/** }
+  web:           { in: internal/adapters/web/** }
+  demo:          { in: internal/demo/** }
+  config:        { in: internal/config/** }
+  server:        { in: internal/server/** }
+  perf:          { in: internal/perf/** }
+  pkg:           { in: pkg/** }
+  cmd:           { in: cmd/** }
+
+deps:
+  ports:
+    mayDependOn: [domain]
+  services:
+    mayDependOn: [domain, ports, pkg]
+    canUse: [bluemonday]
+  gql:
+    mayDependOn: [gql, domain, ports, auth, pkg]
+    anyVendorDeps: true
+  auth:
+    mayDependOn: [domain, ports]
+    anyVendorDeps: true
+  repo-postgres:
+    mayDependOn: [domain, ports, pkg]
+    anyVendorDeps: true
+  repo-cached:
+    mayDependOn: [domain, ports]
+    anyVendorDeps: true
+  realtime:
+    mayDependOn: [domain, ports]
+    anyVendorDeps: true
+  tmdb:
+    mayDependOn: [domain, ports, pkg]
+    anyVendorDeps: true
+  youtube:
+    mayDependOn: [domain, ports]
+    anyVendorDeps: true
+  webpage:
+    mayDependOn: [domain]
+    anyVendorDeps: true
+  wikidata:
+    mayDependOn: [domain]
+    anyVendorDeps: true
+  openlibrary:
+    mayDependOn: [domain, ports]
+    anyVendorDeps: true
+  web:
+    mayDependOn: [domain]
+    anyVendorDeps: true
+  demo:
+    mayDependOn: [domain, ports]
+    anyVendorDeps: true
+  config:
+    anyVendorDeps: true
+  pkg:
+    mayDependOn: [pkg]
+    anyVendorDeps: true
+  server:
+    anyProjectDeps: true
+    anyVendorDeps: true
+  perf:
+    anyProjectDeps: true
+    anyVendorDeps: true
+  cmd:
+    anyProjectDeps: true
+    anyVendorDeps: true

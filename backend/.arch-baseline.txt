@@ -1,0 +1,35 @@
+B2 | internal/adapters/graphql/resolvers/content.resolvers.go | resolver SetPassageDisplayTitle does not derive the actor (auth.RequireAuth or auth.ForContext)
+B6 | internal/core/services/content_service.go | ContentService.ClearPassageDisplayTitle has no actor or user id parameter
+B6 | internal/core/services/content_service.go | ContentService.CreateClaim has no actor or user id parameter
+B6 | internal/core/services/content_service.go | ContentService.CreateFromPassage has no actor or user id parameter
+B6 | internal/core/services/content_service.go | ContentService.DeleteClaim has no actor or user id parameter
+B6 | internal/core/services/content_service.go | ContentService.SetPassageDisplayTitle has no actor or user id parameter
+B6 | internal/core/services/content_service.go | ContentService.UpdateClaim has no actor or user id parameter
+B6 | internal/core/services/perspective_service.go | PerspectiveService.Create has no actor or user id parameter
+B7 | internal/adapters/repositories/postgres/gorm_category_repository.go | model.UpdatedAt = time.Now()
+B7 | internal/adapters/repositories/postgres/gorm_content_repository.go | "updated_at": time.Now(),
+B7 | internal/adapters/repositories/postgres/gorm_import_job_repository.go | values["imported_at"] = time.Now().UTC()
+B7 | internal/core/services/build_info_service.go | startedAt: time.Now().UTC(),
+B7 | internal/core/services/content_service.go | effective := time.Now().UTC().Format(claimDateLayout)
+B7 | internal/core/services/content_service.go | return time.Now()
+B7 | internal/core/services/messaging_service.go | if err := s.threadRepo.SetLeft(ctx, threadID, actorUserID, time.Now()); err != nil {
+B7 | internal/core/services/messaging_service.go | tombstoned, err := s.msgRepo.SoftDelete(ctx, messageID, actorUserID, time.Now().UTC())
+B7 | internal/core/services/messaging_service.go | updated, err := s.msgRepo.UpdateBody(ctx, messageID, actorUserID, body, time.Now().UTC())
+B7 | internal/core/services/user_service.go | now := time.Now().UTC().Format(time.RFC3339)
+B7 | internal/core/services/user_todo_service.go | applyStatusStartDate(&todo, existing.Status == domain.UserTodoStatusInProgress, time.Now().UTC())
+B7 | internal/core/services/user_todo_service.go | applyStatusStartDate(todo, false, time.Now().UTC())
+B8 | internal/adapters/auth/clerk_middleware.go | if strings.Contains(createErr.Error(), "unique_email") || strings.Contains(createErr.Error(), "23505") {
+B8 | internal/core/services/content_service.go | return nil, fmt.Errorf("%w: %v", domain.ErrInvalidInput, err)
+B8 | internal/core/services/content_service.go | return nil, fmt.Errorf("%w: %v", domain.ErrInvalidURL, err)
+B8 | internal/core/services/content_service.go | return nil, fmt.Errorf("%w: %v", domain.ErrInvalidURL, err)
+auth | internal/adapters/auth/clerk_middleware.go | internal/demo
+auth | internal/adapters/auth/demo_token_verifier.go | internal/demo
+gql | internal/adapters/graphql/resolvers/helpers.go | internal/adapters/tmdb
+gql | internal/adapters/graphql/resolvers/resolver.go | internal/adapters/realtime
+services | internal/core/services/content_service.go | internal/adapters/tmdb
+services | internal/core/services/content_service.go | internal/adapters/youtube
+services | internal/core/services/content_service_webpage.go | internal/adapters/webpage
+services | internal/core/services/import_service_file.go | internal/adapters/webpage
+services | internal/core/services/retention.go | gorm.io/gorm
+tmdb | internal/adapters/tmdb/demo_client.go | internal/demo
+youtube | internal/adapters/youtube/fixture_client.go | internal/demo

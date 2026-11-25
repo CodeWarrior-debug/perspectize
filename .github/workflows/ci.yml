@@ -127,6 +127,9 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v7
+        with:
+          # arch-check's repository-method gate diffs against origin/main
+          fetch-depth: 0
 
       - name: Set up Go
         uses: actions/setup-go@v7
@@ -142,6 +145,13 @@ jobs:
       # NewResolver/Middleware). Vet builds it without needing a database.
       - name: Compile perf-tagged harness
         run: go vet -tags perf ./internal/perf/...
+
+      # Layer and convention rules with a baseline of known violations (backend/CLAUDE.md -> Architecture rules).
+      # Fails on a violation that is not in .arch-baseline.txt or a file that grows past its .size-ceilings.txt entry.
+      - name: Architecture rules
+        run: |
+          go install github.com/fe3dback/go-arch-lint@v1.19.2
+          scripts/arch-check.sh
 
       - name: Verify formatting
         run: |

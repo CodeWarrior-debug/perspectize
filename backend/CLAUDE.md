@@ -137,6 +137,14 @@ Order: domain model (`core/domain/`) → repository port (`core/ports/repositori
 
 Backend subagents: `go-backend`, `graphql-designer`, `db-migration`, `code-reviewer`, `test-writer` (`.claude/agents/`); architecture decisions stay in the main session. Each agent's model is set in its `model:` frontmatter; don't override it with the Agent tool's `model` parameter.
 
+## Architecture rules (enforced: `scripts/arch-check.sh`, CI step "Architecture rules")
+
+`.go-arch-lint.yml` is the allow-list of package edges (B1 core imports no adapters or gorm; B3 adapters import only domain/ports, never each other or `internal/demo`). Pattern checks add B2 (mutation resolvers derive the actor, `@auth` on every mutation), B5 (`Paginate()` callers check `pageResult.Error`), B6 (service writers take the actor), B7 (no `time.Now()` in services/repositories: inject a clock), B8 (wrap with `%w`; never branch on error text), B4 (a new repository method ships a `querycount` test; diff gate).
+
+- **Baselined violations** are in `.arch-baseline.txt`; **files over 500 lines** have a ceiling in `.size-ceilings.txt` (tests exempt). Both may only shrink. Never add a line to either to make a check pass; fix the code.
+- **Off-limits:** don't add code to a file listed in `.size-ceilings.txt` or to one named in `.arch-baseline.txt`. Put new code in a new file in the same package (a new `_<topic>.go` beside it).
+- After fixing a baselined violation run `scripts/arch-check.sh --update` and commit the smaller baseline.
+
 ## Self-Verification
 
 **`go run ./cmd/server` does not hot-reload.** Before manual browser verification, confirm the process on :8080 postdates your changes (`lsof -i :8080`, `ps -p <pid> -o command`) or restart it; use `make dev` (air) for hot-reload.
