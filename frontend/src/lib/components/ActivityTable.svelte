@@ -803,7 +803,7 @@
 				lockPinned: true,
 				headerName: 'Item',
 				flex: 2,
-				minWidth: 175, // a floor only: Item is flex 2 and grows; 10px less keeps the YouTube lg set inside 1212px
+				minWidth: 174, // a floor only: Item is flex 2 and grows; kept low so the YouTube lg set fits 1212px
 
 				filter: 'agTextColumnFilter',
 				filterValueGetter: (params) => params.data?.name ?? '',
@@ -999,6 +999,7 @@
 				headerName: 'Likes',
 				flex: 0.8,
 				maxWidth: 130,
+				minWidth: 105, // fits the italic "Refresh to view" shown for aged-out numbers
 
 				filter: 'agNumberColumnFilter',
 				valueFormatter: (params) =>
