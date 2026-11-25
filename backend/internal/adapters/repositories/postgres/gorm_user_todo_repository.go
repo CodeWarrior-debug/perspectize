@@ -68,12 +68,8 @@ func (r *GormUserTodoRepository) List(ctx context.Context, params domain.UserTod
 	// Read-authorization predicate, same shape as perspectives (see
 	// GormPerspectiveRepository.List).
 	if params.RestrictToPublicOrOwner {
-		public := privacyToDBValue(domain.PrivacyPublic)
-		if params.ViewerID != nil {
-			query = query.Where("privacy = ? OR user_id = ?", public, *params.ViewerID)
-		} else {
-			query = query.Where("privacy = ?", public)
-		}
+		readable, args := todoAudience.readableSQL("", params.ViewerID)
+		query = query.Where(readable, args...)
 	}
 
 	// Total count (before cursor/limit, respects filters and privacy only)
@@ -400,7 +396,8 @@ func NewGormUserTodoListRepository(db *gorm.DB) *GormUserTodoListRepository {
 func (r *GormUserTodoListRepository) ListByUser(ctx context.Context, userID int, includePrivate bool) ([]*domain.UserTodoList, error) {
 	query := r.db.WithContext(ctx).Model(&UserTodoListModel{}).Where("user_id = ?", userID)
 	if !includePrivate {
-		query = query.Where("privacy = ?", privacyToDBValue(domain.PrivacyPublic))
+		publicOnly, args := todoAudience.readableSQL("", nil)
+		query = query.Where(publicOnly, args...)
 	}
 
 	var models []UserTodoListModel

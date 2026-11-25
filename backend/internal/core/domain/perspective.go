@@ -152,10 +152,9 @@ type PaginatedPerspectives struct {
 	TotalCount  *int
 }
 
-// PerspectiveAggregate summarizes ALL perspectives on a single piece of
-// content — public and private alike; Privacy controls who can read a
-// perspective's content, not whether it counts here (see FEATURE_BACKLOG.md
-// for a possible future opt-out of aggregates) — how many there are, how
+// PerspectiveAggregate summarizes the PUBLIC perspectives on a single piece of
+// content (Audience.CountsInAggregates: private rows never count, so no
+// aggregate is attributable to an owner) — how many there are, how
 // many of those set a Quality rating (the "headline" rating dimension - see
 // RatingInput.svelte's field order on the frontend), and their average
 // Quality. QualityCount can be less than Count since Quality is optional.
@@ -188,8 +187,9 @@ type PerspectiveAggregate struct {
 // perspectives in scope", not just of those that set any feeling at all.
 // AverageIntensity/StdDevIntensity are nil when Count is 0; StdDevIntensity
 // is also nil when Count is 1 (standard deviation of one value is
-// undefined here, not 0). Counts public and private perspectives alike,
-// matching PerspectiveAggregate's privacy stance -- see its doc comment.
+// undefined here, not 0). Counts only public perspectives on content the
+// viewer may read, the same scope as PerspectiveAggregate. Content the viewer
+// cannot read gives the same answer as a content id that does not exist.
 type FeelingStats struct {
 	Emoji             string
 	Label             *string

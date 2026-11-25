@@ -465,7 +465,11 @@ func (s *UserTodoService) ReorderUserTodoList(ctx context.Context, actorUserID, 
 // canViewUserTodoRow reports whether a todo or list is visible: PUBLIC rows are
 // visible to everyone, PRIVATE rows only to their owner.
 func canViewUserTodoRow(privacy domain.Privacy, ownerID int, viewerID *int) bool {
-	return privacy == domain.PrivacyPublic || (viewerID != nil && *viewerID == ownerID)
+	viewer := 0
+	if viewerID != nil {
+		viewer = *viewerID
+	}
+	return domain.Audience{Privacy: privacy, OwnerID: ownerID}.ReadableBy(viewer)
 }
 
 // notOwnedUserTodoError answers a write on a row the actor doesn't own. A PUBLIC
@@ -482,7 +486,7 @@ func emptyUserTodoPage(includeTotalCount bool) *domain.PaginatedUserTodos {
 }
 
 func notOwnedUserTodoError(privacy domain.Privacy) error {
-	if privacy == domain.PrivacyPublic {
+	if err := domain.NonOwnerWriteError(privacy); errors.Is(err, domain.ErrForbidden) {
 		return fmt.Errorf("%w: you can only modify your own items", domain.ErrForbidden)
 	}
 	return domain.ErrNotFound

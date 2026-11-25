@@ -824,14 +824,25 @@ func onlyIDAndAggregatesSelected(ctx context.Context) bool {
 	return true
 }
 
+// statsViewer is the caller's ID for scoping aggregate stats, or nil when the
+// caller is anonymous.
+func statsViewer(ctx context.Context) *int {
+	viewer, ok := auth.ForContext(ctx)
+	if !ok {
+		return nil
+	}
+	id := viewer.ID
+	return &id
+}
+
 // canViewContent reports whether the caller may read a content row: public
 // rows are readable by anyone, private rows only by their owner.
 func canViewContent(ctx context.Context, privacy domain.Privacy, ownerID int) bool {
-	if privacy != domain.PrivacyPrivate {
-		return true
+	viewerID := 0
+	if viewer, ok := auth.ForContext(ctx); ok {
+		viewerID = viewer.ID
 	}
-	viewer, ok := auth.ForContext(ctx)
-	return ok && viewer.ID == ownerID
+	return domain.ContentAudience(privacy, ownerID).ReadableBy(viewerID)
 }
 
 // ---- User todo ("Plan") mappers ----

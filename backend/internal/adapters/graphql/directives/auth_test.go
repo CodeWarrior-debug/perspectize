@@ -162,11 +162,11 @@ func (m *mockPerspectiveService) CountVisibleByContentIDs(ctx context.Context, c
 	return map[int]int{}, nil
 }
 
-func (m *mockPerspectiveService) FeelingStats(ctx context.Context, contentID *int, emoji string, label *string) (*domain.FeelingStats, error) {
+func (m *mockPerspectiveService) FeelingStats(ctx context.Context, contentID *int, emoji string, label *string, viewerID *int) (*domain.FeelingStats, error) {
 	return &domain.FeelingStats{Emoji: emoji, Label: label}, nil
 }
 
-func (m *mockPerspectiveService) CustomFieldStats(ctx context.Context, contentID *int, key string) (*domain.CustomFieldStats, error) {
+func (m *mockPerspectiveService) CustomFieldStats(ctx context.Context, contentID *int, key string, viewerID *int) (*domain.CustomFieldStats, error) {
 	return &domain.CustomFieldStats{Key: key}, nil
 }
 

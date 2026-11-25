@@ -101,10 +101,10 @@ type PerspectiveService interface {
 	// FeelingStats computes count/average/stddev for perspectives carrying the
 	// given feeling (see domain.FeelingStats), scoped to one content ID or,
 	// when contentID is nil, every perspective.
-	FeelingStats(ctx context.Context, contentID *int, emoji string, label *string) (*domain.FeelingStats, error)
+	FeelingStats(ctx context.Context, contentID *int, emoji string, label *string, viewerID *int) (*domain.FeelingStats, error)
 
 	// CustomFieldStats computes how many perspectives set the given
 	// CustomFields top-level key (see domain.CustomFieldStats), scoped to one
 	// content ID or, when contentID is nil, every perspective.
-	CustomFieldStats(ctx context.Context, contentID *int, key string) (*domain.CustomFieldStats, error)
+	CustomFieldStats(ctx context.Context, contentID *int, key string, viewerID *int) (*domain.CustomFieldStats, error)
 }

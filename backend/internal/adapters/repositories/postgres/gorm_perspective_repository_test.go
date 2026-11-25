@@ -496,7 +496,7 @@ func TestGormPerspectiveRepository_List(t *testing.T) {
 
 	t.Run("RestrictToPublicOrOwner with no viewer restricts to public only", func(t *testing.T) {
 		db, mock := newMockDB(t)
-		mock.ExpectQuery(`WHERE user_id = \$1 AND privacy = \$2 AND \(EXISTS \(SELECT 1 FROM content c WHERE c.id = perspectives.content_id AND c.privacy = \$3\)\) ORDER BY`).
+		mock.ExpectQuery(`WHERE user_id = \$1 AND privacy = \$2 AND \(\(perspectives\.content_id IS NULL OR EXISTS \(SELECT 1 FROM content c WHERE c\.id = perspectives\.content_id AND \(c\.privacy = \$3\)\)\)\) ORDER BY`).
 			WillReturnRows(perspectiveRows())
 
 		got, err := NewGormPerspectiveRepository(db).List(ctx, domain.PerspectiveListParams{
@@ -512,7 +512,7 @@ func TestGormPerspectiveRepository_List(t *testing.T) {
 	t.Run("RestrictToPublicOrOwner false still requires public content for an anonymous caller", func(t *testing.T) {
 		db, mock := newMockDB(t)
 		// The perspective's own privacy is not restricted, but its content is.
-		mock.ExpectQuery(`SELECT \* FROM "perspectives" WHERE user_id = \$1 AND \(EXISTS \(SELECT 1 FROM content c WHERE c.id = perspectives.content_id AND c.privacy = \$2\)\) ORDER BY`).
+		mock.ExpectQuery(`SELECT \* FROM "perspectives" WHERE user_id = \$1 AND \(\(perspectives\.content_id IS NULL OR EXISTS \(SELECT 1 FROM content c WHERE c\.id = perspectives\.content_id AND \(c\.privacy = \$2\)\)\)\) ORDER BY`).
 			WillReturnRows(perspectiveRows())
 
 		_, err := NewGormPerspectiveRepository(db).List(ctx, domain.PerspectiveListParams{
@@ -548,8 +548,8 @@ func TestGormPerspectiveRepository_AggregateByContentIDs(t *testing.T) {
 		// COUNT(quality)/the Quality column at all.
 		rows := sqlmock.NewRows([]string{"content_id", "count", "quality_count", "avg_quality"}).
 			AddRow(11, 1, 0, nil)
-		mock.ExpectQuery(`SELECT c.id AS content_id, COUNT\(p.id\) AS count, COUNT\(p.quality\) AS quality_count, AVG\(p.quality\) AS avg_quality, c.privacy AS privacy, c.added_by_user_id AS owner_id, c.import_job_id FROM content AS c LEFT JOIN perspectives p ON p.content_id = c.id WHERE c.id = ANY\(CAST\(\$1 AS bigint\[\]\)\) GROUP BY "c"."id"`).
-			WithArgs("{11}"). // one bigint[] parameter, not one placeholder per id
+		mock.ExpectQuery(`SELECT c.id AS content_id, COUNT\(p.id\) AS count, COUNT\(p.quality\) AS quality_count, AVG\(p.quality\) AS avg_quality, c.privacy AS privacy, c.added_by_user_id AS owner_id, c.import_job_id FROM content AS c LEFT JOIN perspectives p ON p.content_id = c.id AND p.privacy = \$1 WHERE c.id = ANY\(CAST\(\$2 AS bigint\[\]\)\) GROUP BY "c"."id"`).
+			WithArgs("public", "{11}"). // one bigint[] parameter, not one placeholder per id
 			WillReturnRows(rows)
 
 		got, err := NewGormPerspectiveRepository(db).AggregateByContentIDs(ctx, []int{11})
@@ -567,8 +567,8 @@ func TestGormPerspectiveRepository_AggregateByContentIDs(t *testing.T) {
 		// perspectives) and nothing for 99 (no content row).
 		rows := sqlmock.NewRows([]string{"content_id", "count", "quality_count", "avg_quality"}).
 			AddRow(11, 0, 0, nil)
-		mock.ExpectQuery(`FROM content AS c LEFT JOIN perspectives p ON p.content_id = c.id`).
-			WithArgs("{11,99}").
+		mock.ExpectQuery(`FROM content AS c LEFT JOIN perspectives p ON p.content_id = c.id AND p.privacy = \$1`).
+			WithArgs("public", "{11,99}").
 			WillReturnRows(rows)
 
 		got, err := NewGormPerspectiveRepository(db).AggregateByContentIDs(ctx, []int{11, 99})
@@ -643,18 +643,18 @@ func TestGormPerspectiveRepository_FeelingStats(t *testing.T) {
 		avg := 8500.0
 		rows := sqlmock.NewRows([]string{"count", "avg_intensity", "stddev_intensity"}).
 			AddRow(1, avg, 0.0)
-		mock.ExpectQuery(`(?s)SELECT.*COUNT\(DISTINCT p\.id\) AS count.*FROM perspectives p.*CROSS JOIN LATERAL unnest\(p\.feelings\) AS f.*WHERE f->>'emoji' = \$1.*AND lower\(f->>'label'\) = lower\(\$2\).*AND p\.content_id = \$3`).
-			WithArgs("🥰", "Love", 11).
+		mock.ExpectQuery(`(?s)SELECT.*COUNT\(DISTINCT p\.id\) AS count.*FROM perspectives p.*CROSS JOIN LATERAL unnest\(p\.feelings\) AS f.*WHERE f->>'emoji' = \$1.*AND lower\(f->>'label'\) = lower\(\$4\).*AND p\.content_id = \$5`).
+			WithArgs("🥰", "public", "public", "Love", 11).
 			WillReturnRows(rows)
 
 		countRows := sqlmock.NewRows([]string{"count"}).AddRow(4)
-		mock.ExpectQuery(`SELECT count\(\*\) FROM "perspectives" WHERE content_id = \$1`).
-			WithArgs(11).
+		mock.ExpectQuery(`SELECT count\(\*\) FROM "perspectives" WHERE content_id = \$1 .*perspectives\.privacy = \$2`).
+			WithArgs(11, "public", "public").
 			WillReturnRows(countRows)
 
 		label := "Love"
 		contentID := 11
-		got, err := NewGormPerspectiveRepository(db).FeelingStats(ctx, &contentID, "🥰", &label)
+		got, err := NewGormPerspectiveRepository(db).FeelingStats(ctx, &contentID, "🥰", &label, nil)
 		require.NoError(t, err)
 		assert.Equal(t, 1, got.Count)
 		assert.Equal(t, 4, got.TotalPerspectives)
@@ -669,15 +669,15 @@ func TestGormPerspectiveRepository_FeelingStats(t *testing.T) {
 		avg, stddev := 6000.0, 1500.0
 		rows := sqlmock.NewRows([]string{"count", "avg_intensity", "stddev_intensity"}).
 			AddRow(5, avg, stddev)
-		mock.ExpectQuery(`(?s)SELECT.*FROM perspectives p.*WHERE f->>'emoji' = \$1$`).
-			WithArgs("🤬").
+		mock.ExpectQuery(`(?s)SELECT.*FROM perspectives p.*WHERE f->>'emoji' = \$1 AND p\.privacy = \$2 AND \(p\.content_id IS NULL OR EXISTS \(SELECT 1 FROM content c WHERE c\.id = p\.content_id AND \(c\.privacy = \$3\)\)\)$`).
+			WithArgs("🤬", "public", "public").
 			WillReturnRows(rows)
 
 		countRows := sqlmock.NewRows([]string{"count"}).AddRow(20)
-		mock.ExpectQuery(`SELECT count\(\*\) FROM "perspectives"$`).
+		mock.ExpectQuery(`SELECT count\(\*\) FROM "perspectives" WHERE .*perspectives\.privacy = \$1`).
 			WillReturnRows(countRows)
 
-		got, err := NewGormPerspectiveRepository(db).FeelingStats(ctx, nil, "🤬", nil)
+		got, err := NewGormPerspectiveRepository(db).FeelingStats(ctx, nil, "🤬", nil, nil)
 		require.NoError(t, err)
 		assert.Equal(t, 5, got.Count)
 		assert.Equal(t, 20, got.TotalPerspectives)
@@ -694,17 +694,17 @@ func TestGormPerspectiveRepository_CustomFieldStats(t *testing.T) {
 	t.Run("uses jsonb_exists, not the bare ? operator (avoids GORM Raw placeholder collision)", func(t *testing.T) {
 		db, mock := newMockDB(t)
 		rows := sqlmock.NewRows([]string{"count"}).AddRow(2)
-		mock.ExpectQuery(`(?s)SELECT COUNT\(\*\) AS count.*FROM perspectives p.*WHERE jsonb_exists\(p\.custom_fields, \$1\).*AND p\.content_id = \$2`).
-			WithArgs("mood", 11).
+		mock.ExpectQuery(`(?s)SELECT COUNT\(\*\) AS count.*FROM perspectives p.*WHERE jsonb_exists\(p\.custom_fields, \$1\).*AND p\.content_id = \$4`).
+			WithArgs("mood", "public", "public", 11).
 			WillReturnRows(rows)
 
 		countRows := sqlmock.NewRows([]string{"count"}).AddRow(4)
-		mock.ExpectQuery(`SELECT count\(\*\) FROM "perspectives" WHERE content_id = \$1`).
-			WithArgs(11).
+		mock.ExpectQuery(`SELECT count\(\*\) FROM "perspectives" WHERE content_id = \$1 .*perspectives\.privacy = \$2`).
+			WithArgs(11, "public", "public").
 			WillReturnRows(countRows)
 
 		contentID := 11
-		got, err := NewGormPerspectiveRepository(db).CustomFieldStats(ctx, &contentID, "mood")
+		got, err := NewGormPerspectiveRepository(db).CustomFieldStats(ctx, &contentID, "mood", nil)
 		require.NoError(t, err)
 		assert.Equal(t, 2, got.Count)
 		assert.Equal(t, 4, got.TotalPerspectives)

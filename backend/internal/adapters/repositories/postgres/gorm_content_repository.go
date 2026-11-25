@@ -356,11 +356,12 @@ func applyContentSearch(query *gorm.DB, term string, fields []domain.ContentSear
 
 // applyContentVisibility restricts a content query to rows the viewer may read.
 func applyContentVisibility(query *gorm.DB, viewerID *int) *gorm.DB {
-	public := privacyToDBValue(domain.PrivacyPublic)
-	if viewerID == nil {
-		return query.Where("content.privacy = ?", public)
+	cond, args := contentAudience.readableSQL("content.", viewerID)
+	if viewerID != nil {
+		// The viewer form is an OR; parentheses keep it apart from the caller's ANDs.
+		cond = "(" + cond + ")"
 	}
-	return query.Where("(content.privacy = ? OR content.added_by_user_id = ?)", public, *viewerID)
+	return query.Where(cond, args...)
 }
 
 func (r *GormContentRepository) List(ctx context.Context, params domain.ContentListParams) (*domain.PaginatedContent, error) {
@@ -465,7 +466,7 @@ func (r *GormContentRepository) List(ctx context.Context, params domain.ContentL
 		// their own), the same scope as the perspectives list, so a row that
 		// passes here has that many perspectives to compare.
 		if params.Filter.MinPerspectiveCount != nil && *params.Filter.MinPerspectiveCount > 0 {
-			visible, args := visiblePerspectivePredicate(params.ViewerID)
+			visible, args := perspectiveAudience.readableSQL("", params.ViewerID)
 			args = append(args, *params.Filter.MinPerspectiveCount)
 			query = query.Where(
 				"(SELECT COUNT(*) FROM perspectives WHERE perspectives.content_id = content.id AND ("+visible+")) >= ?",
@@ -563,10 +564,11 @@ func (r *GormContentRepository) ReassignByUser(ctx context.Context, fromUserID, 
 // the viewer, and both answer domain.ErrNotFound.
 func (r *GormContentRepository) UpdatePrimaryCategoryID(ctx context.Context, contentID int, categoryID *int, viewerID int) (*domain.Content, error) {
 	var updated ContentModel
+	readable, readArgs := contentAudience.readableSQL("", &viewerID)
 	result := r.db.WithContext(ctx).
 		Model(&updated).
 		Clauses(clause.Returning{}).
-		Where("id = ? AND (privacy = 'public' OR added_by_user_id = ?)", contentID, viewerID).
+		Where("id = ? AND ("+readable+")", append([]any{contentID}, readArgs...)...).
 		Update("primary_category_id", categoryID)
 	if result.Error != nil {
 		return nil, fmt.Errorf("failed to update primary category: %w", result.Error)
