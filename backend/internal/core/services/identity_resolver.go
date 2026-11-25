@@ -43,7 +43,7 @@ func (r *IdentityResolver) Resolve(ctx context.Context, clerkID string) (*domain
 	}
 	profile, err := r.directory.Profile(ctx, clerkID)
 	if err != nil {
-		return nil, fmt.Errorf("clerk profile for %s: %w", clerkID, err)
+		return nil, fmt.Errorf("clerk profile: %w", err)
 	}
 	user, err = r.create(ctx, profile)
 	if err != nil {
@@ -83,12 +83,12 @@ func (r *IdentityResolver) create(ctx context.Context, profile domain.ClerkProfi
 		case errors.Is(err, domain.ErrClerkIDTaken):
 			return r.users.GetByClerkID(ctx, profile.ClerkID)
 		case errors.Is(err, domain.ErrUsernameTaken) && !suffixed:
-			slog.Info("username taken, retrying with disambiguated name", "clerk_id", profile.ClerkID)
+			slog.Info("username taken, retrying with disambiguated name")
 			username = profile.DisambiguatedUsername()
 			suffixed = true
 		case errors.Is(err, domain.ErrEmailTaken) && email != "":
 			if !profile.PrimaryEmailVerified() {
-				slog.Warn("email taken by another account and unverified in clerk, provisioning without it", "clerk_id", profile.ClerkID)
+				slog.Warn("email taken by another account and unverified in clerk, provisioning without it")
 				email = ""
 				continue
 			}
@@ -97,7 +97,7 @@ func (r *IdentityResolver) create(ctx context.Context, profile domain.ClerkProfi
 			return nil, err
 		}
 	}
-	return nil, fmt.Errorf("provision clerk user %s after %d attempts: %w", profile.ClerkID, maxIdentityCreateAttempts, domain.ErrAlreadyExists)
+	return nil, fmt.Errorf("provision clerk user after %d attempts: %w", maxIdentityCreateAttempts, domain.ErrAlreadyExists)
 }
 
 // link attaches the Clerk ID to the existing row that owns the email. It only
@@ -113,7 +113,7 @@ func (r *IdentityResolver) link(ctx context.Context, profile domain.ClerkProfile
 	}
 	if existing.ClerkUserID != "" || existing.IsSentinel() {
 		slog.Warn("refused to link clerk identity to an email owned by another account",
-			"clerk_id", profile.ClerkID, "local_user_id", existing.ID)
+			"local_user_id", existing.ID)
 		return nil, fmt.Errorf("%w: email belongs to another account", domain.ErrEmailTaken)
 	}
 	existing.ClerkUserID = profile.ClerkID
