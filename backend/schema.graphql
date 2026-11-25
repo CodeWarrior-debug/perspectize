@@ -138,7 +138,7 @@ type MovieSearchResult {
   posterPath: String
   # TMDB vote average 0-10; null when there are no votes
   voteAverage: Float
-  # Canonical content URL (https://www.themoviedb.org/movie/<id>) — pass to createContentFromMovie
+  # Canonical content URL (https://www.themoviedb.org/movie/<id>) — pass to createContent (movie field)
   url: String!
 }
 
@@ -169,7 +169,7 @@ type BookSearchResult {
   alreadyReadCount: Int
   # Open Library's own total across the shelves
   readingLogCount: Int
-  # Canonical content URL (https://openlibrary.org/works/<id>) — pass to createContentFromBook
+  # Canonical content URL (https://openlibrary.org/works/<id>) — pass to createContent (book field)
   url: String!
 }
 
@@ -430,6 +430,17 @@ input CreateContentFromPassageInput {
   endChapter: Int!
   endVerse: Int!
   userID: IntID!
+}
+
+# One content create. Set exactly one field; the field picks the content type and
+# carries that type's input. Zero or two fields are refused with INVALID_INPUT.
+input CreateContentInput @oneOf {
+  youtube: CreateContentFromYouTubeInput
+  webPage: CreateContentFromWebPageInput
+  website: CreateContentFromWebsiteInput
+  movie: CreateContentFromMovieInput
+  book: CreateContentFromBookInput
+  passage: CreateContentFromPassageInput
 }
 
 input SetPassageDisplayTitleInput {
@@ -930,21 +941,26 @@ input StageImportFromFileInput {
 }
 
 type Mutation {
-  createContentFromYouTube(input: CreateContentFromYouTubeInput!): CreateContentResult! @auth
+  # Creates or finds one content row. Send exactly one field of CreateContentInput.
+  createContent(input: CreateContentInput!): CreateContentResult! @auth
+  createContentFromYouTube(input: CreateContentFromYouTubeInput!): CreateContentResult! @auth @deprecated(reason: "Use createContent")
   updateContentSourceData(contentId: IntID!): Content! @auth
 
   # Movie mutations
-  createContentFromMovie(input: CreateContentFromMovieInput!): Content! @auth
+  # Returns the row without saying whether it already existed.
+  createContentFromMovie(input: CreateContentFromMovieInput!): Content! @auth @deprecated(reason: "Use createContent")
 
   # Book mutations
-  createContentFromBook(input: CreateContentFromBookInput!): Content! @auth
+  # Returns the row without saying whether it already existed.
+  createContentFromBook(input: CreateContentFromBookInput!): Content! @auth @deprecated(reason: "Use createContent")
 
   # Webpage mutations
-  createContentFromWebPage(input: CreateContentFromWebPageInput!): CreateContentResult! @auth
-  createContentFromWebsite(input: CreateContentFromWebsiteInput!): CreateContentResult! @auth
+  createContentFromWebPage(input: CreateContentFromWebPageInput!): CreateContentResult! @auth @deprecated(reason: "Use createContent")
+  createContentFromWebsite(input: CreateContentFromWebsiteInput!): CreateContentResult! @auth @deprecated(reason: "Use createContent")
 
   # Bible passage mutations
-  createContentFromPassage(input: CreateContentFromPassageInput!): Content! @auth
+  # Returns the row without saying whether it already existed.
+  createContentFromPassage(input: CreateContentFromPassageInput!): Content! @auth @deprecated(reason: "Use createContent")
   # First-write-wins: if a title already exists, returns the content with the existing title.
   setPassageDisplayTitle(input: SetPassageDisplayTitleInput!): Content! @auth
   # Admin only: resets the title so it can be set again.
