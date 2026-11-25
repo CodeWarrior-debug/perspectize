@@ -146,7 +146,7 @@ func (s *ContentService) CreateFromYouTube(ctx context.Context, url string, user
 			"error", err) // err is already sanitized by youtube client
 
 		// Generic error for GraphQL response
-		return nil, fmt.Errorf("failed to fetch video metadata")
+		return nil, domain.Unavailable("failed to fetch video metadata")
 	}
 
 	// 5. Build content with canonical URL
@@ -260,7 +260,7 @@ func (s *ContentService) UpdateSourceData(ctx context.Context, contentID, viewer
 			"videoID", videoID,
 			"contentID", contentID,
 			"error", err)
-		return nil, fmt.Errorf("failed to fetch video metadata")
+		return nil, domain.Unavailable("failed to fetch video metadata")
 	}
 
 	updated, err := s.repo.UpdateMetadata(ctx, contentID, metadata.Title, metadata.Response, &metadata.Duration, nil, nil)
@@ -870,7 +870,7 @@ func (s *ContentService) TrendingMovies(ctx context.Context, window domain.Trend
 
 // ErrMovieClientUnavailable is returned by CreateFromMovie when the service was
 // built without a movie client. Resolvers show clients a generic message.
-var ErrMovieClientUnavailable = errors.New("movie lookup is unavailable: no movie client configured")
+var ErrMovieClientUnavailable = domain.Unavailable("movie lookup is unavailable: no movie client configured")
 
 // CreateFromMovie creates MOVIE content from a TMDB or IMDb movie URL (or bare IMDb id),
 // attributed to the given user. If the movie already exists, returns the existing content
@@ -1026,7 +1026,7 @@ func normalizeISBN(raw string) string {
 // ErrBookClientUnavailable is returned by CreateFromBook, SearchBooks,
 // TrendingBooks and ResolveBookISBN when the service was built without the
 // relevant Open Library client. Resolvers show clients a generic message.
-var ErrBookClientUnavailable = errors.New("book lookup is unavailable: no book client configured")
+var ErrBookClientUnavailable = domain.Unavailable("book lookup is unavailable: no book client configured")
 
 // canonicalBookURL is the canonical content URL stored for an Open Library work.
 func canonicalBookURL(workKey string) string {

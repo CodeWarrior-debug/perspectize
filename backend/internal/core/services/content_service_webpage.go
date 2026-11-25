@@ -14,7 +14,7 @@ import (
 
 // ErrWebPageClientUnavailable is returned by CreateFromWebPage and PreviewWebPage
 // when the service was built without a webpage client.
-var ErrWebPageClientUnavailable = errors.New("webpage lookup is unavailable: no webpage client configured")
+var ErrWebPageClientUnavailable = domain.Unavailable("webpage lookup is unavailable: no webpage client configured")
 
 // CreateFromWebPage saves a webpage by URL, attributed to userID. The URL is
 // canonicalised and checked against the library before any fetch, so a saved
