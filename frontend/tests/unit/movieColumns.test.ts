@@ -590,6 +590,11 @@ describe('default column sets fit the 1212px grid', () => {
 		});
 		return Math.max(explicit, header);
 	}
+	// "Refresh to view" in the italic cell font is about 89px, plus 16px of cell padding and border.
+	it.each(['views', 'likes'])('%s is never too narrow for the aged-out placeholder', (colId) => {
+		expect(minWidth(colId)).toBeGreaterThanOrEqual(105);
+	});
+
 	it('YouTube lg set sums under 1212', () => {
 		const { visible } = defaultColumnVisibility('lg', 'general');
 		const total = visible.reduce((sum, id) => sum + minWidth(id), 0);
@@ -616,13 +621,13 @@ describe('default column sets fit the 1212px grid', () => {
 		}
 	});
 
-	it('Movie lg minimum widths are the header-derived floors without Type, which the filter names (sum 1162)', () => {
+	it('Movie lg minimum widths are the header-derived floors without Type, which the filter names (sum 1161)', () => {
 		// Sortable columns also reserve the multi-sort order number (~11px each, see headerChrome).
 		const { visible } = defaultColumnVisibility('lg', 'movie', 'movie');
 		expect(visible).not.toContain('type');
 		const widths = Object.fromEntries(visible.map((id) => [id, minWidth(id)]));
 		expect(widths).toMatchObject({
-			item: 175,
+			item: 174,
 			genre: 79,
 			rated: 110,
 			cast: 125,
@@ -633,7 +638,7 @@ describe('default column sets fit the 1212px grid', () => {
 			tmdbScore: 115,
 			tags: 71,
 		});
-		expect(Object.values(widths).reduce((a, b) => a + b, 0)).toBe(1162);
+		expect(Object.values(widths).reduce((a, b) => a + b, 0)).toBe(1161);
 	});
 
 	it('the map in ActivityTable floors every column at its header width', () => {

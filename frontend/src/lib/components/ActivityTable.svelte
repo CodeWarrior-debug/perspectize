@@ -87,6 +87,7 @@
 		textOrEmpty,
 		EMPTY_VALUE,
 	} from '#lib/utils/formatting.js';
+	import { sourceDataCellState, sourceDataCellText } from '#lib/utils/sourceDataExpiry.js';
 	import { headerMinWidth } from '#lib/utils/grid-header-width.js';
 	import {
 		capitalizeContentType,
@@ -802,7 +803,7 @@
 				lockPinned: true,
 				headerName: 'Item',
 				flex: 2,
-				minWidth: 175, // a floor only: Item is flex 2 and grows; 10px less keeps the YouTube lg set inside 1212px
+				minWidth: 174, // a floor only: Item is flex 2 and grows; kept low so the YouTube lg set fits 1212px
 
 				filter: 'agTextColumnFilter',
 				filterValueGetter: (params) => params.data?.name ?? '',
@@ -983,7 +984,12 @@
 				maxWidth: 130,
 
 				filter: 'agNumberColumnFilter',
-				valueFormatter: (params) => formatCount(params.value),
+				valueFormatter: (params) =>
+					sourceDataCellText(
+						sourceDataCellState({ expired: params.data?.sourceDataExpired, signedIn: true }),
+						formatCount(params.value),
+					),
+				cellClass: (params) => (params.data?.sourceDataExpired ? 'text-muted-foreground italic' : ''),
 				context: { tooltipSpec: ACTIVITY_TOOLTIP_SPECS.views },
 				headerTooltip: 'View count from YouTube API',
 			},
@@ -993,9 +999,15 @@
 				headerName: 'Likes',
 				flex: 0.8,
 				maxWidth: 130,
+				minWidth: 105, // fits the italic "Refresh to view" shown for aged-out numbers
 
 				filter: 'agNumberColumnFilter',
-				valueFormatter: (params) => formatCount(params.value),
+				valueFormatter: (params) =>
+					sourceDataCellText(
+						sourceDataCellState({ expired: params.data?.sourceDataExpired, signedIn: true }),
+						formatCount(params.value),
+					),
+				cellClass: (params) => (params.data?.sourceDataExpired ? 'text-muted-foreground italic' : ''),
 				context: { tooltipSpec: ACTIVITY_TOOLTIP_SPECS.likes },
 				headerTooltip: 'Like count from YouTube API',
 			},
