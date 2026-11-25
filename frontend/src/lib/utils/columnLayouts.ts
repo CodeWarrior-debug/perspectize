@@ -1,4 +1,10 @@
-import { defaultColumnVisibility, togglableColIds, type ColumnView, type ResponsiveTier } from './grid-config';
+import {
+	defaultColumnVisibility,
+	RETIRED_COL_IDS,
+	togglableColIds,
+	type ColumnView,
+	type ResponsiveTier,
+} from './grid-config';
 
 export { columnViewFor, type ColumnView } from './grid-config';
 
@@ -61,7 +67,8 @@ function writeAll(all: Partial<Record<ColumnView, ColumnLayout>>): void {
 
 export function loadLayout(view: ColumnView): ColumnLayout | null {
 	const layout = readAll()[view];
-	return isLayout(layout) ? layout : null;
+	if (!isLayout(layout)) return null;
+	return Object.fromEntries(Object.entries(layout).filter(([colId]) => !RETIRED_COL_IDS.has(colId)));
 }
 
 export function saveLayout(view: ColumnView, layout: ColumnLayout): void {

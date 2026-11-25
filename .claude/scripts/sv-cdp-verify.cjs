@@ -87,7 +87,7 @@ const SCENARIOS = {
 	// Activity-table cell popover: styling parity, copy values, tags multi-select, A→B, scroll-close.
 	async 'cell-popover'(page, h) {
 		const out = { columns: {} };
-		for (const col of ['item', 'category', 'views', 'likes', 'percentLiked', 'tags']) {
+		for (const col of ['item', 'category', 'views', 'likes', 'tags']) {
 			if ((await h.cell(col).count()) === 0) { out.columns[col] = 'no visible cell'; continue; }
 			await h.hoverCell(col);
 			const p = await h.popover();
