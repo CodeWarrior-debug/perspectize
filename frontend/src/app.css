@@ -1284,7 +1284,6 @@ select.select-inset {
 	.print-root td[data-col='duration'],
 	.print-root td[data-col='views'],
 	.print-root td[data-col='likes'],
-	.print-root td[data-col='percentLiked'],
 	.print-root td[data-col='boxOffice'],
 	.print-root td[data-col='vsBudget'],
 	.print-root td[data-col='tmdbScore'],

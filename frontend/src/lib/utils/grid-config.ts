@@ -4,7 +4,6 @@
  */
 import type { ContentItem, ContentType } from '#lib/queries/content/index.js';
 import {
-	percentLikedValueGetter,
 	formatTags,
 	contentTags,
 	movieResponse,
@@ -220,6 +219,9 @@ export interface ColumnMeta {
 	filterSet?: boolean;
 }
 
+/** Removed columns that saved links and column setups may still name; they are dropped on load. */
+export const RETIRED_COL_IDS: ReadonlySet<string> = new Set(['percentLiked']);
+
 /**
  * Every ContentLibrary column, in the same order they appear in the grid.
  * `perspectize` and `item` are `picker: 'none'` — perspectize has no data to
@@ -347,18 +349,6 @@ export const COLUMNS: readonly ColumnMeta[] = [
 		filterKey: 'likes',
 		filterValue: (row) => row.likeCount,
 		filterRange: 'number',
-	},
-	{
-		colId: 'percentLiked',
-		label: '% Liked',
-		picker: 'data',
-		sortable: true,
-		// Sorts server-side via ContentSortBy.PERCENT_LIKED in "All Items" mode and
-		// client-side here (percentLikedValueGetter, shared with the grid column
-		// itself) for "Loaded" mode and the mobile card list. No filter — a real
-		// filter would need a backend field (see PR notes).
-		sortValue: (row) => percentLikedValueGetter({ data: row }),
-		serverSort: 'PERCENT_LIKED',
 	},
 	// Released has no server sort key (PUBLISHED_AT reads the YouTube path), so it sorts client-side only.
 	{
@@ -679,7 +669,6 @@ export const NUMERIC_COL_IDS: ReadonlySet<string> = new Set([
 	'duration',
 	'views',
 	'likes',
-	'percentLiked',
 	'boxOffice',
 	'vsBudget',
 	'tmdbScore',
@@ -739,7 +728,7 @@ export function defaultColumnVisibility(
 		visible = ['item', 'type', 'perspectize'];
 		if (sm) visible.push('category', 'channel');
 		if (md) visible.push('duration', 'publishDate');
-		if (lg) visible.push('views', 'likes', 'percentLiked', 'tags');
+		if (lg) visible.push('views', 'likes', 'tags');
 	}
 	// Type is redundant once the filter names one type (any type), so it is hidden then.
 	if (solo !== null) visible = visible.filter((c) => c !== 'type');
@@ -751,7 +740,6 @@ export function defaultColumnVisibility(
 		'publishDate',
 		'views',
 		'likes',
-		'percentLiked',
 		// Picker-only: adding it to the lg set overflows the 1212px grid (movieColumns.test.ts).
 		'user',
 		'tags',

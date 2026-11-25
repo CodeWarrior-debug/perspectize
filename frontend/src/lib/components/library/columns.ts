@@ -18,8 +18,6 @@ import {
 	formatDurationSeconds,
 	dateValueFormatter,
 	formatCount,
-	percentLikedValueGetter,
-	formatPercentLiked,
 	formatPublishDate,
 	formatClaimDate,
 	formatRatingScore,
@@ -320,23 +318,6 @@ export function buildLibraryColumnDefs({
 				valueFormatter: (params) => formatCount(params.value),
 				context: { tooltipSpec: LIBRARY_TOOLTIP_SPECS.likes },
 				headerTooltip: 'Like count from YouTube API',
-			},
-			{
-				colId: 'percentLiked',
-				headerName: '% Liked',
-				flex: 0.8,
-				maxWidth: 130,
-
-				filter: false,
-				valueGetter: percentLikedValueGetter,
-				valueFormatter: (params) => formatPercentLiked(params.value),
-				context: { tooltipSpec: LIBRARY_TOOLTIP_SPECS.percentLiked },
-				comparator: (_valueA, _valueB, nodeA, nodeB) => {
-					const a = percentLikedValueGetter({ data: nodeA?.data }) ?? -1;
-					const b = percentLikedValueGetter({ data: nodeB?.data }) ?? -1;
-					return a - b;
-				},
-				headerTooltip: 'Likes as a percentage of views',
 			},
 			{
 				colId: 'released',

@@ -97,7 +97,7 @@ describe('readExportTable raw numbers in spreadsheet mode', () => {
 	const cols: [string, string | undefined][] = [
 		['item', 'Item'],
 		['views', 'Views'],
-		['percentLiked', '% Liked'],
+		['vsBudget', 'Vs. budget'],
 		['boxOffice', 'Box office'],
 		['duration', 'Length'],
 		['myQuality', 'My quality'],
@@ -107,7 +107,7 @@ describe('readExportTable raw numbers in spreadsheet mode', () => {
 	const nodes = [{ data: item({ id: 'a', name: 'A' }) }];
 	const formatted = {
 		'a:views': '1.2 M',
-		'a:percentLiked': '0.8%',
+		'a:vsBudget': '0.8%',
 		'a:boxOffice': '$1.2B',
 		'a:duration': '2:41',
 		'a:myQuality': '75',
@@ -116,7 +116,7 @@ describe('readExportTable raw numbers in spreadsheet mode', () => {
 	};
 	const raw = {
 		'a:views': 1234567,
-		'a:percentLiked': 0.8,
+		'a:vsBudget': 0.8,
 		'a:boxOffice': 1200000000,
 		'a:duration': '2:41',
 		'a:myQuality': 7500,

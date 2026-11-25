@@ -9,8 +9,6 @@ import {
 } from './bookFormatting';
 import {
 	formatCountExact,
-	percentLikedTooltip,
-	percentLikedValueGetter,
 	castTooltipItems,
 	castTooltipCopyValues,
 	boxOfficeTooltip,
@@ -53,10 +51,6 @@ export const LIBRARY_TOOLTIP_SPECS = {
 	likes: {
 		text: (c: CellCtx) => formatCountExact(c.data?.likeCount ?? null),
 		copyValue: (c: CellCtx) => c.data?.likeCount,
-	},
-	percentLiked: {
-		text: (c: CellCtx) => percentLikedTooltip({ data: c.data }),
-		copyValue: (c: CellCtx) => percentLikedValueGetter({ data: c.data }),
 	},
 	tags: { mode: 'multi', emptyText: 'No tags', items: (c: CellCtx) => contentTags(c.data) ?? [] },
 	cast: {
