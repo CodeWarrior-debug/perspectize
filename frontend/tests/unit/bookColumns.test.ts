@@ -87,7 +87,6 @@ describe('Book default column set', () => {
 			'publishDate',
 			'views',
 			'likes',
-			'percentLiked',
 			'description',
 			'editions',
 			'readers',
@@ -132,7 +131,6 @@ describe('the other views keep their exact default sets', () => {
 			'publishDate',
 			'views',
 			'likes',
-			'percentLiked',
 			'tags',
 		]);
 	});

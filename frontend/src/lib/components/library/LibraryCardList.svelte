@@ -44,7 +44,7 @@
 		lengthDisplay?: LengthDisplay | null;
 		// Beyond name/channel/duration, the mobile card shows category, views and
 		// likes — the three most-used of the grid's other columns; the remaining
-		// columns (% liked, publish date, tags, description) are grid/details-modal
+		// columns (publish date, tags, description) are grid/details-modal
 		// only on mobile.
 		primaryCategory?: { label: string } | null;
 		viewCount?: number | null;
