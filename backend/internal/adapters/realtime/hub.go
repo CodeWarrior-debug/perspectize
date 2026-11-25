@@ -312,7 +312,7 @@ func (h *Hub) Broadcast(threadID int, evt domain.ThreadEvent) {
 // out to subscribers of env.ThreadID.
 func (h *Hub) PublishEnvelope(ctx context.Context, env domain.EventEnvelope) {
 	switch env.Type {
-	case "MESSAGE_POSTED":
+	case domain.KindMessagePosted:
 		// Every instance receives every NOTIFY; drop the ones this process has
 		// no local consumer for before spending any query on them.
 		h.mu.RLock()
@@ -330,13 +330,13 @@ func (h *Hub) PublishEnvelope(ctx context.Context, env domain.EventEnvelope) {
 		}
 		h.Broadcast(env.ThreadID, domain.MessagePostedEvent{Message: *m})
 		h.fanOutInbox(ctx, env.ThreadID, m.Seq, m.CreatedAt)
-	case "MESSAGE_EDITED":
-		// Same early-drop guard as MESSAGE_POSTED. An edit changes no inbox
-		// summary, so there is no fanOutInbox call below.
+	case domain.KindMessageEdited:
+		// An edit changes no inbox summary and reaches only the thread's
+		// subscribers, so inbox-only processes skip the message load.
 		h.mu.RLock()
-		threadSubs, inboxSubs := len(h.subs[env.ThreadID]), len(h.inbox)
+		threadSubs := len(h.subs[env.ThreadID])
 		h.mu.RUnlock()
-		if threadSubs == 0 && inboxSubs == 0 {
+		if threadSubs == 0 {
 			return
 		}
 
@@ -347,7 +347,7 @@ func (h *Hub) PublishEnvelope(ctx context.Context, env domain.EventEnvelope) {
 			return
 		}
 		h.Broadcast(env.ThreadID, domain.MessageEditedEvent{Message: *m})
-	case "MESSAGE_DELETED":
+	case domain.KindMessageDeleted:
 		// A tombstone carries everything the client needs (thread, message, seq),
 		// so there is no message load and the guard only cares about thread subs.
 		h.mu.RLock()
@@ -361,19 +361,19 @@ func (h *Hub) PublishEnvelope(ctx context.Context, env domain.EventEnvelope) {
 			MessageID: env.MessageID,
 			Seq:       env.Seq,
 		})
-	case "READ_RECEIPT_CHANGED":
+	case domain.KindReadReceiptChanged:
 		h.Broadcast(env.ThreadID, domain.ReadReceiptChangedEvent{
 			ThreadID:    env.ThreadID,
 			UserID:      env.UserID,
 			LastReadSeq: env.LastReadSeq,
 		})
-	case "TYPING_CHANGED":
+	case domain.KindTypingChanged:
 		h.Broadcast(env.ThreadID, domain.TypingChangedEvent{
 			ThreadID: env.ThreadID,
 			UserID:   env.UserID,
 			Typing:   env.Typing,
 		})
-	case "PARTICIPANT_CHANGED":
+	case domain.KindParticipantChanged:
 		h.Broadcast(env.ThreadID, domain.ParticipantChangedEvent{
 			ThreadID: env.ThreadID,
 			UserID:   env.UserID,
@@ -385,16 +385,16 @@ func (h *Hub) PublishEnvelope(ctx context.Context, env domain.EventEnvelope) {
 			// stay readable after the close, so nothing already sent is lost.
 			h.DropSubscriber(env.ThreadID, env.UserID)
 		}
-	case "PRESENCE_CHANGED":
+	case domain.KindPresenceChanged:
 		h.Broadcast(env.ThreadID, domain.PresenceChangedEvent{
 			ThreadID: env.ThreadID,
 			UserID:   env.UserID,
-			State:    domain.PresenceState(env.State),
+			State:    env.State,
 		})
-	case "STREAM_RESET":
+	case domain.KindStreamReset:
 		h.Broadcast(env.ThreadID, domain.StreamResetEvent{ThreadID: env.ThreadID})
 	default:
-		slog.Warn("realtime hub: unknown envelope type", "type", env.Type, "thread_id", env.ThreadID)
+		slog.Warn("realtime hub: unknown envelope type", "type", env.Type.String(), "thread_id", env.ThreadID)
 	}
 }
 
@@ -411,6 +411,11 @@ func (h *Hub) PublishEphemeral(ctx context.Context, envs ...domain.EventEnvelope
 	if len(envs) == 0 {
 		return nil
 	}
+	for _, env := range envs {
+		if !env.Type.Known() {
+			return fmt.Errorf("publish unknown event kind %q", env.Type.String())
+		}
+	}
 	if h.notifier == nil {
 		for _, env := range envs {
 			h.PublishEnvelope(ctx, env)
@@ -421,7 +426,7 @@ func (h *Hub) PublishEphemeral(ctx context.Context, envs ...domain.EventEnvelope
 	for i, env := range envs {
 		payload, err := json.Marshal(env)
 		if err != nil {
-			return fmt.Errorf("marshal %s envelope: %w", env.Type, err)
+			return fmt.Errorf("marshal %s envelope: %w", env.Type.String(), err)
 		}
 		payloads[i] = string(payload)
 	}

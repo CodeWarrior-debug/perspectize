@@ -17,8 +17,8 @@ func BenchmarkHub_PublishEphemeral(b *testing.B) {
 	h := NewHub(nil, nil, discardNotifier{})
 	ctx := context.Background()
 	envs := []domain.EventEnvelope{
-		{Type: "TYPING", ThreadID: 42, UserID: 7, Typing: true},
-		{Type: "READ", ThreadID: 42, UserID: 7, LastReadSeq: 1234},
+		{Type: domain.KindTypingChanged, ThreadID: 42, UserID: 7, Typing: true},
+		{Type: domain.KindReadReceiptChanged, ThreadID: 42, UserID: 7, LastReadSeq: 1234},
 	}
 	b.ReportAllocs()
 	for b.Loop() {

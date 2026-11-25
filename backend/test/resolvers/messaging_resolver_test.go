@@ -590,7 +590,7 @@ func TestInboxEventsSubscription_DeliversAndClosesOnCancel(t *testing.T) {
 	require.NoError(t, err)
 
 	hub.PublishEnvelope(context.Background(), domain.EventEnvelope{
-		Type: "MESSAGE_POSTED", ThreadID: 3, Seq: 9, MessageID: 90,
+		Type: domain.KindMessagePosted, ThreadID: 3, Seq: 9, MessageID: 90,
 	})
 
 	select {
