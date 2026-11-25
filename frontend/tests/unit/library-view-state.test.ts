@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { createLibraryViewState } from '#lib/components/library/libraryViewState.svelte.js';
+import { libraryListRequest } from '#lib/queries/content/libraryList.js';
 import { parseGridParams } from '#lib/utils/gridUrlState.js';
 import { CLIENT_ONLY_SORT_COLS } from '#lib/utils/grid-config.js';
 import type { ContentItem } from '#lib/queries/content/index.js';
@@ -86,7 +87,7 @@ describe('sorts', () => {
 		expect(view.activeSorts).toEqual([{ col: 'views', dir: 'asc' }]);
 	});
 
-	it('sortsFromGrid in All with the server sorts changes nothing (replaces the skip-next-event flag)', () => {
+	it('sortsFromGrid in All with the server sorts changes nothing', () => {
 		const { view, resetCursors, navigations } = setup('mode=all');
 		view.sortsFromGrid(view.serverSorts);
 		expect(navigations).toHaveLength(0);
@@ -238,6 +239,37 @@ describe('card list rows', () => {
 	it('in All mode returns the server rows untouched', () => {
 		const { view } = setup('mode=all&f.views=100..');
 		expect(view.cardRows(rows)).toBe(rows);
+	});
+});
+
+describe('list request variables', () => {
+	const request = (view: { params: Parameters<typeof libraryListRequest>[0] }) =>
+		libraryListRequest(view.params, null).variables;
+
+	it('Loaded fetches 50 rows, All fetches the page size', () => {
+		const { view } = setup('f.type=youtube_video');
+		expect(request(view).first).toBe(50);
+		view.setMode('all');
+		expect(request(view).first).toBe(10);
+	});
+
+	it('Loaded sends only the Type filter and search; All also sends the column filters', () => {
+		const { view } = setup('f.type=youtube_video&f.views=100..');
+		expect(request(view).filter).not.toHaveProperty('minViewCount');
+		view.setMode('all');
+		expect(request(view).filter).toMatchObject({ minViewCount: 100 });
+	});
+
+	it('a person filter in All reaches the server as personId', () => {
+		const { view } = setup('mode=all');
+		view.filterByPerson('603');
+		expect(request(view).filter).toMatchObject({ personId: '603' });
+	});
+
+	it('a sort in All reaches the server as a single sort entry', () => {
+		const { view } = setup('mode=all');
+		view.setSorts([{ col: 'views', dir: 'desc' }]);
+		expect(request(view).sorts).toHaveLength(1);
 	});
 });
 
