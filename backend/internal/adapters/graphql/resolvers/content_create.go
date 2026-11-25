@@ -4,8 +4,6 @@ import (
 	"errors"
 	"log/slog"
 
-	"github.com/vektah/gqlparser/v2/gqlerror"
-
 	"github.com/CodeWarrior-debug/perspectize/backend/internal/adapters/graphql/model"
 	"github.com/CodeWarrior-debug/perspectize/backend/internal/core/domain"
 )
@@ -67,10 +65,7 @@ func createError(err error, f createFailure) error {
 			slog.Error(f.logMsg, "error", err)
 		}
 	}
-	if kind == domain.KindNone {
-		return errors.New(msg)
-	}
-	return &gqlerror.Error{Message: msg, Extensions: map[string]any{"code": string(kind)}}
+	return kindedError(msg, kind)
 }
 
 var (

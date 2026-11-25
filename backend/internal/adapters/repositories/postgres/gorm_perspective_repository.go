@@ -30,7 +30,7 @@ const perspectivesUserContentPrivacyUnique = "uq_perspectives_user_content_priva
 // perspectivesUserContentPrivacyUnique. The SQL detail stays out of the message.
 func perspectiveDuplicateError(privacy domain.Privacy) error {
 	return fmt.Errorf("%w: you already have a %s perspective on this content",
-		domain.ErrAlreadyExists, strings.ToLower(string(privacy)))
+		domain.ErrDuplicatePerspective, strings.ToLower(string(privacy)))
 }
 
 // GormPerspectiveRepository implements the PerspectiveRepository interface using GORM
@@ -446,4 +446,28 @@ func (r *GormPerspectiveRepository) ReassignByUser(ctx context.Context, fromUser
 		Model(&PerspectiveModel{}).
 		Where("user_id = ?", fromUserID).
 		Update("user_id", toUserID).Error
+}
+
+// VisibleIDs returns the subset of ids viewerID may read, in one query (see
+// repositories.LinkedPerspectiveReader). The predicate is the list's read rule:
+// a public row or the viewer's own, and, when the row is attached to content,
+// that content public or owned by the viewer. The content check is written so
+// a row with no content still passes, which List's EXISTS join would not.
+func (r *GormPerspectiveRepository) VisibleIDs(ctx context.Context, ids []int, viewerID int) ([]int, error) {
+	if len(ids) == 0 {
+		return nil, nil
+	}
+	visible, args := visiblePerspectivePredicate(&viewerID)
+	var out []int
+	err := r.db.WithContext(ctx).
+		Table("perspectives").
+		Where("id = ANY(CAST(? AS bigint[]))", intsToArray(ids)).
+		Where(visible, args...).
+		Where("(content_id IS NULL OR EXISTS (SELECT 1 FROM content c WHERE c.id = perspectives.content_id AND (c.privacy = ? OR c.added_by_user_id = ?)))",
+			privacyToDBValue(domain.PrivacyPublic), viewerID).
+		Pluck("id", &out).Error
+	if err != nil {
+		return nil, fmt.Errorf("failed to check linked perspectives: %w", err)
+	}
+	return out, nil
 }

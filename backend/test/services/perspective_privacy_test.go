@@ -150,7 +150,9 @@ func TestPerspectiveUpdate_ContentPrivacy(t *testing.T) {
 	// The perspective belongs to the actor in every case, so only the content
 	// being attached varies.
 	ownPerspective := func(actor int) *domain.Perspective {
-		return &domain.Perspective{ID: 5, UserID: actor, Privacy: domain.PrivacyPublic}
+		// A stored perspective always has content; the update's non-empty rule
+		// is checked against the row, so the fixture carries a description.
+		return &domain.Perspective{ID: 5, UserID: actor, Privacy: domain.PrivacyPublic, Description: pvStr("existing view")}
 	}
 
 	tests := []struct {
@@ -249,7 +251,7 @@ func TestPerspectiveUpdate_UnchangedContentIDSkipsLookup(t *testing.T) {
 	lookups := 0
 	repo := &mockPerspectiveRepository{
 		getByIDFn: func(ctx context.Context, id int) (*domain.Perspective, error) {
-			return &domain.Perspective{ID: 5, UserID: privacyOtherID, ContentID: pvInt(privacyClaimID)}, nil
+			return &domain.Perspective{ID: 5, UserID: privacyOtherID, ContentID: pvInt(privacyClaimID), Description: pvStr("existing view")}, nil
 		},
 	}
 	svc := services.NewPerspectiveService(repo, &mockUserRepoForPerspective{},
