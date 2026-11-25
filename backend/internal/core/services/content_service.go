@@ -213,18 +213,22 @@ func (s *ContentService) UpdateSourceData(ctx context.Context, contentID, viewer
 		return nil, fmt.Errorf("%w: content has no source URL to refresh", domain.ErrInvalidInput)
 	}
 
-	switch existing.ContentType {
-	case domain.ContentTypeBook:
-		return s.refreshBook(ctx, existing)
-	case domain.ContentTypeMovie:
-		return s.refreshMovie(ctx, existing)
-	case "", domain.ContentTypeYouTubeVideo:
-		// YouTube rows (and rows loaded without a type, as in older tests) take the path below.
-	default:
-		// Other types have no refresh source yet.
+	// Rows loaded without a type (as in older tests) are YouTube rows.
+	typ := existing.ContentType
+	if typ == "" {
+		typ = domain.ContentTypeYouTubeVideo
+	}
+	refresh, ok := refreshers[typ]
+	if !ok {
 		return nil, fmt.Errorf("%w: content type %s cannot be refreshed", domain.ErrInvalidInput, existing.ContentType)
 	}
+	return refresh(s, ctx, existing)
+}
 
+// refreshYouTube re-reads a YouTube row's metadata from the YouTube API and
+// updates the stored row in place.
+func (s *ContentService) refreshYouTube(ctx context.Context, existing *domain.Content) (*domain.Content, error) {
+	contentID := existing.ID
 	videoID, err := s.youtubeClient.ExtractVideoID(*existing.URL)
 	if err != nil {
 		return nil, fmt.Errorf("%w: %v", domain.ErrInvalidURL, err)

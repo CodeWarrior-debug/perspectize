@@ -117,3 +117,19 @@ func TestPipelineDuplicateReturnsExistingRowWithAlreadyExists(t *testing.T) {
 		})
 	}
 }
+
+// A saved type with no refresh source is refused as invalid input, and the
+// refusal names the type.
+func TestUpdateSourceDataRefusesTypeWithoutRefresher(t *testing.T) {
+	url := "https://example.com/"
+	repo := &mockContentRepository{
+		getByIDFn: func(ctx context.Context, id int) (*domain.Content, error) {
+			return &domain.Content{ID: id, ContentType: domain.ContentTypeWebsite, URL: &url}, nil
+		},
+	}
+	svc := services.NewContentService(repo, nil, nil)
+	_, err := svc.UpdateSourceData(context.Background(), 5, 0)
+	require.Error(t, err)
+	assert.Equal(t, domain.KindInvalid, domain.KindOf(err))
+	assert.Contains(t, err.Error(), "content type WEBSITE cannot be refreshed")
+}

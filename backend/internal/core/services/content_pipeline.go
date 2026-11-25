@@ -77,3 +77,23 @@ func (s *ContentService) existingByURL(ctx context.Context, canonical string) (*
 	}
 	return nil, nil
 }
+
+// refreshers maps a content type to its refresh-from-source function. A type
+// absent from the map has no source to refresh from.
+var refreshers = map[domain.ContentType]func(s *ContentService, ctx context.Context, existing *domain.Content) (*domain.Content, error){
+	domain.ContentTypeYouTubeVideo: (*ContentService).refreshYouTube,
+	domain.ContentTypeBook:         (*ContentService).refreshBook,
+	domain.ContentTypeMovie:        (*ContentService).refreshMovie,
+}
+
+// importCreators maps an importable content type to its create call. Webpage
+// is not listed: a webpage import carries prefetched facts and goes through
+// importWebPage.
+var importCreators = map[domain.ContentType]func(ctx context.Context, c importContentCreator, url string, userID int) (*domain.Content, error){
+	domain.ContentTypeYouTubeVideo: func(ctx context.Context, c importContentCreator, url string, userID int) (*domain.Content, error) {
+		return c.CreateFromYouTube(ctx, url, userID)
+	},
+	domain.ContentTypeMovie: func(ctx context.Context, c importContentCreator, url string, userID int) (*domain.Content, error) {
+		return c.CreateFromMovie(ctx, url, userID)
+	},
+}
