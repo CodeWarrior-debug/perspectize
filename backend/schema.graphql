@@ -934,17 +934,23 @@ type Mutation {
   updateContentSourceData(contentId: IntID!): Content! @auth
 
   # Movie mutations
-  createContentFromMovie(input: CreateContentFromMovieInput!): Content! @auth
+  # Returns the row without saying whether it already existed. Use createContentResultFromMovie.
+  createContentFromMovie(input: CreateContentFromMovieInput!): Content! @auth @deprecated(reason: "Use createContentResultFromMovie, which reports alreadyExisted.")
+  createContentResultFromMovie(input: CreateContentFromMovieInput!): CreateContentResult! @auth
 
   # Book mutations
-  createContentFromBook(input: CreateContentFromBookInput!): Content! @auth
+  # Returns the row without saying whether it already existed. Use createContentResultFromBook.
+  createContentFromBook(input: CreateContentFromBookInput!): Content! @auth @deprecated(reason: "Use createContentResultFromBook, which reports alreadyExisted.")
+  createContentResultFromBook(input: CreateContentFromBookInput!): CreateContentResult! @auth
 
   # Webpage mutations
   createContentFromWebPage(input: CreateContentFromWebPageInput!): CreateContentResult! @auth
   createContentFromWebsite(input: CreateContentFromWebsiteInput!): CreateContentResult! @auth
 
   # Bible passage mutations
-  createContentFromPassage(input: CreateContentFromPassageInput!): Content! @auth
+  # Returns the row without saying whether it already existed. Use createContentResultFromPassage.
+  createContentFromPassage(input: CreateContentFromPassageInput!): Content! @auth @deprecated(reason: "Use createContentResultFromPassage, which reports alreadyExisted.")
+  createContentResultFromPassage(input: CreateContentFromPassageInput!): CreateContentResult! @auth
   # First-write-wins: if a title already exists, returns the content with the existing title.
   setPassageDisplayTitle(input: SetPassageDisplayTitleInput!): Content! @auth
   # Admin only: resets the title so it can be set again.

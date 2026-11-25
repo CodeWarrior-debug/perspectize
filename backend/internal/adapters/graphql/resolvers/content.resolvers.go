@@ -261,29 +261,7 @@ func (r *mutationResolver) CreateContentFromYouTube(ctx context.Context, input m
 	userID := authUser.ID
 
 	content, err := r.ContentService.CreateFromYouTube(ctx, input.URL, userID)
-
-	// Handle idempotent duplicate: service returns (content, ErrAlreadyExists)
-	if errors.Is(err, domain.ErrAlreadyExists) && content != nil {
-		return &model.CreateContentResult{
-			Content:        domainToModel(content),
-			AlreadyExisted: true,
-		}, nil
-	}
-
-	if err != nil {
-		if errors.Is(err, domain.ErrInvalidURL) {
-			return nil, fmt.Errorf("invalid YouTube URL")
-		}
-
-		// Generic error for any other failure (including YouTube API errors)
-		// Details are already logged server-side by service layer
-		return nil, fmt.Errorf("failed to create content from YouTube")
-	}
-
-	return &model.CreateContentResult{
-		Content:        domainToModel(content),
-		AlreadyExisted: false,
-	}, nil
+	return createResult(content, err, youtubeCreateFailure)
 }
 
 // CreateContentFromWebPage is the resolver for the createContentFromWebPage field.
@@ -295,19 +273,7 @@ func (r *mutationResolver) CreateContentFromWebPage(ctx context.Context, input m
 	}
 
 	content, err := r.ContentService.CreateFromWebPage(ctx, portservices.CreateWebPageInput{URL: input.URL, Roles: input.WebPageRoles, ParentContentID: input.ParentContentID}, authUser.ID)
-	if errors.Is(err, domain.ErrAlreadyExists) && content != nil {
-		return &model.CreateContentResult{Content: domainToModel(content), AlreadyExisted: true}, nil
-	}
-	if err != nil {
-		if msg := webPageInputMessage(err); msg != "" {
-			// The message never says why (an SSRF refusal names no address).
-			return nil, errors.New(msg)
-		}
-		// Details are already logged server-side by the service layer.
-		slog.Error("creating webpage content failed", "userID", authUser.ID, "error", err)
-		return nil, fmt.Errorf("failed to save webpage")
-	}
-	return &model.CreateContentResult{Content: domainToModel(content), AlreadyExisted: false}, nil
+	return createResult(content, err, webPageCreateFailure)
 }
 
 // CreateContentFromWebsite is the resolver for the createContentFromWebsite field.
@@ -319,17 +285,7 @@ func (r *mutationResolver) CreateContentFromWebsite(ctx context.Context, input m
 	}
 
 	content, err := r.ContentService.CreateFromWebsite(ctx, input.URL, authUser.ID)
-	if errors.Is(err, domain.ErrAlreadyExists) && content != nil {
-		return &model.CreateContentResult{Content: domainToModel(content), AlreadyExisted: true}, nil
-	}
-	if err != nil {
-		if msg := webPageInputMessage(err); msg != "" {
-			return nil, errors.New(msg)
-		}
-		slog.Error("creating website content failed", "userID", authUser.ID, "error", err)
-		return nil, fmt.Errorf("failed to save website")
-	}
-	return &model.CreateContentResult{Content: domainToModel(content), AlreadyExisted: false}, nil
+	return createResult(content, err, websiteCreateFailure)
 }
 
 // ParentContent is the resolver for the parentContent field. The parent comes from
@@ -366,38 +322,38 @@ func (r *queryResolver) PreviewWebPage(ctx context.Context, url string) (*model.
 }
 
 // CreateContentFromMovie is the resolver for the createContentFromMovie field.
+// Deprecated: it returns the row without alreadyExisted; see CreateContentResultFromMovie.
 func (r *mutationResolver) CreateContentFromMovie(ctx context.Context, input model.CreateContentFromMovieInput) (*model.Content, error) {
+	result, err := r.CreateContentResultFromMovie(ctx, input)
+	if err != nil {
+		return nil, err
+	}
+	return result.Content, nil
+}
+
+// CreateContentResultFromMovie is the resolver for the createContentResultFromMovie field.
+func (r *mutationResolver) CreateContentResultFromMovie(ctx context.Context, input model.CreateContentFromMovieInput) (*model.CreateContentResult, error) {
 	// Identity comes from the session only; the input carries just the URL.
 	authUser, err := auth.RequireAuth(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("access denied: authentication required")
 	}
-
 	content, err := r.ContentService.CreateFromMovie(ctx, input.URL, authUser.ID)
-	// Idempotent duplicate: return the existing row.
-	if errors.Is(err, domain.ErrAlreadyExists) && content != nil {
-		return domainToModel(content), nil
-	}
-	if err != nil {
-		switch {
-		case errors.Is(err, domain.ErrInvalidInput):
-			return nil, fmt.Errorf("invalid movie URL: use a TMDB or IMDb movie link")
-		case errors.Is(err, domain.ErrNotFound):
-			return nil, fmt.Errorf("movie not found")
-		case errors.Is(err, domain.ErrContentNotAllowed):
-			return nil, &gqlerror.Error{
-				Message:    domain.ErrContentNotAllowed.Error(),
-				Extensions: map[string]any{"code": "CONTENT_NOT_ALLOWED"},
-			}
-		}
-		// Details are already logged server-side by the service layer.
-		return nil, fmt.Errorf("failed to create content from movie")
-	}
-	return domainToModel(content), nil
+	return createResult(content, err, movieCreateFailure)
 }
 
 // CreateContentFromPassage is the resolver for the createContentFromPassage field.
+// Deprecated: it returns the row without alreadyExisted; see CreateContentResultFromPassage.
 func (r *mutationResolver) CreateContentFromPassage(ctx context.Context, input model.CreateContentFromPassageInput) (*model.Content, error) {
+	result, err := r.CreateContentResultFromPassage(ctx, input)
+	if err != nil {
+		return nil, err
+	}
+	return result.Content, nil
+}
+
+// CreateContentResultFromPassage is the resolver for the createContentResultFromPassage field.
+func (r *mutationResolver) CreateContentResultFromPassage(ctx context.Context, input model.CreateContentFromPassageInput) (*model.CreateContentResult, error) {
 	// Identity comes from the session; a client-supplied userID only has to match it.
 	authUser, err := auth.RequireAuth(ctx)
 	if err != nil {
@@ -415,18 +371,7 @@ func (r *mutationResolver) CreateContentFromPassage(ctx context.Context, input m
 		EndVerse:     input.EndVerse,
 		UserID:       authUser.ID,
 	})
-	// Idempotent duplicate: the passage row already exists — same as a fresh create for the caller.
-	if errors.Is(err, domain.ErrAlreadyExists) && content != nil {
-		return domainToModel(content), nil
-	}
-	if err != nil {
-		if errors.Is(err, domain.ErrInvalidInput) {
-			return nil, fmt.Errorf("%w", err)
-		}
-		slog.Error("failed to create passage content", "userID", authUser.ID, "error", err)
-		return nil, fmt.Errorf("failed to create passage")
-	}
-	return domainToModel(content), nil
+	return createResult(content, err, passageCreateFailure)
 }
 
 // SetPassageDisplayTitle is the resolver for the setPassageDisplayTitle field.
@@ -918,7 +863,17 @@ func (r *queryResolver) MovieTrending(ctx context.Context, window *domain.Trendi
 // CreateContentFromBook is the resolver for the createContentFromBook field.
 // Mirrors CreateContentFromMovie's structure: identity comes from the session
 // only, and an idempotent duplicate returns the existing row rather than an error.
+// Deprecated: it returns the row without alreadyExisted; see CreateContentResultFromBook.
 func (r *mutationResolver) CreateContentFromBook(ctx context.Context, input model.CreateContentFromBookInput) (*model.Content, error) {
+	result, err := r.CreateContentResultFromBook(ctx, input)
+	if err != nil {
+		return nil, err
+	}
+	return result.Content, nil
+}
+
+// CreateContentResultFromBook is the resolver for the createContentResultFromBook field.
+func (r *mutationResolver) CreateContentResultFromBook(ctx context.Context, input model.CreateContentFromBookInput) (*model.CreateContentResult, error) {
 	authUser, err := auth.RequireAuth(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("access denied: authentication required")
@@ -932,21 +887,7 @@ func (r *mutationResolver) CreateContentFromBook(ctx context.Context, input mode
 	rawURLOrISBN := normalizeHyphenatedISBN(input.URL)
 
 	content, err := r.ContentService.CreateFromBook(ctx, rawURLOrISBN, authUser.ID)
-	// Idempotent duplicate: return the existing row.
-	if errors.Is(err, domain.ErrAlreadyExists) && content != nil {
-		return domainToModel(content), nil
-	}
-	if err != nil {
-		switch {
-		case errors.Is(err, domain.ErrInvalidInput):
-			return nil, fmt.Errorf("invalid book URL or ISBN: use an Open Library work link or an ISBN-10/13")
-		case errors.Is(err, domain.ErrNotFound):
-			return nil, fmt.Errorf("book not found")
-		}
-		// Details are already logged server-side by the service layer.
-		return nil, fmt.Errorf("failed to create content from book")
-	}
-	return domainToModel(content), nil
+	return createResult(content, err, bookCreateFailure)
 }
 
 // BookSearch is the resolver for the bookSearch field. It is public (no @auth)
