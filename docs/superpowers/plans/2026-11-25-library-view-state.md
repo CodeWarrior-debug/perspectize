@@ -247,7 +247,7 @@ git -C /Users/jamesjordan/GitHub/perspectize/.claude/worktrees/1 commit -m "feat
 
 **Files:**
 - Modify: `frontend/src/lib/components/library/ContentLibrary.svelte`
-- Modify: `frontend/tests/components/ContentLibrary.test.ts` (delete the two `expect(true)` placeholders and the source-text test; behaviour tests stay)
+- Modify: `frontend/tests/components/ContentLibrary.test.ts` (delete the two `expect(true)` placeholders; the two source-text tests stay, see Step 3)
 
 **Interfaces:**
 - Consumes: `createLibraryViewState`, `LibraryViewState` from Task 2.
@@ -274,7 +274,7 @@ Expected: 36 passed (baseline).
     const list = useLibraryList(() => view.params);
     ```
   - Delete `gridParams`, `mode`, `sorts`, `pageNum`, `pageSize`, `searchText`, `filters`, `personFilter`, `clientSorts`, `activeFilterModel`, `hasActiveSort`, `activeSorts`, `chipFilterModel` (keep the chip label derivation), `sortedRowData` (use `view.cardRows`), `updateUrl`, all `handle*` URL writers (W1-W14) and `skipNextSortEvent`. Each handler becomes a one-line call to the module plus, where a grid exists, the grid call (W3, W5).
-  - Keep `debounceTimer`. Remove it, since the module owns the debounce. Add `onDestroy(() => view.dispose())`.
+  - Remove `debounceTimer` and `skipNextSortEvent` (the module owns the debounce and the equality check). Add `view.dispose()` to the existing `onDestroy`.
   - Grid sort sync effect reads `view.serverSorts`. Filter restore effect reads `view.filters`.
   - `onFilterChanged`: `view.gridFilterChanged(event.api.getFilterModel())` plus `displayedRowCount` and `hover.close()`.
   - Chips: `onRemove` → `view.removeFilter(colId)`; `onClearAll` → `view.clearFilters()`; `onClearAllButType` → `view.clearFiltersKeepType()`.
