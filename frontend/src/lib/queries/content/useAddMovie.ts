@@ -1,5 +1,6 @@
 import { createMutation, useQueryClient } from '@tanstack/svelte-query';
 import { toast } from 'svelte-sonner';
+import { silentToast } from '#lib/utils/toast.js';
 import { goto } from '$app/navigation';
 import { graphqlRequest } from '../client';
 import { CREATE_CONTENT_FROM_MOVIE, type CreateContentFromMovieResponse } from './index';
@@ -7,8 +8,14 @@ import { queryKeys } from '../keys';
 import { libraryContentHref } from '#lib/utils/contentLinks.js';
 import { contentNotAllowedMessage } from '#lib/utils/movie.js';
 
-export function useAddMovie() {
+export interface UseAddMovieOptions {
+	/** Skip the toasts (and the navigation actions on them); the caller shows its own feedback. */
+	quiet?: boolean;
+}
+
+export function useAddMovie(options: UseAddMovieOptions = {}) {
 	const queryClient = useQueryClient();
+	const notify = options.quiet ? silentToast : toast;
 
 	return createMutation(() => ({
 		// Always the authenticated wrapper; the server derives the user from the session.
@@ -19,7 +26,7 @@ export function useAddMovie() {
 			// The server doesn't say whether the row already existed (find-or-create),
 			// so both cases get a way to jump to it.
 			const id = movie?.id;
-			toast.success(`Added: ${movie?.name ?? 'movie'}`, {
+			notify.success(`Added: ${movie?.name ?? 'movie'}`, {
 				action: id ? { label: 'Go to movie', onClick: () => goto(libraryContentHref(id)) } : undefined,
 			});
 			// New or pre-existing rows both come back as Content, so refetch lists
@@ -31,15 +38,15 @@ export function useAddMovie() {
 			const notAllowed = contentNotAllowedMessage(err);
 			const message = err.message.toLowerCase();
 			if (notAllowed) {
-				toast.error(notAllowed);
+				notify.error(notAllowed);
 			} else if (message.includes('load failed') || message.includes('failed to fetch')) {
-				toast.error('Cannot reach the server. Check your connection and try again.');
+				notify.error('Cannot reach the server. Check your connection and try again.');
 			} else if (message.includes('invalid movie url') || message.includes('movie not found')) {
-				toast.error('Invalid movie link or movie not found');
+				notify.error('Invalid movie link or movie not found');
 			} else if (message.includes('access denied') || message.includes('authentication required')) {
-				toast.error('Please sign in to add a movie');
+				notify.error('Please sign in to add a movie');
 			} else {
-				toast.error('Failed to add movie. Please try again.');
+				notify.error('Failed to add movie. Please try again.');
 			}
 		},
 	}));
