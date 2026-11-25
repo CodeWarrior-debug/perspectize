@@ -438,13 +438,8 @@ func (r *GormContentRepository) List(ctx context.Context, params domain.ContentL
 		if params.Filter.MaxLikeCount != nil {
 			query = query.Where(statCountExpr("likeCount")+" <= ?", *params.Filter.MaxLikeCount)
 		}
-		// Published date filters (JSONB extraction, ISO 8601 string comparison)
-		if params.Filter.PublishedAfter != nil {
-			query = query.Where("response->'items'->0->'snippet'->>'publishedAt' >= ?", *params.Filter.PublishedAfter)
-		}
-		if params.Filter.PublishedBefore != nil {
-			query = query.Where("response->'items'->0->'snippet'->>'publishedAt' <= ?", *params.Filter.PublishedBefore)
-		}
+		// Published date and web page facts (see applyFactFilters)
+		query = applyFactFilters(query, params.Filter)
 		// Channel title filter (JSONB extraction + ILIKE)
 		if params.Filter.ChannelTitle != nil && *params.Filter.ChannelTitle != "" {
 			query = query.Where("response->'items'->0->'snippet'->>'channelTitle' ILIKE ?", "%"+*params.Filter.ChannelTitle+"%")

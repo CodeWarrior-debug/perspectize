@@ -295,13 +295,10 @@ func TestContentByID_NoStatisticsInResponse(t *testing.T) {
 	err := json.Unmarshal(result.Data, &data)
 	require.NoError(t, err)
 
-	// Empty stat strings default to 0
-	require.NotNil(t, data.ContentByID.ViewCount)
-	assert.Equal(t, 0, *data.ContentByID.ViewCount)
-	require.NotNil(t, data.ContentByID.LikeCount)
-	assert.Equal(t, 0, *data.ContentByID.LikeCount)
-	require.NotNil(t, data.ContentByID.CommentCount)
-	assert.Equal(t, 0, *data.ContentByID.CommentCount)
+	// A statistic the source did not report is missing (null), not zero.
+	assert.Nil(t, data.ContentByID.ViewCount)
+	assert.Nil(t, data.ContentByID.LikeCount)
+	assert.Nil(t, data.ContentByID.CommentCount)
 }
 
 func TestContentByID_EmptyStatisticStrings(t *testing.T) {
@@ -350,13 +347,10 @@ func TestContentByID_EmptyStatisticStrings(t *testing.T) {
 	err := json.Unmarshal(result.Data, &data)
 	require.NoError(t, err)
 
-	// Empty strings should default to 0, not cause parse errors
-	require.NotNil(t, data.ContentByID.ViewCount)
-	assert.Equal(t, 0, *data.ContentByID.ViewCount)
-	require.NotNil(t, data.ContentByID.LikeCount)
-	assert.Equal(t, 0, *data.ContentByID.LikeCount)
-	require.NotNil(t, data.ContentByID.CommentCount)
-	assert.Equal(t, 0, *data.ContentByID.CommentCount)
+	// Empty strings are missing counts (null), and must not cause parse errors.
+	assert.Nil(t, data.ContentByID.ViewCount)
+	assert.Nil(t, data.ContentByID.LikeCount)
+	assert.Nil(t, data.ContentByID.CommentCount)
 }
 
 func TestContentByID_EmptyItemsArray(t *testing.T) {

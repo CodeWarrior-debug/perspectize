@@ -913,14 +913,11 @@ func (s *ImportService) importOne(ctx context.Context, actorID int, it *domain.I
 		content *domain.Content
 		err     error
 	)
-	switch it.DestinationType {
-	case domain.ContentTypeYouTubeVideo:
-		content, err = s.content.CreateFromYouTube(createCtx, it.CanonicalURL, actorID)
-	case domain.ContentTypeMovie:
-		content, err = s.content.CreateFromMovie(createCtx, it.CanonicalURL, actorID)
-	case domain.ContentTypeWebPage:
+	if create, ok := importCreators[it.DestinationType]; ok {
+		content, err = create(createCtx, s.content, it.CanonicalURL, actorID)
+	} else if it.DestinationType == domain.ContentTypeWebPage {
 		content, err = s.importWebPage(createCtx, actorID, it, sites)
-	default:
+	} else {
 		err = fmt.Errorf("%w: cannot import %s", domain.ErrInvalidInput, it.DestinationType)
 	}
 

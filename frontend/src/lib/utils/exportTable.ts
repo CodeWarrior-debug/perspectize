@@ -79,7 +79,7 @@ export function exportCellText(row: ContentItem, colId: string, gridValue: unkno
 /**
  * A spreadsheet cell's plain number (no grouping, units or abbreviation), or null when the cell keeps
  * its formatted text: a non-number, a non-finite number, or a column in SPREADSHEET_FORMATTED_COLIDS.
- * % Liked, vs budget and the money columns hold the number their header names (percent, whole
+ * Vs budget and the money columns hold the number their header names (percent, whole
  * dollars), so they pass through unscaled.
  */
 export function spreadsheetNumberText(colId: string, rawValue: unknown): string | null {
