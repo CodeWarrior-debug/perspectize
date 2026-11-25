@@ -1,4 +1,4 @@
-import { isMovieOnlyTypeFilter } from '#lib/utils/grid-config';
+import { CHART_ELIGIBLE_COLS } from './libraryColumns/index';
 
 export const CHART_TYPES = [
 	'histogram',
@@ -28,18 +28,6 @@ export const CHART_TYPE_LABELS: Record<ChartType, string> = {
 	coverage: 'Coverage',
 };
 
-/** Numeric columns that can show a chart (colIds from grid-config.ts COLUMNS). */
-export const CHART_ELIGIBLE_COLS: ReadonlySet<string> = new Set([
-	'views',
-	'likes',
-	'duration',
-	'boxOffice',
-	'vsBudget',
-	'tmdbScore',
-	'budget',
-	'votes',
-]);
-
 /** Default chart per eligible column. Developers change individual entries here. */
 export const DEFAULT_CHART_TYPE: Record<string, ChartType> = Object.fromEntries(
 	[...CHART_ELIGIBLE_COLS].map((id) => [id, 'histogram' as ChartType]),
@@ -47,8 +35,4 @@ export const DEFAULT_CHART_TYPE: Record<string, ChartType> = Object.fromEntries(
 
 export function defaultChartType(colId: string): ChartType {
 	return DEFAULT_CHART_TYPE[colId] ?? 'histogram';
-}
-
-export function isChartEligible(colId: string, typeFilter: string | undefined): boolean {
-	return CHART_ELIGIBLE_COLS.has(colId) && isMovieOnlyTypeFilter(typeFilter);
 }

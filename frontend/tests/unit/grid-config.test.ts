@@ -1,27 +1,28 @@
+import { LIBRARY_COLUMNS } from '#lib/utils/libraryColumns/index.js';
 import { describe, it, expect, vi } from 'vitest';
 import {
 	syncItemHeader,
 	capitalizeContentType,
 	durationComparator,
-	DATA_COLUMNS,
-	INTERNAL_COLUMNS,
-	togglableColIds,
-	SORTABLE_COLUMNS,
-	compareContentBySorts,
-	filterContentRows,
-	CLIENT_ONLY_SORT_COLS,
-	COL_TO_SORT,
-	sortableColumnsFor,
 	releasedComparator,
 	labelComparator,
 	itemColumnHeader,
 	soloTypeFilter,
-	defaultColumnVisibility,
-	COLUMNS,
-	NUMERIC_COL_IDS,
 	CONTENT_TYPE_OPTIONS,
 	liveGridApi,
 } from '#lib/utils/grid-config.js';
+import {
+	DATA_COLUMNS,
+	INTERNAL_COLUMNS,
+	togglableColIds,
+	SORTABLE_COLUMNS,
+	CLIENT_ONLY_SORT_COLS,
+	COL_TO_SORT,
+	sortableColumnsFor,
+	defaultColumnVisibility,
+	NUMERIC_COL_IDS,
+} from '#lib/utils/libraryColumns/index.js';
+import { compareContentBySorts, filterContentRows } from '#lib/utils/libraryColumns/clientRows.js';
 import type { ContentItem } from '#lib/queries/content/index.js';
 
 describe('CONTENT_TYPE_OPTIONS (Book)', () => {
@@ -544,7 +545,8 @@ describe('Category column (client-only sort)', () => {
 	});
 
 	it('the value extractor yields the lowercased label, or null when there is no category', () => {
-		const sortValue = COLUMNS.find((c) => c.colId === 'category')?.sortValue;
+		const sort = LIBRARY_COLUMNS.find((c) => c.colId === 'category')?.sort;
+		const sortValue = sort ? sort.client : undefined;
 		expect(sortValue?.(withCategory('x', 'Art'))).toBe('art');
 		expect(sortValue?.(withCategory('x', null))).toBeNull();
 	});
@@ -662,12 +664,12 @@ describe('Claim column set', () => {
 
 	it('registers the claim date columns as picker data columns sorted client-side only', () => {
 		for (const id of ['effectiveDate', 'evaluateBy']) {
-			const meta = COLUMNS.find((c) => c.colId === id);
+			const meta = LIBRARY_COLUMNS.find((c) => c.colId === id);
 			expect(meta, id).toBeDefined();
 			expect(meta?.picker).toBe('data');
-			expect(meta?.sortable).toBe(true);
-			expect(meta?.serverSort, id).toBeUndefined();
-			expect(meta?.filterKey, id).toBeUndefined();
+			expect(meta?.sort, id).toBeTruthy();
+			expect(meta && meta.sort !== false ? meta.sort.server : undefined, id).toBeUndefined();
+			expect(meta?.filter?.key, id).toBeUndefined();
 		}
 	});
 });

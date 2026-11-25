@@ -26,14 +26,13 @@
 	} from '#lib/utils/gridUrlState.js';
 	import type { DataMode, GridParams, SortSpec } from '#lib/utils/gridUrlState.js';
 	import { contentRowId, moviePeople, PERSON_ID_ATTR } from '#lib/utils/formatting.js';
+	import { CLIENT_ONLY_SORT_COLS, sortableColumnsFor, togglableColIds } from '#lib/utils/libraryColumns/index.js';
+	import { compareContentBySorts, filterContentRows } from '#lib/utils/libraryColumns/clientRows.js';
 	import {
 		itemColumnHeader,
 		soloTypeFilter,
-		CLIENT_ONLY_SORT_COLS,
-		sortableColumnsFor,
-		compareContentBySorts,
-		filterContentRows,
-		togglableColIds,
+		columnViewFor,
+		type ColumnView,
 		syncItemHeader,
 		PERSON_FILTER_KEY,
 		parsePersonFilter,
@@ -53,13 +52,11 @@
 	import {
 		COLUMN_VIEW_LABEL,
 		clearLayout,
-		columnViewFor,
 		defaultLayout,
 		loadLayout,
 		planColumnSwitch,
 		saveLayout,
 		type ColumnLayout,
-		type ColumnView,
 	} from '#lib/utils/columnLayouts.js';
 	import { toast } from 'svelte-sonner';
 	import SortPickerDialog from '#lib/components/SortPickerDialog.svelte';

@@ -1,5 +1,6 @@
+import { LIBRARY_COLUMNS } from '#lib/utils/libraryColumns/index.js';
 import { describe, it, expect, beforeEach } from 'vitest';
-import { COLUMNS, defaultColumnVisibility } from '#lib/utils/grid-config.js';
+import { defaultColumnVisibility } from '#lib/utils/libraryColumns/index.js';
 import { GRID_DEFAULTS, parseGridParams, sortsToGraphQL } from '#lib/utils/gridUrlState.js';
 import { COLUMN_LAYOUTS_KEY, loadLayout } from '#lib/utils/columnLayouts.js';
 
@@ -8,7 +9,7 @@ describe('removed percentLiked column', () => {
 	beforeEach(() => localStorage.clear());
 
 	it('is not a column or a default in any tier', () => {
-		expect(COLUMNS.map((c) => c.colId)).not.toContain('percentLiked');
+		expect(LIBRARY_COLUMNS.map((c) => c.colId)).not.toContain('percentLiked');
 		expect(defaultColumnVisibility('lg', 'general').visible).not.toContain('percentLiked');
 	});
 
