@@ -11,7 +11,7 @@
     "date": "2026-10-07",
     "sources": [
       "docs/superpowers/specs/2026-10-07-movie-content-type-design.md",
-      "frontend/src/lib/components/ActivityTable.svelte",
+      "frontend/src/lib/components/library/ContentLibrary.svelte",
       "backend/schema.graphql",
       "tools/content-type-designer/src/catalog.ts"
     ],

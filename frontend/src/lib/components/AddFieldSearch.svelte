@@ -108,6 +108,16 @@
 		isOpen = false;
 	}
 
+	// The input sits inside the perspective form, so Enter would submit (and close) it.
+	// Treat Enter as "add what I typed": the top match, else a custom field.
+	function handleKeydown(e: KeyboardEvent) {
+		if (e.key !== 'Enter') return;
+		e.preventDefault();
+		const top = filtered()[0];
+		if (top && query.trim()) addExisting(top);
+		else if (canCreateCustom()) addCustom();
+	}
+
 	$effect(() => {
 		document.addEventListener('mousedown', handleClickOutside);
 		return () => document.removeEventListener('mousedown', handleClickOutside);
@@ -132,6 +142,7 @@
 			oninput={() => {
 				isOpen = true;
 			}}
+			onkeydown={handleKeydown}
 			onfocus={() => {
 				isOpen = true;
 				isFocused = true;

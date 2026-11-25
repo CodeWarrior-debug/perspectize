@@ -42,7 +42,7 @@ export const GRID_COLOR_PARAM_KEYS = Object.keys(GRID_THEME_PARAMS).filter((k) =
  * pass AA text contrast on `--color-muted` (the header background) in every preset. The uppercase
  * and letter-spacing half lives in app.css under `.activity-grid`: they are not theme params.
  */
-export const ACTIVITY_HEADER_PARAMS = {
+export const LIBRARY_HEADER_PARAMS = {
 	headerFontSize: 11,
 	headerTextColor: 'var(--color-muted-foreground)',
 } as const;
@@ -55,7 +55,7 @@ export const ACTIVITY_HEADER_PARAMS = {
  * zebra and every preset stay as they were (see the PR for the measurements). The Plan grid also
  * uses `themeBalham` with the shared params, without the Activity header tweaks.
  */
-export const ACTIVITY_GRID_THEME = themeBalham.withParams(GRID_THEME_PARAMS).withParams(ACTIVITY_HEADER_PARAMS);
+export const LIBRARY_GRID_THEME = themeBalham.withParams(GRID_THEME_PARAMS).withParams(LIBRARY_HEADER_PARAMS);
 
 /**
  * How the Activity header label is set beyond the theme params. app.css applies these under
@@ -69,7 +69,7 @@ export interface HeaderTextCase {
 	letterSpacingEm: number;
 }
 
-export const ACTIVITY_HEADER_TEXT_CASE: HeaderTextCase = { uppercase: true, letterSpacingEm: 0.06 };
+export const LIBRARY_HEADER_TEXT_CASE: HeaderTextCase = { uppercase: true, letterSpacingEm: 0.06 };
 
 /**
  * Horizontal space, in px, that AG Grid draws around a header label in the Activity grid, read
@@ -102,7 +102,7 @@ export interface HeaderChrome extends HeaderTextCase {
 const WIDEST_DIGIT_EM = Math.max(...[...'0123456789'].map((d) => GEIST_SEMIBOLD_ADVANCE_EM[d.charCodeAt(0) - 32]));
 
 export function headerChrome(
-	theme: { getParams(): Record<string, unknown> } = ACTIVITY_GRID_THEME,
+	theme: { getParams(): Record<string, unknown> } = LIBRARY_GRID_THEME,
 	textCase: HeaderTextCase = { uppercase: false, letterSpacingEm: 0 },
 ): HeaderChrome {
 	const p = theme.getParams();
@@ -129,7 +129,7 @@ export function headerChrome(
 }
 
 /** The Activity grid's header chrome, computed once. */
-export const ACTIVITY_HEADER_CHROME: HeaderChrome = headerChrome(ACTIVITY_GRID_THEME, ACTIVITY_HEADER_TEXT_CASE);
+export const LIBRARY_HEADER_CHROME: HeaderChrome = headerChrome(LIBRARY_GRID_THEME, LIBRARY_HEADER_TEXT_CASE);
 
 /** The Plan grid's theme: the shared params on the base theme, with headers in the default case. */
 export const PLAN_GRID_THEME = themeBalham.withParams(GRID_THEME_PARAMS);

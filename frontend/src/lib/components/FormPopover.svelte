@@ -65,7 +65,8 @@
 </script>
 
 {#if isMobile}
-	<Button variant={triggerVariant} size={triggerSize} onclick={() => (open = true)}>
+	<!-- The text label is hidden below md, so the icon-only button needs its own name. -->
+	<Button variant={triggerVariant} size={triggerSize} aria-label={triggerLabel} onclick={() => (open = true)}>
 		{@render triggerIcon()}
 		<span class="hidden md:inline">{triggerLabel}</span>
 	</Button>
@@ -88,7 +89,7 @@
 	</Dialog>
 {:else}
 	<Popover bind:open>
-		<PopoverTrigger class={buttonVariants({ variant: triggerVariant, size: triggerSize })}>
+		<PopoverTrigger class={buttonVariants({ variant: triggerVariant, size: triggerSize })} aria-label={triggerLabel}>
 			{@render triggerIcon()}
 			<span class="hidden md:inline">{triggerLabel}</span>
 		</PopoverTrigger>

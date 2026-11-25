@@ -83,17 +83,7 @@ describe('NUMERIC_COL_IDS (right-aligned columns)', () => {
 	});
 
 	it('covers every count, money, score and duration column', () => {
-		for (const id of [
-			'duration',
-			'views',
-			'likes',
-			'percentLiked',
-			'boxOffice',
-			'vsBudget',
-			'tmdbScore',
-			'budget',
-			'votes',
-		]) {
+		for (const id of ['duration', 'views', 'likes', 'boxOffice', 'vsBudget', 'tmdbScore', 'budget', 'votes']) {
 			expect(NUMERIC_COL_IDS.has(id), id).toBe(true);
 		}
 	});
@@ -203,7 +193,6 @@ describe('column-picker registry', () => {
 			'duration',
 			'views',
 			'likes',
-			'percentLiked',
 			'released',
 			'boxOffice',
 			'vsBudget',
@@ -287,10 +276,6 @@ describe('SORTABLE_COLUMNS', () => {
 		expect(ids).toContain('released');
 		expect(ids).toContain('tmdbScore');
 	});
-
-	it('includes percentLiked — sortable in the grid, must stay sortable in the mobile/Loaded-mode picker too', () => {
-		expect(SORTABLE_COLUMNS.map((c) => c.colId)).toContain('percentLiked');
-	});
 });
 
 // ---------------------------------------------------------------------------
@@ -340,16 +325,6 @@ describe('compareContentBySorts', () => {
 		const rows = [row({ id: '1', name: 'banana' }), row({ id: '2', name: 'Apple' })];
 		const sorted = [...rows].sort((a, b) => compareContentBySorts(a, b, [{ col: 'item', dir: 'asc' }]));
 		expect(sorted.map((r) => r.id)).toEqual(['2', '1']);
-	});
-
-	it('sorts by percentLiked (likes / views), the same computation the grid column uses', () => {
-		const rows = [
-			row({ id: '1', viewCount: 100, likeCount: 10 }), // 10%
-			row({ id: '2', viewCount: 100, likeCount: 90 }), // 90%
-			row({ id: '3', viewCount: 0, likeCount: 0 }), // null — no meaningful rate
-		];
-		const sorted = [...rows].sort((a, b) => compareContentBySorts(a, b, [{ col: 'percentLiked', dir: 'desc' }]));
-		expect(sorted.map((r) => r.id)).toEqual(['2', '1', '3']);
 	});
 
 	it('skips a colId with no known value getter', () => {
@@ -648,7 +623,6 @@ describe('Claim column set', () => {
 			'publishDate',
 			'views',
 			'likes',
-			'percentLiked',
 			'tags',
 			'user',
 			'description',

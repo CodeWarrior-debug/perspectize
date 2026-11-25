@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { beforeNavigate } from '$app/navigation';
-	import { updated } from '$app/state';
+	import { page, updated } from '$app/state';
 	import { onMount } from 'svelte';
 	import { ClerkProvider, ClerkLoaded, ClerkLoading } from 'svelte-clerk';
 	import { QueryClientProvider } from '@tanstack/svelte-query';
@@ -19,12 +19,15 @@
 	import GuestLanding from '#lib/components/onboarding/GuestLanding.svelte';
 	import OnboardingShell from '#lib/components/onboarding/OnboardingShell.svelte';
 	import { initTelemetry } from '#lib/telemetry.js';
+	import { pageTitleFor } from '#lib/utils/pageTitle.js';
 	import { watchForNewVersion } from '#lib/utils/versionWatch.js';
 	import { attachVersionHotkey } from '#lib/utils/versionHotkey.js';
 	import { printVersionInfo } from '#lib/utils/versionInfo.js';
 	import '../app.css';
 
 	let { children } = $props();
+
+	const pageTitle = $derived(pageTitleFor(page.url.pathname));
 
 	const publishableKey = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY;
 
@@ -58,6 +61,7 @@
 </script>
 
 <svelte:head>
+	<title>{pageTitle}</title>
 	<link rel="icon" href={favicon} />
 </svelte:head>
 

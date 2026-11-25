@@ -17,13 +17,13 @@ Full design: [docs/superpowers/specs/2026-09-28-oauth-external-sync-design.md](d
 ## Saved Views (Activity Table)
 
 Named, persisted presets that capture column visibility + filters + sort +
-page size for `ActivityTable`, so a user can switch between "My reading queue",
+page size for `ContentLibrary`, so a user can switch between "My reading queue",
 "Admin audit", etc. without re-toggling each time.
 
 - Persist per user (localStorage first; backend `user_views` table later for
   cross-device).
 - Builds directly on the session-only column picker shipped 2026-09-02
-  (`ColumnPickerDialog` + `userColumnOverride` in `ActivityTable.svelte`) —
+  (`ColumnPickerDialog` + `userColumnOverride` in `ContentLibrary.svelte`) —
   promote that transient state into a saveable/loadable view object.
 - Serialize via `gridApi.getColumnState()` / `getFilterModel()` and restore via
   `applyColumnState()` / `setFilterModel()`.
@@ -136,7 +136,7 @@ An AI-powered assistant integrated into the platform to help users discover, ref
 
 ## Perspectize Column Sorting & Filtering
 
-The Perspectize column in the ActivityTable currently shows a glasses icon for adding/viewing perspectives but doesn't support AG Grid sorting or filtering. Users should be able to sort and filter content by perspective status.
+The Perspectize column in the ContentLibrary currently shows a glasses icon for adding/viewing perspectives but doesn't support AG Grid sorting or filtering. Users should be able to sort and filter content by perspective status.
 
 **Sorting options:**
 - Has perspective vs. no perspective (binary)

@@ -68,7 +68,7 @@ Compare is linked from the Activity modal and Discover cards. Plan rows and the 
 `GuestLanding` replaces every route for signed-out visitors (`+layout.svelte`). Someone sent `/compare?contentId=42` sees the generic pitch with no hint of what they were sent. Show "Sign in to see this comparison" (title, thumbnail if cheap) on the landing, and *verify* that the URL survives the Clerk modal. Longer term, a public read-only Compare is the strongest growth surface the product has.
 
 ### 5. Empty states have no next step — H / S
-- Activity empty: `"No content yet"` (`ActivityTable.svelte:1206`) — no Add Content or Discover button. The filtered-empty variant should offer "Clear filters".
+- Activity empty: `"No content yet"` (`ContentLibrary.svelte:1206`) — no Add Content or Discover button. The filtered-empty variant should offer "Clear filters".
 - Compare empty states point back to Activity but nowhere useful ("No one has shared a perspective" → offer "Add yours").
 - Messages: "Select a conversation" / "No conversations yet" have no "New conversation" button in the pane (the dialog exists on the list header).
 Each should carry the single most useful action.

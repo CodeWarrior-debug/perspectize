@@ -22,7 +22,7 @@ Rules for translating Figma designs into Perspectize Svelte code via the Figma M
 ## Component Organization
 
 - **shadcn primitives:** `frontend/src/lib/components/shadcn/{component}/` — Button, Input, Label, Dialog, Popover, Select
-- **Feature components:** `frontend/src/lib/components/*.svelte` — Header, ActivityTable, AddVideoDialog, UserSelector, etc.
+- **Feature components:** `frontend/src/lib/components/*.svelte` — Header, ContentLibrary, AddVideoDialog, UserSelector, etc.
 - **Page routes:** `frontend/src/routes/+page.svelte`
 - **Barrel export:** `frontend/src/lib/components/shadcn/index.ts` — all shadcn components re-exported
 
@@ -149,6 +149,6 @@ Follow the `tailwind-variants` (`tv()`) pattern used by shadcn-svelte:
 | `shadcn/popover` | Popover (trigger + content) |
 | `shadcn/select` | Select (trigger + content + items) |
 | `Header.svelte` | App header with logo, navigation |
-| `ActivityTable.svelte` | AG Grid data table (main content area) |
+| `ContentLibrary.svelte` | AG Grid data table (main content area) |
 | `AddVideoDialog.svelte` | Add video dialog form |
 | `UserSelector.svelte` | User avatar/selector dropdown |

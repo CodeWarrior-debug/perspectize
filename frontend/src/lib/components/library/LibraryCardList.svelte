@@ -10,6 +10,7 @@
 	import PlayIcon from '@lucide/svelte/icons/play';
 	import PlusIcon from '@lucide/svelte/icons/plus';
 	import GlassesIcon from '@lucide/svelte/icons/glasses';
+	import MessageSquareTextIcon from '@lucide/svelte/icons/message-square-text';
 	import {
 		extractVideoIdFromUrl,
 		formatDuration,
@@ -43,7 +44,7 @@
 		lengthDisplay?: LengthDisplay | null;
 		// Beyond name/channel/duration, the mobile card shows category, views and
 		// likes — the three most-used of the grid's other columns; the remaining
-		// columns (% liked, publish date, tags, description) are grid/details-modal
+		// columns (publish date, tags, description) are grid/details-modal
 		// only on mobile.
 		primaryCategory?: { label: string } | null;
 		viewCount?: number | null;
@@ -84,6 +85,7 @@
 	}
 
 	const isPassage = (row: CardRow) => row.contentType === 'BIBLE_PASSAGE';
+	const isClaim = (row: CardRow) => row.contentType === 'CLAIM';
 	const isMovie = (row: CardRow) => row.contentType === 'MOVIE';
 	const isBook = (row: CardRow) => row.contentType === 'BOOK';
 	const isWebPage = (row: CardRow) => row.contentType === 'WEB_PAGE';
@@ -133,9 +135,9 @@
 		return cover ? { src: cover, fitted: true } : null;
 	}
 
-	/** Grey tile only behind a video thumbnail or an empty slot; posters, covers and the passage sit on the card colour. */
+	/** Grey tile only behind a video thumbnail or an empty slot; posters, covers, the passage and the claim icon sit on the card colour. */
 	function thumbBg(row: CardRow): string {
-		if (isPassage(row) || thumbSrc(row)?.fitted) return '';
+		if (isPassage(row) || isClaim(row) || thumbSrc(row)?.fitted) return '';
 		return 'bg-muted';
 	}
 
@@ -157,6 +159,11 @@
 			>
 				{#if isPassage(row)}
 					<BiblePassageIcon {...passageIconLabels(row)} />
+				{:else if isClaim(row)}
+					<!-- A claim has no image to show (and no url), so its type icon fills the slot. -->
+					<div class="flex h-full w-full items-center justify-center text-primary">
+						<MessageSquareTextIcon data-icon="claim" class="size-8" />
+					</div>
 				{:else}
 					{@const thumb = thumbSrc(row)}
 					{#if thumb}

@@ -24,3 +24,15 @@ func TestSanitizeReview_StripsJavascriptURLs(t *testing.T) {
 	got := sanitizeReview(in)
 	assert.NotContains(t, got, "javascript:")
 }
+
+func TestSanitizeReview_KeepsBlockquoteAndItsFormatting(t *testing.T) {
+	in := `<blockquote><p>a <strong>quoted</strong> line</p></blockquote><p>my reply</p>`
+	got := sanitizeReview(in)
+	assert.Equal(t, in, got)
+}
+
+func TestSanitizeReview_BlockquoteGetsNoAttributesOrScripts(t *testing.T) {
+	in := `<blockquote onclick="alert(1)" style="x:y"><p>q</p><script>alert(1)</script></blockquote>`
+	got := sanitizeReview(in)
+	assert.Equal(t, "<blockquote><p>q</p></blockquote>", got)
+}

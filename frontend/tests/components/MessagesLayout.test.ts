@@ -34,4 +34,26 @@ describe('messages layout', () => {
 		expect(screen.getByTestId('new-thread')).toBeInTheDocument();
 		expect(screen.getByTestId('threads-empty')).toBeInTheDocument();
 	});
+
+	// Narrow screens show one pane at a time: the list, or the open thread.
+	const panes = (container: HTMLElement) => {
+		const row = container.firstElementChild as HTMLElement;
+		return { list: row.children[0] as HTMLElement, detail: row.children[1] as HTMLElement };
+	};
+
+	it('on narrow screens with no thread open, shows the list and hides the empty detail pane', () => {
+		const { container } = render(MessagesLayout, { props: { children: createChildrenSnippet() } });
+		const { list, detail } = panes(container);
+		expect(list.classList.contains('hidden')).toBe(false);
+		expect(detail.classList.contains('hidden')).toBe(true);
+		expect(detail.classList.contains('md:block')).toBe(true);
+	});
+
+	it('on narrow screens with a thread open, hides the list and shows the thread', () => {
+		state.params = { threadId: '7' };
+		const { container } = render(MessagesLayout, { props: { children: createChildrenSnippet() } });
+		const { list, detail } = panes(container);
+		expect(list.classList.contains('hidden')).toBe(true);
+		expect(detail.classList.contains('hidden')).toBe(false);
+	});
 });

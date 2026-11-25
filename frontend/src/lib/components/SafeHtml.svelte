@@ -37,6 +37,12 @@
 		color: var(--color-primary);
 		text-decoration: underline;
 	}
+	.safe-html :global(blockquote) {
+		margin: 6px 0;
+		padding-left: 12px;
+		border-left: 3px solid var(--color-border);
+		color: var(--color-muted-foreground);
+	}
 	.safe-html :global(li) {
 		margin: 2px 0;
 	}
