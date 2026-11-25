@@ -135,23 +135,6 @@ describe('ContentLibrary', () => {
 		expect(container).toBeTruthy();
 	});
 
-	it('imports TanStack Query dependencies correctly', () => {
-		// Verify imports work (createQuery, keepPreviousData, queryKeys)
-		// This is a compile-time check - if these imports fail, the test file won't load
-		expect(true).toBe(true);
-	});
-
-	it('component code uses required TanStack Query patterns', () => {
-		// Pattern verification via code inspection (automated in execution flow):
-		// - createQuery with function wrapper pattern
-		// - keepPreviousData for placeholder data
-		// - queryKeys.content.list() with all params (sortBy, sortOrder, search, first, after)
-		// - Derived values for rowData, totalCount, loading
-		// - No manual fetchData() function
-		// - Query invalidation for cache updates (no custom events)
-		expect(true).toBe(true);
-	});
-
 	it('refetches in Loaded mode when the search text changes (and again when cleared)', async () => {
 		// Regression test for the search bar not clearing/filtering: the query cache key must
 		// track the actual search text in "Loaded" mode, or TanStack Query never refetches when
