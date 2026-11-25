@@ -1,0 +1,140 @@
+{
+  "src/lib/components/AuthUserSync.svelte": {
+    "no-restricted-imports": {
+      "count": 3
+    },
+    "no-restricted-syntax": {
+      "count": 2
+    }
+  },
+  "src/lib/components/CategoryTypeahead.svelte": {
+    "no-restricted-imports": {
+      "count": 2
+    },
+    "no-restricted-syntax": {
+      "count": 2
+    }
+  },
+  "src/lib/components/Compare.svelte": {
+    "no-restricted-imports": {
+      "count": 2
+    }
+  },
+  "src/lib/components/ComparePicker.svelte": {
+    "no-restricted-imports": {
+      "count": 2
+    }
+  },
+  "src/lib/components/ContentDetailsModal.svelte": {
+    "no-restricted-syntax": {
+      "count": 3
+    }
+  },
+  "src/lib/components/PassageText.svelte": {
+    "no-restricted-imports": {
+      "count": 2
+    },
+    "no-restricted-syntax": {
+      "count": 1
+    }
+  },
+  "src/lib/components/discover/BookISBNPanel.svelte": {
+    "no-restricted-imports": {
+      "count": 1
+    }
+  },
+  "src/lib/components/discover/BookSearchPanel.svelte": {
+    "no-restricted-imports": {
+      "count": 2
+    }
+  },
+  "src/lib/components/discover/BookTrendingFeed.svelte": {
+    "no-restricted-imports": {
+      "count": 2
+    }
+  },
+  "src/lib/components/discover/MovieSearchPanel.svelte": {
+    "no-restricted-imports": {
+      "count": 2
+    }
+  },
+  "src/lib/components/discover/MovieTrendingFeed.svelte": {
+    "no-restricted-imports": {
+      "count": 2
+    }
+  },
+  "src/lib/components/interlinear/OriginalLanguage.svelte": {
+    "no-restricted-imports": {
+      "count": 2
+    }
+  },
+  "src/lib/components/library/ContentLibrary.svelte": {
+    "no-restricted-imports": {
+      "count": 2
+    },
+    "no-restricted-syntax": {
+      "count": 1
+    }
+  },
+  "src/lib/components/messaging/InboxStreamMount.svelte": {
+    "no-restricted-imports": {
+      "count": 1
+    }
+  },
+  "src/lib/components/messaging/MessagingWidget.svelte": {
+    "no-restricted-syntax": {
+      "count": 1
+    }
+  },
+  "src/lib/components/messaging/NewThreadDialog.svelte": {
+    "no-restricted-imports": {
+      "count": 2
+    }
+  },
+  "src/lib/components/messaging/ThreadView.svelte": {
+    "no-restricted-imports": {
+      "count": 3
+    }
+  },
+  "src/lib/components/onboarding/OnboardingCoach.svelte": {
+    "no-restricted-imports": {
+      "count": 2
+    },
+    "no-restricted-syntax": {
+      "count": 1
+    }
+  },
+  "src/lib/components/onboarding/OnboardingShell.svelte": {
+    "no-restricted-imports": {
+      "count": 2
+    },
+    "no-restricted-syntax": {
+      "count": 1
+    }
+  },
+  "src/lib/queries/users/useMarkOnboardingSeen.ts": {
+    "no-restricted-syntax": {
+      "count": 1
+    }
+  },
+  "src/lib/queries/users/useMe.svelte.ts": {
+    "no-restricted-syntax": {
+      "count": 1
+    }
+  },
+  "src/lib/utils/tooltipHover.ts": {
+    "no-restricted-imports": {
+      "count": 1
+    }
+  },
+  "src/routes/discover/+page.svelte": {
+    "no-restricted-imports": {
+      "count": 3
+    }
+  },
+  "src/routes/messages/+layout.svelte": {
+    "no-restricted-syntax": {
+      "count": 1
+    }
+  }
+}
