@@ -61,8 +61,14 @@ type ContentFilter struct {
 	MinLikeCount *int
 	MaxLikeCount *int
 	// Published date filters (ISO 8601 string comparison)
+	// PublishedAfter and PublishedBefore bound the published date of every row that
+	// has one: YouTube videos and web pages (see ContentFactPublishedAt).
 	PublishedAfter  *string
 	PublishedBefore *string
+	// WebPageSiteContains and WebPageAuthorContains match web page rows by the site
+	// name and author they were saved with (webpage rows only).
+	WebPageSiteContains   *string
+	WebPageAuthorContains *string
 	// Channel/tag/description filters (JSONB extraction + ILIKE)
 	ChannelTitle      *string
 	TagContains       *string

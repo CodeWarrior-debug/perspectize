@@ -540,9 +540,12 @@ input ContentFilter {
   maxViewCount: Int
   minLikeCount: Int
   maxLikeCount: Int
-  # Published date filters (ISO 8601 date string)
+  # Published date filters (ISO 8601 date string). Cover YouTube videos and web pages.
   publishedAfter: String
   publishedBefore: String
+  # Web page filters (web page rows only; other rows never match). Case-insensitive contains.
+  webPageSiteContains: String
+  webPageAuthorContains: String
   # Channel/tag/description filters
   channelTitle: String       # ILIKE search
   tagContains: String        # Tag text contains

@@ -188,11 +188,10 @@ func (r *mutationResolver) createMovie(ctx context.Context, in model.CreateConte
 	return createResult(content, err, movieCreateFailure)
 }
 
-// createBook creates a book from an Open Library work URL or an ISBN. Hyphenated
-// ISBNs are normalized first: the service's isbnRe only matches bare digits, so a
-// hyphenated one would be rejected with ErrInvalidInput.
+// createBook creates a book from an Open Library work URL or an ISBN. The service
+// classifies the input, including hyphenated ISBNs.
 func (r *mutationResolver) createBook(ctx context.Context, in model.CreateContentFromBookInput, userID int) (*model.CreateContentResult, error) {
-	content, err := r.ContentService.CreateFromBook(ctx, normalizeHyphenatedISBN(in.URL), userID)
+	content, err := r.ContentService.CreateFromBook(ctx, in.URL, userID)
 	return createResult(content, err, bookCreateFailure)
 }
 

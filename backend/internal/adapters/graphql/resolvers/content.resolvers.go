@@ -869,11 +869,7 @@ func (r *queryResolver) BookTrending(ctx context.Context, window *domain.Trendin
 // record for the ISBN, so the client can show "not found" without surfacing
 // a GraphQL error.
 func (r *queryResolver) BookByIsbn(ctx context.Context, isbn string) (*model.BookSearchResult, error) {
-	// See createBook: normalize a hyphenated ISBN before it reaches
-	// ContentService's bare-digit isbnRe (Task 5 finding).
-	raw := normalizeHyphenatedISBN(isbn)
-
-	result, err := r.ContentService.ResolveBookISBN(ctx, raw)
+	result, err := r.ContentService.ResolveBookISBN(ctx, isbn)
 	if err != nil {
 		if errors.Is(err, domain.ErrNotFound) {
 			return nil, nil
