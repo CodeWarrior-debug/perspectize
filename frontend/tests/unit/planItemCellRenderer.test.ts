@@ -1,12 +1,12 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { planItemCellRenderer } from '#lib/utils/planItemCellRenderer.js';
-import { activityItemCellRenderer } from '#lib/utils/activityItemCellRenderer.js';
+import { libraryItemCellRenderer } from '#lib/utils/libraryItemCellRenderer.js';
 import type { UserTodoItem } from '#lib/queries/userTodos/index.js';
 
 // Pass-through spy: real rendering, but we can see what data the Plan cell hands over.
-vi.mock('#lib/utils/activityItemCellRenderer.js', async (importOriginal) => {
-	const actual = await importOriginal<typeof import('#lib/utils/activityItemCellRenderer.js')>();
-	return { ...actual, activityItemCellRenderer: vi.fn(actual.activityItemCellRenderer) };
+vi.mock('#lib/utils/libraryItemCellRenderer.js', async (importOriginal) => {
+	const actual = await importOriginal<typeof import('#lib/utils/libraryItemCellRenderer.js')>();
+	return { ...actual, libraryItemCellRenderer: vi.fn(actual.libraryItemCellRenderer) };
 });
 
 function todo(overrides: Partial<UserTodoItem> = {}): UserTodoItem {
@@ -131,7 +131,7 @@ describe('planItemCellRenderer', () => {
 					},
 				}),
 			);
-			expect(activityItemCellRenderer).toHaveBeenLastCalledWith(
+			expect(libraryItemCellRenderer).toHaveBeenLastCalledWith(
 				expect.objectContaining({ data: expect.objectContaining({ contentType: 'BOOK', book }) }),
 			);
 		});

@@ -4,7 +4,7 @@ import { createRawSnippet } from 'svelte';
 import Layout from '../../src/routes/+layout.svelte';
 
 const mocks = vi.hoisted(() => ({
-	page: { route: { id: '/' as string | null } },
+	page: { route: { id: '/' as string | null }, url: new URL('http://localhost/') },
 	session: { signedIn: false, pickerOpen: false },
 }));
 
@@ -35,6 +35,7 @@ const children = createRawSnippet(() => ({ render: () => '<p>route page</p>' }))
 
 function open(routeId: string, signedIn: boolean) {
 	mocks.page.route.id = routeId;
+	mocks.page.url = new URL(`http://localhost${routeId}`);
 	mocks.session.signedIn = signedIn;
 	render(Layout, { props: { children } });
 }

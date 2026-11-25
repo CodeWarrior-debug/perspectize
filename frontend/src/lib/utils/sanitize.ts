@@ -21,6 +21,7 @@ export function sanitizeHtml(dirty: string): string {
 			'span',
 			'h2',
 			'h3',
+			'blockquote',
 			'img',
 			'table',
 			'thead',

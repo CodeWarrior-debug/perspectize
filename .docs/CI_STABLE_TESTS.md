@@ -21,7 +21,7 @@ In each case the test logic is fine: the wait covers a cost the test never meant
    ```ts
    import { preloadLazy } from "../helpers/warmUp";
 
-   preloadLazy(() => import("#lib/components/ActivityDetailsModal.svelte"));
+   preloadLazy(() => import("#lib/components/ContentDetailsModal.svelte"));
    ```
 
    Find them with `grep -rn "{#await import(" src/lib`. Every test file that renders one of those components needs the preload, even when it only sometimes reaches the lazy branch.

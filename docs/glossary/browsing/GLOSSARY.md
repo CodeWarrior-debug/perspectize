@@ -7,7 +7,7 @@ How people look at content and perspectives: the pages, the grid, filtering and 
 ### Pages
 
 **Library**:
-The content library for all Perspectize members, at `/content-library`: a grid (cards on narrow screens) of content with its perspectives and facts. Signed-in visitors to `/` are sent here. "Content library" in full; "Library" in the nav and headings. It was called Activity until it was renamed, and code names from then remain (`ActivityTable`, `activityList`).
+The content library for all Perspectize members, at `/content-library`: a grid (cards on narrow screens) of content with its perspectives and facts. Signed-in visitors to `/` are sent here. "Content library" in full; "Library" in the nav and headings. It was called Activity until it was renamed. A few runtime strings keep the old name so saved state and styling carry over: the `perspectize:activityColumns:v1` layout key, the `.activity-grid` class and the `activity-*` element ids.
 _Avoid_: Activity (former name), feed, dashboard
 
 **Discover**:

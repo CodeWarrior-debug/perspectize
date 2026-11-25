@@ -122,6 +122,18 @@ describe('PerspectivePopover component', () => {
 			expect(screen.getByText('Add perspective')).toBeInTheDocument();
 		});
 
+		it('names the dialog itself so screen readers announce it on open', async () => {
+			renderPopover({ existingPerspective: null });
+			await tick();
+			expect(screen.getByRole('dialog', { name: 'Add perspective' })).toBeInTheDocument();
+		});
+
+		it('names the dialog "Edit perspective" when editing', async () => {
+			renderPopover({ existingPerspective: { id: '1', quality: 7500, like: null } });
+			await tick();
+			expect(screen.getByRole('dialog', { name: 'Edit perspective' })).toBeInTheDocument();
+		});
+
 		it('renders dialog with "Edit perspective" title when editing', async () => {
 			renderPopover({
 				existingPerspective: {
@@ -492,6 +504,42 @@ describe('PerspectivePopover component', () => {
 			expect(payload.agreement).toBe(5000);
 		});
 
+		it('Cmd/Ctrl+Enter inside the writing area saves; plain Enter does not', async () => {
+			renderPopover({
+				existingPerspective: {
+					id: '5',
+					quality: 7500,
+					agreement: 5000,
+					importance: null,
+					confidence: null,
+					like: null,
+				},
+			});
+			await tick();
+			const editor = screen.getByLabelText('Comment');
+			const before = mocks.mockUpdateMutateAsync.mock.calls.length;
+
+			await fireEvent.keyDown(editor, { key: 'Enter' });
+			expect(mocks.mockUpdateMutateAsync.mock.calls.length).toBe(before);
+
+			await fireEvent.keyDown(editor, { key: 'Enter', ctrlKey: true });
+			expect(mocks.mockUpdateMutateAsync.mock.calls.length).toBe(before + 1);
+
+			await fireEvent.keyDown(editor, { key: 'Enter', metaKey: true });
+			expect(mocks.mockUpdateMutateAsync.mock.calls.length).toBe(before + 2);
+
+			// The editor row may be nested in the form (phones): one keypress is still one save.
+			const form = editor.closest('form');
+			if (form) {
+				const handler = vi.fn();
+				document.addEventListener('keydown', handler);
+				await fireEvent.keyDown(editor, { key: 'Enter', ctrlKey: true });
+				document.removeEventListener('keydown', handler);
+				expect(handler).not.toHaveBeenCalled();
+				expect(mocks.mockUpdateMutateAsync.mock.calls.length).toBe(before + 3);
+			}
+		});
+
 		it('clearing the thumb (toggling it off) sends like: null, keeping the untouched rating', async () => {
 			renderPopover({
 				existingPerspective: {
@@ -807,6 +855,72 @@ describe('PerspectivePopover component', () => {
 				expect(mocks.mockSaveDraft).not.toHaveBeenCalled();
 				await vi.advanceTimersByTimeAsync(1000);
 				expect(mocks.mockSaveDraft).toHaveBeenCalledWith('draft:1:42', '<p>hello</p>', '');
+			} finally {
+				vi.useRealTimers();
+			}
+		});
+
+		it('says where the draft is kept once it is stored, and clears the note on the next keystroke', async () => {
+			vi.useFakeTimers();
+			try {
+				mocks.mockSaveDraft.mockReturnValue(true);
+				renderPopover();
+				await tick();
+				const editor = screen.getByLabelText('Comment');
+				await fireEvent.input(editor, { target: { value: '<p>hello</p>' } });
+				expect(screen.getByTestId('editor-status').textContent).toBe('');
+				await vi.advanceTimersByTimeAsync(1000);
+				expect(screen.getByTestId('editor-status')).toHaveTextContent('Draft saved on this device');
+				await fireEvent.input(editor, { target: { value: '<p>hello again</p>' } });
+				expect(screen.getByTestId('editor-status').textContent).toBe('');
+			} finally {
+				vi.useRealTimers();
+			}
+		});
+
+		it('does not claim the draft was saved when the browser refused to store it', async () => {
+			vi.useFakeTimers();
+			try {
+				mocks.mockSaveDraft.mockReturnValue(false);
+				renderPopover();
+				await tick();
+				await fireEvent.input(screen.getByLabelText('Comment'), { target: { value: '<p>hello</p>' } });
+				await vi.advanceTimersByTimeAsync(1000);
+				expect(mocks.mockSaveDraft).toHaveBeenCalled();
+				expect(screen.getByTestId('editor-status').textContent).toBe('');
+			} finally {
+				vi.useRealTimers();
+			}
+		});
+
+		it('pagehide writes the pending draft at once (reload or tab close inside the debounce window)', async () => {
+			vi.useFakeTimers();
+			try {
+				renderPopover();
+				await tick();
+				await fireEvent.input(screen.getByLabelText('Comment'), { target: { value: '<p>quick</p>' } });
+				expect(mocks.mockSaveDraft).not.toHaveBeenCalled();
+				window.dispatchEvent(new Event('pagehide'));
+				expect(mocks.mockSaveDraft).toHaveBeenCalledWith('draft:1:42', '<p>quick</p>', '');
+			} finally {
+				vi.useRealTimers();
+			}
+		});
+
+		it('backgrounding the page (visibility hidden) writes the pending draft; becoming visible does not', async () => {
+			vi.useFakeTimers();
+			try {
+				renderPopover();
+				await tick();
+				await fireEvent.input(screen.getByLabelText('Comment'), { target: { value: '<p>away</p>' } });
+				const vis = vi.spyOn(document, 'visibilityState', 'get');
+				vis.mockReturnValue('visible');
+				document.dispatchEvent(new Event('visibilitychange'));
+				expect(mocks.mockSaveDraft).not.toHaveBeenCalled();
+				vis.mockReturnValue('hidden');
+				document.dispatchEvent(new Event('visibilitychange'));
+				expect(mocks.mockSaveDraft).toHaveBeenCalledWith('draft:1:42', '<p>away</p>', '');
+				vis.mockRestore();
 			} finally {
 				vi.useRealTimers();
 			}
@@ -1219,6 +1333,30 @@ describe('PerspectivePopover component', () => {
 				await fireEvent.click(screen.getByRole('button', { name: 'Save perspective' }));
 				expect(toast.info).not.toHaveBeenCalled();
 				expect(mocks.mockUpdateMutateAsync).toHaveBeenCalledTimes(1);
+			});
+		});
+
+		describe('offline save', () => {
+			const offlineMsg = "You're offline. This will save when you reconnect.";
+			const setOnline = (value: boolean) => vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(value);
+
+			it('tells the person the save is waiting for a connection, and still submits', async () => {
+				const online = setOnline(false);
+				renderPopover({ existingPerspective: existing });
+				await tick();
+				await fireEvent.click(screen.getByRole('button', { name: 'Save perspective' }));
+				expect(toast.info).toHaveBeenCalledWith(offlineMsg, { duration: 6000 });
+				expect(mocks.mockUpdateMutateAsync).toHaveBeenCalledTimes(1);
+				online.mockRestore();
+			});
+
+			it('says nothing while online', async () => {
+				const online = setOnline(true);
+				renderPopover({ existingPerspective: existing });
+				await tick();
+				await fireEvent.click(screen.getByRole('button', { name: 'Save perspective' }));
+				expect(toast.info).not.toHaveBeenCalled();
+				online.mockRestore();
 			});
 		});
 	});

@@ -1,5 +1,5 @@
 /**
- * ActivityTable Tests
+ * ContentLibrary Tests
  *
  * LIMITATION: AG Grid + TanStack Query rendering in JSDOM has known limitations.
  * AG Grid's mocked component doesn't trigger lifecycle hooks (onGridReady), and
@@ -45,7 +45,7 @@ vi.mock('svelte-clerk', () => ({
 
 // queryKeys is used directly, no need to mock since it's a simple object
 
-import ActivityTable from '#lib/components/ActivityTable.svelte';
+import ContentLibrary from '#lib/components/library/ContentLibrary.svelte';
 import { preloadLazy, warmUp } from '../helpers/warmUp';
 
 const mockEmptyResponse = {
@@ -107,7 +107,7 @@ function renderWithQuery(queryClient?: QueryClient) {
 	return render(TestWrapper, {
 		props: {
 			queryClient: client,
-			component: ActivityTable,
+			component: ContentLibrary,
 			props: {},
 		},
 	});
@@ -121,7 +121,7 @@ preloadLazy(() => import('#lib/components/PerspectivePopover.svelte'));
 // one: under full-suite load it alone can pass the 5 s testTimeout (#728).
 warmUp(() => renderWithQuery());
 
-describe('ActivityTable', () => {
+describe('ContentLibrary', () => {
 	beforeEach(() => {
 		vi.clearAllMocks();
 		clerkState.isLoaded = false;
@@ -348,13 +348,16 @@ describe('ActivityTable', () => {
 	});
 
 	// The menu stays disabled under the mocked grid, so its items can't be opened here; ExportMenu.test.ts
-	// covers the items, and this pins that ActivityTable hands the menu its CSV and Copy handlers.
-	it('passes the CSV and Copy handlers to the Export menu', async () => {
+	// covers the items, libraryExport.test.ts covers the handlers, and this pins that ContentLibrary
+	// hands the menu the exporter's handlers.
+	it('passes the export and print handlers to the Export menu', async () => {
 		const { readFileSync } = await import('node:fs');
-		const source = readFileSync('src/lib/components/ActivityTable.svelte', 'utf8');
+		const source = readFileSync('src/lib/components/library/ContentLibrary.svelte', 'utf8');
 		const tag = source.match(/<ExportMenu[\s\S]*?\n\s*\/>/)?.[0] ?? '';
-		expect(tag).toContain('onDownloadCsv={handleDownloadCsv}');
-		expect(tag).toContain('onCopy={handleCopy}');
+		expect(tag).toContain('onDownloadCsv={exporter.downloadCsv}');
+		expect(tag).toContain('onCopy={exporter.copy}');
+		expect(tag).toContain('onPrintAsSeen={exporter.printAsSeen}');
+		expect(tag).toContain('onPrintAsList={() => (exporter.printOptionsOpen = true)}');
 	});
 
 	it('omits the Export trigger in card mode', async () => {

@@ -36,9 +36,9 @@ import {
 	unknownLastComparator,
 	ratedComparator,
 } from '#lib/utils/grid-config.js';
-import activityTableSource from '#lib/components/ActivityTable.svelte?raw';
+import libraryColumnsSource from '#lib/components/library/columns.ts?raw';
 import { headerMinWidth } from '#lib/utils/grid-header-width.js';
-import { activityItemCellRenderer } from '#lib/utils/activityItemCellRenderer.js';
+import { libraryItemCellRenderer } from '#lib/utils/libraryItemCellRenderer.js';
 import {
 	sortsToGraphQL,
 	urlParamsToGraphQLFilter,
@@ -353,7 +353,7 @@ describe('movie type cell', () => {
 
 describe('movie item cell', () => {
 	it('shows poster, title and year', () => {
-		const el = activityItemCellRenderer({
+		const el = libraryItemCellRenderer({
 			data: {
 				id: '1',
 				name: 'Inception',
@@ -368,7 +368,7 @@ describe('movie item cell', () => {
 	});
 
 	it('omits the poster and year when unknown', () => {
-		const el = activityItemCellRenderer({
+		const el = libraryItemCellRenderer({
 			data: { id: '1', name: 'Inception', url: null, contentType: 'MOVIE', movie: null },
 		}) as HTMLElement;
 		expect(el.querySelector('img')).toBeNull();
@@ -479,7 +479,6 @@ describe('Movie default column set', () => {
 				'publishDate',
 				'views',
 				'likes',
-				'percentLiked',
 				'tags',
 			]),
 		);
@@ -570,15 +569,15 @@ describe('grid comparators (Loaded-mode desktop grid)', () => {
 
 	it('the Rated, Box office and Vs. budget colDefs use these comparators', () => {
 		for (const id of ['rated', 'boxOffice', 'vsBudget']) {
-			const block = activityTableSource.split(/(?=colId:\s*')/g).find((b) => b.startsWith(`colId: '${id}'`));
+			const block = libraryColumnsSource.split(/(?=colId:\s*')/g).find((b) => b.startsWith(`colId: '${id}'`));
 			expect(block, id).toMatch(/comparator:\s*(ratedComparator|unknownLastComparator)/);
 		}
 	});
 });
 
 describe('default column sets fit the 1212px grid', () => {
-	const blocks = activityTableSource.split(/(?=colId:\s*')/g);
-	// Mirrors ActivityTable's colDef map: the header floor, raised (never lowered) by an explicit minWidth.
+	const blocks = libraryColumnsSource.split(/(?=colId:\s*')/g);
+	// Mirrors buildLibraryColumnDefs' colDef map: the header floor, raised (never lowered) by an explicit minWidth.
 	function minWidth(colId: string): number {
 		const b = blocks.find((x) => x.startsWith(`colId: '${colId}'`));
 		if (!b) throw new Error(`no colDef for ${colId}`);
@@ -636,9 +635,9 @@ describe('default column sets fit the 1212px grid', () => {
 		expect(Object.values(widths).reduce((a, b) => a + b, 0)).toBe(1162);
 	});
 
-	it('the map in ActivityTable floors every column at its header width', () => {
+	it('the map in buildLibraryColumnDefs floors every column at its header width', () => {
 		// Guards against a colDef's explicit minWidth replacing (rather than raising) the header floor.
-		expect(activityTableSource).toMatch(/minWidth:\s*Math\.max\(\s*col\.minWidth \?\? 0,\s*headerMinWidth\(/);
+		expect(libraryColumnsSource).toMatch(/minWidth:\s*Math\.max\(\s*col\.minWidth \?\? 0,\s*headerMinWidth\(/);
 	});
 });
 

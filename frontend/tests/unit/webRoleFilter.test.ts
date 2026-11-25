@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { WebRoleFilter } from '#lib/utils/contentTypeFilter.js';
 import { parseGridParams, urlParamsToFilter, urlParamsToGraphQLFilter } from '#lib/utils/gridUrlState.js';
-import { activityListRequest } from '#lib/queries/content/activityList.js';
+import { libraryListRequest } from '#lib/queries/content/libraryList.js';
 import type { ContentItem } from '#lib/queries/content/index.js';
 
 const row = (webPageRoles: string[] | null): ContentItem =>
@@ -95,12 +95,12 @@ describe('f.webrole URL param', () => {
 
 describe('Roles filter cache key', () => {
 	it('changes the Activity list key when the roles filter changes, and not otherwise', () => {
-		const base = activityListRequest(parseGridParams(new URLSearchParams('mode=all&f.type=web_page')), null);
-		const blog = activityListRequest(
+		const base = libraryListRequest(parseGridParams(new URLSearchParams('mode=all&f.type=web_page')), null);
+		const blog = libraryListRequest(
 			parseGridParams(new URLSearchParams('mode=all&f.type=web_page&f.webrole=blog_post')),
 			null,
 		);
-		const session = activityListRequest(
+		const session = libraryListRequest(
 			parseGridParams(new URLSearchParams('mode=all&f.type=web_page&f.webrole=session_transcript')),
 			null,
 		);

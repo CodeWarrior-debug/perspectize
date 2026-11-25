@@ -12,8 +12,8 @@ import {
 import { columnViewFor as columnViewForFromLayouts } from '#lib/utils/columnLayouts.js';
 import { urlParamsToGraphQLFilter } from '#lib/utils/gridUrlState.js';
 import { headerMinWidth } from '#lib/utils/grid-header-width.js';
-import { ACTIVITY_TOOLTIP_SPECS } from '#lib/utils/activityTooltipSpecs.js';
-import activityTableSource from '#lib/components/ActivityTable.svelte?raw';
+import { LIBRARY_TOOLTIP_SPECS } from '#lib/utils/libraryTooltipSpecs.js';
+import libraryColumnsSource from '#lib/components/library/columns.ts?raw';
 
 const TIERS: ResponsiveTier[] = ['xs', 'sm', 'md', 'lg'];
 
@@ -87,7 +87,6 @@ describe('Book default column set', () => {
 			'publishDate',
 			'views',
 			'likes',
-			'percentLiked',
 			'description',
 			'editions',
 			'readers',
@@ -132,7 +131,6 @@ describe('the other views keep their exact default sets', () => {
 			'publishDate',
 			'views',
 			'likes',
-			'percentLiked',
 			'tags',
 		]);
 	});
@@ -215,16 +213,16 @@ describe('Published, Pages and Book rating filters', () => {
 	});
 });
 
-// The grid's colDefs live in ActivityTable.svelte (AG Grid does not render in jsdom), so these
+// The grid's colDefs live in library/columns.ts (AG Grid does not render in jsdom), so these
 // read its source, as the Movie column tests do.
-describe('Book colDefs in ActivityTable', () => {
-	const blocks = activityTableSource.split(/(?=colId:\s*')/g);
+describe('Book colDefs in ContentLibrary', () => {
+	const blocks = libraryColumnsSource.split(/(?=colId:\s*')/g);
 	const block = (colId: string): string => {
 		const b = blocks.find((x) => x.startsWith(`colId: '${colId}'`));
 		if (!b) throw new Error(`no colDef for ${colId}`);
 		return b;
 	};
-	// Mirrors ActivityTable's colDef map: an explicit minWidth only raises the header floor.
+	// Mirrors buildLibraryColumnDefs' colDef map: an explicit minWidth only raises the header floor.
 	function minWidth(colId: string): number {
 		const b = block(colId);
 		const explicit = Number(b.match(/\n\s*minWidth:\s*(\d+)/)?.[1] ?? 0);
@@ -289,7 +287,7 @@ describe('Book colDefs in ActivityTable', () => {
 
 describe('Book tooltip specs', () => {
 	it('readers explains the breakdown, the Open-Library-only caveat and the as-of date', () => {
-		const spec = ACTIVITY_TOOLTIP_SPECS.readers as unknown as { text: (c: { data: unknown }) => string };
+		const spec = LIBRARY_TOOLTIP_SPECS.readers as unknown as { text: (c: { data: unknown }) => string };
 		const text = spec.text({
 			data: {
 				contentType: 'BOOK',
@@ -307,7 +305,7 @@ describe('Book tooltip specs', () => {
 	});
 
 	it('author lists every author on hover, and says so when there are none', () => {
-		const spec = ACTIVITY_TOOLTIP_SPECS.author as unknown as {
+		const spec = LIBRARY_TOOLTIP_SPECS.author as unknown as {
 			items: (c: { data: unknown }) => string[];
 			emptyText: string;
 		};
@@ -317,7 +315,7 @@ describe('Book tooltip specs', () => {
 	});
 
 	it('rating explains the average and the count, or that there are no ratings yet', () => {
-		const spec = ACTIVITY_TOOLTIP_SPECS.rating as unknown as { text: (c: { data: unknown }) => string };
+		const spec = LIBRARY_TOOLTIP_SPECS.rating as unknown as { text: (c: { data: unknown }) => string };
 		expect(spec.text({ data: { contentType: 'BOOK', book: { ratingsAverage: 4.1, ratingsCount: 100 } } })).toBe(
 			'4.1 out of 5 · 100 ratings',
 		);

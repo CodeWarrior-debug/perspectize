@@ -951,7 +951,7 @@ function renderPerspectiveMock(row) {
 }
 function renderSurfaces() {
     const row = focusedRow();
-    const blurb = 'What a row opens into. Pick a row by clicking its title in the preview above, or choose one here. These are mockups of ActivityDetailsModal.svelte and PerspectivePopover.svelte, drawn from the bindings, not the real components.';
+    const blurb = 'What a row opens into. Pick a row by clicking its title in the preview above, or choose one here. These are mockups of ContentDetailsModal.svelte and PerspectivePopover.svelte, drawn from the bindings, not the real components.';
     if (!row)
         return el('section', { id: 'surfaces' }, [el('h2', {}, ['5 · Row details & perspective']), el('p', { class: 'blurb' }, [blurb]), el('p', { class: 'muted' }, ['Select a type with sample rows in section 4.'])]);
     const fullness = state.fullness ?? 'usual';

@@ -57,7 +57,7 @@ Settings → General → "Restart onboarding" replays from step 1
 4. Column menus add filters; **filter chips** show them and can be cleared ("Clear all" stores `f=none`).
 5. **Sort**, **column picker** (visible columns), pagination, and "Loaded" vs paged modes.
 6. All grid state lives in the URL, so links and reloads reproduce the view.
-7. **Mobile:** same data as cards (`ActivityCardList`), with fewer fields.
+7. **Mobile:** same data as cards (`LibraryCardList`), with fewer fields.
 8. Error → "Failed to load content" + Retry (+ hint to clear filters). Empty → "No content yet" / filtered-empty message.
 
 ## Flow 4 — Add content to the library
@@ -84,7 +84,7 @@ Three entry points, one outcome (a `Content` row, shown in Activity):
 
 ## Flow 5 — Inspect an item (details modal)
 
-`Click row/card → ActivityDetailsModal`
+`Click row/card → ContentDetailsModal`
 - Shows thumbnail/poster, stats, tags, description, category, aggregate **perspective count** and **average quality rating** (lazy-loaded).
 - **Refresh source data** (re-pull title/stats from YouTube; gated by a ~6 h cooldown).
 - Movies: poster + TMDB body. Passages: verse text, position bar, outside links, and a **one-time title** field.

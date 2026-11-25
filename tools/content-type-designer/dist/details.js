@@ -1,5 +1,5 @@
 /**
- * Content details view layouts — what ActivityDetailsModal shows per type.
+ * Content details view layouts — what ContentDetailsModal shows per type.
  *
  * YouTube and Bible passage mirror the modal as it ships today; the TMDB
  * family is the proposal. Any other type gets a generic layout built from its
@@ -106,7 +106,7 @@ export const DETAILS = {
             { label: 'Tags', col: 'tags', kind: 'chips' }
         ],
         actions: SOURCE_ACTIONS,
-        notes: ['Mirrors ActivityDetailsModal as it ships today.']
+        notes: ['Mirrors ContentDetailsModal as it ships today.']
     },
     bible: {
         heading: 'Bible Passage',
@@ -116,7 +116,7 @@ export const DETAILS = {
         sections: [{ label: 'Text (BSB)', col: 'description', kind: 'text' }],
         actions: ['Compare'],
         notes: [
-            'Mirrors ActivityDetailsModal today: PassageText, PassagePositionBar and PassageLinks sit under the title, plus the set-once title form.',
+            'Mirrors ContentDetailsModal today: PassageText, PassagePositionBar and PassageLinks sit under the title, plus the set-once title form.',
             'No source-data refresh — nothing is fetched.'
         ]
     },

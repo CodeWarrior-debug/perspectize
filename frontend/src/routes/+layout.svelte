@@ -19,6 +19,7 @@
 	import GuestLanding from '#lib/components/onboarding/GuestLanding.svelte';
 	import OnboardingShell from '#lib/components/onboarding/OnboardingShell.svelte';
 	import { initTelemetry } from '#lib/telemetry.js';
+	import { pageTitleFor } from '#lib/utils/pageTitle.js';
 	import { watchForNewVersion } from '#lib/utils/versionWatch.js';
 	import { attachVersionHotkey } from '#lib/utils/versionHotkey.js';
 	import { printVersionInfo } from '#lib/utils/versionInfo.js';
@@ -30,6 +31,7 @@
 	// /add keeps a shared link on screen while the visitor signs in.
 	const SIGNED_OUT_ROUTES = new Set(['/add']);
 	const openToGuests = $derived(SIGNED_OUT_ROUTES.has(page.route.id ?? ''));
+	const pageTitle = $derived(pageTitleFor(page.url.pathname));
 
 	const publishableKey = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY;
 
@@ -63,6 +65,7 @@
 </script>
 
 <svelte:head>
+	<title>{pageTitle}</title>
 	<link rel="icon" href={favicon} />
 </svelte:head>
 

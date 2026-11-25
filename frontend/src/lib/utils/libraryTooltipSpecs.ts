@@ -9,8 +9,6 @@ import {
 } from './bookFormatting';
 import {
 	formatCountExact,
-	percentLikedTooltip,
-	percentLikedValueGetter,
 	castTooltipItems,
 	castTooltipCopyValues,
 	boxOfficeTooltip,
@@ -30,8 +28,8 @@ import {
 } from './formatting';
 import { webPageAuthor, webPagePublished, webPageRoleLabel, webPageRolesOf, webPageSite } from './webPage';
 
-/** Per-column hover popover specs for ActivityTable, keyed by colId. */
-export const ACTIVITY_TOOLTIP_SPECS = {
+/** Per-column hover popover specs for ContentLibrary, keyed by colId. */
+export const LIBRARY_TOOLTIP_SPECS = {
 	perspectize: false,
 	item: {
 		text: (c: CellCtx) => c.data?.name ?? '',
@@ -53,10 +51,6 @@ export const ACTIVITY_TOOLTIP_SPECS = {
 	likes: {
 		text: (c: CellCtx) => formatCountExact(c.data?.likeCount ?? null),
 		copyValue: (c: CellCtx) => c.data?.likeCount,
-	},
-	percentLiked: {
-		text: (c: CellCtx) => percentLikedTooltip({ data: c.data }),
-		copyValue: (c: CellCtx) => percentLikedValueGetter({ data: c.data }),
 	},
 	tags: { mode: 'multi', emptyText: 'No tags', items: (c: CellCtx) => contentTags(c.data) ?? [] },
 	cast: {

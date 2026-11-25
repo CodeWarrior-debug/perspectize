@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, cleanup, waitFor } from '@testing-library/svelte';
-import ActivityDetailsModal from '#lib/components/ActivityDetailsModal.svelte';
+import ContentDetailsModal from '#lib/components/ContentDetailsModal.svelte';
 import TestWrapper from '../helpers/TestWrapper.svelte';
 import { makeClient } from '../helpers/queryBudget';
 import { GET_CONTENT_DETAILS, LIST_WEBSITE_PAGES } from '#lib/queries/content/index.js';
@@ -99,7 +99,7 @@ function mount(content: unknown, client = makeClient()) {
 	return render(TestWrapper, {
 		props: {
 			queryClient: client,
-			component: ActivityDetailsModal,
+			component: ContentDetailsModal,
 			props: { content, open: true, onClose: vi.fn() },
 		},
 	});

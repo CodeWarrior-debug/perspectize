@@ -302,43 +302,6 @@ export function formatCountExact(count: number | null): string {
 }
 
 /**
- * AG Grid value getter for % Liked — likes as a percentage of views.
- * Computed client-side; both fields are already loaded on ContentItem, so no
- * backend field is needed (see .claude/docs/ADDING_AG_GRID_COLUMN.md
- * Decision 1). Returns null when views is 0/null/missing or likes is
- * missing — there's no meaningful rate to show.
- */
-export function percentLikedValueGetter(params: {
-	data?: { viewCount: number | null; likeCount: number | null };
-}): number | null {
-	const views = params.data?.viewCount;
-	const likes = params.data?.likeCount;
-	if (!views || likes === null || likes === undefined) return null;
-	return (likes / views) * 100;
-}
-
-/**
- * Format a % Liked value to 1 decimal place, or "—" when unavailable.
- */
-export function formatPercentLiked(value: number | null): string {
-	if (value === null) return EMPTY_VALUE;
-	return `${value.toFixed(1)}%`;
-}
-
-/**
- * AG Grid tooltip value getter for % Liked — shows the exact calculation
- * (likes ÷ views × 100) with the result to 3 decimal places, so a rounded
- * 1-decimal cell value never hides the precision behind it.
- */
-export function percentLikedTooltip(params: { data?: { viewCount: number | null; likeCount: number | null } }): string {
-	const views = params.data?.viewCount;
-	const likes = params.data?.likeCount;
-	if (!views || likes === null || likes === undefined) return 'No views recorded';
-	const pct = (likes / views) * 100;
-	return `${formatCountExact(likes)} ÷ ${formatCountExact(views)} × 100 = ${pct.toFixed(3)}%`;
-}
-
-/**
  * Format date in compact form: "MMM 'YY" (e.g., "Jul '10") for tight columns.
  */
 export function formatDateCompact(isoString: string | null): string {
@@ -688,7 +651,7 @@ export function categoryCellRenderer(params: {
 	const category = params.data?.primaryCategory;
 	if (category) {
 		// Label links out to Wikipedia when available; clicking elsewhere in the
-		// cell still opens the category-edit popover (see ActivityTable's grid
+		// cell still opens the category-edit popover (see ContentLibrary's grid
 		// cell click handler).
 		const label: HTMLElement = category.wikipediaUrl ? document.createElement('a') : document.createElement('span');
 		label.textContent = category.label;
@@ -821,7 +784,7 @@ export function moviePeople(row: MovieRow | null | undefined): MoviePerson[] {
 export const CAST_CELL_MAX_DIRECTORS = 2;
 export const CAST_CELL_MAX_CAST = 3;
 
-/** Attribute on a clickable cast/director name; its value is the TMDB person id (read by ActivityTable's cell click). */
+/** Attribute on a clickable cast/director name; its value is the TMDB person id (read by ContentLibrary's cell click). */
 export const PERSON_ID_ATTR = 'data-person-id';
 
 /** The names, comma separated, each wrapped in a span carrying its person id so a click can filter by that person. */

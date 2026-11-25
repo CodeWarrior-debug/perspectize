@@ -350,6 +350,8 @@ describe('useUpdatePerspective hook', () => {
 		it('shows generic message with a Retry action for unknown errors', () => {
 			capturedMutationOptions.onError(new Error('connection timeout'), { id: 5, quality: 7500 });
 			expect(mockToastError).toHaveBeenCalledWith('Failed to update perspective.', {
+				duration: Infinity,
+				closeButton: true,
 				action: { label: 'Retry', onClick: expect.any(Function) },
 			});
 		});
