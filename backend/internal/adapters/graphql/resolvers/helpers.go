@@ -17,6 +17,7 @@ import (
 	"github.com/CodeWarrior-debug/perspectize/backend/internal/adapters/tmdb"
 	"github.com/CodeWarrior-debug/perspectize/backend/internal/core/domain"
 	portservices "github.com/CodeWarrior-debug/perspectize/backend/internal/core/ports/services"
+	"github.com/vektah/gqlparser/v2/gqlerror"
 )
 
 // webPageInputMessage is the user-facing message for a webpage input error, or ""
@@ -1320,4 +1321,24 @@ func forward[In, Out any](ctx context.Context, in <-chan In, mapFn func(In) Out)
 		}
 	}()
 	return out
+}
+
+// pageInfoToModel maps one list's paging state onto the GraphQL PageInfo. Every
+// paged list resolver builds its connection's PageInfo here.
+func pageInfoToModel(hasNext, hasPrev bool, start, end *string) *model.PageInfo {
+	return &model.PageInfo{
+		HasNextPage:     hasNext,
+		HasPreviousPage: hasPrev,
+		StartCursor:     start,
+		EndCursor:       end,
+	}
+}
+
+// invalidPagingError is the INVALID_INPUT error for a list's paging arguments.
+// The message keeps the "invalid pagination parameters" prefix clients match on.
+func invalidPagingError(err error) error {
+	return &gqlerror.Error{
+		Message:    fmt.Sprintf("invalid pagination parameters: %v", err),
+		Extensions: map[string]any{"code": string(domain.KindInvalid)},
+	}
 }

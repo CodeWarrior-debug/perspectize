@@ -154,21 +154,26 @@ func TestPerspectiveUpdate_RelatedPerspectiveIDsCapIsFifty(t *testing.T) {
 }
 
 func TestPerspectiveListPerspectives_FirstAndLastBounds(t *testing.T) {
+	cursor := strPtr("Y3Vyc29y")
 	tests := []struct {
 		name    string
 		first   *int
 		last    *int
+		after   *string
+		before  *string
 		wantErr bool
 	}{
-		{"first 0 rejected", intPtr(0), nil, true},
-		{"first 1 accepted", intPtr(1), nil, false},
-		{"first 100 accepted", intPtr(100), nil, false},
-		{"first 101 rejected", intPtr(101), nil, true},
-		{"first negative rejected", intPtr(-1), nil, true},
-		{"last 0 rejected", nil, intPtr(0), true},
-		{"last 1 accepted", nil, intPtr(1), false},
-		{"last 100 accepted", nil, intPtr(100), false},
-		{"last 101 rejected", nil, intPtr(101), true},
+		{"first 0 rejected", intPtr(0), nil, nil, nil, true},
+		{"first 1 accepted", intPtr(1), nil, nil, nil, false},
+		{"first 100 accepted", intPtr(100), nil, nil, nil, false},
+		{"first 101 rejected", intPtr(101), nil, nil, nil, true},
+		{"first negative rejected", intPtr(-1), nil, nil, nil, true},
+		{"last 0 rejected", nil, intPtr(0), nil, cursor, true},
+		{"last 1 with before accepted", nil, intPtr(1), nil, cursor, false},
+		{"last 100 with before accepted", nil, intPtr(100), nil, cursor, false},
+		{"last 101 rejected", nil, intPtr(101), nil, cursor, true},
+		{"last without before rejected", nil, intPtr(5), nil, nil, true},
+		{"after with before rejected", nil, nil, cursor, cursor, true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -181,7 +186,9 @@ func TestPerspectiveListPerspectives_FirstAndLastBounds(t *testing.T) {
 			}
 			svc := services.NewPerspectiveService(repo, &mockUserRepoForPerspective{})
 
-			_, err := svc.ListPerspectives(context.Background(), domain.PerspectiveListParams{First: tt.first, Last: tt.last})
+			_, err := svc.ListPerspectives(context.Background(), domain.PerspectiveListParams{
+				First: tt.first, Last: tt.last, After: tt.after, Before: tt.before,
+			})
 
 			if tt.wantErr {
 				require.Error(t, err)
