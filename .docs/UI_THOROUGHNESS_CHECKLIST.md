@@ -28,12 +28,12 @@ A column, field, filter, sort, setting or content type touches some of these lay
 - [ ] **Query keys:** a new list query gets its own key branch. Optimistic `setQueriesData` targets only lists **with the same row shape and the same privacy scope**; others are invalidated, not patched. (#3)
 - [ ] Optimistic updates treat "cleared" as `null`, not `?? previous`. (#2)
 
-### C. Grid (ActivityTable)
+### C. Grid (ContentLibrary)
 Until the column-metadata refactor in §3 lands, a new column has to be added to **every** one of these by hand:
-- [ ] Column definition in `ActivityTable.svelte`: `colId`, `headerName`, `hide`, `sortable`, `filter`.
+- [ ] Column definition in `library/columns.ts`: `colId`, `headerName`, `hide`, `sortable`, `filter`.
 - [ ] Renderer or formatter in `formatting.ts`, **using theme tokens only** (see F).
-- [ ] Tooltip/copy spec in `activityTooltipSpecs.ts` (#390 popover), or a note that the column doesn't need one.
-- [ ] The responsive tier lists in the `ActivityTable` effect (`smCols` / `mdCols` / …).
+- [ ] Tooltip/copy spec in `libraryTooltipSpecs.ts` (#390 popover), or a note that the column doesn't need one.
+- [ ] The responsive tier lists in the `ContentLibrary` effect (`smCols` / `mdCols` / …).
 - [ ] **Column picker:** `DATA_COLUMNS`, or `INTERNAL_COLUMNS` if admin-only. (#1)
 - [ ] **Sort:** `SORTABLE_COLUMNS`, `SORT_VALUE_GETTERS` (mobile/Loaded sort) and `COL_TO_SORT` / `SORT_TO_COL` (server sort). If there is no server sort, the column must not be sortable in All mode. (#7)
 - [ ] **Filter:** `COL_TO_FILTER_KEY`, `urlParamsToFilter`, `urlParamsToGraphQLFilter`, `FilterChips` `COLUMN_LABELS` and its value formatter. (#10, #17)

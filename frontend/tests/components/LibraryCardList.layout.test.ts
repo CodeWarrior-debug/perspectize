@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, within } from '@testing-library/svelte';
-import ActivityCardList from '#lib/components/ActivityCardList.svelte';
+import LibraryCardList from '#lib/components/library/LibraryCardList.svelte';
 
 // The "Add to plan" button reads the auth facade; the real module needs Clerk, so stub it.
 const authState = vi.hoisted(() => ({ userId: null as string | null }));
@@ -32,14 +32,14 @@ const factTexts = (row: HTMLElement) =>
 
 // A phone leaves a card about 150px of text beside a 96px thumbnail and two 36px buttons. These pin the
 // layout choices that give that column back, since jsdom cannot measure a wrap.
-describe('ActivityCardList layout on a narrow screen', () => {
+describe('LibraryCardList layout on a narrow screen', () => {
 	beforeEach(() => {
 		authState.userId = null;
 	});
 
 	it('stacks the card actions in one column, so the title keeps the width the second button took', () => {
 		authState.userId = 'user_1';
-		render(ActivityCardList, { props: { rowData: [video()], onOpenDetails: vi.fn(), onAddToPlan: vi.fn() } });
+		render(LibraryCardList, { props: { rowData: [video()], onOpenDetails: vi.fn(), onAddToPlan: vi.fn() } });
 
 		const actions = screen.getByTestId('card-actions-1');
 		expect(actions.className).toContain('flex-col');
@@ -48,20 +48,20 @@ describe('ActivityCardList layout on a narrow screen', () => {
 	});
 
 	it('keeps a lone action (signed out) in the same column wrapper', () => {
-		render(ActivityCardList, { props: { rowData: [video()], onOpenDetails: vi.fn() } });
+		render(LibraryCardList, { props: { rowData: [video()], onOpenDetails: vi.fn() } });
 		const actions = screen.getByTestId('card-actions-1');
 		expect(within(actions).getAllByRole('button')).toHaveLength(1);
 	});
 
 	it('puts a video channel on its own single line, so a long name cannot push the facts around', () => {
-		render(ActivityCardList, { props: { rowData: [video()], onOpenDetails: vi.fn() } });
+		render(LibraryCardList, { props: { rowData: [video()], onOpenDetails: vi.fn() } });
 		const channel = screen.getByTestId('card-channel-1');
 		expect(channel).toHaveTextContent('Messianic Choir by Caleb Aviel');
 		expect(channel.className).toContain('line-clamp-1');
 	});
 
 	it('lists duration, category, views and likes as one facts line', () => {
-		render(ActivityCardList, {
+		render(LibraryCardList, {
 			props: {
 				rowData: [video({ primaryCategory: { label: 'Philosophy' }, viewCount: 1300000, likeCount: 26500 })],
 				onOpenDetails: vi.fn(),
@@ -76,12 +76,12 @@ describe('ActivityCardList layout on a narrow screen', () => {
 	});
 
 	it('does not repeat the channel inside the facts line', () => {
-		render(ActivityCardList, { props: { rowData: [video({ viewCount: 5 })], onOpenDetails: vi.fn() } });
+		render(LibraryCardList, { props: { rowData: [video({ viewCount: 5 })], onOpenDetails: vi.fn() } });
 		expect(factTexts(screen.getByTestId('card-facts-1'))).not.toContain('Messianic Choir by Caleb Aviel');
 	});
 
 	it('shows views alone when that is all there is, with no separator before it', () => {
-		render(ActivityCardList, {
+		render(LibraryCardList, {
 			props: {
 				rowData: [video({ length: null, lengthUnits: null, channelTitle: null, viewCount: 812 })],
 				onOpenDetails: vi.fn(),
@@ -93,7 +93,7 @@ describe('ActivityCardList layout on a narrow screen', () => {
 	});
 
 	it('renders no channel line and no facts line for a video with nothing to show', () => {
-		render(ActivityCardList, {
+		render(LibraryCardList, {
 			props: { rowData: [video({ length: null, lengthUnits: null, channelTitle: null })], onOpenDetails: vi.fn() },
 		});
 		expect(screen.queryByTestId('card-channel-1')).not.toBeInTheDocument();
@@ -101,7 +101,7 @@ describe('ActivityCardList layout on a narrow screen', () => {
 	});
 
 	it('renders a claim (no channel, no length) with just its text and category', () => {
-		render(ActivityCardList, {
+		render(LibraryCardList, {
 			props: {
 				rowData: [
 					{
@@ -123,12 +123,12 @@ describe('ActivityCardList layout on a narrow screen', () => {
 	});
 
 	it('leaves room under the last card so the floating chat button never covers its actions', () => {
-		render(ActivityCardList, { props: { rowData: [video()], onOpenDetails: vi.fn() } });
+		render(LibraryCardList, { props: { rowData: [video()], onOpenDetails: vi.fn() } });
 		expect(screen.getByTestId('activity-card-list').className).toContain('pb-20');
 	});
 
 	it('renders movie, book and webpage facts through the same wrap-safe row', () => {
-		render(ActivityCardList, {
+		render(LibraryCardList, {
 			props: {
 				rowData: [
 					{

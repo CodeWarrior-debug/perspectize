@@ -4,6 +4,7 @@
 	import ExternalLinkIcon from '@lucide/svelte/icons/external-link';
 	import XIcon from '@lucide/svelte/icons/x';
 	import LoaderCircleIcon from '@lucide/svelte/icons/loader-circle';
+	import MessageSquareTextIcon from '@lucide/svelte/icons/message-square-text';
 	import RefreshCwIcon from '@lucide/svelte/icons/refresh-cw';
 	import PlusIcon from '@lucide/svelte/icons/plus';
 	import ScaleIcon from '@lucide/svelte/icons/scale';
@@ -90,6 +91,7 @@
 	const isMovie = $derived(content?.contentType === 'MOVIE');
 	const isBook = $derived(content?.contentType === 'BOOK');
 	const isWebPage = $derived(content?.contentType === 'WEB_PAGE');
+	const isClaim = $derived(content?.contentType === 'CLAIM');
 	// A list row carries the shaped webpage payload but not `response` (the metadata behind the Fetched
 	// tile and the description). Load the details for that one page while the modal is open. A row that
 	// already has `response`, or a closed modal, makes no request. The hook's key is the one a deep link
@@ -290,6 +292,11 @@
 										onerror={(e) => e.currentTarget.remove()}
 									/>
 								{/if}
+							{:else if isClaim}
+								<!-- A claim has no image to show (and no url), so its type icon fills the box. -->
+								<div class="flex h-full w-full items-center justify-center text-primary">
+									<MessageSquareTextIcon data-icon="claim" class="size-8" />
+								</div>
 							{:else if thumbSrc}
 								<img
 									src={thumbSrc}

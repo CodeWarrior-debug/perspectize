@@ -65,6 +65,8 @@
 	} = $props();
 
 	const isEditMode = $derived(existingPerspective !== null);
+	// The dialog's title is a plain <h2> inside the body, so give the dialog itself a name.
+	const dialogName = $derived(isEditMode ? 'Edit perspective' : 'Add perspective');
 
 	// Delete is offered only when the perspective provably belongs to the signed-in
 	// user (userId is the session user from every caller) — whatever its privacy
@@ -98,6 +100,8 @@
 	let comment = $state('');
 	let commentExpanded = $state(false);
 	let restoredFromDraft = $state(false);
+	// Shown under the writing area once the draft is stored in this browser; cleared by the next keystroke.
+	let draftStatus = $state('');
 	let draftSaveTimer: ReturnType<typeof setTimeout> | undefined;
 	// Latest HTML awaiting the debounced draft save (null when nothing is pending).
 	let pendingDraft: string | null = null;
@@ -273,8 +277,8 @@
 	function flushPendingDraft() {
 		const html = pendingDraft;
 		cancelPendingDraft();
-		if (html !== null) {
-			saveDraft(draftKey(contentId, userId), html, existingPerspective?.review ?? '');
+		if (html !== null && saveDraft(draftKey(contentId, userId), html, existingPerspective?.review ?? '')) {
+			draftStatus = 'Draft saved on this device';
 		}
 	}
 
@@ -284,6 +288,7 @@
 	function handleCommentChange(html: string) {
 		comment = html;
 		restoredFromDraft = false;
+		draftStatus = '';
 		pendingDraft = html;
 		if (draftSaveTimer) clearTimeout(draftSaveTimer);
 		draftSaveTimer = setTimeout(flushPendingDraft, 1000);
@@ -294,6 +299,7 @@
 		clearDraft(draftKey(contentId, userId));
 		comment = existingPerspective?.review ?? '';
 		restoredFromDraft = false;
+		draftStatus = '';
 	}
 
 	// Build customFields payload from dynamic (non-core) field values.
@@ -336,6 +342,19 @@
 	// deleted by id yet.
 	const isStillSaving = $derived(isOptimisticId(existingPerspective?.id));
 
+	// Cmd/Ctrl+Enter saves from anywhere in the form, including the writing area where a bare
+	// Enter starts a new paragraph, so a keyboard writer need not Tab to the Save button.
+	let formEl: HTMLFormElement | undefined = $state();
+
+	function submitOnModEnter(e: KeyboardEvent) {
+		if (e.key !== 'Enter' || !(e.metaKey || e.ctrlKey) || e.isComposing) return;
+		e.preventDefault();
+		// The editor row sits inside the form on phones and outside it on desktop, so both carry
+		// this handler; stopping here keeps a phone keypress from submitting twice.
+		e.stopPropagation();
+		formEl?.requestSubmit();
+	}
+
 	function handleSubmit(e: Event) {
 		e.preventDefault();
 
@@ -371,6 +390,11 @@
 		// offers Retry, and the review text survives as a draft (flushed below,
 		// cleared only once the save succeeds).
 		flushPendingDraft();
+		// The sheet closes at once and a save made offline just waits; without this the
+		// person believes it is safe on the server.
+		if (typeof navigator !== 'undefined' && !navigator.onLine) {
+			toast.info("You're offline. This will save when you reconnect.", { duration: 6000 });
+		}
 		const key = draftKey(contentId, userId);
 		const afterSave = () => {
 			clearDraft(key);
@@ -463,7 +487,13 @@
 	{/if}
 
 	<!-- Scrollable body — ratings + add field -->
-	<form onsubmit={handleSubmit} class="flex flex-col flex-1 min-h-0 overflow-hidden">
+	<!-- svelte-ignore a11y_no_noninteractive_element_interactions -- the shortcut listens for keys bubbling from the fields inside -->
+	<form
+		bind:this={formEl}
+		onsubmit={handleSubmit}
+		onkeydown={submitOnModEnter}
+		class="flex flex-col flex-1 min-h-0 overflow-hidden"
+	>
 		<div class="flex-1 min-h-0 overflow-y-auto overscroll-contain">
 			{#if mobile}
 				{@render commentRows(true)}
@@ -633,9 +663,18 @@
 {/snippet}
 
 {#snippet commentRows(mobile: boolean)}
+	{@const stackedEditor = mobile && commentExpanded}
 	<!-- Overall + Comment row -->
-	<div class="shrink-0 flex items-center gap-3.5 px-5 py-3.5 border-b border-border">
-		<div class="flex flex-col items-center gap-1.5 flex-shrink-0">
+	<!-- On desktop this row sits outside the form, so it carries its own Cmd/Ctrl+Enter handler. -->
+	<div
+		class="shrink-0 flex gap-3.5 px-5 py-3.5 border-b border-border {stackedEditor
+			? 'flex-col items-stretch'
+			: 'items-center'}"
+		onkeydown={submitOnModEnter}
+		role="presentation"
+	>
+		<!-- A phone's open editor gets the full sheet width: the thumbs sit in a row above it instead of beside it. -->
+		<div class="flex items-center gap-1.5 flex-shrink-0 {stackedEditor ? 'flex-row gap-3' : 'flex-col'}">
 			<span class="font-sans text-[11px] font-medium text-muted-foreground uppercase tracking-[0.06em]"> Overall </span>
 			<Thumbs
 				value={likeValue}
@@ -652,7 +691,7 @@
 				onclick={() => {
 					commentExpanded = true;
 				}}
-				aria-label="Add comment"
+				aria-label={hasComment ? 'Edit comment' : 'Add a comment'}
 				class="flex flex-1 items-center justify-between gap-2 h-14 px-3 rounded-lg border border-border bg-card cursor-pointer text-left"
 			>
 				<span
@@ -675,13 +714,15 @@
 				<CommentsEditor
 					value={comment}
 					onChange={handleCommentChange}
-					minHeight={68}
+					minHeight={mobile ? 68 : 140}
+					autofocus={!mobile}
 					showPopout={true}
 					expanded={commentExpanded}
 					onPopout={() => {
 						commentExpanded = !commentExpanded;
 					}}
 					isMobile={mobile}
+					status={draftStatus}
 				/>
 			</div>
 		{/if}
@@ -689,7 +730,7 @@
 
 	{#if restoredFromDraft}
 		<div
-			class="shrink-0 flex items-center justify-between gap-2 px-5 py-2 border-b border-border bg-accent text-[12px] text-muted-foreground"
+			class="shrink-0 flex items-center justify-between gap-2 px-5 py-2 border-b border-border bg-muted text-[12px] text-muted-foreground"
 		>
 			<span>Restored unsaved draft</span>
 			<button type="button" class="text-muted-foreground underline hover:opacity-70" onclick={discardDraft}>
@@ -700,6 +741,14 @@
 {/snippet}
 
 <!-- Desktop: centered dialog -->
+<!-- A reload, tab close or app switch skips onDestroy, so write the pending draft as the page hides. -->
+<svelte:window onpagehide={flushPendingDraft} />
+<svelte:document
+	onvisibilitychange={() => {
+		if (document.visibilityState === 'hidden') flushPendingDraft();
+	}}
+/>
+
 {#if !isMobile.current}
 	<Dialog
 		bind:open
@@ -710,6 +759,7 @@
 		<DialogContent
 			class="w-[calc(100vw-2rem)] max-h-[90vh] overflow-hidden p-0 flex flex-col sm:max-w-[760px]"
 			overlayClass="bg-black/45"
+			aria-label={dialogName}
 		>
 			{@render modalBody(false)}
 		</DialogContent>
@@ -722,7 +772,7 @@
 			if (!isOpen) onClose();
 		}}
 	>
-		<DrawerContent class="max-h-[88dvh] flex flex-col p-0">
+		<DrawerContent class="max-h-[88dvh] flex flex-col p-0" aria-label={dialogName}>
 			{@render modalBody(true)}
 		</DrawerContent>
 	</Drawer>

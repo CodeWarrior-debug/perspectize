@@ -262,7 +262,7 @@ function renderWebPageCell(opts: {
 	return cell;
 }
 
-export interface ActivityItemCellRendererParams {
+export interface LibraryItemCellRendererParams {
 	data?: {
 		id: string | number;
 		name: string;
@@ -293,7 +293,7 @@ const PLAY_ICON_SVG = `<svg width="14" height="14" viewBox="0 0 24 24" fill="non
  * larger-thumbnail) version this replaced, and CLAUDE.md's AG Grid gotcha
  * for why `whitespace-normal` below is required.
  */
-export function activityItemCellRenderer(params: ActivityItemCellRendererParams): HTMLElement | string {
+export function libraryItemCellRenderer(params: LibraryItemCellRendererParams): HTMLElement | string {
 	if (!params.data) return '';
 
 	const { id, name, url, contentType, displayTitle, verseStartID, verseEndID, movie, book, response, webPage } =

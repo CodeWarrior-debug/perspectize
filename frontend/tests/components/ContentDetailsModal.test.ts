@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/svelte';
-import ActivityDetailsModal from '#lib/components/ActivityDetailsModal.svelte';
+import ContentDetailsModal from '#lib/components/ContentDetailsModal.svelte';
 import { MODAL_ACTION_CLASS } from '#lib/components/modal-action.js';
 import { warmUpRender } from '../helpers/warmUp';
 
@@ -77,18 +77,18 @@ const content = {
 
 // Pay the component's first-render cost before any test, not inside the first
 // one: under full-suite load it alone can pass the 5 s testTimeout (#728).
-warmUpRender(ActivityDetailsModal, { content, open: true, onClose: () => {} });
+warmUpRender(ContentDetailsModal, { content, open: true, onClose: () => {} });
 
-describe('ActivityDetailsModal', () => {
+describe('ContentDetailsModal', () => {
 	beforeEach(reset);
 
 	it('renders nothing when closed', () => {
-		render(ActivityDetailsModal, { props: { content, open: false, onClose: vi.fn() } });
+		render(ContentDetailsModal, { props: { content, open: false, onClose: vi.fn() } });
 		expect(screen.queryByText(content.name)).not.toBeInTheDocument();
 	});
 
 	it('renders the video title, channel, link, and stats when open', () => {
-		render(ActivityDetailsModal, { props: { content, open: true, onClose: vi.fn() } });
+		render(ContentDetailsModal, { props: { content, open: true, onClose: vi.fn() } });
 
 		expect(screen.getByText(content.name)).toBeInTheDocument();
 		expect(screen.getByText('TBD tribute')).toBeInTheDocument();
@@ -99,7 +99,7 @@ describe('ActivityDetailsModal', () => {
 	});
 
 	it('labels the length tile "Duration" to match the grid column', () => {
-		render(ActivityDetailsModal, { props: { content, open: true, onClose: vi.fn() } });
+		render(ContentDetailsModal, { props: { content, open: true, onClose: vi.fn() } });
 
 		expect(screen.getByText('Duration')).toBeInTheDocument();
 		expect(screen.queryByText('Length')).not.toBeInTheDocument();
@@ -109,7 +109,7 @@ describe('ActivityDetailsModal', () => {
 	// hard-coded "YouTube Video" regardless of content type -- even though all
 	// three were already on the ContentItem rows both callers pass in.
 	it('shows the primary category and the date added to Perspectize', () => {
-		render(ActivityDetailsModal, { props: { content, open: true, onClose: vi.fn() } });
+		render(ContentDetailsModal, { props: { content, open: true, onClose: vi.fn() } });
 
 		expect(screen.getByText('Category')).toBeInTheDocument();
 		expect(screen.getByText('Powerlifting')).toBeInTheDocument();
@@ -118,7 +118,7 @@ describe('ActivityDetailsModal', () => {
 	});
 
 	it('shows an em dash for category and date added when the content has neither', () => {
-		render(ActivityDetailsModal, {
+		render(ContentDetailsModal, {
 			props: {
 				content: { ...content, primaryCategory: null, createdAt: undefined },
 				open: true,
@@ -131,7 +131,7 @@ describe('ActivityDetailsModal', () => {
 	});
 
 	it('labels the header "YouTube Video" for a YOUTUBE content item', () => {
-		render(ActivityDetailsModal, { props: { content, open: true, onClose: vi.fn() } });
+		render(ContentDetailsModal, { props: { content, open: true, onClose: vi.fn() } });
 		expect(screen.getByText('YouTube Video')).toBeInTheDocument();
 	});
 
@@ -139,35 +139,43 @@ describe('ActivityDetailsModal', () => {
 		const TMDB_NOTICE = 'This product uses the TMDB API but is not endorsed or certified by TMDB.';
 
 		it('is shown for a MOVIE row', () => {
-			render(ActivityDetailsModal, {
+			render(ContentDetailsModal, {
 				props: { content: { ...content, contentType: 'MOVIE' }, open: true, onClose: vi.fn() },
 			});
 			expect(screen.getByText(TMDB_NOTICE)).toBeInTheDocument();
 		});
 
 		it('is hidden for a YOUTUBE_VIDEO row', () => {
-			render(ActivityDetailsModal, { props: { content, open: true, onClose: vi.fn() } });
+			render(ContentDetailsModal, { props: { content, open: true, onClose: vi.fn() } });
 			expect(screen.queryByText(TMDB_NOTICE)).not.toBeInTheDocument();
 		});
 	});
 
 	it('labels the header "Claim" for a CLAIM content item', () => {
-		render(ActivityDetailsModal, {
+		render(ContentDetailsModal, {
 			props: { content: { ...content, contentType: 'CLAIM' }, open: true, onClose: vi.fn() },
 		});
 		expect(screen.getByText('Claim')).toBeInTheDocument();
 		expect(screen.queryByText('YouTube Video')).not.toBeInTheDocument();
 	});
 
+	it('shows the claim type icon, not an empty box, where the thumbnail goes for a CLAIM', () => {
+		render(ContentDetailsModal, {
+			props: { content: { ...content, contentType: 'CLAIM', url: null }, open: true, onClose: vi.fn() },
+		});
+		expect(document.querySelector('[data-icon="claim"]')).not.toBeNull();
+		expect(document.querySelector('img')).toBeNull();
+	});
+
 	it('falls back to "YouTube Video" when contentType is not provided (backward compatibility)', () => {
 		const { contentType, ...withoutType } = content;
-		render(ActivityDetailsModal, { props: { content: withoutType, open: true, onClose: vi.fn() } });
+		render(ContentDetailsModal, { props: { content: withoutType, open: true, onClose: vi.fn() } });
 		expect(screen.getByText('YouTube Video')).toBeInTheDocument();
 	});
 
 	it('shows a loading indicator for perspectives and avg rating while the aggregates query is in flight', () => {
 		mocks.mockQueryState.isLoading = true;
-		render(ActivityDetailsModal, { props: { content, open: true, onClose: vi.fn() } });
+		render(ContentDetailsModal, { props: { content, open: true, onClose: vi.fn() } });
 
 		expect(screen.getByText('Perspectives')).toBeInTheDocument();
 		expect(screen.getByText('Avg. Rating')).toBeInTheDocument();
@@ -178,7 +186,7 @@ describe('ActivityDetailsModal', () => {
 		mocks.mockQueryState.data = {
 			contentByID: { id: content.id, perspectiveCount: 7, averageRating: 8234, qualityRatingCount: 5 },
 		};
-		render(ActivityDetailsModal, { props: { content, open: true, onClose: vi.fn() } });
+		render(ContentDetailsModal, { props: { content, open: true, onClose: vi.fn() } });
 
 		expect(screen.getByText('7')).toBeInTheDocument();
 		expect(screen.getByText('8.234')).toBeInTheDocument();
@@ -188,7 +196,7 @@ describe('ActivityDetailsModal', () => {
 		mocks.mockQueryState.data = {
 			contentByID: { id: content.id, perspectiveCount: 0, averageRating: null, qualityRatingCount: 0 },
 		};
-		render(ActivityDetailsModal, { props: { content, open: true, onClose: vi.fn() } });
+		render(ContentDetailsModal, { props: { content, open: true, onClose: vi.fn() } });
 
 		expect(screen.getByText('0')).toBeInTheDocument();
 		expect(screen.getByText('—')).toBeInTheDocument();
@@ -198,7 +206,7 @@ describe('ActivityDetailsModal', () => {
 		mocks.mockQueryState.data = {
 			contentByID: { id: content.id, perspectiveCount: 7, averageRating: 8234, qualityRatingCount: 5 },
 		};
-		render(ActivityDetailsModal, { props: { content, open: true, onClose: vi.fn() } });
+		render(ContentDetailsModal, { props: { content, open: true, onClose: vi.fn() } });
 
 		expect(screen.getByText('Avg. Rating').closest('[data-tooltip]')).toHaveAttribute(
 			'data-tooltip',
@@ -210,7 +218,7 @@ describe('ActivityDetailsModal', () => {
 		mocks.mockQueryState.data = {
 			contentByID: { id: content.id, perspectiveCount: 1, averageRating: 8234, qualityRatingCount: 1 },
 		};
-		render(ActivityDetailsModal, { props: { content, open: true, onClose: vi.fn() } });
+		render(ContentDetailsModal, { props: { content, open: true, onClose: vi.fn() } });
 
 		expect(screen.getByText('Avg. Rating').closest('[data-tooltip]')).toHaveAttribute(
 			'data-tooltip',
@@ -219,32 +227,32 @@ describe('ActivityDetailsModal', () => {
 	});
 
 	it('renders tags when present', () => {
-		render(ActivityDetailsModal, { props: { content, open: true, onClose: vi.fn() } });
+		render(ContentDetailsModal, { props: { content, open: true, onClose: vi.fn() } });
 		expect(screen.getByText('tom brady, tom brady goat')).toBeInTheDocument();
 	});
 
 	it('renders the description above the tags when present', () => {
-		render(ActivityDetailsModal, { props: { content, open: true, onClose: vi.fn() } });
+		render(ContentDetailsModal, { props: { content, open: true, onClose: vi.fn() } });
 		expect(screen.getByText('Description')).toBeInTheDocument();
 		expect(screen.getByText(content.description)).toBeInTheDocument();
 	});
 
 	it('omits the description section when there is none', () => {
-		render(ActivityDetailsModal, {
+		render(ContentDetailsModal, {
 			props: { content: { ...content, description: null }, open: true, onClose: vi.fn() },
 		});
 		expect(screen.queryByText('Description')).not.toBeInTheDocument();
 	});
 
 	it('omits the tags section when there are none', () => {
-		render(ActivityDetailsModal, {
+		render(ContentDetailsModal, {
 			props: { content: { ...content, tags: null }, open: true, onClose: vi.fn() },
 		});
 		expect(screen.queryByText('Tags')).not.toBeInTheDocument();
 	});
 
 	it('renders an "Update source data" button that triggers the update mutation for this item', async () => {
-		render(ActivityDetailsModal, { props: { content, open: true, onClose: vi.fn() } });
+		render(ContentDetailsModal, { props: { content, open: true, onClose: vi.fn() } });
 		const button = screen.getByRole('button', { name: 'Update source data' });
 		expect(button).toBeInTheDocument();
 
@@ -255,7 +263,7 @@ describe('ActivityDetailsModal', () => {
 
 	it('disables the Update source data button while the mutation is pending', () => {
 		mocks.mockMutationState.isPending = true;
-		render(ActivityDetailsModal, { props: { content, open: true, onClose: vi.fn() } });
+		render(ContentDetailsModal, { props: { content, open: true, onClose: vi.fn() } });
 
 		const button = screen.getByRole('button', { name: /update source data/i });
 		expect(button).toBeDisabled();
@@ -263,14 +271,14 @@ describe('ActivityDetailsModal', () => {
 
 	it('calls onClose when the close button is clicked', async () => {
 		const onClose = vi.fn();
-		render(ActivityDetailsModal, { props: { content, open: true, onClose } });
+		render(ContentDetailsModal, { props: { content, open: true, onClose } });
 
 		await fireEvent.click(screen.getByRole('button', { name: /close/i }));
 		expect(onClose).toHaveBeenCalled();
 	});
 
 	it('renders a Compare link pointing at /compare for this content', () => {
-		render(ActivityDetailsModal, { props: { content, open: true, onClose: vi.fn() } });
+		render(ContentDetailsModal, { props: { content, open: true, onClose: vi.fn() } });
 		const link = screen.getByRole('link', { name: /compare/i });
 		expect(link).toHaveAttribute('href', `/compare?contentId=${content.id}`);
 	});
@@ -311,7 +319,7 @@ describe('ActivityDetailsModal', () => {
 			movie,
 		});
 		const open = (movie: unknown) =>
-			render(ActivityDetailsModal, { props: { content: movieRow(movie), open: true, onClose: vi.fn() } });
+			render(ContentDetailsModal, { props: { content: movieRow(movie), open: true, onClose: vi.fn() } });
 
 		it('labels the header Movie and drops the YouTube-only tiles', () => {
 			open(baseMovie);
@@ -402,7 +410,7 @@ describe('ActivityDetailsModal', () => {
 		});
 
 		it('keeps Views, Likes and Update source data for a YouTube row', () => {
-			render(ActivityDetailsModal, { props: { content, open: true, onClose: vi.fn() } });
+			render(ContentDetailsModal, { props: { content, open: true, onClose: vi.fn() } });
 			expect(screen.getByText('Views')).toBeInTheDocument();
 			expect(screen.getByText('Likes')).toBeInTheDocument();
 			expect(screen.getByRole('button', { name: 'Update source data' })).toBeInTheDocument();
@@ -441,7 +449,7 @@ describe('ActivityDetailsModal', () => {
 		});
 
 		it('shows the position bar, a versioned Bible Gateway link, and collapsed commentaries', () => {
-			render(ActivityDetailsModal, { props: { content: passage, open: true, onClose: vi.fn() } });
+			render(ContentDetailsModal, { props: { content: passage, open: true, onClose: vi.fn() } });
 
 			expect(screen.getByText(/Verses 1–3 of 31,102 · Genesis \(book 1 of 66\)/)).toBeInTheDocument();
 			expect(screen.getByRole('link', { name: /read on bible gateway/i })).toHaveAttribute(
@@ -452,17 +460,17 @@ describe('ActivityDetailsModal', () => {
 		});
 
 		it('does not show the raw version-less Bible Gateway url as a link (it would serve a different translation)', () => {
-			render(ActivityDetailsModal, { props: { content: passage, open: true, onClose: vi.fn() } });
+			render(ContentDetailsModal, { props: { content: passage, open: true, onClose: vi.fn() } });
 			expect(screen.queryByText(passage.url)).not.toBeInTheDocument();
 		});
 
 		it('does not show passage links for a YouTube video', () => {
-			render(ActivityDetailsModal, { props: { content, open: true, onClose: vi.fn() } });
+			render(ContentDetailsModal, { props: { content, open: true, onClose: vi.fn() } });
 			expect(screen.queryByRole('link', { name: /read on bible gateway/i })).not.toBeInTheDocument();
 		});
 
 		it('shows the passage header, reference, and passage text with no video stat tiles', () => {
-			render(ActivityDetailsModal, { props: { content: passage, open: true, onClose: vi.fn() } });
+			render(ContentDetailsModal, { props: { content: passage, open: true, onClose: vi.fn() } });
 
 			expect(screen.getByText('Bible Passage')).toBeInTheDocument();
 			expect(screen.queryByText('YouTube Video')).not.toBeInTheDocument();
@@ -478,7 +486,7 @@ describe('ActivityDetailsModal', () => {
 		});
 
 		it('offers a title form while untitled and submits the trimmed title', async () => {
-			render(ActivityDetailsModal, { props: { content: passage, open: true, onClose: vi.fn() } });
+			render(ContentDetailsModal, { props: { content: passage, open: true, onClose: vi.fn() } });
 
 			const save = screen.getByRole('button', { name: /save title/i });
 			expect(save).toBeDisabled();
@@ -491,7 +499,7 @@ describe('ActivityDetailsModal', () => {
 		});
 
 		it('shows the display title with the reference as subtitle and hides the form once titled', () => {
-			render(ActivityDetailsModal, {
+			render(ContentDetailsModal, {
 				props: { content: { ...passage, displayTitle: 'Creation' }, open: true, onClose: vi.fn() },
 			});
 
@@ -503,26 +511,26 @@ describe('ActivityDetailsModal', () => {
 
 		it('disables Save title while the mutation is pending', async () => {
 			mocks.mockMutationState.isPending = true;
-			render(ActivityDetailsModal, { props: { content: passage, open: true, onClose: vi.fn() } });
+			render(ContentDetailsModal, { props: { content: passage, open: true, onClose: vi.fn() } });
 
 			await fireEvent.input(screen.getByLabelText('Passage title'), { target: { value: 'Creation' } });
 			expect(screen.getByRole('button', { name: /save title/i })).toBeDisabled();
 		});
 
 		it('sizes Save title like the other dialog actions and its input to match (#667)', () => {
-			render(ActivityDetailsModal, { props: { content: passage, open: true, onClose: vi.fn() } });
+			render(ContentDetailsModal, { props: { content: passage, open: true, onClose: vi.fn() } });
 			const save = screen.getByRole('button', { name: /save title/i });
 			for (const c of MODAL_ACTION_CLASS.split(' ')) expect(save).toHaveClass(c);
 			expect(screen.getByLabelText('Passage title')).toHaveClass('h-9');
 		});
 
 		it('offers original language for a passage', () => {
-			render(ActivityDetailsModal, { props: { content: passage, open: true, onClose: vi.fn() } });
+			render(ContentDetailsModal, { props: { content: passage, open: true, onClose: vi.fn() } });
 			expect(screen.getByRole('button', { name: /show original language/i })).toBeInTheDocument();
 		});
 
 		it('does not offer original language for a YouTube video', () => {
-			render(ActivityDetailsModal, { props: { content, open: true, onClose: vi.fn() } });
+			render(ContentDetailsModal, { props: { content, open: true, onClose: vi.fn() } });
 			expect(screen.queryByRole('button', { name: /original language/i })).not.toBeInTheDocument();
 		});
 	});
@@ -539,7 +547,7 @@ describe('ActivityDetailsModal', () => {
 					importedFrom: { id: '12', name: 'Spring 2026 watchlist' },
 				},
 			};
-			render(ActivityDetailsModal, { props: { content, open: true, onClose: vi.fn() } });
+			render(ContentDetailsModal, { props: { content, open: true, onClose: vi.fn() } });
 
 			expect(screen.getByText('Imported from')).toBeInTheDocument();
 			const link = screen.getByRole('link', { name: 'Spring 2026 watchlist' });
@@ -556,7 +564,7 @@ describe('ActivityDetailsModal', () => {
 					importedFrom: null,
 				},
 			};
-			render(ActivityDetailsModal, { props: { content, open: true, onClose: vi.fn() } });
+			render(ContentDetailsModal, { props: { content, open: true, onClose: vi.fn() } });
 
 			expect(screen.queryByText('Imported from')).not.toBeInTheDocument();
 			expect(screen.queryByRole('link', { name: /spring/i })).not.toBeInTheDocument();
@@ -565,14 +573,14 @@ describe('ActivityDetailsModal', () => {
 		it('shows no row and no error while the aggregates are still loading', () => {
 			mocks.mockQueryState.isLoading = true;
 			mocks.mockQueryState.data = undefined;
-			render(ActivityDetailsModal, { props: { content, open: true, onClose: vi.fn() } });
+			render(ContentDetailsModal, { props: { content, open: true, onClose: vi.fn() } });
 
 			expect(screen.queryByText('Imported from')).not.toBeInTheDocument();
 			expect(screen.getByText('Perspectives')).toBeInTheDocument();
 		});
 
 		it('ignores an importedFrom carried on the row itself (only the viewer-scoped query is trusted)', () => {
-			render(ActivityDetailsModal, {
+			render(ContentDetailsModal, {
 				props: {
 					content: { ...content, importedFrom: { id: '12', name: 'Spring 2026 watchlist' } } as any,
 					open: true,
@@ -614,7 +622,7 @@ describe('ActivityDetailsModal', () => {
 			book,
 		});
 		const open = (book: unknown) =>
-			render(ActivityDetailsModal, { props: { content: bookRow(book), open: true, onClose: vi.fn() } });
+			render(ContentDetailsModal, { props: { content: bookRow(book), open: true, onClose: vi.fn() } });
 
 		it('labels the header Book, shows the author under the title, and the Open Library attribution', () => {
 			open(eastOfEden);
@@ -673,7 +681,7 @@ describe('ActivityDetailsModal', () => {
 			movie: null,
 		};
 		const renderRow = (row: unknown) =>
-			render(ActivityDetailsModal, { props: { content: row as any, open: true, onClose: vi.fn() } });
+			render(ContentDetailsModal, { props: { content: row as any, open: true, onClose: vi.fn() } });
 
 		it('is visible and enabled for a movie updated more than 6h ago', () => {
 			renderRow({ ...movie, updatedAt: updatedAgo(7 * HOUR_MS) });
@@ -741,7 +749,7 @@ describe('ActivityDetailsModal', () => {
 		it('shows Add to plan for a signed-in user and passes the content to onAddToPlan', async () => {
 			authState.userId = 'user_1';
 			const onAddToPlan = vi.fn();
-			render(ActivityDetailsModal, { props: { content, open: true, onClose: vi.fn(), onAddToPlan } });
+			render(ContentDetailsModal, { props: { content, open: true, onClose: vi.fn(), onAddToPlan } });
 
 			await fireEvent.click(screen.getByRole('button', { name: 'Add to plan' }));
 			expect(onAddToPlan).toHaveBeenCalledTimes(1);
@@ -753,7 +761,7 @@ describe('ActivityDetailsModal', () => {
 			async (contentType) => {
 				const onAddPerspective = vi.fn();
 				const row = { ...content, contentType };
-				render(ActivityDetailsModal, { props: { content: row, open: true, onClose: vi.fn(), onAddPerspective } });
+				render(ContentDetailsModal, { props: { content: row, open: true, onClose: vi.fn(), onAddPerspective } });
 
 				await fireEvent.click(screen.getByRole('button', { name: 'Add perspective' }));
 				expect(onAddPerspective).toHaveBeenCalledTimes(1);
@@ -762,18 +770,18 @@ describe('ActivityDetailsModal', () => {
 		);
 
 		it('hides Add perspective when no handler is provided', () => {
-			render(ActivityDetailsModal, { props: { content, open: true, onClose: vi.fn() } });
+			render(ContentDetailsModal, { props: { content, open: true, onClose: vi.fn() } });
 			expect(screen.queryByRole('button', { name: 'Add perspective' })).toBeNull();
 		});
 
 		it('hides Add to plan for a signed-out user', () => {
-			render(ActivityDetailsModal, { props: { content, open: true, onClose: vi.fn(), onAddToPlan: vi.fn() } });
+			render(ContentDetailsModal, { props: { content, open: true, onClose: vi.fn(), onAddToPlan: vi.fn() } });
 			expect(screen.queryByRole('button', { name: 'Add to plan' })).toBeNull();
 		});
 
 		it('renders no Add to plan action when the parent does not handle it', () => {
 			authState.userId = 'user_1';
-			render(ActivityDetailsModal, { props: { content, open: true, onClose: vi.fn() } });
+			render(ContentDetailsModal, { props: { content, open: true, onClose: vi.fn() } });
 			expect(screen.queryByRole('button', { name: 'Add to plan' })).toBeNull();
 		});
 	});
@@ -794,7 +802,7 @@ describe('ActivityDetailsModal', () => {
 		}
 
 		it('gives Compare, Add to plan and Update source data the same size and look', () => {
-			render(ActivityDetailsModal, { props: { content, open: true, onClose: vi.fn(), onAddToPlan: vi.fn() } });
+			render(ContentDetailsModal, { props: { content, open: true, onClose: vi.fn(), onAddToPlan: vi.fn() } });
 			for (const el of actions()) {
 				for (const c of shared) expect(el).toHaveClass(c);
 				expect(el).toHaveClass('grow', 'basis-36');
@@ -802,13 +810,13 @@ describe('ActivityDetailsModal', () => {
 		});
 
 		it('gives every action one leading icon, so none sits lower or narrower than its neighbours', () => {
-			render(ActivityDetailsModal, { props: { content, open: true, onClose: vi.fn(), onAddToPlan: vi.fn() } });
+			render(ContentDetailsModal, { props: { content, open: true, onClose: vi.fn(), onAddToPlan: vi.fn() } });
 			for (const el of actions()) expect(el.querySelectorAll('svg')).toHaveLength(1);
 		});
 
 		it('swaps the refresh icon for a spinner while updating, keeping one icon so the width holds', () => {
 			mocks.mockMutationState.isPending = true;
-			render(ActivityDetailsModal, { props: { content, open: true, onClose: vi.fn(), onAddToPlan: vi.fn() } });
+			render(ContentDetailsModal, { props: { content, open: true, onClose: vi.fn(), onAddToPlan: vi.fn() } });
 			const button = screen.getByRole('button', { name: 'Update source data' });
 			const icons = button.querySelectorAll('svg');
 			expect(icons).toHaveLength(1);
@@ -816,7 +824,7 @@ describe('ActivityDetailsModal', () => {
 		});
 
 		it('puts the actions on their own row under the date instead of beside it', () => {
-			render(ActivityDetailsModal, { props: { content, open: true, onClose: vi.fn(), onAddToPlan: vi.fn() } });
+			render(ContentDetailsModal, { props: { content, open: true, onClose: vi.fn(), onAddToPlan: vi.fn() } });
 			const row = screen.getByTestId('details-actions');
 			expect(row).toHaveClass('flex', 'flex-wrap', 'gap-2');
 			expect(row).not.toHaveTextContent(/last updated/i);

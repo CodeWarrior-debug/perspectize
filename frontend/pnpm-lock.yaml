@@ -57,11 +57,17 @@ importers:
         specifier: ^1.33.5
         version: 1.33.5(svelte@5.57.3)
       '@tanstack/svelte-query':
-        specifier: ^6.4.1
-        version: 6.4.1(svelte@5.57.3)
+        specifier: ^6.4.4
+        version: 6.4.4(svelte@5.57.3)
       '@tiptap/core':
         specifier: ^3.34.0
         version: 3.34.0(@tiptap/pm@3.34.0)
+      '@tiptap/extension-bubble-menu':
+        specifier: 3.34.0
+        version: 3.34.0(@tiptap/core@3.34.0(@tiptap/pm@3.34.0))(@tiptap/pm@3.34.0)
+      '@tiptap/extension-heading':
+        specifier: 3.34.0
+        version: 3.34.0(@tiptap/core@3.34.0(@tiptap/pm@3.34.0))
       '@tiptap/extension-image':
         specifier: ^3.34.0
         version: 3.34.0(@tiptap/core@3.34.0(@tiptap/pm@3.34.0))
@@ -83,12 +89,21 @@ importers:
       '@tiptap/extension-table-row':
         specifier: ^3.34.0
         version: 3.34.0(@tiptap/extension-table@3.34.0(@tiptap/core@3.34.0(@tiptap/pm@3.34.0))(@tiptap/pm@3.34.0))
+      '@tiptap/extension-typography':
+        specifier: 3.34.0
+        version: 3.34.0(@tiptap/core@3.34.0(@tiptap/pm@3.34.0))
       '@tiptap/extension-underline':
         specifier: ^3.34.0
         version: 3.34.0(@tiptap/core@3.34.0(@tiptap/pm@3.34.0))
+      '@tiptap/extensions':
+        specifier: 3.34.0
+        version: 3.34.0(@tiptap/core@3.34.0(@tiptap/pm@3.34.0))(@tiptap/pm@3.34.0)
       '@tiptap/starter-kit':
         specifier: ^3.34.0
         version: 3.34.0
+      '@tiptap/suggestion':
+        specifier: 3.34.0
+        version: 3.34.0(@floating-ui/dom@1.8.0)(@tiptap/core@3.34.0(@tiptap/pm@3.34.0))(@tiptap/pm@3.34.0)
       ag-grid-svelte5:
         specifier: ^1.0.3
         version: 1.0.3
@@ -108,8 +123,8 @@ importers:
         specifier: ^7.4.0
         version: 7.4.0(graphql@16.15.0)
       graphql-ws:
-        specifier: ^6.4.2
-        version: 6.4.2(graphql@16.15.0)(ws@8.21.3)
+        specifier: ^6.4.3
+        version: 6.4.3(graphql@16.15.0)(ws@8.21.3)
       svelte-clerk:
         specifier: ^1.3.0
         version: 1.3.0(@sveltejs/kit@3.2.0(@opentelemetry/api@1.9.1)(@sveltejs/vite-plugin-svelte@7.3.1(svelte@5.57.3)(vite@8.3.8(@types/node@25.2.1)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.50.0)))(svelte@5.57.3)(typescript@6.0.3)(vite@8.3.8(@types/node@25.2.1)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.50.0)))(svelte@5.57.3)
@@ -117,8 +132,8 @@ importers:
         specifier: ^1.2.3
         version: 1.2.3(svelte@5.57.3)
       tailwind-merge:
-        specifier: ^3.7.0
-        version: 3.7.0
+        specifier: ^3.7.1
+        version: 3.7.1
     devDependencies:
       '@grafana/faro-rollup-plugin':
         specifier: 0.13.2
@@ -1627,8 +1642,8 @@ packages:
   '@tanstack/query-core@5.104.5':
     resolution: {integrity: sha512-Q94gI8Opd+CbdVNOdj8ZCyV8WqLYitrDq1t96Xc8WZT6lY0r5iRnJLXYDxMex7EEf2v+mXvn4FcjaBKSxXZQ9A==}
 
-  '@tanstack/query-core@5.107.1':
-    resolution: {integrity: sha512-PSyAik11oQBEVOiVy5hjZWHmoUqOXqK1WYy4v55mcxozEfKaQgpUMsgnXhWjuESzSht8JfzqMS1m6M/9CpNgvg==}
+  '@tanstack/query-core@5.108.1':
+    resolution: {integrity: sha512-GBX6Xsc9E+9eVLLxuM7orQNbssQjpruOCbocBYwT78MjxOWT5I+CWdvEo0N+UM6+oCZEKxuSud1oFLvE3OEmIg==}
 
   '@tanstack/store@0.11.0':
     resolution: {integrity: sha512-WlzzCt3xi0G6pCAJu1U+2jiECwabETDpQDi3hfkFZvJii9AuZqEKbOiVarX1/bWhTNjU486yQtJCCasi/0q+Cw==}
@@ -1638,8 +1653,8 @@ packages:
     peerDependencies:
       svelte: ^5.0.0
 
-  '@tanstack/svelte-query@6.4.1':
-    resolution: {integrity: sha512-5j0PrXJOx8Ay6s13UamdLL6oc4stG84kVv0/WwFN74y5mkWDR20wNs9idYD4wb3etAI/slmKzPQzNkAzumKkMg==}
+  '@tanstack/svelte-query@6.4.4':
+    resolution: {integrity: sha512-BqLa+1Bv7jtaB1hXlKeNK12DqbFe6GvXZufMkulHlHYw1QiwxLrauDpNjPmn7AZ0BHkzq7TJ2dPmayzvONTZEg==}
     peerDependencies:
       svelte: ^5.25.0
 
@@ -1693,6 +1708,12 @@ packages:
     resolution: {integrity: sha512-QvqHpxDe1vEnaOk88O28zsKD+jXTRWOYTBuoosLJzU+fNedC0z3uEXVqUUO4ljwJxj604mLuQBB4aVb+/7ObSg==}
     peerDependencies:
       '@tiptap/core': 3.34.0
+
+  '@tiptap/extension-bubble-menu@3.34.0':
+    resolution: {integrity: sha512-Q6+/RxlaYLsF+hm9MFY//wwVFA4Apfjn2EAnbjaBlaiIs1LtB/s5t5fSjRwCBzadTf9ysMvGh7parpN1hT0tug==}
+    peerDependencies:
+      '@tiptap/core': 3.34.0
+      '@tiptap/pm': 3.34.0
 
   '@tiptap/extension-bullet-list@3.34.0':
     resolution: {integrity: sha512-3xtzmtIMoqGa3fAcNmRiR1DHTBMiGr167mgt5ksK6a+m38tCl74W+kPf59HknGojbhI/pVM+Unf2htsOdijDNw==}
@@ -1819,6 +1840,11 @@ packages:
     peerDependencies:
       '@tiptap/core': 3.34.0
 
+  '@tiptap/extension-typography@3.34.0':
+    resolution: {integrity: sha512-9TUYoDTuIo3gn9AkpmmWhSDIYFKuSklNKMs2V38oeI6g+yOBx7mDADlMrQIA8nGZNk4A9kSNpCaeO4gx9AjjvQ==}
+    peerDependencies:
+      '@tiptap/core': 3.34.0
+
   '@tiptap/extension-underline@3.34.0':
     resolution: {integrity: sha512-4/Di2L96tCUo31SalwjeElOQC64bP2lIqXsruYNndo510fAkYEmzGHhfu4Eh0a4Z94lyA9BYI9zAgJS2yTdq8w==}
     peerDependencies:
@@ -1835,6 +1861,13 @@ packages:
 
   '@tiptap/starter-kit@3.34.0':
     resolution: {integrity: sha512-SPlLjlGD8KpTBsUQJfNuRLprSCV8d69QACBloPZXCF0XGfpTmJWFzt1vGTfBzisRrI1iV/goXJJr8qw2SAIpiw==}
+
+  '@tiptap/suggestion@3.34.0':
+    resolution: {integrity: sha512-+gu9T9lc+6UeREkxIZan/HtMkmlT6LJmI7XqhaXl9nxCkVDy0KmaTs1Us03FafNbJ9yHLPq2ykth87CMWWsMcw==}
+    peerDependencies:
+      '@floating-ui/dom': ^1.0.0
+      '@tiptap/core': 3.34.0
+      '@tiptap/pm': 3.34.0
 
   '@tybys/wasm-util@0.10.5':
     resolution: {integrity: sha512-dOGOPxlaNV+G046mZzN+9C0dAcQZeSKcXiVaM0TYy/LM4ttTmgSBDxYfovcYI8Em3+eAbiAYpvWLOv8+ZVRJKA==}
@@ -2701,8 +2734,8 @@ packages:
     peerDependencies:
       graphql: 14 - 16
 
-  graphql-ws@6.4.2:
-    resolution: {integrity: sha512-wxhPhhOGJo8PbGDkBYVE76sZLDrS+GkyrR4bZECSLVbo0pZZNKs0HtBh2Ip/uaUuiVUxwO9ssI9R92buQfNSqQ==}
+  graphql-ws@6.4.3:
+    resolution: {integrity: sha512-wdnv6+iQF0U3rPeaoCALqyFHLE7zansTAqBnsrbwyzgj/Iu0kaglAsA8k3nGDHu9AmeGOQI3uH6C+ojz3DO9AA==}
     engines: {node: '>=20'}
     peerDependencies:
       '@fastify/websocket': ^10 || ^11
@@ -3829,8 +3862,8 @@ packages:
     resolution: {integrity: sha512-yEFYrVhod+hdNyx7g5Bnkkb0G6si8HJurOoOEgC8B/O0uXLHlaey/65KRv6cuWBNhBgHKAROVpc7QyYqE5gFng==}
     engines: {node: '>=20'}
 
-  tailwind-merge@3.7.0:
-    resolution: {integrity: sha512-XPPUyAc+cvspz3lHTcR/QgPfW2A0lv/xQNIjX3HGhLR+Nq2lHaLq5MtTesHn8GUr3W3DguT2KT5x3NVgRtYwmA==}
+  tailwind-merge@3.7.1:
+    resolution: {integrity: sha512-v7y4BV4FUlO8exj/4M5UXKeoowDiuugVUg3tkMNIyOUCOHy5xp8+5aWQeXCtZ2491sUV1YPsVeM9EveZ6/xuZQ==}
 
   tailwind-variants@4.0.2:
     resolution: {integrity: sha512-sZvOFkfe5LlYG/crRX5IvP3oUHmJPu+7WmrLQFvF0kCRq51C+lurlzFMm/jURG/5keT7VOJ/it0N3jkzYux85w==}
@@ -5530,7 +5563,7 @@ snapshots:
 
   '@tanstack/query-core@5.104.5': {}
 
-  '@tanstack/query-core@5.107.1': {}
+  '@tanstack/query-core@5.108.1': {}
 
   '@tanstack/store@0.11.0': {}
 
@@ -5540,9 +5573,9 @@ snapshots:
       '@tanstack/svelte-store': 0.12.0(svelte@5.57.3)
       svelte: 5.57.3
 
-  '@tanstack/svelte-query@6.4.1(svelte@5.57.3)':
+  '@tanstack/svelte-query@6.4.4(svelte@5.57.3)':
     dependencies:
-      '@tanstack/query-core': 5.107.1
+      '@tanstack/query-core': 5.108.1
       svelte: 5.57.3
 
   '@tanstack/svelte-store@0.12.0(svelte@5.57.3)':
@@ -5596,6 +5629,12 @@ snapshots:
   '@tiptap/extension-bold@3.34.0(@tiptap/core@3.34.0(@tiptap/pm@3.34.0))':
     dependencies:
       '@tiptap/core': 3.34.0(@tiptap/pm@3.34.0)
+
+  '@tiptap/extension-bubble-menu@3.34.0(@tiptap/core@3.34.0(@tiptap/pm@3.34.0))(@tiptap/pm@3.34.0)':
+    dependencies:
+      '@floating-ui/dom': 1.8.0
+      '@tiptap/core': 3.34.0(@tiptap/pm@3.34.0)
+      '@tiptap/pm': 3.34.0
 
   '@tiptap/extension-bullet-list@3.34.0(@tiptap/extension-list@3.34.0(@tiptap/core@3.34.0(@tiptap/pm@3.34.0))(@tiptap/pm@3.34.0))':
     dependencies:
@@ -5699,6 +5738,10 @@ snapshots:
     dependencies:
       '@tiptap/core': 3.34.0(@tiptap/pm@3.34.0)
 
+  '@tiptap/extension-typography@3.34.0(@tiptap/core@3.34.0(@tiptap/pm@3.34.0))':
+    dependencies:
+      '@tiptap/core': 3.34.0(@tiptap/pm@3.34.0)
+
   '@tiptap/extension-underline@3.34.0(@tiptap/core@3.34.0(@tiptap/pm@3.34.0))':
     dependencies:
       '@tiptap/core': 3.34.0(@tiptap/pm@3.34.0)
@@ -5749,6 +5792,12 @@ snapshots:
       '@tiptap/extension-text': 3.34.0(@tiptap/core@3.34.0(@tiptap/pm@3.34.0))
       '@tiptap/extension-underline': 3.34.0(@tiptap/core@3.34.0(@tiptap/pm@3.34.0))
       '@tiptap/extensions': 3.34.0(@tiptap/core@3.34.0(@tiptap/pm@3.34.0))(@tiptap/pm@3.34.0)
+      '@tiptap/pm': 3.34.0
+
+  '@tiptap/suggestion@3.34.0(@floating-ui/dom@1.8.0)(@tiptap/core@3.34.0(@tiptap/pm@3.34.0))(@tiptap/pm@3.34.0)':
+    dependencies:
+      '@floating-ui/dom': 1.8.0
+      '@tiptap/core': 3.34.0(@tiptap/pm@3.34.0)
       '@tiptap/pm': 3.34.0
 
   '@tybys/wasm-util@0.10.5':
@@ -6612,7 +6661,7 @@ snapshots:
       '@graphql-typed-document-node/core': 3.2.0(graphql@16.15.0)
       graphql: 16.15.0
 
-  graphql-ws@6.4.2(graphql@16.15.0)(ws@8.21.3):
+  graphql-ws@6.4.3(graphql@16.15.0)(ws@8.21.3):
     dependencies:
       graphql: 16.15.0
     optionalDependencies:
@@ -7803,7 +7852,7 @@ snapshots:
 
   tagged-tag@1.0.0: {}
 
-  tailwind-merge@3.7.0: {}
+  tailwind-merge@3.7.1: {}
 
   tailwind-variants@4.0.2: {}
 

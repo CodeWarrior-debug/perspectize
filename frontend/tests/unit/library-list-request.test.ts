@@ -1,12 +1,12 @@
 /**
- * The Activity list key and request come from one builder (activityListRequest), which
- * ActivityTable and the route prefetch both use. These tests pin the key and the variables
+ * The Activity list key and request come from one builder (libraryListRequest), which
+ * ContentLibrary and the route prefetch both use. These tests pin the key and the variables
  * for the URL states that matter, so the refactor is provably behaviour-preserving and a
  * future key/variable desync (see frontend/CLAUDE.md, queryKey rule) fails here.
  */
 import { describe, it, expect } from 'vitest';
 import { hashKey } from '@tanstack/svelte-query';
-import { activityListRequest, cursorsAfterPage, LOADED_MODE_FIRST } from '#lib/queries/content/index.js';
+import { libraryListRequest, cursorsAfterPage, LOADED_MODE_FIRST } from '#lib/queries/content/index.js';
 import { queryKeys } from '#lib/queries/keys.js';
 import {
 	ALL_SEARCH_SCOPES,
@@ -18,9 +18,9 @@ import {
 
 const params = (qs: string) => parseGridParams(new URLSearchParams(qs));
 
-describe('activityListRequest: key parity with the request it describes', () => {
+describe('libraryListRequest: key parity with the request it describes', () => {
 	it('default (Loaded, first load): YouTube type filter, UPDATED_AT, first 10 in the key', () => {
-		const req = activityListRequest(params(''), null);
+		const req = libraryListRequest(params(''), null);
 		const expected = queryKeys.content.list({
 			sortBy: 'UPDATED_AT',
 			sortOrder: 'DESC',
@@ -45,7 +45,7 @@ describe('activityListRequest: key parity with the request it describes', () => 
 	});
 
 	it('"All" mode with a sort: the sort reaches both the key and the variables', () => {
-		const req = activityListRequest(params(`mode=all&sort=views.desc`), null);
+		const req = libraryListRequest(params(`mode=all&sort=views.desc`), null);
 		const sorts = [{ field: COL_TO_SORT.views, order: 'DESC' as const }];
 		const expected = queryKeys.content.list({
 			sortBy: COL_TO_SORT.views,
@@ -64,7 +64,7 @@ describe('activityListRequest: key parity with the request it describes', () => 
 	});
 
 	it('"All" mode with column filters: every filter reaches the key', () => {
-		const req = activityListRequest(params('mode=all&f.type=movie&f.views=1000..5000'), null);
+		const req = libraryListRequest(params('mode=all&f.type=movie&f.views=1000..5000'), null);
 		const urlFilters = { type: 'movie', views: '1000..5000' };
 		const filter = urlParamsToGraphQLFilter(urlFilters, '', ALL_SEARCH_SCOPES);
 		const expected = queryKeys.content.list({
@@ -84,7 +84,7 @@ describe('activityListRequest: key parity with the request it describes', () => 
 	});
 
 	it('search text and scopes: the search is in the key and the variables', () => {
-		const req = activityListRequest(params('q=matrix'), null);
+		const req = libraryListRequest(params('q=matrix'), null);
 		const filter = urlParamsToGraphQLFilter({ type: 'youtube_video' }, 'matrix', ALL_SEARCH_SCOPES);
 		const expected = queryKeys.content.list({
 			sortBy: 'UPDATED_AT',
@@ -102,7 +102,7 @@ describe('activityListRequest: key parity with the request it describes', () => 
 	});
 
 	it('"Loaded" mode ignores the sort and the cursor in the request, and keeps them out of the variables', () => {
-		const req = activityListRequest(params('mode=loaded&sort=views.desc'), null);
+		const req = libraryListRequest(params('mode=loaded&sort=views.desc'), null);
 		expect(req.variables.sorts).toBeUndefined();
 		expect(req.variables.sortBy).toBe('UPDATED_AT');
 		expect(req.variables.after).toBeNull();
@@ -110,17 +110,17 @@ describe('activityListRequest: key parity with the request it describes', () => 
 	});
 });
 
-describe('activityListRequest: every variable the request sends is in the key', () => {
+describe('libraryListRequest: every variable the request sends is in the key', () => {
 	it('the cursor (after) changes the key in "All" mode', () => {
-		const first = activityListRequest(params('mode=all'), null);
-		const second = activityListRequest(params('mode=all'), 'cursor:10');
+		const first = libraryListRequest(params('mode=all'), null);
+		const second = libraryListRequest(params('mode=all'), 'cursor:10');
 		expect(hashKey(first.queryKey)).not.toBe(hashKey(second.queryKey));
 		expect(second.variables.after).toBe('cursor:10');
 	});
 
 	it('the page size changes the key and the "All" mode request', () => {
-		const a = activityListRequest(params('mode=all&pageSize=10'), null);
-		const b = activityListRequest(params('mode=all&pageSize=25'), null);
+		const a = libraryListRequest(params('mode=all&pageSize=10'), null);
+		const b = libraryListRequest(params('mode=all&pageSize=25'), null);
 		expect(hashKey(a.queryKey)).not.toBe(hashKey(b.queryKey));
 		expect(b.variables.first).toBe(25);
 	});

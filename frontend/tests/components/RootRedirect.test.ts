@@ -8,7 +8,7 @@ import { render } from '@testing-library/svelte';
 import { goto } from '$app/navigation';
 import { mockPageState } from '../setup';
 
-vi.mock('#lib/components/ActivityTable.svelte', () => ({
+vi.mock('#lib/components/library/ContentLibrary.svelte', () => ({
 	default: vi.fn(() => ({ $$: {}, $set: vi.fn(), $on: vi.fn(), $destroy: vi.fn() })),
 }));
 

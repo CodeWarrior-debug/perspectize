@@ -1,10 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen } from '@testing-library/svelte';
-import ActivityDetailsModal from '#lib/components/ActivityDetailsModal.svelte';
+import ContentDetailsModal from '#lib/components/ContentDetailsModal.svelte';
 import { formatDateTime } from '#lib/utils/formatting.js';
 import { warmUpRender } from '../helpers/warmUp';
 
-// Same mock shape as ActivityDetailsModal.test.ts: the modal reads mutation and query hooks.
+// Same mock shape as ContentDetailsModal.test.ts: the modal reads mutation and query hooks.
 const mocks = vi.hoisted(() => ({
 	mockMutate: vi.fn(),
 	mockMutationState: { mutate: null as any, isPending: false },
@@ -80,47 +80,47 @@ function tileValue(label: string): string {
 
 // Pay the component's first-render cost before any test, not inside the first
 // one: under full-suite load it alone can pass the 5 s testTimeout (#728).
-warmUpRender(ActivityDetailsModal, { content: webPageContent(), open: true, onClose: () => {} });
+warmUpRender(ContentDetailsModal, { content: webPageContent(), open: true, onClose: () => {} });
 
-describe('ActivityDetailsModal: webpage', () => {
+describe('ContentDetailsModal: webpage', () => {
 	beforeEach(() => {
 		vi.clearAllMocks();
 		mocks.mockQueryState.data = undefined;
 	});
 
 	it('titles the dialog Webpage and shows the site under the title', () => {
-		render(ActivityDetailsModal, { props: { content: webPageContent(), open: true, onClose: vi.fn() } });
+		render(ContentDetailsModal, { props: { content: webPageContent(), open: true, onClose: vi.fn() } });
 		expect(screen.getByText('Webpage')).toBeInTheDocument();
 		// The site shows under the title and again in the Site tile.
 		expect(screen.getAllByText('Example Blog').length).toBeGreaterThan(0);
 	});
 
 	it('shows the page description when it has one', () => {
-		render(ActivityDetailsModal, { props: { content: webPageContent(), open: true, onClose: vi.fn() } });
+		render(ContentDetailsModal, { props: { content: webPageContent(), open: true, onClose: vi.fn() } });
 		expect(screen.getByText('A short summary of the post.')).toBeInTheDocument();
 	});
 
 	it('shows the no-description line when the page has none', () => {
-		render(ActivityDetailsModal, {
+		render(ContentDetailsModal, {
 			props: { content: webPageContent({ description: null }), open: true, onClose: vi.fn() },
 		});
 		expect(screen.getByText('This page has no description.')).toBeInTheDocument();
 	});
 
 	it('shows the Type tile and the Fetched tile with date and time', () => {
-		render(ActivityDetailsModal, { props: { content: webPageContent(), open: true, onClose: vi.fn() } });
+		render(ContentDetailsModal, { props: { content: webPageContent(), open: true, onClose: vi.fn() } });
 		expect(tileValue('Type')).toBe('Blog post');
 		expect(tileValue('Fetched')).toBe(formatDateTime(FETCHED_AT));
 	});
 
 	it('has no related-content section and no source-data refresh for a webpage', () => {
-		render(ActivityDetailsModal, { props: { content: webPageContent(), open: true, onClose: vi.fn() } });
+		render(ContentDetailsModal, { props: { content: webPageContent(), open: true, onClose: vi.fn() } });
 		expect(screen.queryByText(/related/i)).toBeNull();
 		expect(screen.queryByRole('button', { name: /update source data/i })).toBeNull();
 	});
 
 	it('does not show the YouTube Views or Likes tiles', () => {
-		render(ActivityDetailsModal, { props: { content: webPageContent(), open: true, onClose: vi.fn() } });
+		render(ContentDetailsModal, { props: { content: webPageContent(), open: true, onClose: vi.fn() } });
 		expect(screen.queryByText('Views', { selector: 'div' })).toBeNull();
 		expect(screen.queryByText('Likes', { selector: 'div' })).toBeNull();
 	});

@@ -1,5 +1,5 @@
 /**
- * Extracted AG Grid configuration logic from ActivityTable.svelte.
+ * Extracted AG Grid configuration logic from ContentLibrary.svelte.
  * Pure functions and constants that can be unit-tested without a browser.
  */
 import type { ContentItem, ContentType } from '#lib/queries/content/index.js';
@@ -162,7 +162,7 @@ export function releasedComparator(
 // ---------------------------------------------------------------------------
 
 /**
- * One entry per ActivityTable column. Everything below is derived from this one
+ * One entry per ContentLibrary column. Everything below is derived from this one
  * array (the column picker's DATA_COLUMNS/INTERNAL_COLUMNS, the sort picker's
  * SORTABLE_COLUMNS, the mobile/Loaded-mode SORT_VALUE_GETTERS, gridUrlState.ts's
  * COL_TO_SORT/SORT_TO_COL and COL_TO_FILTER_KEY, and FilterChips.svelte's
@@ -170,7 +170,7 @@ export function releasedComparator(
  * those places by mistake (see .docs/UI_THOROUGHNESS_CHECKLIST.md §3.1).
  *
  * `colId` and `label` must match the `colId`/`headerName` on the
- * corresponding ColDef in ActivityTable.svelte — column-registry-parity.test.ts
+ * corresponding ColDef in library/columns.ts — column-registry-parity.test.ts
  * and column-label-parity.test.ts read that file's source and fail if they
  * don't (kept as an extra guard even though this refactor makes the drift
  * this project actually hit — a column present in one list but not
@@ -221,7 +221,7 @@ export interface ColumnMeta {
 }
 
 /**
- * Every ActivityTable column, in the same order they appear in the grid.
+ * Every ContentLibrary column, in the same order they appear in the grid.
  * `perspectize` and `item` are `picker: 'none'` — perspectize has no data to
  * filter/sort/hide, and item is the only column carrying a video's title/
  * thumbnail, so hiding it would leave rows with no way to identify which
@@ -702,7 +702,7 @@ const WEBPAGE_COLS = ['webSite', 'webPublished', 'webRoles', 'webAuthor', 'creat
  * in the picker). The Book set (type filter exactly BOOK) is Item, Type, Author,
  * Published, Pages, Rating, Tags, widening by tier. Any other filter keeps the YouTube
  * layout and hides the Movie and Book columns, which would be empty. Mirrored by the colDef `hide` flags in
- * ActivityTable.svelte (initial default); this is the override that wins.
+ * ContentLibrary.svelte (initial default); this is the override that wins.
  */
 export function defaultColumnVisibility(
 	tier: ResponsiveTier,

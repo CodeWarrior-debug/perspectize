@@ -1,7 +1,7 @@
 <script module lang="ts">
 	// Same head start as the Library route's own module script: begin downloading the table
 	// while Clerk loads, so the hop from `/` to /content-library doesn't add a serial chunk fetch.
-	import('#lib/components/ActivityTable.svelte').catch(() => {});
+	import('#lib/components/library/ContentLibrary.svelte').catch(() => {});
 </script>
 
 <script lang="ts">

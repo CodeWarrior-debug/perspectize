@@ -97,7 +97,7 @@ The end goal above covers every content type in the Activity grid. Delivery is s
   - backend `UserTodoSortBy` / `UserTodoFilter` in `schema.graphql`, plus the user-todo repository, which need a way to name a metric.
 - **Content-type plumbing:** each type's numeric fields are registered as operands, in one catalogue shared by backend and frontend. The [Adding a Content Type](../../.claude/docs/ADDING_CONTENT_TYPE.md) guide gains a step for this.
 - **Frontend:**
-  - `ActivityTable.svelte` (colDefs, both data modes);
+  - `library/columns.ts` (colDefs) and `ContentLibrary.svelte` (both data modes);
   - `grid-config.ts` (`COLUMNS` / `ColumnMeta`; dynamic entries join the static list);
   - `ColumnPickerDialog.svelte`;
   - `columnLayouts.ts` (localStorage layouts must reference metric ids);

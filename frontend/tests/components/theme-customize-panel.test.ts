@@ -4,7 +4,7 @@ import { createThemeStore, STORAGE_KEY } from '#lib/theme/store.svelte.js';
 import { THEME_PRESETS } from '#lib/theme/presets.js';
 
 // ColorWheel wraps a third-party canvas widget (@jaames/iro) — stubbed out here
-// the same way ActivityTable.test.ts stubs ag-grid-svelte5 (see vite.config.ts's
+// the same way ContentLibrary.test.ts stubs ag-grid-svelte5 (see vite.config.ts's
 // coverage exclude comment for why ColorWheel itself isn't unit-tested).
 vi.mock('#lib/components/theme/ColorWheel.svelte', () => ({
 	default: vi.fn(() => ({ $$: {}, $set: vi.fn(), $on: vi.fn(), $destroy: vi.fn() })),

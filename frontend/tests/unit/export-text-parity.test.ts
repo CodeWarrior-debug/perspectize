@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import activityTableSource from '#lib/components/ActivityTable.svelte?raw';
+import libraryColumnsSource from '#lib/components/library/columns.ts?raw';
 import { EXPORT_EXCLUDED_COLIDS, RENDERED_TEXT_COLIDS } from '#lib/utils/exportTable.js';
 // The parity check reads only the source text; this import makes the test fail first until the grid reader exists.
 import { readExportTable } from '#lib/utils/exportGrid.js';
@@ -8,7 +8,7 @@ describe('export text parity', () => {
 	it('knows the text of every renderer-only column', () => {
 		expect(typeof readExportTable).toBe('function');
 		const known: string[] = [...RENDERED_TEXT_COLIDS, ...EXPORT_EXCLUDED_COLIDS];
-		const blocks = activityTableSource.split("colId: '").slice(1);
+		const blocks = libraryColumnsSource.split("colId: '").slice(1);
 		const rendererOnly = blocks
 			.filter((b) => b.includes('cellRenderer:') && !/^\s*(valueGetter|field):/m.test(b))
 			.map((b) => b.slice(0, b.indexOf("'")));

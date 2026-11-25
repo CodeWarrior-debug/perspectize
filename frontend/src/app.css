@@ -1089,7 +1089,7 @@
 	box-shadow: 0 0 0 2px var(--ag-icon-button-hover-color);
 }
 
-/* Activity headers: small uppercase labels (size and colour come from ACTIVITY_HEADER_PARAMS). */
+/* Activity headers: small uppercase labels (size and colour come from LIBRARY_HEADER_PARAMS). */
 .activity-grid .ag-header-cell-text {
 	text-transform: uppercase;
 	letter-spacing: 0.06em;

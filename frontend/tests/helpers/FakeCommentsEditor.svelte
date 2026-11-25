@@ -13,6 +13,7 @@
 		expanded = false,
 		isMobile = false,
 		toolbar = 'full',
+		status = '',
 	}: {
 		value?: string;
 		onChange: (html: string) => void;
@@ -23,6 +24,7 @@
 		expanded?: boolean;
 		isMobile?: boolean;
 		toolbar?: 'full' | 'basic';
+		status?: string;
 	} = $props();
 </script>
 
@@ -37,3 +39,4 @@
 	<button type="button" aria-label={expanded ? 'Collapse comment' : 'Expand comment'} onclick={() => onPopout?.()}
 	></button>
 {/if}
+<span data-testid="editor-status">{status}</span>

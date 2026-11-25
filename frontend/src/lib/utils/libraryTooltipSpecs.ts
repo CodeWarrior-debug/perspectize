@@ -30,8 +30,8 @@ import {
 } from './formatting';
 import { webPageAuthor, webPagePublished, webPageRoleLabel, webPageRolesOf, webPageSite } from './webPage';
 
-/** Per-column hover popover specs for ActivityTable, keyed by colId. */
-export const ACTIVITY_TOOLTIP_SPECS = {
+/** Per-column hover popover specs for ContentLibrary, keyed by colId. */
+export const LIBRARY_TOOLTIP_SPECS = {
 	perspectize: false,
 	item: {
 		text: (c: CellCtx) => c.data?.name ?? '',
