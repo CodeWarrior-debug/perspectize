@@ -27,7 +27,7 @@ func NewClerkDirectory() *ClerkDirectory { return &ClerkDirectory{} }
 func (d *ClerkDirectory) Profile(ctx context.Context, clerkID string) (domain.ClerkProfile, error) {
 	u, err := clerkuser.Get(ctx, clerkID)
 	if err != nil {
-		return domain.ClerkProfile{}, fmt.Errorf("clerk user %s: %w", clerkID, err)
+		return domain.ClerkProfile{}, fmt.Errorf("clerk user lookup: %w", err)
 	}
 	profile := domain.ClerkProfile{ClerkID: clerkID}
 	if u.Username != nil {
