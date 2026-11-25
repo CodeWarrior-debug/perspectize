@@ -11,7 +11,7 @@ export type { ContentFilterInput } from '#lib/utils/gridUrlState.js';
 export { libraryListRequest, cursorsAfterPage, LIBRARY_LIST_STALE_TIME_MS, LOADED_MODE_FIRST } from './libraryList';
 
 // Values the API returns in Content.contentType (a String, not a GraphQL enum).
-export type ContentType = 'YOUTUBE_VIDEO' | 'CLAIM' | 'BIBLE_PASSAGE' | 'MOVIE' | 'BOOK' | 'WEB_PAGE';
+export type ContentType = 'YOUTUBE_VIDEO' | 'CLAIM' | 'BIBLE_PASSAGE' | 'MOVIE' | 'BOOK' | 'WEB_PAGE' | 'WEBSITE';
 
 /**
  * A webpage's role (the backend `WebPageRole` enum). Chosen by the adder, never read from the page.
