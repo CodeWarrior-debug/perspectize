@@ -4517,9 +4517,12 @@ input ContentFilter {
   maxViewCount: Int
   minLikeCount: Int
   maxLikeCount: Int
-  # Published date filters (ISO 8601 date string)
+  # Published date filters (ISO 8601 date string). Cover YouTube videos and web pages.
   publishedAfter: String
   publishedBefore: String
+  # Web page filters (web page rows only; other rows never match). Case-insensitive contains.
+  webPageSiteContains: String
+  webPageAuthorContains: String
   # Channel/tag/description filters
   channelTitle: String       # ILIKE search
   tagContains: String        # Tag text contains
@@ -22124,7 +22127,7 @@ func (ec *executionContext) unmarshalInputContentFilter(ctx context.Context, obj
 		asMap[k] = v
 	}
 
-	fieldsInOrder := [...]string{"contentType", "contentTypes", "minLengthSeconds", "maxLengthSeconds", "search", "searchFields", "personId", "personRole", "genreContains", "castContains", "ageRating", "releasedAfter", "releasedBefore", "minBoxOffice", "maxBoxOffice", "minTmdbScore", "maxTmdbScore", "authorContains", "minPublishYear", "maxPublishYear", "minPages", "maxPages", "minBookRating", "maxBookRating", "webPageRoles", "parentContentID", "minViewCount", "maxViewCount", "minLikeCount", "maxLikeCount", "publishedAfter", "publishedBefore", "channelTitle", "tagContains", "descriptionSearch", "addedByUsername", "minPerspectiveCount", "createdAfter", "createdBefore", "updatedAfter", "updatedBefore"}
+	fieldsInOrder := [...]string{"contentType", "contentTypes", "minLengthSeconds", "maxLengthSeconds", "search", "searchFields", "personId", "personRole", "genreContains", "castContains", "ageRating", "releasedAfter", "releasedBefore", "minBoxOffice", "maxBoxOffice", "minTmdbScore", "maxTmdbScore", "authorContains", "minPublishYear", "maxPublishYear", "minPages", "maxPages", "minBookRating", "maxBookRating", "webPageRoles", "parentContentID", "minViewCount", "maxViewCount", "minLikeCount", "maxLikeCount", "publishedAfter", "publishedBefore", "webPageSiteContains", "webPageAuthorContains", "channelTitle", "tagContains", "descriptionSearch", "addedByUsername", "minPerspectiveCount", "createdAfter", "createdBefore", "updatedAfter", "updatedBefore"}
 	for _, k := range fieldsInOrder {
 		v, ok := asMap[k]
 		if !ok {
@@ -22355,6 +22358,20 @@ func (ec *executionContext) unmarshalInputContentFilter(ctx context.Context, obj
 				return it, err
 			}
 			it.PublishedBefore = data
+		case "webPageSiteContains":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("webPageSiteContains"))
+			data, err := ec.unmarshalOString2ᚖstring(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.WebPageSiteContains = data
+		case "webPageAuthorContains":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("webPageAuthorContains"))
+			data, err := ec.unmarshalOString2ᚖstring(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.WebPageAuthorContains = data
 		case "channelTitle":
 			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("channelTitle"))
 			data, err := ec.unmarshalOString2ᚖstring(ctx, v)
