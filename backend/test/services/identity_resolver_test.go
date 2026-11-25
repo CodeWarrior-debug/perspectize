@@ -110,13 +110,21 @@ func (d *fakeDirectory) Profile(_ context.Context, clerkID string) (domain.Clerk
 	return p, nil
 }
 
+// aliceProfile's primary email is verified in Clerk, so it may link by email.
 func aliceProfile() domain.ClerkProfile {
 	return domain.ClerkProfile{
 		ClerkID:        "user_alice",
 		Username:       "alice",
 		PrimaryEmailID: "e1",
-		Emails:         []domain.ClerkEmail{{ID: "e1", Address: "alice@example.com"}},
+		Emails:         []domain.ClerkEmail{{ID: "e1", Address: "alice@example.com", Verified: true}},
 	}
+}
+
+// unverifiedAliceProfile is aliceProfile with its email not verified in Clerk.
+func unverifiedAliceProfile() domain.ClerkProfile {
+	p := aliceProfile()
+	p.Emails = []domain.ClerkEmail{{ID: "e1", Address: "alice@example.com"}}
+	return p
 }
 
 func newDirectory(profiles ...domain.ClerkProfile) *fakeDirectory {
@@ -204,6 +212,22 @@ func TestResolve_EmailLinkRefusedForSentinel(t *testing.T) {
 	_, err := newResolver(users, newDirectory(aliceProfile())).Resolve(context.Background(), "user_alice")
 	assert.True(t, errors.Is(err, domain.ErrEmailTaken), "expected ErrEmailTaken, got %v", err)
 	assert.Equal(t, 0, users.updates)
+}
+
+func TestResolve_UnverifiedEmailDoesNotLink(t *testing.T) {
+	users := newIdentityUsers(&domain.User{ID: 3, Username: "legacy", Email: "alice@example.com", Active: true})
+
+	got, err := newResolver(users, newDirectory(unverifiedAliceProfile())).Resolve(context.Background(), "user_alice")
+	require.NoError(t, err)
+	assert.NotEqual(t, 3, got.ID, "the legacy row must not be linked")
+	assert.Equal(t, "user_alice", got.ClerkUserID)
+	assert.Equal(t, "", got.Email, "the unverified address is not stored on the new row")
+	assert.Equal(t, 0, users.updates)
+	assert.Equal(t, 2, users.creates, "one attempt with the email, one without it")
+	legacy := users.rows[0]
+	assert.Equal(t, 3, legacy.ID)
+	assert.Equal(t, "", legacy.ClerkUserID, "the legacy row stays unlinked")
+	assert.Equal(t, "alice@example.com", legacy.Email, "the legacy row's email is unchanged")
 }
 
 func TestResolve_UsernameCollisionRetriesWithSuffix(t *testing.T) {

@@ -35,6 +35,9 @@ type clerkUserData struct {
 	EmailAddresses []struct {
 		ID           string `json:"id"`
 		EmailAddress string `json:"email_address"`
+		Verification *struct {
+			Status string `json:"status"`
+		} `json:"verification"`
 	} `json:"email_addresses"`
 	PrimaryEmailAddressID string `json:"primary_email_address_id"`
 }
@@ -46,7 +49,8 @@ func (d *clerkUserData) profile() domain.ClerkProfile {
 		p.Username = *d.Username
 	}
 	for _, ea := range d.EmailAddresses {
-		p.Emails = append(p.Emails, domain.ClerkEmail{ID: ea.ID, Address: ea.EmailAddress})
+		verified := ea.Verification != nil && ea.Verification.Status == clerkVerifiedStatus
+		p.Emails = append(p.Emails, domain.ClerkEmail{ID: ea.ID, Address: ea.EmailAddress, Verified: verified})
 	}
 	return p
 }

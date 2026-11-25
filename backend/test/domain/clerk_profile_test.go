@@ -74,3 +74,30 @@ func TestClerkProfile_UsernameConflictSentinelsWrapAlreadyExists(t *testing.T) {
 		assert.ErrorIs(t, err, domain.ErrAlreadyExists)
 	}
 }
+
+func TestClerkProfile_PrimaryEmailVerifiedReadsThePrimaryAddress(t *testing.T) {
+	// A verified secondary address must not make an unverified primary count as verified.
+	p := domain.ClerkProfile{
+		PrimaryEmailID: "e1",
+		Emails: []domain.ClerkEmail{
+			{ID: "e1", Address: "a@x.com"},
+			{ID: "e2", Address: "b@x.com", Verified: true},
+		},
+	}
+	assert.False(t, p.PrimaryEmailVerified())
+
+	p.PrimaryEmailID = "e2"
+	assert.True(t, p.PrimaryEmailVerified())
+}
+
+func TestClerkProfile_PrimaryEmailVerifiedFallsBackToFirst(t *testing.T) {
+	p := domain.ClerkProfile{
+		PrimaryEmailID: "missing",
+		Emails:         []domain.ClerkEmail{{ID: "e1", Address: "a@x.com", Verified: true}},
+	}
+	assert.True(t, p.PrimaryEmailVerified())
+}
+
+func TestClerkProfile_PrimaryEmailVerifiedFalseWithoutAddresses(t *testing.T) {
+	assert.False(t, domain.ClerkProfile{}.PrimaryEmailVerified())
+}

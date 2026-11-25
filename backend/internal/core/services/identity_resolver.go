@@ -67,7 +67,9 @@ func (r *IdentityResolver) Provision(ctx context.Context, profile domain.ClerkPr
 
 // create inserts the profile's row. Each conflict has one response: a Clerk ID
 // conflict is the idempotent success case, a username conflict retries with a
-// disambiguated name, and an email conflict links the existing row.
+// disambiguated name, and an email conflict links the existing row when the
+// email is verified in Clerk. An unverified email never links; the row is
+// provisioned without it instead.
 func (r *IdentityResolver) create(ctx context.Context, profile domain.ClerkProfile) (*domain.User, error) {
 	username := profile.LocalUsername()
 	email := profile.PrimaryEmail()
@@ -85,6 +87,11 @@ func (r *IdentityResolver) create(ctx context.Context, profile domain.ClerkProfi
 			username = profile.DisambiguatedUsername()
 			suffixed = true
 		case errors.Is(err, domain.ErrEmailTaken) && email != "":
+			if !profile.PrimaryEmailVerified() {
+				slog.Warn("email taken by another account and unverified in clerk, provisioning without it", "clerk_id", profile.ClerkID)
+				email = ""
+				continue
+			}
 			return r.link(ctx, profile, email)
 		default:
 			return nil, err

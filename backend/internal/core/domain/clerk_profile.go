@@ -14,10 +14,12 @@ const disambiguatedBaseRunes = 17
 // username unique again after a collision.
 const disambiguatedSuffixRunes = 6
 
-// ClerkEmail is one email address on a Clerk user.
+// ClerkEmail is one email address on a Clerk user. Verified is true only when
+// Clerk reports the address as verified; a missing or any other status is false.
 type ClerkEmail struct {
-	ID      string
-	Address string
+	ID       string
+	Address  string
+	Verified bool
 }
 
 // ClerkProfile is the identity provider's view of a user, mapped from either
@@ -30,18 +32,32 @@ type ClerkProfile struct {
 	Emails         []ClerkEmail
 }
 
-// PrimaryEmail returns the address whose ID is PrimaryEmailID, falling back to
-// the first address, or "" when the user has none.
-func (p ClerkProfile) PrimaryEmail() string {
+// primaryEmail returns the entry whose ID is PrimaryEmailID, falling back to the
+// first entry. ok is false when the user has no addresses.
+func (p ClerkProfile) primaryEmail() (ClerkEmail, bool) {
 	for _, e := range p.Emails {
 		if e.ID == p.PrimaryEmailID {
-			return e.Address
+			return e, true
 		}
 	}
 	if len(p.Emails) > 0 {
-		return p.Emails[0].Address
+		return p.Emails[0], true
 	}
-	return ""
+	return ClerkEmail{}, false
+}
+
+// PrimaryEmail returns the address whose ID is PrimaryEmailID, falling back to
+// the first address, or "" when the user has none.
+func (p ClerkProfile) PrimaryEmail() string {
+	e, _ := p.primaryEmail()
+	return e.Address
+}
+
+// PrimaryEmailVerified reports whether the address PrimaryEmail returns is
+// verified in Clerk. It is false when the user has no addresses.
+func (p ClerkProfile) PrimaryEmailVerified() bool {
+	e, _ := p.primaryEmail()
+	return e.Verified
 }
 
 // LocalUsername returns the Clerk username, else the primary email's local

@@ -128,7 +128,7 @@ func TestIdentityBudget_WebhookAfterHTTPHitsWarmCache(t *testing.T) {
 
 func TestIdentityBudget_EmailLinkCostsFour(t *testing.T) {
 	db, mock, users := newIdentityFixture(t)
-	dir := &fixedDirectory{profile: domain.ClerkProfile{ClerkID: "user_alice", Username: "alice", PrimaryEmailID: "e1", Emails: []domain.ClerkEmail{{ID: "e1", Address: "alice@example.com"}}}}
+	dir := &fixedDirectory{profile: domain.ClerkProfile{ClerkID: "user_alice", Username: "alice", PrimaryEmailID: "e1", Emails: []domain.ClerkEmail{{ID: "e1", Address: "alice@example.com", Verified: true}}}}
 	resolver := services.NewIdentityResolver(users, dir)
 	counter := querycount.Attach(t, db)
 

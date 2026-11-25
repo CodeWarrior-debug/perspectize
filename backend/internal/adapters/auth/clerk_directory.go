@@ -9,6 +9,10 @@ import (
 	clerkuser "github.com/clerk/clerk-sdk-go/v2/user"
 )
 
+// clerkVerifiedStatus is the Clerk verification status that marks an email
+// address as verified. Clerk's other statuses are all treated as unverified.
+const clerkVerifiedStatus = "verified"
+
 // ClerkDirectory implements portservices.ClerkDirectory against the Clerk
 // Backend API. It is the only place the Clerk user API is called.
 type ClerkDirectory struct{}
@@ -33,7 +37,8 @@ func (d *ClerkDirectory) Profile(ctx context.Context, clerkID string) (domain.Cl
 		profile.PrimaryEmailID = *u.PrimaryEmailAddressID
 	}
 	for _, ea := range u.EmailAddresses {
-		profile.Emails = append(profile.Emails, domain.ClerkEmail{ID: ea.ID, Address: ea.EmailAddress})
+		verified := ea.Verification != nil && ea.Verification.Status == clerkVerifiedStatus
+		profile.Emails = append(profile.Emails, domain.ClerkEmail{ID: ea.ID, Address: ea.EmailAddress, Verified: verified})
 	}
 	return profile, nil
 }
