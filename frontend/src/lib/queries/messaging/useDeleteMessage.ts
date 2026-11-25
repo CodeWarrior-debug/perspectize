@@ -2,7 +2,7 @@ import { createMutation, useQueryClient } from '@tanstack/svelte-query';
 import { graphqlRequest } from '../client';
 import { DELETE_MESSAGE, type DeleteMessageResponse } from './index';
 import { queryKeys } from '../keys';
-import { applyMessageDeleted, applyMessageEdited, type ThreadMessagesCache } from '#lib/messaging/threadCache.js';
+import { applyMessageResult } from '#lib/messaging/messagingCache.js';
 import { toast } from 'svelte-sonner';
 
 export function useDeleteMessage() {
@@ -12,14 +12,14 @@ export function useDeleteMessage() {
 		mutationFn: (args: { messageId: string; threadId: string }) =>
 			graphqlRequest<DeleteMessageResponse>(DELETE_MESSAGE, { messageId: args.messageId }),
 		onMutate: (args) => {
-			queryClient.setQueryData<ThreadMessagesCache>(queryKeys.messaging.messages.list(args.threadId), (cache) =>
-				cache ? applyMessageDeleted(cache, { messageId: args.messageId }) : cache,
-			);
+			applyMessageResult(queryClient, {
+				kind: 'deleteStarted',
+				threadId: args.threadId,
+				messageId: args.messageId,
+			});
 		},
-		onSuccess: (data, args) => {
-			queryClient.setQueryData<ThreadMessagesCache>(queryKeys.messaging.messages.list(args.threadId), (cache) =>
-				cache ? applyMessageEdited(cache, data.deleteMessage) : cache,
-			);
+		onSuccess: (data) => {
+			applyMessageResult(queryClient, { kind: 'deleted', message: data.deleteMessage });
 			toast('Message deleted');
 		},
 		onError: (_err, args) => {

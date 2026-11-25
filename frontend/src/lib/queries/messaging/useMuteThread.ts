@@ -1,8 +1,7 @@
 import { createMutation, useQueryClient } from '@tanstack/svelte-query';
 import { graphqlRequest } from '../client';
 import { MUTE_THREAD, type MuteThreadResponse } from './index';
-import { queryKeys } from '../keys';
-import { patchThreadInList } from '#lib/messaging/inboxCache.js';
+import { applyThreadResult } from '#lib/messaging/messagingCache.js';
 import { toast } from 'svelte-sonner';
 
 export function useMuteThread() {
@@ -15,8 +14,7 @@ export function useMuteThread() {
 				muted: args.muted,
 			}),
 		onSuccess: (data) => {
-			queryClient.setQueryData(queryKeys.messaging.threads.detail(data.muteThread.id), data.muteThread);
-			patchThreadInList(queryClient, data.muteThread);
+			applyThreadResult(queryClient, data.muteThread);
 		},
 		onError: (_err, args) => {
 			toast.error(args.muted ? 'Could not mute thread' : 'Could not unmute thread');

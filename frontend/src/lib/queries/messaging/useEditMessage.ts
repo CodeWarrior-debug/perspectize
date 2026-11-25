@@ -2,7 +2,8 @@ import { createMutation, useQueryClient } from '@tanstack/svelte-query';
 import { graphqlRequest } from '../client';
 import { EDIT_MESSAGE, type EditMessageResponse } from './index';
 import { queryKeys } from '../keys';
-import { applyMessageEdited, type ThreadMessagesCache } from '#lib/messaging/threadCache.js';
+import type { ThreadMessagesCache } from '#lib/messaging/threadCache.js';
+import { applyMessageResult } from '#lib/messaging/messagingCache.js';
 import { toast } from 'svelte-sonner';
 
 export function useEditMessage() {
@@ -19,36 +20,26 @@ export function useEditMessage() {
 			const key = queryKeys.messaging.messages.list(args.threadId);
 			const existing = queryClient.getQueryData<ThreadMessagesCache>(key)?.items.find((m) => m.id === args.messageId);
 			const previousEditedAt = existing?.editedAt ?? null;
-			queryClient.setQueryData<ThreadMessagesCache>(key, (cache) => {
-				if (!cache) return cache;
-				const current = cache.items.find((m) => m.id === args.messageId);
-				if (!current) return cache;
-				return applyMessageEdited(cache, {
-					...current,
-					body: args.body.trim(),
-					editedAt: new Date().toISOString(),
+			if (existing) {
+				applyMessageResult(queryClient, {
+					kind: 'editStarted',
+					message: { ...existing, body: args.body.trim(), editedAt: new Date().toISOString() },
 				});
-			});
+			}
 			return { previousBody: args.previousBody, previousEditedAt };
 		},
-		onSuccess: (data, args) => {
-			const key = queryKeys.messaging.messages.list(args.threadId);
-			queryClient.setQueryData<ThreadMessagesCache>(key, (cache) =>
-				cache ? applyMessageEdited(cache, data.editMessage) : cache,
-			);
+		onSuccess: (data) => {
+			applyMessageResult(queryClient, { kind: 'edited', message: data.editMessage });
 		},
 		onError: (_err, args, ctx) => {
 			const key = queryKeys.messaging.messages.list(args.threadId);
-			queryClient.setQueryData<ThreadMessagesCache>(key, (cache) => {
-				if (!cache) return cache;
-				const existing = cache.items.find((m) => m.id === args.messageId);
-				if (!existing) return cache;
-				return applyMessageEdited(cache, {
-					...existing,
-					body: args.previousBody,
-					editedAt: ctx?.previousEditedAt ?? null,
+			const existing = queryClient.getQueryData<ThreadMessagesCache>(key)?.items.find((m) => m.id === args.messageId);
+			if (existing) {
+				applyMessageResult(queryClient, {
+					kind: 'editStarted',
+					message: { ...existing, body: args.previousBody, editedAt: ctx?.previousEditedAt ?? null },
 				});
-			});
+			}
 			toast.error('Could not edit message');
 		},
 	}));
