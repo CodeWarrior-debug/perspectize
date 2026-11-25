@@ -879,14 +879,9 @@ func (r *mutationResolver) CreateContentResultFromBook(ctx context.Context, inpu
 		return nil, fmt.Errorf("access denied: authentication required")
 	}
 
-	// The input may be an Open Library work URL or a raw ISBN-10/13. Strip
-	// hyphens from hyphenated ISBNs (e.g. "978-0-434-74002-4") before they
-	// reach ContentService: its isbnRe only matches bare-digit ISBNs, so a
-	// hyphenated one would otherwise be misclassified and rejected with
-	// ErrInvalidInput (carried forward from Task 5's review).
-	rawURLOrISBN := normalizeHyphenatedISBN(input.URL)
-
-	content, err := r.ContentService.CreateFromBook(ctx, rawURLOrISBN, authUser.ID)
+	// The input may be an Open Library work URL or a raw ISBN-10/13. ContentService
+	// classifies it, including hyphenated ISBNs.
+	content, err := r.ContentService.CreateFromBook(ctx, input.URL, authUser.ID)
 	return createResult(content, err, bookCreateFailure)
 }
 
@@ -941,11 +936,7 @@ func (r *queryResolver) BookTrending(ctx context.Context, window *domain.Trendin
 // record for the ISBN, so the client can show "not found" without surfacing
 // a GraphQL error.
 func (r *queryResolver) BookByIsbn(ctx context.Context, isbn string) (*model.BookSearchResult, error) {
-	// See CreateContentFromBook: normalize a hyphenated ISBN before it reaches
-	// ContentService's bare-digit isbnRe (Task 5 finding).
-	raw := normalizeHyphenatedISBN(isbn)
-
-	result, err := r.ContentService.ResolveBookISBN(ctx, raw)
+	result, err := r.ContentService.ResolveBookISBN(ctx, isbn)
 	if err != nil {
 		if errors.Is(err, domain.ErrNotFound) {
 			return nil, nil
