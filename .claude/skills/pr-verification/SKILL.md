@@ -84,8 +84,10 @@ Attach to the shared Chrome on `:9222` and follow [.docs/VERIFICATION.md](../../
   load `http://localhost:<frontendPort>/plan` and wait for `.ag-row` (up to ~20 s). "Sign In" text
   alone proves nothing while the app is still loading, but the landing page with no grid after the wait
   means the Clerk session has lapsed.
-- Signed out? Stop and ask the human to sign in again. Never enter credentials. You hold the
-  slot while you wait, so release it first if the answer may take a while.
+- Signed out? Sign in as the agent test user with the script in
+  [VERIFICATION.md → Agent sign-in](../../../.docs/VERIFICATION.md#agent-sign-in); never type
+  credentials yourself. If the script fails, stop and ask the human, releasing the slot first if the
+  answer may take a while.
 - Open your own tab (`PUT http://localhost:9222/json/new?<url>`) and close only that tab. The Chrome
   on :9222 also holds other sessions' tabs: never touch those. Don't use the chrome-devtools MCP while
   other agents may be verifying: its selected page is shared state.
