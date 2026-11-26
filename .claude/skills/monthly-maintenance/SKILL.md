@@ -44,7 +44,7 @@ The run log lives in [ROUTINES.md](../../../ROUTINES.md) at the repo root — re
    - Tests: `python3 -I -m unittest discover -s .claude/skills/monthly-maintenance -p "test_harvest_prs.py"` (local fixtures, no GitHub calls).
 
 4. **Update graphify.**
-   - `graphify update .` (AST-only refresh, no API cost) to keep the knowledge graph current.
+   - `graphify update .` in the main checkout (AST-only refresh, no API cost) to keep the shared knowledge graph current.
 
 5. **Re-run `gsd:map-codebase`.**
    - Invoke the `gsd:map-codebase` command/skill to refresh `.planning/codebase/` docs.
