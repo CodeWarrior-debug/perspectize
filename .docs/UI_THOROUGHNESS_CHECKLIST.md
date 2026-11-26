@@ -16,7 +16,7 @@ It was built from the gaps in [UI_GAP_AUDIT.md](UI_GAP_AUDIT.md). The `(#N)` tag
 A column, field, filter, sort, setting or content type touches some of these layers. Find the ones your change touches, then check every **surface** in §2 that shows that data.
 
 ### A. Backend contract
-- [ ] **Schema:** a field on the type, plus `ContentSortBy` / `ContentFilter` / `ContentSearchField` entries if it should be sortable, filterable or searchable. (#7: `PERCENT_LIKED` missing)
+- [ ] **Schema:** a field on the type, plus `ContentSortBy` / `ContentFilter` / `ContentSearchField` entries if it should be sortable, filterable or searchable. (#7: a sort value was missing)
 - [ ] **Clearable:** an optional field in an `Update*Input` can be *cleared*, not just left out. Use gqlgen `omittable` or a `clearX` flag, and have the service handle it. (#2)
 - [ ] Domain, GORM model, mapper, sort/filter rules in `helpers.go`, resolver/dataloader.
 - [ ] Migration **written only**. The PR says it needs a manual `migrate up` in each environment.
@@ -94,8 +94,8 @@ Every hand-kept list is a layer that can go missing. These changes remove whole 
    export const COLUMNS = [
      { colId: 'category', label: 'Category', togglable: 'all', tier: 'sm', cardVisible: true,
        sort: null, filterKey: 'category', tooltip: true },
-     { colId: 'percentLiked', label: '% Liked', togglable: 'all', tier: 'lg', cardVisible: false,
-       sort: { server: null, getter: (r) => (r.viewCount ? r.likeCount / r.viewCount : null) } },
+     { colId: 'vsBudget', label: 'vs Budget', togglable: 'all', tier: 'lg', cardVisible: false,
+       sort: { server: null, getter: (r) => (r.budget ? r.revenue / r.budget : null) } },
      …
    ] as const satisfies readonly ColumnMeta[];
    ```
