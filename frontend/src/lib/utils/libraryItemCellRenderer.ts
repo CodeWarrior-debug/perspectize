@@ -1,3 +1,4 @@
+import { descriptorFor } from '#lib/contentTypes/registry.js';
 import { extractVideoIdFromUrl, movieResponse } from './formatting';
 import { authorCellText, bookResponse, openLibraryCoverUrl } from './bookFormatting';
 import {
@@ -299,6 +300,7 @@ export function libraryItemCellRenderer(params: LibraryItemCellRendererParams): 
 	const { id, name, url, contentType, displayTitle, verseStartID, verseEndID, movie, book, response, webPage } =
 		params.data;
 	const onOpenDetails = params.context?.onOpenDetails;
+	const descriptor = descriptorFor(contentType);
 
 	if (contentType === 'WEB_PAGE') {
 		return renderWebPageCell({ id, name, url, faviconUrl: webPage?.faviconUrl ?? null, onOpenDetails });
@@ -362,8 +364,8 @@ export function libraryItemCellRenderer(params: LibraryItemCellRendererParams): 
 		'line-clamp-2 min-w-0 flex-1 whitespace-normal text-left font-slot-cell font-[family-name:var(--font-family-serif)] text-[13px] leading-[1.5] text-foreground decoration-primary/30 group-hover/cell:underline';
 	title.textContent = name;
 
-	// A claim has no video to thumbnail, so its title takes the whole cell.
-	if (contentType !== 'CLAIM') cell.appendChild(thumbSlot(thumbWrap));
+	// A type that is not a video (a claim, a website) has no thumbnail to play, so its title takes the whole cell.
+	if (descriptor.isVideo) cell.appendChild(thumbSlot(thumbWrap));
 	cell.appendChild(title);
 
 	return cell;

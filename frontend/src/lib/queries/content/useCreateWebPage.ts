@@ -4,7 +4,7 @@ import { silentToast } from '#lib/utils/toast.js';
 import { goto } from '$app/navigation';
 import { graphqlRequest } from '../client';
 import { CREATE_CONTENT_FROM_WEB_PAGE, type CreateContentFromWebPageResponse, type WebPageRole } from './index';
-import { queryKeys } from '../keys';
+import { evictAfterContentCreated } from './contentCreatedEviction';
 import { libraryContentHref } from '#lib/utils/contentLinks.js';
 
 export interface CreateWebPageArgs {
@@ -40,7 +40,7 @@ export function useCreateWebPage(options: UseCreateWebPageOptions = {}) {
 				action: id ? { label: 'Go to webpage', onClick: () => goto(libraryContentHref(id)) } : undefined,
 			});
 			// Refetch lists instead of prepending: an existing row can come back (no duplicates).
-			queryClient.invalidateQueries({ queryKey: queryKeys.content.lists() });
+			evictAfterContentCreated(queryClient);
 		},
 		onError: (err: Error) => {
 			console.error('[CreateWebPage] mutation failed:', err);
