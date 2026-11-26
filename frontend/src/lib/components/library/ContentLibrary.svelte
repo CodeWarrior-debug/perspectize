@@ -18,12 +18,13 @@
 	import type { PerspectiveItem } from '#lib/queries/perspectives/index.js';
 	import { urlParamsToFilter, type SortSpec } from '#lib/utils/gridUrlState.js';
 	import { contentRowId, moviePeople, PERSON_ID_ATTR } from '#lib/utils/formatting.js';
+	import { CLIENT_ONLY_SORT_COLS, sortableColumnsFor, togglableColIds } from '#lib/utils/libraryColumns/index.js';
+	import { compareContentBySorts, filterContentRows } from '#lib/utils/libraryColumns/clientRows.js';
 	import {
 		itemColumnHeader,
 		soloTypeFilter,
-		CLIENT_ONLY_SORT_COLS,
-		sortableColumnsFor,
-		togglableColIds,
+		columnViewFor,
+		type ColumnView,
 		syncItemHeader,
 		rowMatchesPerson,
 		showColumnRelevanceCallout,
@@ -38,16 +39,15 @@
 	import PrintOptionsDialog from '#lib/components/PrintOptionsDialog.svelte';
 	import { isExportDisabled } from '#lib/utils/exportGrid.js';
 	import ColumnChartPopover from '#lib/components/charts/ColumnChartPopover.svelte';
+	import { itemNounFor } from '#lib/utils/chartReadout';
 	import {
 		COLUMN_VIEW_LABEL,
 		clearLayout,
-		columnViewFor,
 		defaultLayout,
 		loadLayout,
 		planColumnSwitch,
 		saveLayout,
 		type ColumnLayout,
-		type ColumnView,
 	} from '#lib/utils/columnLayouts.js';
 	import { toast } from 'svelte-sonner';
 	import SortPickerDialog from '#lib/components/SortPickerDialog.svelte';
@@ -884,6 +884,7 @@
 			total={charts.data.total}
 			ranked={charts.data.ranked}
 			format={charts.format(charts.target.colId)}
+			noun={itemNounFor(columnView)}
 			open={true}
 			onClose={charts.close}
 			anchor={charts.target.anchor}

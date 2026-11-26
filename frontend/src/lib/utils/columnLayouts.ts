@@ -1,12 +1,5 @@
-import {
-	defaultColumnVisibility,
-	RETIRED_COL_IDS,
-	togglableColIds,
-	type ColumnView,
-	type ResponsiveTier,
-} from './grid-config';
-
-export { columnViewFor, type ColumnView } from './grid-config';
+import type { ColumnView, ResponsiveTier } from './grid-config';
+import { defaultColumnVisibility, RETIRED_COL_IDS, togglableColIds } from './libraryColumns/index';
 
 /**
  * columnLayouts — per-view Activity table column setups.

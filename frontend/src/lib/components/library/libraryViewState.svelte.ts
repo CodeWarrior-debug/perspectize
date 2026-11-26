@@ -21,15 +21,9 @@ import {
 	type GridParams,
 	type SortSpec,
 } from '#lib/utils/gridUrlState.js';
-import {
-	CLIENT_ONLY_SORT_COLS,
-	PERSON_FILTER_KEY,
-	parsePersonFilter,
-	rowMatchesPerson,
-	filterContentRows,
-	compareContentBySorts,
-	type PersonFilter,
-} from '#lib/utils/grid-config.js';
+import { PERSON_FILTER_KEY, parsePersonFilter, rowMatchesPerson, type PersonFilter } from '#lib/utils/grid-config.js';
+import { CLIENT_ONLY_SORT_COLS } from '#lib/utils/libraryColumns/index.js';
+import { compareContentBySorts, filterContentRows } from '#lib/utils/libraryColumns/clientRows.js';
 
 /** Quiet period after the last grid filter change before it is written to the URL. */
 export const FILTER_DEBOUNCE_MS = 500;

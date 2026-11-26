@@ -1,13 +1,12 @@
+import { LIBRARY_COLUMNS } from '#lib/utils/libraryColumns/index.js';
 import { describe, it, expect } from 'vitest';
 import {
-	COLUMNS,
 	CONTENT_TYPE_OPTIONS,
-	DATA_COLUMNS,
 	columnViewFor,
-	defaultColumnVisibility,
 	isWebPageOnlyTypeFilter,
 	itemColumnHeader,
 } from '#lib/utils/grid-config.js';
+import { DATA_COLUMNS, defaultColumnVisibility } from '#lib/utils/libraryColumns/index.js';
 
 // The default Webpage set, exactly (spec §3): ◎, WebPage, Site, Category, Published, Added.
 const WEBPAGE_DEFAULT_SET = ['perspectize', 'item', 'webSite', 'category', 'webPublished', 'createdAt'];
@@ -56,8 +55,8 @@ describe('Webpage column view', () => {
 	});
 
 	it('Roles and Author are picker-only: offered in the column picker, never in the default set', () => {
-		const roles = COLUMNS.find((c) => c.colId === 'webRoles');
-		const author = COLUMNS.find((c) => c.colId === 'webAuthor');
+		const roles = LIBRARY_COLUMNS.find((c) => c.colId === 'webRoles');
+		const author = LIBRARY_COLUMNS.find((c) => c.colId === 'webAuthor');
 		expect(roles).toMatchObject({ label: 'Roles', picker: 'data' });
 		expect(author).toMatchObject({ label: 'Author', picker: 'data' });
 		for (const view of ['webpage', 'general', 'movie', 'book'] as const) {
@@ -69,7 +68,7 @@ describe('Webpage column view', () => {
 	});
 
 	it('the Published column is labelled Published and the Site column Site', () => {
-		expect(COLUMNS.find((c) => c.colId === 'webPublished')?.label).toBe('Published');
-		expect(COLUMNS.find((c) => c.colId === 'webSite')?.label).toBe('Site');
+		expect(LIBRARY_COLUMNS.find((c) => c.colId === 'webPublished')?.label).toBe('Published');
+		expect(LIBRARY_COLUMNS.find((c) => c.colId === 'webSite')?.label).toBe('Site');
 	});
 });

@@ -2,7 +2,7 @@ import { describe, it, expect, vi, afterEach } from 'vitest';
 import { createLibraryViewState } from '#lib/components/library/libraryViewState.svelte.js';
 import { libraryListRequest } from '#lib/queries/content/libraryList.js';
 import { parseGridParams } from '#lib/utils/gridUrlState.js';
-import { CLIENT_ONLY_SORT_COLS } from '#lib/utils/grid-config.js';
+import { CLIENT_ONLY_SORT_COLS } from '#lib/utils/libraryColumns/index.js';
 import type { ContentItem } from '#lib/queries/content/index.js';
 
 // A URL adapter over a plain closure. The module reads the URL through plain getters, so no reactivity is needed here.

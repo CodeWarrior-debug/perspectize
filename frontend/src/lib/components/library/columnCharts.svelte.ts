@@ -2,7 +2,7 @@ import type { GridApi } from '@ag-grid-community/core';
 import type { ContentItem } from '#lib/queries/content/index.js';
 import type { GridHandle } from '#lib/utils/gridHandle.svelte.js';
 import type { DataMode } from '#lib/utils/gridUrlState.js';
-import { CHART_ELIGIBLE_COLS, isChartEligible } from '#lib/utils/columnCharts.js';
+import { chartableColIds, isChartEligible } from '#lib/utils/libraryColumns/index.js';
 import { isChartOn, loadChartFlags, setChartFlag } from '#lib/utils/columnChartSettings.js';
 import { topBottom, type TopBottom } from '#lib/utils/columnStats.js';
 import { formatDurationMinutes } from '#lib/utils/formatting.js';
@@ -147,9 +147,7 @@ export function createColumnCharts({
 
 	const pickerColumns = $derived.by(() => {
 		const v = view();
-		return v.mode === 'loaded' && !v.cardMode
-			? [...CHART_ELIGIBLE_COLS].filter((c) => isChartEligible(c, v.typeFilter))
-			: [];
+		return v.mode === 'loaded' && !v.cardMode ? chartableColIds(v.typeFilter) : [];
 	});
 
 	const pickerFlags = $derived.by(() => {

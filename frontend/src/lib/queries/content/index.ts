@@ -7,7 +7,7 @@ export interface LengthDisplay {
 	precision: string;
 }
 
-export type { ContentFilterInput } from '#lib/utils/gridUrlState.js';
+export type { ContentFilterInput } from '#lib/utils/libraryColumns/filterCodec.js';
 export { libraryListRequest, cursorsAfterPage, LIBRARY_LIST_STALE_TIME_MS, LOADED_MODE_FIRST } from './libraryList';
 
 // Values the API returns in Content.contentType (a String, not a GraphQL enum).

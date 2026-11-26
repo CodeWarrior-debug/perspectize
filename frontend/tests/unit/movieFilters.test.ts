@@ -1,16 +1,18 @@
+import { LIBRARY_COLUMNS } from '#lib/utils/libraryColumns/index.js';
 import { describe, it, expect } from 'vitest';
 import {
-	COLUMNS,
+	AGE_RATING_OPTIONS,
+	setFilterValueLabel,
+	parsePersonFilter,
+	rowMatchesPerson,
+} from '#lib/utils/grid-config.js';
+import {
 	COL_TO_FILTER_KEY,
 	NUMBER_RANGE_COLS,
 	DATE_RANGE_COLS,
 	SET_FILTER_COLS,
-	AGE_RATING_OPTIONS,
-	setFilterValueLabel,
-	filterContentRows,
-	parsePersonFilter,
-	rowMatchesPerson,
-} from '#lib/utils/grid-config.js';
+} from '#lib/utils/libraryColumns/index.js';
+import { filterContentRows } from '#lib/utils/libraryColumns/clientRows.js';
 import {
 	filterToUrlParams,
 	urlParamsToFilter,
@@ -47,7 +49,7 @@ describe('Movie filter column registry', () => {
 	});
 
 	it('leaves Vs. budget unfiltered (derived value, no backend field, would be dropped in All mode)', () => {
-		expect(COLUMNS.find((c) => c.colId === 'vsBudget')?.filterKey).toBeUndefined();
+		expect(LIBRARY_COLUMNS.find((c) => c.colId === 'vsBudget')?.filter?.key).toBeUndefined();
 		expect(COL_TO_FILTER_KEY.vsBudget).toBeUndefined();
 		expect(filterToUrlParams({ vsBudget: { filterType: 'number', type: 'greaterThan', filter: 100 } })).toEqual({});
 	});

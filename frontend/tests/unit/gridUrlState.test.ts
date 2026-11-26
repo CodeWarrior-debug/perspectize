@@ -6,10 +6,9 @@ import {
 	filterToUrlParams,
 	urlParamsToFilter,
 	urlParamsToGraphQLFilter,
-	COL_TO_SORT,
-	SORT_TO_COL,
 	GRID_DEFAULTS,
 } from '#lib/utils/gridUrlState.js';
+import { COL_TO_SORT, SORT_TO_COL } from '#lib/utils/libraryColumns/index.js';
 
 // ---------------------------------------------------------------------------
 // parseGridParams
