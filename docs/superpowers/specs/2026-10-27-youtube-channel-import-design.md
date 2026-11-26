@@ -37,21 +37,19 @@ Each fact is listed with where it comes from, because that decides cost and fres
 | **Length** | Clip vs lecture, and the time cost of the perspective it invites | `contentDetails.duration` (ISO 8601) | Shown h:mm:ss, filtered in seconds. |
 | **Views** | Reach | `statistics.viewCount` | |
 | **Likes** | Reception | `statistics.likeCount` | **Absent when the channel hides likes.** Show "hidden", never 0. |
-| **Like rate** | Reception normalised for reach, so a 50K-view gem beats a 5M-view dud | derived: likes ÷ views | Not stored. `n/a` when likes are hidden; sorts last. Bar relative to the sheet's best. |
 | **Comments** | Discussion, often a proxy for "people have opinions": the raw material for perspectives | `statistics.commentCount` | Absent when comments are off; show blank. |
-| **Views/day** | Momentum, so new uploads aren't punished for being new | derived: views ÷ days since published | Not stored. |
 | **Kind** | Video, Short or Live, which people often want to include or exclude as a group | see **Shorts** below | Pill. |
 | **Source** / **Import** | Which channel and which named import it came from | staging data | Import name has its own toolbar filter. |
 | **Status** | In library or not | `content.url` match on the canonical URL | In-library rows can't be selected; show Content # with a link. |
 
 Columns in **All columns** only (bookkeeping, not decision-making): Chapters (count), Captions, Tags, Import, Source type, Imports as, Recency, Video ID, Language, Content #.
 
-The **detail panel** (click a row, separate from the checkbox) shows full description (collapsed past ~500 characters), chapters with timestamps, tags, outbound link domains (e.g. `gty.org`), caption availability, like/comment rates and an "Open on YouTube" link. The real page should also show the thumbnail (`i.ytimg.com`, which the Activity table already loads). The artifact previews couldn't, because artifacts block external images.
+The **detail panel** (click a row, separate from the checkbox) shows full description (collapsed past ~500 characters), chapters with timestamps, tags, outbound link domains (e.g. `gty.org`), caption availability and an "Open on YouTube" link. The real page should also show the thumbnail (`i.ytimg.com`, which the Activity table already loads). The artifact previews couldn't, because artifacts block external images.
 
 ### Facts that need care
 
 - **Dislikes are not available.** YouTube made `statistics.dislikeCount` private in December 2021. Do not add a column or a placeholder for it.
-- **Hidden likes.** `likeCount` is missing, not zero. Every derived value and sort must treat it as null. In the sample, 3 of 107 videos hid likes.
+- **Hidden likes.** `likeCount` is missing, not zero. Every sort must treat it as null. In the sample, 3 of 107 videos hid likes.
 - **Shorts are not flagged by the API.** Two options: the channel's Shorts playlist (`UUSH` + channel ID suffix; undocumented, but stable for years) or a duration heuristic (≤ 180 s). Recommend listing the long-form (`UULF…`), Shorts (`UUSH…`) and live (`UULV…`) playlists separately and tagging rows by which list they came from, with the heuristic as a fallback when a list 404s. All three resolved for `@JordanBPeterson` on 2026-10-27. Plain `UU…` is every upload, all kinds mixed. Each playlist costs the same 1 unit per 50.
 - **Chapters are not in the API.** Parse them from the description the way YouTube does: a first timestamp at `0:00`, at least three timestamps in order, each chapter at least 10 s. 49 of the 107 sample videos had chapters.
 - **Captions.** `contentDetails.caption` is a `"true"`/`"false"` string meaning human captions exist; auto-captions aren't reported. Label it "Captions: yes/no", not "transcript available".
@@ -65,7 +63,7 @@ Promote what the grid sorts and filters on, and keep the rest as the trimmed API
 
 `video_id` (unique per job), `kind` (`video|short|live`), `title`, `published_at`, `duration_seconds`, `view_count`, `like_count` (nullable), `comment_count` (nullable), `summary` (derived once at staging), `chapter_count`, `has_captions`, `stats_fetched_at`, `response jsonb` (same trimmed shape as `content.response`: description, tags, channelTitle, categoryId), plus the shared columns from the WordPress design (`job_id`, `excluded_from_import`, `import_status`, `import_error`, `content_id`).
 
-Like rate, comment rate, views/day and age are computed at read time, never stored, since they change with the counts and with the clock.
+Nothing is computed from views, likes or comments, stored or at read time: YouTube's API policy forbids derived metrics.
 
 ## Cost (YouTube Data API, 10,000 units/day default)
 
@@ -99,5 +97,5 @@ Thumbnail-based judgement (beyond showing the image), dislike counts, transcript
 2. **Shared or per-user staging?** If two users stage the same channel, do they share one job's rows, or each get their own?
 3. **Review model.** The WordPress design reviews by exclusion (`excluded_from_import`, default included). The sheet picks by inclusion (checkboxes, default none). Recommend inclusion for channels, since most of a 2,000-video channel is unwanted. Exclusion suits a blog where you want nearly everything. Keep one column with a per-job default, or two modes?
 4. **Stats freshness.** Is a snapshot from listing time good enough for deciding, or should opening the sheet refresh counts older than N days? A refresh costs 1 unit per 50.
-5. **Popularity ordering.** Unlike core WordPress, YouTube does give views and likes, so "import the 50 most-liked" is possible here. Offer it as a selection shortcut ("Select top N by …")?
+5. ~~Popularity ordering.~~ **Decided: no.** No ordering or "select top N" shortcut by YouTube statistics.
 6. **Where does the page live?** Recommend `/import/[jobId]`, linked from wherever an import is started and not in the main nav, matching "preliminary".

@@ -20,6 +20,8 @@ missing that colId (still visible immediately in the picker/sort-picker
 UI), not a silent, separately-drifting list — see `.docs/UI_THOROUGHNESS_CHECKLIST.md`
 §3.1 for why this replaced the older multi-registry design.
 
+**Never derive a column from YouTube API data** (views, likes, comments and the like): no computed column, sort, filter or tooltip. YouTube's API policy forbids it. Showing a returned value as it is, or formatting it (duration, date), is fine.
+
 ## Key files
 
 | File | Purpose |
@@ -58,7 +60,7 @@ Is the field already in the ContentItem TypeScript interface?
 │
 └── NO → Where does the data live?
     │
-    ├── COMPUTED from existing fields (e.g. percentLiked from viewCount/likeCount)
+    ├── COMPUTED from existing fields (e.g. vsBudget from revenue/budget)
     │   → FRONTEND-ONLY: use valueGetter, no backend needed for the column
     │   itself — but see Decision 5 if it should also sort server-side.
     │
@@ -67,7 +69,7 @@ Is the field already in the ContentItem TypeScript interface?
     │   Steps:
     │   1. Add field to Content type in schema.graphql
     │   2. Add virtual field to GORM model (gorm:"-" tag) — see the
-    │      ViewCount/LikeCount/PercentLiked pattern in gorm_models.go
+    │      ViewCount/LikeCount pattern in gorm_models.go
     │   3. Add SQL extraction path in helpers.go
     │   4. Add field to GraphQL resolver if not auto-resolved
     │   5. Run make graphql-gen
@@ -97,8 +99,8 @@ Is the field already in the ContentItem TypeScript interface?
           tags:         response->'items'->0->'snippet'->'tags'
           description:  response->'items'->0->'snippet'->>'description'
 
-          Percent-liked-style computed rules (division, CASE) also live in
-          helpers.go's contentSortRule() — see the PERCENT_LIKED case for the
+          Computed rules (division, CASE) also live in
+          helpers.go's contentSortRule() — see the VS_BUDGET case for the
           NULLIF/CASE pattern for a rate that can divide by zero or be
           missing.
 ```
@@ -151,7 +153,7 @@ the last column (see `frontend/CLAUDE.md`'s "Column minimum widths" gotcha).
 | Date formatting | `valueFormatter` | `formatting.ts` | `dateValueFormatter`, `formatPublishDate` |
 | Array to string | `valueFormatter` | `formatting.ts` | `formatTags` |
 | Truncated text | `valueFormatter` | `formatting.ts` | `truncateDescription` |
-| Computed from multiple fields | `valueGetter` | inline or `formatting.ts` | `durationValueGetter`, `percentLikedValueGetter` |
+| Computed from multiple fields | `valueGetter` | inline or `formatting.ts` | `durationValueGetter`, `vsBudgetValueGetter` |
 | Rich HTML (images, links, icons) | `cellRenderer` returning `HTMLElement` | `formatting.ts` | `itemCellRenderer`, `typeCellRenderer`, `categoryCellRenderer` |
 
 **Use theme tokens, not hex colours.** A renderer that sets `style.color`/
@@ -184,7 +186,7 @@ client sorting is required, server sorting is optional):
    but no `serverSort` is intentionally left out of `COL_TO_SORT`, and
    `sortsToGraphQL` silently drops any colId missing from it, so in "All
    Items" mode the sort has no effect. Leave a comment saying so on the
-   entry (see `percentLiked`'s entry for the pattern), or the next reader
+   entry, or the next reader
    will assume it's a bug.
 
 **Server-side too** (needs a real backend sort, e.g. it's a persisted
@@ -194,7 +196,7 @@ column, or the client-only limitation above isn't acceptable):
 3. Add the matching constant to `ContentSortBy` in `domain/pagination.go`.
 4. Add a case to `contentSortRule()` in `helpers.go` — for a JSONB or
    computed field, this is where the SQL expression goes (see the
-   `PERCENT_LIKED` case for a division that can be zero/NULL).
+   `VS_BUDGET` case for a division that can be zero/NULL).
 5. Set `serverSort: 'BACKEND_ENUM_VALUE'` on the same `ColumnMeta` entry in
    `grid-config.ts` — this feeds both `COL_TO_SORT` and (reversed)
    `SORT_TO_COL`. If two colIds ever share a `serverSort` value, `SORT_TO_COL`
@@ -296,7 +298,7 @@ The effect uses **four** tiers, not two — `xs` (<445px), `sm` (445–639px),
 const alwaysVisible = ['item', 'type', 'perspectize']; // every tier
 const smCols = ['category', 'channel'];                // sm and wider
 const mdCols = ['duration', 'publishDate'];             // md and wider
-const lgCols = ['views', 'likes', 'percentLiked', 'user', 'tags']; // lg only
+const lgCols = ['views', 'likes', 'user', 'tags']; // lg only
 const alwaysHidden = ['description'];                   // never shown by the tier system
 // createdAt/updatedAt/id/addedByUserID/url stay hidden via their colDef
 // `hide: true` until the user (or, for the admin-only ones, an admin)
@@ -316,7 +318,7 @@ as `createdAt`/`updatedAt`/the admin-only columns.
 
 Insert the `ColDef` in the `columnDefs` array at the desired position.
 Current order: perspectize (action), item (name + thumbnail), type, category
-(hidden), duration, views, likes, percentLiked, publishDate, channel, tags,
+(hidden), duration, views, likes, publishDate, channel, tags,
 description (hidden), updatedAt (hidden), createdAt (hidden), then the
 admin-only id/addedByUserID/url (all hidden).
 
