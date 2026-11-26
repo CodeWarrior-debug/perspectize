@@ -10,10 +10,6 @@ import (
 const MaxRelatedPerspectiveIDs = 50
 
 var (
-	// ErrReviewStatusLocked is returned when an owner's write sets ReviewStatus.
-	// Review status is moderation state; no owner path may set it.
-	ErrReviewStatusLocked = fmt.Errorf("%w: review status is set by moderators", ErrForbidden)
-
 	// ErrLinkedPerspectiveNotFound is returned when a perspective links to
 	// another perspective the actor cannot read. A missing row and an
 	// unreadable one give the same answer, so the id's existence isn't disclosed.

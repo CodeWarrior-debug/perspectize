@@ -481,7 +481,6 @@ type ComplexityRoot struct {
 		Quality               func(childComplexity int) int
 		RelatedPerspectiveIDs func(childComplexity int) int
 		Review                func(childComplexity int) int
-		ReviewStatus          func(childComplexity int) int
 		UpdatedAt             func(childComplexity int) int
 		User                  func(childComplexity int) int
 		UserID                func(childComplexity int) int
@@ -2926,12 +2925,6 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.Perspective.Review(childComplexity), true
-	case "Perspective.reviewStatus":
-		if e.ComplexityRoot.Perspective.ReviewStatus == nil {
-			break
-		}
-
-		return e.ComplexityRoot.Perspective.ReviewStatus(childComplexity), true
 	case "Perspective.updatedAt":
 		if e.ComplexityRoot.Perspective.UpdatedAt == nil {
 			break
@@ -3999,12 +3992,6 @@ enum Privacy {
   PRIVATE
 }
 
-enum ReviewStatus {
-  PENDING
-  APPROVED
-  REJECTED
-}
-
 enum PerspectiveSortBy {
   CREATED_AT
   UPDATED_AT
@@ -4038,7 +4025,6 @@ type Perspective {
   privacy: Privacy!
   description: String
   category: String
-  reviewStatus: ReviewStatus
   parts: [Int!]
   labels: [String!]
   categorizedRatings: [CategorizedRating!]
@@ -4594,7 +4580,6 @@ input UpdatePerspectiveInput {
   privacy: Privacy
   description: String
   category: String
-  reviewStatus: ReviewStatus
   parts: [Int!]
   labels: [String!]
   categorizedRatings: [CategorizedRatingInput!]
@@ -6109,8 +6094,6 @@ func (ec *executionContext) childFields_Perspective(ctx context.Context, field g
 		return ec.fieldContext_Perspective_description(ctx, field)
 	case "category":
 		return ec.fieldContext_Perspective_category(ctx, field)
-	case "reviewStatus":
-		return ec.fieldContext_Perspective_reviewStatus(ctx, field)
 	case "parts":
 		return ec.fieldContext_Perspective_parts(ctx, field)
 	case "labels":
@@ -16785,29 +16768,6 @@ func (ec *executionContext) fieldContext_Perspective_category(_ context.Context,
 	return graphql.NewScalarFieldContext("Perspective", field, false, false, "String")
 }
 
-func (ec *executionContext) _Perspective_reviewStatus(ctx context.Context, field graphql.CollectedField, obj *model.Perspective) (ret graphql.Marshaler) {
-	return graphql.ResolveField(
-		ctx,
-		ec.OperationContext,
-		field,
-		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			return ec.fieldContext_Perspective_reviewStatus(ctx, field)
-		},
-		func(ctx context.Context) (any, error) {
-			return obj.ReviewStatus, nil
-		},
-		nil,
-		func(ctx context.Context, selections ast.SelectionSet, v *domain.ReviewStatus) graphql.Marshaler {
-			return ec.marshalOReviewStatus2ᚖgithubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋcoreᚋdomainᚐReviewStatus(ctx, selections, v)
-		},
-		true,
-		false,
-	)
-}
-func (ec *executionContext) fieldContext_Perspective_reviewStatus(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
-	return graphql.NewScalarFieldContext("Perspective", field, false, false, "ReviewStatus")
-}
-
 func (ec *executionContext) _Perspective_parts(ctx context.Context, field graphql.CollectedField, obj *model.Perspective) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
@@ -24119,7 +24079,7 @@ func (ec *executionContext) unmarshalInputUpdatePerspectiveInput(ctx context.Con
 		asMap[k] = v
 	}
 
-	fieldsInOrder := [...]string{"id", "contentID", "quality", "agreement", "importance", "confidence", "like", "privacy", "description", "category", "reviewStatus", "parts", "labels", "categorizedRatings", "feelings", "primaryPerspectiveID", "relatedPerspectiveIDs", "customFields", "review"}
+	fieldsInOrder := [...]string{"id", "contentID", "quality", "agreement", "importance", "confidence", "like", "privacy", "description", "category", "parts", "labels", "categorizedRatings", "feelings", "primaryPerspectiveID", "relatedPerspectiveIDs", "customFields", "review"}
 	for _, k := range fieldsInOrder {
 		v, ok := asMap[k]
 		if !ok {
@@ -24196,13 +24156,6 @@ func (ec *executionContext) unmarshalInputUpdatePerspectiveInput(ctx context.Con
 				return it, err
 			}
 			it.Category = data
-		case "reviewStatus":
-			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("reviewStatus"))
-			data, err := ec.unmarshalOReviewStatus2ᚖgithubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋcoreᚋdomainᚐReviewStatus(ctx, v)
-			if err != nil {
-				return it, err
-			}
-			it.ReviewStatus = data
 		case "parts":
 			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("parts"))
 			data, err := ec.unmarshalOInt2ᚕintᚄ(ctx, v)
@@ -27468,11 +27421,6 @@ func (ec *executionContext) _Perspective(ctx context.Context, sel ast.SelectionS
 			}
 		case "category":
 			out.Values[i] = ec._Perspective_category(ctx, field, obj)
-			if out.Values[i] == graphql.RequiredNull {
-				atomic.AddUint32(&out.Invalids, 1)
-			}
-		case "reviewStatus":
-			out.Values[i] = ec._Perspective_reviewStatus(ctx, field, obj)
 			if out.Values[i] == graphql.RequiredNull {
 				atomic.AddUint32(&out.Invalids, 1)
 			}
@@ -31052,25 +31000,6 @@ func (ec *executionContext) unmarshalOPrivacy2ᚖgithubᚗcomᚋCodeWarriorᚑde
 }
 
 func (ec *executionContext) marshalOPrivacy2ᚖgithubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋcoreᚋdomainᚐPrivacy(ctx context.Context, sel ast.SelectionSet, v *domain.Privacy) graphql.Marshaler {
-	if v == nil {
-		return graphql.Null
-	}
-	_ = sel
-	_ = ctx
-	res := graphql.MarshalString(string(*v))
-	return res
-}
-
-func (ec *executionContext) unmarshalOReviewStatus2ᚖgithubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋcoreᚋdomainᚐReviewStatus(ctx context.Context, v any) (*domain.ReviewStatus, error) {
-	if v == nil {
-		return nil, nil
-	}
-	tmp, err := graphql.UnmarshalString(v)
-	res := domain.ReviewStatus(tmp)
-	return &res, graphql.ErrorOnPath(ctx, err)
-}
-
-func (ec *executionContext) marshalOReviewStatus2ᚖgithubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋcoreᚋdomainᚐReviewStatus(ctx context.Context, sel ast.SelectionSet, v *domain.ReviewStatus) graphql.Marshaler {
 	if v == nil {
 		return graphql.Null
 	}
