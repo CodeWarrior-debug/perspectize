@@ -364,9 +364,9 @@ func applyContentVisibility(query *gorm.DB, viewerID *int) *gorm.DB {
 }
 
 func (r *GormContentRepository) List(ctx context.Context, params domain.ContentListParams) (*domain.PaginatedContent, error) {
-	limit := 10
-	if params.First != nil {
-		limit = *params.First
+	window, err := domain.ResolvePage(params.First, params.Last, params.After, params.Before)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list content: %w", err)
 	}
 
 	// Build sort rules using helper from helpers.go. Multi-column sort (params.Sorts)
@@ -381,17 +381,6 @@ func (r *GormContentRepository) List(ctx context.Context, params domain.ContentL
 	// The cursor is built from the last row's struct fields, so every computed sort
 	// expression must come back as a scanned column (C-02).
 	computedSelects := computedSortSelects(rules)
-
-	// Configure paginator options
-	opts := []paginator.Option{
-		paginator.WithRules(rules...),
-		paginator.WithLimit(limit),
-		paginator.WithAllowTupleCmp(paginator.TRUE),
-	}
-	if params.After != nil {
-		opts = append(opts, paginator.WithAfter(*params.After))
-	}
-	p := paginator.New(opts...)
 
 	// Start query with context and apply filters BEFORE pagination
 	query := r.db.WithContext(ctx).Model(&ContentModel{})
@@ -438,13 +427,8 @@ func (r *GormContentRepository) List(ctx context.Context, params domain.ContentL
 		if params.Filter.MaxLikeCount != nil {
 			query = query.Where(statCountExpr("likeCount")+" <= ?", *params.Filter.MaxLikeCount)
 		}
-		// Published date filters (JSONB extraction, ISO 8601 string comparison)
-		if params.Filter.PublishedAfter != nil {
-			query = query.Where("response->'items'->0->'snippet'->>'publishedAt' >= ?", *params.Filter.PublishedAfter)
-		}
-		if params.Filter.PublishedBefore != nil {
-			query = query.Where("response->'items'->0->'snippet'->>'publishedAt' <= ?", *params.Filter.PublishedBefore)
-		}
+		// Published date and web page facts (see applyFactFilters)
+		query = applyFactFilters(query, params.Filter)
 		// Channel title filter (JSONB extraction + ILIKE)
 		if params.Filter.ChannelTitle != nil && *params.Filter.ChannelTitle != "" {
 			query = query.Where("response->'items'->0->'snippet'->>'channelTitle' ILIKE ?", "%"+*params.Filter.ChannelTitle+"%")
@@ -504,12 +488,9 @@ func (r *GormContentRepository) List(ctx context.Context, params domain.ContentL
 
 	// Execute pagination
 	var models []ContentModel
-	pageResult, cursor, err := p.Paginate(query, &models)
+	cursor, err := listPage(query, rules, window, &models)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list content: %w", err)
-	}
-	if pageResult.Error != nil {
-		return nil, fmt.Errorf("failed to list content: %w", pageResult.Error)
 	}
 
 	var totalCountInt *int
@@ -518,8 +499,8 @@ func (r *GormContentRepository) List(ctx context.Context, params domain.ContentL
 		switch {
 		case len(models) > 0 && models[0].TotalCount != nil:
 			count = *models[0].TotalCount
-		case params.After != nil:
-			// An empty page past the end carries no row to read the total from.
+		case window.After != nil || window.Before != nil:
+			// An empty page past either end carries no row to read the total from.
 			if err := countQuery.Count(&count).Error; err != nil {
 				return nil, fmt.Errorf("failed to count content: %w", err)
 			}
@@ -534,18 +515,14 @@ func (r *GormContentRepository) List(ctx context.Context, params domain.ContentL
 		items[i] = contentModelToDomain(&models[i])
 	}
 
-	result := &domain.PaginatedContent{
-		Items:      items,
-		HasNext:    cursor.After != nil,
-		HasPrev:    cursor.Before != nil,
-		TotalCount: totalCountInt,
-	}
-
-	// StartCursor = cursor.Before, EndCursor = cursor.After
-	result.StartCursor = cursor.Before
-	result.EndCursor = cursor.After
-
-	return result, nil
+	return &domain.PaginatedContent{
+		Items:       items,
+		HasNext:     cursor.HasNext,
+		HasPrev:     cursor.HasPrev,
+		StartCursor: cursor.StartCursor,
+		EndCursor:   cursor.EndCursor,
+		TotalCount:  totalCountInt,
+	}, nil
 }
 
 // ReassignByUser updates all content owned by fromUserID to toUserID

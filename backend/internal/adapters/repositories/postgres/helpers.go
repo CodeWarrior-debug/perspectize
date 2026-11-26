@@ -295,7 +295,7 @@ func contentSortRule(sortBy domain.ContentSortBy, order domain.SortOrder) pagina
 		return paginator.Rule{
 			Key:             "PublishedAt",
 			Order:           paginatorOrder,
-			SQLRepr:         "CASE WHEN content_type = 'web_page' THEN response->>'publishedAt' ELSE response->'items'->0->'snippet'->>'publishedAt' END",
+			SQLRepr:         factText(domain.ContentFactPublishedAt),
 			NULLReplacement: publishedNull,
 		}
 	case domain.ContentSortByChannelTitle:

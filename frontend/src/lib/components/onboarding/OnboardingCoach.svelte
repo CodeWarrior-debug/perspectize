@@ -28,12 +28,8 @@
 	import { useMarkOnboardingSeen } from '#lib/queries/users/useMarkOnboardingSeen.js';
 	import { graphqlRequest } from '#lib/queries/client.js';
 	import { LIST_CONTENT, type ContentItem, type ContentResponse } from '#lib/queries/content/index.js';
-	import {
-		LIST_PERSPECTIVES_BY_USER,
-		MAX_PERSPECTIVES_PER_LIST,
-		type ListPerspectivesByUserResponse,
-		type PerspectiveItem,
-	} from '#lib/queries/perspectives/index.js';
+	import type { PerspectiveItem } from '#lib/queries/perspectives/index.js';
+	import { useViewerPerspectives } from '#lib/queries/perspectives/viewerPerspectives.js';
 	import { queryKeys } from '#lib/queries/keys.js';
 	import { setCoachForceOpen } from '#lib/onboarding/coachGate.svelte.js';
 
@@ -70,29 +66,15 @@
 		staleTime: 30_000,
 	}));
 
-	const perspectivesQuery = createQuery(() => ({
-		queryKey: queryKeys.perspectives.listByUser(userId),
-		queryFn: () =>
-			graphqlRequest<ListPerspectivesByUserResponse>(LIST_PERSPECTIVES_BY_USER, {
-				userID: userId,
-				first: MAX_PERSPECTIVES_PER_LIST,
-			}),
-		enabled: open && userId > 0,
-		staleTime: 30_000,
-	}));
+	// Shares the by-user perspectives query with the library and Plan (one request, one key).
+	const perspectives = useViewerPerspectives(() => (open && userId > 0 ? userId : null));
 
 	const ownedContent = $derived.by(() => {
 		const items = contentQuery.data?.content?.items ?? [];
 		return items.filter((c) => c.addedByUserID === userIdStr);
 	});
 
-	const perspectivesByContentId = $derived.by(() => {
-		const map = new Map<string, PerspectiveItem>();
-		for (const p of perspectivesQuery.data?.perspectives?.items ?? []) {
-			if (p.contentID) map.set(p.contentID, p);
-		}
-		return map;
-	});
+	const perspectivesByContentId = $derived(perspectives.byContent);
 
 	/** Prefer owned content without a perspective; fall back to any owned item. */
 	const perspectiveTarget = $derived.by((): ContentItem | null => {
@@ -274,7 +256,7 @@
 		<PerspectivePopover
 			contentId={parseInt(perspectiveTarget.id, 10)}
 			contentName={perspectiveTarget.name}
-			existingPerspective={perspectivesByContentId.get(perspectiveTarget.id) ?? null}
+			existingPerspective={perspectivesByContentId.get(perspectiveTarget.id)?.[0] ?? null}
 			{userId}
 			bind:open={perspectiveOpen}
 			onClose={() => {

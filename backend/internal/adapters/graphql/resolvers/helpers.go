@@ -8,9 +8,7 @@ import (
 	"fmt"
 	"github.com/CodeWarrior-debug/perspectize/backend/internal/adapters/auth"
 	"log/slog"
-	"regexp"
 	"strconv"
-	"strings"
 	"time"
 
 	"github.com/99designs/gqlgen/graphql"
@@ -19,6 +17,7 @@ import (
 	"github.com/CodeWarrior-debug/perspectize/backend/internal/adapters/tmdb"
 	"github.com/CodeWarrior-debug/perspectize/backend/internal/core/domain"
 	portservices "github.com/CodeWarrior-debug/perspectize/backend/internal/core/ports/services"
+	"github.com/vektah/gqlparser/v2/gqlerror"
 )
 
 // webPageInputMessage is the user-facing message for a webpage input error, or ""
@@ -135,23 +134,6 @@ func bookSearchPageToModel(page *portservices.BookSearchPage) *model.BookSearchP
 		out.Items = append(out.Items, bookSearchResultToModel(item))
 	}
 	return out
-}
-
-// hyphenatedISBNRe matches a string made only of digits, X/x and hyphens —
-// shaped like a human-entered ISBN-10/13 (e.g. "978-0-434-74002-4").
-var hyphenatedISBNRe = regexp.MustCompile(`^[0-9Xx-]+$`)
-
-// normalizeHyphenatedISBN strips hyphens from a raw ISBN-shaped input before
-// it reaches ContentService: its isbnRe only matches bare-digit ISBN-10/13,
-// so a hyphenated ISBN would otherwise be misclassified and rejected with
-// ErrInvalidInput (Task 5 review finding). Input that isn't ISBN-shaped (an
-// Open Library work URL, or an already bare ISBN) passes through unchanged.
-func normalizeHyphenatedISBN(raw string) string {
-	trimmed := strings.TrimSpace(raw)
-	if strings.Contains(trimmed, "-") && hyphenatedISBNRe.MatchString(trimmed) {
-		return strings.ReplaceAll(trimmed, "-", "")
-	}
-	return raw
 }
 
 // userDomainToModel converts a domain User to a GraphQL model User
@@ -308,9 +290,9 @@ func domainToModel(c *domain.Content) *model.Content {
 // parseStatCount parses a YouTube statistics string to *int.
 // Returns pointer to 0 for empty strings, nil for non-numeric values.
 func parseStatCount(value, field string, contentID int) *int {
+	// An empty value is a count the source did not report: nil, never zero.
 	if value == "" {
-		zero := 0
-		return &zero
+		return nil
 	}
 	v, err := strconv.Atoi(value)
 	if err != nil {
@@ -1339,4 +1321,24 @@ func forward[In, Out any](ctx context.Context, in <-chan In, mapFn func(In) Out)
 		}
 	}()
 	return out
+}
+
+// pageInfoToModel maps one list's paging state onto the GraphQL PageInfo. Every
+// paged list resolver builds its connection's PageInfo here.
+func pageInfoToModel(hasNext, hasPrev bool, start, end *string) *model.PageInfo {
+	return &model.PageInfo{
+		HasNextPage:     hasNext,
+		HasPreviousPage: hasPrev,
+		StartCursor:     start,
+		EndCursor:       end,
+	}
+}
+
+// invalidPagingError is the INVALID_INPUT error for a list's paging arguments.
+// The message keeps the "invalid pagination parameters" prefix clients match on.
+func invalidPagingError(err error) error {
+	return &gqlerror.Error{
+		Message:    fmt.Sprintf("invalid pagination parameters: %v", err),
+		Extensions: map[string]any{"code": string(domain.KindInvalid)},
+	}
 }
