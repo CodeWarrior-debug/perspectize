@@ -242,11 +242,6 @@ func (s *PerspectiveService) Update(ctx context.Context, input portservices.Upda
 		return nil, fmt.Errorf("failed to get perspective: %w", domain.ErrNotFound)
 	}
 
-	// Review status is moderation state, so no owner write may set it.
-	if input.ReviewStatus != nil {
-		return nil, domain.ErrReviewStatusLocked
-	}
-
 	// Attaching different content is checked against the acting user. An
 	// unchanged content id is not a new attachment, so it isn't re-checked.
 	if input.ContentID != nil && (existing.ContentID == nil || *existing.ContentID != *input.ContentID) {

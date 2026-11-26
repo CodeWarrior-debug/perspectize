@@ -114,7 +114,6 @@ type PerspectiveModel struct {
 	Category              *string         `gorm:""`
 	Labels                StringArray     `gorm:"type:text[]"`
 	Description           *string         `gorm:""`
-	ReviewStatus          *string         `gorm:""`
 	CategorizedRatings    JSONBArray      `gorm:"type:jsonb[];column:categorized_ratings"`
 	Feelings              JSONBArray      `gorm:"type:jsonb[];column:feelings"`
 	PrimaryPerspectiveID  *int            `gorm:"column:primary_perspective_id"`

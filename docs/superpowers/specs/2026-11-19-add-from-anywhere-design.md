@@ -107,7 +107,7 @@ The goal is to let users add the page or video they are looking at from wherever
 ## Delivery (stacked or sequential PRs)
 
 1. **Extract `AddContentForm` from `AddContentPopover`** (refactor, no behaviour change). The existing popover tests must pass unchanged.
-2. **Add the `/add` route and the param parsing.** Label `needs-demo-video`.
+2. **Add the `/add` route and the param parsing.** Label `needs-demo-evidence`.
 3. **Add the `extension/` package**, with a README on loading it unpacked and a store-listing checklist.
 4. **Add the iOS Shortcut help section and the doc for rebuilding the Shortcut.**
 

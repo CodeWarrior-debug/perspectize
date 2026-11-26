@@ -155,7 +155,7 @@ Behaviour to implement (page layout within existing shadcn/Tailwind styles):
 
 ### Task 6: Open PR 2
 
-- [ ] Run `pnpm run test:run`, push, open PR labelled `needs-demo-video` (cloud: no Clerk sign-in; local: record with the saved video tool). PR body notes the Clerk session-length setting (30-day rolling plus inactivity timeout) is the owner's dashboard change. Run `/revise-claude-md`.
+- [ ] Run `pnpm run test:run`, push, open PR labelled `needs-demo-evidence` (cloud: no Clerk sign-in; local: record with the saved video tool). PR body notes the Clerk session-length setting (30-day rolling plus inactivity timeout) is the owner's dashboard change. Run `/revise-claude-md`.
 
 ---
 
@@ -220,7 +220,7 @@ Behaviour to implement (page layout within existing shadcn/Tailwind styles):
 
 ### Task 11: Open PR 4
 
-- [ ] Run `pnpm run test:run`; push; open PR labelled `needs-demo-video` (user-visible Settings section); note the owner supplies `IOS_SHORTCUT_URL`. Run `/revise-claude-md`.
+- [ ] Run `pnpm run test:run`; push; open PR labelled `needs-demo-evidence` (user-visible Settings section); note the owner supplies `IOS_SHORTCUT_URL`. Run `/revise-claude-md`.
 
 ## Self-review notes
 

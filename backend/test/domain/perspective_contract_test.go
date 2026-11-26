@@ -74,7 +74,6 @@ func TestMaxRelatedPerspectiveIDs(t *testing.T) {
 func TestSentinelsWrapTheirKinds(t *testing.T) {
 	assert.True(t, errors.Is(domain.ErrDuplicatePerspective, domain.ErrAlreadyExists))
 	assert.True(t, errors.Is(domain.ErrLinkedPerspectiveNotFound, domain.ErrNotFound))
-	assert.True(t, errors.Is(domain.ErrReviewStatusLocked, domain.ErrForbidden))
 }
 
 func TestKindOfDuplicatePerspective(t *testing.T) {

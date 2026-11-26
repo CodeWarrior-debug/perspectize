@@ -4,7 +4,7 @@ import { silentToast } from '#lib/utils/toast.js';
 import { goto } from '$app/navigation';
 import { graphqlRequest } from '../client';
 import { CREATE_CONTENT_FROM_PASSAGE, type CreateContentFromPassageResponse } from '../bible';
-import { queryKeys } from '../keys';
+import { evictAfterContentCreated } from './contentCreatedEviction';
 import type { PassageRange } from '#lib/utils/bible.js';
 import { libraryContentHref } from '#lib/utils/contentLinks.js';
 
@@ -41,7 +41,7 @@ export function useAddPassage(options: UseAddPassageOptions = {}) {
 			});
 			// Idempotent server call: new or pre-existing rows both come back as
 			// Content, so refetch lists instead of blindly prepending (no duplicates).
-			queryClient.invalidateQueries({ queryKey: queryKeys.content.lists() });
+			evictAfterContentCreated(queryClient);
 		},
 		onError: (err: Error) => {
 			console.error('[AddPassage] mutation failed:', err);

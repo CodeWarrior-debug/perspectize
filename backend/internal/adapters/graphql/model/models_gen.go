@@ -582,7 +582,6 @@ type Perspective struct {
 	Privacy               domain.Privacy       `json:"privacy"`
 	Description           *string              `json:"description,omitempty"`
 	Category              *string              `json:"category,omitempty"`
-	ReviewStatus          *domain.ReviewStatus `json:"reviewStatus,omitempty"`
 	Parts                 []int                `json:"parts,omitempty"`
 	Labels                []string             `json:"labels,omitempty"`
 	CategorizedRatings    []*CategorizedRating `json:"categorizedRatings,omitempty"`
@@ -727,7 +726,6 @@ type UpdatePerspectiveInput struct {
 	Privacy            *domain.Privacy            `json:"privacy,omitempty"`
 	Description        *string                    `json:"description,omitempty"`
 	Category           *string                    `json:"category,omitempty"`
-	ReviewStatus       *domain.ReviewStatus       `json:"reviewStatus,omitempty"`
 	Parts              []int                      `json:"parts,omitempty"`
 	Labels             []string                   `json:"labels,omitempty"`
 	CategorizedRatings []*CategorizedRatingInput  `json:"categorizedRatings,omitempty"`

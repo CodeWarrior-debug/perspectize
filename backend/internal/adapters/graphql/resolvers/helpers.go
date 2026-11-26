@@ -327,21 +327,20 @@ func categoryDomainToModel(c *domain.Category) *model.Category {
 // perspectiveDomainToModel converts a domain Perspective to a GraphQL model Perspective
 func perspectiveDomainToModel(p *domain.Perspective) *model.Perspective {
 	m := &model.Perspective{
-		ID:           strconv.Itoa(p.ID),
-		UserID:       strconv.Itoa(p.UserID),
-		Quality:      p.Quality,
-		Agreement:    p.Agreement,
-		Importance:   p.Importance,
-		Confidence:   p.Confidence,
-		Like:         p.Like,
-		Privacy:      p.Privacy,
-		Description:  p.Description,
-		Category:     p.Category,
-		Parts:        p.Parts,
-		Labels:       p.Labels,
-		ReviewStatus: p.ReviewStatus,
-		CreatedAt:    p.CreatedAt.Format("2006-01-02T15:04:05Z07:00"),
-		UpdatedAt:    p.UpdatedAt.Format("2006-01-02T15:04:05Z07:00"),
+		ID:          strconv.Itoa(p.ID),
+		UserID:      strconv.Itoa(p.UserID),
+		Quality:     p.Quality,
+		Agreement:   p.Agreement,
+		Importance:  p.Importance,
+		Confidence:  p.Confidence,
+		Like:        p.Like,
+		Privacy:     p.Privacy,
+		Description: p.Description,
+		Category:    p.Category,
+		Parts:       p.Parts,
+		Labels:      p.Labels,
+		CreatedAt:   p.CreatedAt.Format("2006-01-02T15:04:05Z07:00"),
+		UpdatedAt:   p.UpdatedAt.Format("2006-01-02T15:04:05Z07:00"),
 	}
 
 	if p.ContentID != nil {
@@ -683,7 +682,6 @@ func modelToUpdatePerspectiveInput(input model.UpdatePerspectiveInput) portservi
 		Privacy:               input.Privacy,
 		Description:           input.Description,
 		Category:              input.Category,
-		ReviewStatus:          input.ReviewStatus,
 		Parts:                 input.Parts,
 		Labels:                input.Labels,
 		CategorizedRatings:    categorizedRatingInputsToDomain(input.CategorizedRatings),

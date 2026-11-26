@@ -3,8 +3,8 @@ import { toast } from 'svelte-sonner';
 import { silentToast } from '#lib/utils/toast.js';
 import { goto } from '$app/navigation';
 import { graphqlRequest } from '../client';
-import { CREATE_CONTENT_FROM_YOUTUBE, type CreateContentResponse, type ContentResponse } from './index';
-import { queryKeys } from '../keys';
+import { CREATE_CONTENT_FROM_YOUTUBE, type CreateContentResponse } from './index';
+import { evictAfterContentCreated } from './contentCreatedEviction';
 import { libraryContentHref } from '#lib/utils/contentLinks.js';
 
 export interface UseAddVideoOptions {
@@ -40,30 +40,8 @@ export function useAddVideo(options: UseAddVideoOptions = {}) {
 				notify.success(`Added: ${newItem?.name ?? 'video'}`);
 			}
 
-			if (newItem) {
-				// Only insert into cache if it's a genuinely new item
-				if (!result?.alreadyExisted) {
-					queryClient.setQueriesData<ContentResponse>({ queryKey: queryKeys.content.lists() }, (oldData) => {
-						if (!oldData) return oldData;
-						return {
-							content: {
-								...oldData.content,
-								items: [newItem, ...oldData.content.items],
-								totalCount: (oldData.content.totalCount ?? 0) + 1,
-							},
-						};
-					});
-				}
-
-				// Mark stale for eventual consistency
-				queryClient.invalidateQueries({
-					queryKey: queryKeys.content.lists(),
-					refetchType: 'none',
-				});
-			} else {
-				// Fallback: full refetch if response shape is unexpected
-				queryClient.invalidateQueries({ queryKey: queryKeys.content.lists() });
-			}
+			// Only a genuinely new item is prepended; an existing one is evicted without a patch.
+			evictAfterContentCreated(queryClient, newItem && !result?.alreadyExisted ? newItem : null);
 		},
 		onError: (err: Error) => {
 			console.error('[AddVideo] mutation failed:', err);

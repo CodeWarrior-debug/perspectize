@@ -23,7 +23,7 @@ func perspectiveRows() *sqlmock.Rows {
 	return sqlmock.NewRows([]string{
 		"id", "user_id", "content_id", "like", "quality", "agreement", "importance",
 		"confidence", "privacy", "parts", "category", "labels", "description",
-		"review_status", "categorized_ratings", "primary_perspective_id",
+		"categorized_ratings", "primary_perspective_id",
 		"related_perspective_ids", "custom_fields", "review", "created_at", "updated_at",
 	})
 }
@@ -33,7 +33,7 @@ func fullPerspectiveRow(rows *sqlmock.Rows, id int) *sqlmock.Rows {
 	return rows.AddRow(
 		id, 2, 11, "loved it", 9000, 8000, 7000,
 		6000, "public", "{1,2,3}", "film", "{a,b}", "desc",
-		"approved", `{"{\"category\":\"acting\",\"rating\":7}"}`, 4,
+		`{"{\"category\":\"acting\",\"rating\":7}"}`, 4,
 		"{10,20}", []byte(`{"k":"v"}`), "review text", perspRepoTime, perspRepoTime,
 	)
 }
@@ -54,8 +54,6 @@ func TestGormPerspectiveRepository_GetByID(t *testing.T) {
 		require.NotNil(t, got.ContentID)
 		assert.Equal(t, 11, *got.ContentID)
 		assert.Equal(t, domain.PrivacyPublic, got.Privacy)
-		require.NotNil(t, got.ReviewStatus)
-		assert.Equal(t, domain.ReviewStatusApproved, *got.ReviewStatus)
 		assert.Equal(t, []int{1, 2, 3}, got.Parts)
 		assert.Equal(t, []string{"a", "b"}, got.Labels)
 		assert.Equal(t, []domain.CategorizedRating{{Category: "acting", Rating: 7}}, got.CategorizedRatings)
@@ -74,14 +72,13 @@ func TestGormPerspectiveRepository_GetByID(t *testing.T) {
 			WillReturnRows(perspectiveRows().AddRow(
 				6, 2, nil, nil, nil, nil, nil,
 				nil, nil, nil, nil, nil, nil,
-				nil, nil, nil,
+				nil, nil,
 				nil, nil, nil, perspRepoTime, perspRepoTime))
 
 		got, err := NewGormPerspectiveRepository(db).GetByID(ctx, 6)
 		require.NoError(t, err)
 		require.NotNil(t, got)
 		assert.Equal(t, domain.PrivacyPublic, got.Privacy)
-		assert.Nil(t, got.ReviewStatus)
 		assert.Nil(t, got.Parts)
 		assert.Nil(t, got.Labels)
 		assert.Nil(t, got.CategorizedRatings)
@@ -226,15 +223,15 @@ func TestGormPerspectiveRepository_Update(t *testing.T) {
 
 	t.Run("single owner-scoped UPDATE ... RETURNING, no follow-up SELECT", func(t *testing.T) {
 		db, mock := newMockDB(t)
-		// 18 SET values (id, user_id and created_at are omitted from SET, and the
+		// 17 SET values (id, user_id and created_at are omitted from SET, and the
 		// nil custom_fields is inlined as NULL), then the owner and id predicates.
-		recs := make([]*recordArg, 20)
-		matchers := make([]driver.Value, 20)
+		recs := make([]*recordArg, 19)
+		matchers := make([]driver.Value, 19)
 		for i := range recs {
 			recs[i] = &recordArg{}
 			matchers[i] = recs[i]
 		}
-		mock.ExpectQuery(`UPDATE "perspectives" SET "content_id"=\$1,.*"review"=\$17,"updated_at"=\$18 WHERE user_id = \$19 AND "id" = \$20 RETURNING `).
+		mock.ExpectQuery(`UPDATE "perspectives" SET "content_id"=\$1,.*"review"=\$16,"updated_at"=\$17 WHERE user_id = \$18 AND "id" = \$19 RETURNING `).
 			WithArgs(matchers...).
 			WillReturnRows(fullPerspectiveRow(perspectiveRows(), 5))
 
@@ -250,9 +247,9 @@ func TestGormPerspectiveRepository_Update(t *testing.T) {
 
 		// The owner predicate binds ownerUserID (42), never the perspective's own
 		// UserID (2); the id predicate binds 5.
-		assert.EqualValues(t, 42, recs[18].got, "user_id predicate must use ownerUserID")
-		assert.EqualValues(t, 5, recs[19].got, "id predicate")
-		for i := 0; i < 18; i++ {
+		assert.EqualValues(t, 42, recs[17].got, "user_id predicate must use ownerUserID")
+		assert.EqualValues(t, 5, recs[18].got, "id predicate")
+		for i := 0; i < 17; i++ {
 			assert.NotEqualValues(t, 42, recs[i].got, "owner id must not be written into SET (arg %d)", i+1)
 		}
 		// Select("*") writes nil fields too, so an unset rating is a real clear.

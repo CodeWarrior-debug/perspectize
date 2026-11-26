@@ -1,7 +1,6 @@
 package postgres
 
 import (
-	"database/sql"
 	"testing"
 
 	"github.com/CodeWarrior-debug/perspectize/backend/internal/core/domain"
@@ -78,40 +77,6 @@ func TestPrivacyDBValueConversion(t *testing.T) {
 	assert.Equal(t, domain.PrivacyPublic, privacyFromDBValue("public"))
 	assert.Equal(t, domain.PrivacyPublic, privacyFromDBValue("PuBLic"))
 	assert.Equal(t, domain.Privacy(""), privacyFromDBValue(""))
-}
-
-func TestReviewStatusToDBValue(t *testing.T) {
-	t.Run("nil pointer yields invalid NullString", func(t *testing.T) {
-		got := reviewStatusToDBValue(nil)
-		assert.False(t, got.Valid)
-		assert.Equal(t, "", got.String)
-	})
-
-	t.Run("approved yields lowercase valid NullString", func(t *testing.T) {
-		rs := domain.ReviewStatusApproved
-		got := reviewStatusToDBValue(&rs)
-		assert.True(t, got.Valid)
-		assert.Equal(t, "approved", got.String)
-	})
-
-	t.Run("pending yields lowercase valid NullString", func(t *testing.T) {
-		rs := domain.ReviewStatusPending
-		got := reviewStatusToDBValue(&rs)
-		assert.True(t, got.Valid)
-		assert.Equal(t, "pending", got.String)
-	})
-}
-
-func TestReviewStatusFromDBValue(t *testing.T) {
-	t.Run("invalid NullString yields nil", func(t *testing.T) {
-		assert.Nil(t, reviewStatusFromDBValue(sql.NullString{}))
-	})
-
-	t.Run("valid NullString is uppercased", func(t *testing.T) {
-		got := reviewStatusFromDBValue(sql.NullString{String: "rejected", Valid: true})
-		require.NotNil(t, got)
-		assert.Equal(t, domain.ReviewStatusRejected, *got)
-	})
 }
 
 func TestIntSliceToInt64Array(t *testing.T) {

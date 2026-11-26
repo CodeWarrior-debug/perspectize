@@ -59,8 +59,6 @@ func createPerspectiveError(err error, privacy *domain.Privacy) error {
 func updatePerspectiveError(err error, privacy *domain.Privacy) error {
 	kind := perspectiveWriteKind(err)
 	switch {
-	case errors.Is(err, domain.ErrReviewStatusLocked):
-		return kindedError("access denied: review status is set by moderators", kind)
 	case errors.Is(err, domain.ErrForbidden):
 		return kindedError("access denied: you can only modify your own perspectives", kind)
 	case errors.Is(err, domain.ErrContentNotFound):

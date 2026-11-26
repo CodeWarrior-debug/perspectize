@@ -13,15 +13,6 @@ const (
 	PrivacyPrivate Privacy = "PRIVATE"
 )
 
-// ReviewStatus represents the review state of a perspective
-type ReviewStatus string
-
-const (
-	ReviewStatusPending  ReviewStatus = "PENDING"
-	ReviewStatusApproved ReviewStatus = "APPROVED"
-	ReviewStatusRejected ReviewStatus = "REJECTED"
-)
-
 // CategorizedRating represents a rating with a category label
 type CategorizedRating struct {
 	Category string `json:"category"`
@@ -55,11 +46,10 @@ type Perspective struct {
 	Confidence *int
 
 	// Optional fields
-	Like         *string // Freeform text
-	Privacy      Privacy
-	Description  *string
-	Category     *string
-	ReviewStatus *ReviewStatus
+	Like        *string // Freeform text
+	Privacy     Privacy
+	Description *string
+	Category    *string
 
 	// Array fields
 	Parts  []int    // Array of part identifiers

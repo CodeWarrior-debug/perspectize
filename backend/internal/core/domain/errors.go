@@ -20,8 +20,17 @@ var (
 	ErrInvalidPercent  = errors.New("percent complete must be between 0 and 100")
 	ErrSentinelUser    = errors.New("cannot modify the system sentinel user")
 	ErrDeleteSentinel  = errors.New("cannot delete the system sentinel user")
-	ErrForbidden       = errors.New("access denied")
-	ErrRateLimited     = errors.New("rate limit exceeded")
+	// The identity conflicts below each wrap ErrAlreadyExists. Repositories name
+	// the unique constraint that was violated; the identity resolver branches on
+	// these, never on error text.
+	ErrUsernameTaken = fmt.Errorf("username already taken: %w", ErrAlreadyExists)
+	ErrEmailTaken    = fmt.Errorf("email already registered: %w", ErrAlreadyExists)
+	ErrClerkIDTaken  = fmt.Errorf("clerk identity already linked: %w", ErrAlreadyExists)
+	// ErrUserInactive is returned for a deactivated user (users.active = false):
+	// such a user is treated as signed out.
+	ErrUserInactive = errors.New("user is deactivated")
+	ErrForbidden    = errors.New("access denied")
+	ErrRateLimited  = errors.New("rate limit exceeded")
 	// ErrUnknownWebPageRole is returned for a webpage role outside the known set. It
 	// also wraps ErrInvalidInput, so callers that match the sentinel still see it.
 	ErrUnknownWebPageRole = errors.New("unknown webpage role")

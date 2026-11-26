@@ -155,7 +155,7 @@ The nav buttons give no "selected" signal to assistive tech. I propose adding `a
   - [ ] the active nav button has `aria-current="page"` and the others don't
 - [ ] Add `'contribute'` to `SectionId`, the section entry (placed **after** `feedback`), the flag filter and the `{:else if}` branch
 - [ ] Full verification: `pnpm run test:run`, `pnpm run check`, `pnpm exec prettier --check` on the touched files
-- [ ] Label the PR `needs-demo-video`, since it is user-visible and cloud sessions can't do the Clerk browser check
+- [ ] Label the PR `needs-demo-evidence`, since it is user-visible and cloud sessions can't do the Clerk browser check
 
 #### Task 4: Ship dark → enable
 - [ ] Merge with the flag unset (the tab is invisible in prod)

@@ -168,25 +168,6 @@ func TestPerspectiveWriteContract_LegacyRowOverCapEditsOtherFields(t *testing.T)
 	})
 }
 
-func TestPerspectiveWriteContract_OwnerCannotSetReviewStatus(t *testing.T) {
-	updated := false
-	repo := &mockPerspectiveRepository{
-		getByIDFn: func(_ context.Context, _ int) (*domain.Perspective, error) { return emptyExistingPerspective(), nil },
-		updateFn: func(_ context.Context, p *domain.Perspective, _ int) (*domain.Perspective, error) {
-			updated = true
-			return p, nil
-		},
-	}
-	svc := services.NewPerspectiveService(repo, &mockUserRepoForPerspective{})
-	approved := domain.ReviewStatusApproved
-
-	_, err := svc.Update(context.Background(), portservices.UpdatePerspectiveInput{ID: 1, Quality: intPtr(1), ReviewStatus: &approved}, 1)
-
-	assert.ErrorIs(t, err, domain.ErrReviewStatusLocked)
-	assert.ErrorIs(t, err, domain.ErrForbidden)
-	assert.False(t, updated, "nothing is persisted when review status is rejected")
-}
-
 func TestPerspectiveWriteContract_LinkedPerspectivesMustBeReadable(t *testing.T) {
 	missingOrHidden := func(err error) bool { return errors.Is(err, domain.ErrLinkedPerspectiveNotFound) }
 

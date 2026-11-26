@@ -6,6 +6,7 @@
 	import EraserIcon from '@lucide/svelte/icons/eraser';
 	import RotateCcwIcon from '@lucide/svelte/icons/rotate-ccw';
 	import { isChosenType, type AddContent } from './useAddContent.svelte.js';
+	import { ADDABLE_CONTENT_TYPES, descriptorFor } from '#lib/contentTypes/registry.js';
 
 	let { add }: { add: AddContent } = $props();
 </script>
@@ -58,11 +59,9 @@
 			disabled={add.isPending}
 		>
 			<option value="" disabled>Select a type</option>
-			<option value="YOUTUBE_VIDEO">YouTube</option>
-			<option value="BIBLE_PASSAGE">Bible passage</option>
-			<option value="MOVIE">Movie</option>
-			<option value="BOOK">Book</option>
-			<option value="WEB_PAGE">Webpage</option>
+			{#each ADDABLE_CONTENT_TYPES as type (type)}
+				<option value={type}>{descriptorFor(type).addLabel}</option>
+			{/each}
 		</select>
 		<div class="ml-auto flex items-center gap-1">
 			<button

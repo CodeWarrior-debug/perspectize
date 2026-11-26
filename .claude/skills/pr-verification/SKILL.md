@@ -53,7 +53,7 @@ node $R verify-acquire
     background. If the human replies "keep", stop the waiter and run `node $R hold --slot 1 --minutes 60`.
     After the takeover, the human's `make start` servers are stopped; tell them in your report.
   - exit **4 `TIMEOUT`** (2 h): give up on browser evidence. Say so in your report, and label the
-    PR `needs-demo-video` ([PR workflow](../../../.docs/PR_WORKFLOW.md#demo-requirement-ready-for-review)).
+    PR `needs-demo-evidence` ([PR workflow](../../../.docs/PR_WORKFLOW.md#demo-requirement-ready-for-review)).
 
 ## 2. Serve your checkout on the slot's ports
 
@@ -72,10 +72,14 @@ sign-in is needed.
 
 ## 3. Verify and capture evidence
 
+What counts as evidence: [PR_WORKFLOW.md → Demo requirement](../../../.docs/PR_WORKFLOW.md#demo-requirement-ready-for-review).
+**Do no write operations** (create, update, delete) without the owner's explicit OK, on the demo stack too.
+Keep non-public information out of the PR body; write `REDACTED`.
+
 Attach to the shared Chrome on `:9222` and follow [.docs/VERIFICATION.md](../../../.docs/VERIFICATION.md).
 - Scripted checks: `node .claude/scripts/sv-cdp-verify.cjs [scenario]` with `BASE_URL=http://localhost:<frontendPort>`.
 - Clips: the video-capture recorder.
-- Evidence goes to `~/Downloads/screenshots/` with the `sv-` prefix (video by default; screenshots only for pure layout changes).
+- Evidence goes to `~/Downloads/screenshots/` with the `sv-` prefix (only when the rule above calls for them: video for behaviour, screenshots for pure layout changes).
 - **Check you are signed in before anything else**, with a tab you opened yourself:
   load `http://localhost:<frontendPort>/plan` and wait for `.ag-row` (up to ~20 s). "Sign In" text
   alone proves nothing while the app is still loading, but the landing page with no grid after the wait

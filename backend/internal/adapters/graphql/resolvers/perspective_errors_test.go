@@ -98,12 +98,6 @@ func TestUpdatePerspectiveErrorsCarryKinds(t *testing.T) {
 		wantCode string
 	}{
 		{
-			name:     "review status is refused as forbidden",
-			err:      domain.ErrReviewStatusLocked,
-			wantMsg:  "access denied: review status is set by moderators",
-			wantCode: "FORBIDDEN",
-		},
-		{
 			name:     "not the owner",
 			err:      fmt.Errorf("%w: you can only modify your own perspectives", domain.ErrForbidden),
 			wantMsg:  "access denied: you can only modify your own perspectives",
