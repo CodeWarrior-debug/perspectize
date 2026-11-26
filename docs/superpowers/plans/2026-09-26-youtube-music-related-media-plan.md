@@ -214,7 +214,7 @@ Order matters: B1 before everything; B2 and B3 before B5's budgets are pinned; B
 - [ ] Frontend: `pnpm run test:run`, `pnpm run check` (baseline: the two #471 errors only), `pnpm exec prettier --check` on touched files.
 - [ ] `graphify update .` locally.
 - [ ] Rehearse 000032 on a **Neon branch** from a local session (`.claude/skills/neon-postgres-branches`): create a branch from production, run `migrate up` against the branch's connection string only, confirm `\d content` shows `idx_content_isrc`, then delete the branch. Never against the parent.
-- [ ] PR #440: keep `needs-demo-video` until a local session records the demo (add a YT Music song, play it, open lyrics, promote the official video, paste a playlist link, flip the flag off and confirm a music link adds as a plain video). Run `/revise-claude-md` and add a **Session Learnings** section to the PR body (`.docs/PR_WORKFLOW.md`).
+- [ ] PR #440: keep `needs-demo-evidence` until a local session records the demo (add a YT Music song, play it, open lyrics, promote the official video, paste a playlist link, flip the flag off and confirm a music link adds as a plain video). Run `/revise-claude-md` and add a **Session Learnings** section to the PR body (`.docs/PR_WORKFLOW.md`).
 - [ ] Last step before merge: confirm 000032 is still the next free number on `main` and `check-migration-number-before-apply` is off; renumber if not.
 - [ ] Rollout order: backend deploy (flag off) → `migrate up` 000032 per environment → swap `migrations-unapplied` for `migrations-applied` → `FEATURE_YOUTUBE_MUSIC=true` in dev → verify → prod → frontend deploy can go any time (it reads the flag).
 

@@ -85,7 +85,7 @@ test('non-migration files and deleted migrations are ignored', () => {
 });
 
 test('labels already correct: no changes', () => {
-	const [p] = planLabels({ mainFiles: main, prs: [pr(1, [28], [UNAPPLIED, 'needs-demo-video'])] });
+	const [p] = planLabels({ mainFiles: main, prs: [pr(1, [28], [UNAPPLIED, 'needs-demo-evidence'])] });
 	assert.deepEqual(p.add, []);
 	assert.deepEqual(p.remove, []);
 });

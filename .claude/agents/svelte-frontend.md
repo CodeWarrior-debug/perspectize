@@ -85,7 +85,7 @@ Read [.docs/QUERY_BUDGET.md](../../.docs/QUERY_BUDGET.md) and the "Query caching
      `verbose`; they replay every test's stderr (1,300+ lines).
    - `pnpm exec prettier --check <changed files>`
 5. You cannot do browser verification in a cloud session. Say so, and note that
-   a user-visible change needs the `needs-demo-video` label (see
+   a user-visible change needs the `needs-demo-evidence` label (see
    `.docs/PR_WORKFLOW.md`).
 
 ## Output
