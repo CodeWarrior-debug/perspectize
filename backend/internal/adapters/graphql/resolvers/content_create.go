@@ -71,10 +71,7 @@ func createError(err error, f createFailure) error {
 			slog.Error(f.logMsg, "error", err)
 		}
 	}
-	if kind == domain.KindNone {
-		return errors.New(msg)
-	}
-	return &gqlerror.Error{Message: msg, Extensions: map[string]any{"code": string(kind)}}
+	return kindedError(msg, kind)
 }
 
 var (

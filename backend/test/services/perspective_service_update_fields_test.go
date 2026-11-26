@@ -71,17 +71,6 @@ func TestPerspectiveUpdate_ProvidedOptionalFieldsAreApplied(t *testing.T) {
 			},
 		},
 		{
-			name: "review status",
-			input: func() portservices.UpdatePerspectiveInput {
-				s := domain.ReviewStatusApproved
-				return portservices.UpdatePerspectiveInput{ReviewStatus: &s}
-			}(),
-			assert: func(t *testing.T, p *domain.Perspective) {
-				require.NotNil(t, p.ReviewStatus)
-				assert.Equal(t, domain.ReviewStatusApproved, *p.ReviewStatus)
-			},
-		},
-		{
 			name:  "parts",
 			input: portservices.UpdatePerspectiveInput{Parts: []int{9}},
 			assert: func(t *testing.T, p *domain.Perspective) {

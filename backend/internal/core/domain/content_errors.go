@@ -34,6 +34,12 @@ const (
 	KindNotAllowed ErrorKind = "CONTENT_NOT_ALLOWED"
 	// KindUnavailable means an upstream source or client could not serve the request.
 	KindUnavailable ErrorKind = "UNAVAILABLE"
+	// KindDuplicate means the write would make a second row where one per
+	// user, content and privacy is allowed.
+	KindDuplicate ErrorKind = "ALREADY_EXISTS"
+	// KindForbidden means the actor may not make this write (not the owner, or
+	// a field only moderators set).
+	KindForbidden ErrorKind = "FORBIDDEN"
 )
 
 // KindOf classifies err by the sentinels it wraps. The first match wins; an
@@ -42,6 +48,8 @@ func KindOf(err error) ErrorKind {
 	switch {
 	case err == nil:
 		return KindNone
+	case errors.Is(err, ErrDuplicatePerspective):
+		return KindDuplicate
 	case errors.Is(err, ErrInvalidInput), errors.Is(err, ErrInvalidURL), errors.Is(err, ErrInvalidPassage):
 		return KindInvalid
 	case errors.Is(err, ErrNotFound):
