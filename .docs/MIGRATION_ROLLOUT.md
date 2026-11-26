@@ -38,7 +38,7 @@ Use `make -s` (silent) for every `migrate-*` target. Without `-s`, make echoes t
 
 ## Verifying on a Neon branch first (for a migration or user-visible change)
 
-Before production, prove the migration and the UI it serves on a throwaway branch. For a migration or a user-visible change, don't label the PR `needs-demo-video` and leave verification as a follow-up: create the branch, apply the migration to it only, seed demo data, run the stack locally, and record the clip (`~/.claude/tools/video-capture`, see [VERIFICATION.md](VERIFICATION.md)).
+Before production, prove the migration and the UI it serves on a throwaway branch. For a migration or a user-visible change, don't label the PR `needs-demo-evidence` and leave verification as a follow-up: create the branch, apply the migration to it only, seed demo data, run the stack locally, and record the clip (`~/.claude/tools/video-capture`, see [VERIFICATION.md](VERIFICATION.md)).
 
 **Auth and branch handoff.** The user approved this split, and it keeps the connection string out of the chat:
 

@@ -1,5 +1,7 @@
 package domain
 
+import "fmt"
+
 // ContentSortBy represents sortable fields for content queries
 type ContentSortBy string
 
@@ -61,8 +63,14 @@ type ContentFilter struct {
 	MinLikeCount *int
 	MaxLikeCount *int
 	// Published date filters (ISO 8601 string comparison)
+	// PublishedAfter and PublishedBefore bound the published date of every row that
+	// has one: YouTube videos and web pages (see ContentFactPublishedAt).
 	PublishedAfter  *string
 	PublishedBefore *string
+	// WebPageSiteContains and WebPageAuthorContains match web page rows by the site
+	// name and author they were saved with (webpage rows only).
+	WebPageSiteContains   *string
+	WebPageAuthorContains *string
 	// Channel/tag/description filters (JSONB extraction + ILIKE)
 	ChannelTitle      *string
 	TagContains       *string
@@ -135,4 +143,58 @@ type PaginatedContent struct {
 	StartCursor *string
 	EndCursor   *string
 	TotalCount  *int
+}
+
+// Page size bounds shared by every list (content, perspectives, user todos).
+const (
+	DefaultPageSize = 10
+	MaxPageSize     = 100
+)
+
+// PageWindow is a validated paging request: how many rows to read and which
+// cursor sets the direction. Exactly one of After and Before is set, or neither
+// for the first page.
+type PageWindow struct {
+	Limit  int
+	After  *string
+	Before *string
+}
+
+// ResolvePage checks the paging arguments of a list and turns them into a
+// PageWindow. Every list calls it, so the rules are the same everywhere:
+//
+//   - first and last are each 1..MaxPageSize.
+//   - after moves forward; before moves backward. Both together are refused.
+//   - last is only meaningful with before, so last without before is refused
+//     rather than returning a first page. The clients here never send it.
+//   - Backward pages use last as their size. first is never a backward size
+//     when last is given. Forward pages use first.
+//
+// first defaults to DefaultPageSize at the schema, so it is always set. That is
+// why a backward page reads last first and does not treat a set first as a
+// conflict.
+//
+// Errors wrap ErrInvalidInput.
+func ResolvePage(first, last *int, after, before *string) (PageWindow, error) {
+	if first != nil && (*first < 1 || *first > MaxPageSize) {
+		return PageWindow{}, fmt.Errorf("%w: first must be between 1 and %d", ErrInvalidInput, MaxPageSize)
+	}
+	if last != nil && (*last < 1 || *last > MaxPageSize) {
+		return PageWindow{}, fmt.Errorf("%w: last must be between 1 and %d", ErrInvalidInput, MaxPageSize)
+	}
+	if after != nil && before != nil {
+		return PageWindow{}, fmt.Errorf("%w: after and before cannot be combined", ErrInvalidInput)
+	}
+	if last != nil && before == nil {
+		return PageWindow{}, fmt.Errorf("%w: last needs before; backward paging takes a cursor", ErrInvalidInput)
+	}
+
+	w := PageWindow{Limit: DefaultPageSize, After: after, Before: before}
+	switch {
+	case before != nil && last != nil:
+		w.Limit = *last
+	case first != nil:
+		w.Limit = *first
+	}
+	return w, nil
 }

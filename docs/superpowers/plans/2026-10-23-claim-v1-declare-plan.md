@@ -18,7 +18,7 @@
 - Rating-style integer fields use the 0 to 10000 range (`valid_integer_range`). Not used by v1 claim fields.
 - Conventional commits; one logical change per commit. No `&&` chained shell commands.
 - Self-verification before any push: `go build ./...`, `gofmt -l .`, `go test ./...` in `backend/`; `pnpm run test:run` in `frontend/`.
-- No browser verification in this plan. Label the PR `needs-demo-video`.
+- No browser verification in this plan. Label the PR `needs-demo-evidence`.
 
 ## Review Focus
 

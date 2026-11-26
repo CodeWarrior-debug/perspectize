@@ -1,14 +1,12 @@
 import { describe, it, expect } from 'vitest';
 import type { ContentItem } from '#lib/queries/content/index.js';
+import { buildExportTable, neutralizeFormula, spreadsheetNumberText } from '#lib/utils/exportTable.js';
 import {
-	buildExportTable,
 	exportCellText,
-	neutralizeFormula,
 	EXPORT_EXCLUDED_COLIDS,
 	RENDERED_TEXT_COLIDS,
 	SPREADSHEET_FORMATTED_COLIDS,
-	spreadsheetNumberText,
-} from '#lib/utils/exportTable.js';
+} from '#lib/utils/libraryColumns/index.js';
 import { EMPTY_VALUE } from '#lib/utils/formatting.js';
 import { webPageRoleLabel } from '#lib/utils/webPage.js';
 
@@ -36,7 +34,7 @@ function row(overrides: Partial<ContentItem> = {}): ContentItem {
 
 describe('column id constants', () => {
 	it('lists the renderer-only and excluded columns', () => {
-		expect([...RENDERED_TEXT_COLIDS]).toEqual(['item', 'category', 'cast', 'webRoles', 'author']);
+		expect([...RENDERED_TEXT_COLIDS].sort()).toEqual(['author', 'cast', 'category', 'item', 'webRoles']);
 		expect([...EXPORT_EXCLUDED_COLIDS]).toEqual(['perspectize']);
 	});
 });

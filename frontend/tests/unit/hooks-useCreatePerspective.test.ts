@@ -294,6 +294,24 @@ describe('useCreatePerspective hook', () => {
 			expect(mockToastError).toHaveBeenCalledWith('Please fill in at least one field');
 		});
 
+		it('a duplicate (ALREADY_EXISTS code) shows a non-retryable message, with no Retry action', () => {
+			const err = new Error('you already have a private perspective on this content') as Error & {
+				response: unknown;
+			};
+			err.response = { errors: [{ message: err.message, extensions: { code: 'ALREADY_EXISTS' } }] };
+			capturedMutationOptions.onError(err, { userID: 42, contentID: 10, quality: 7500 });
+			expect(mockToastError).toHaveBeenCalledWith(
+				'You already have a perspective on this content with this privacy setting.',
+			);
+		});
+
+		it('a typed refusal shows its owner message once, with no Retry action', () => {
+			const err = new Error('access denied: you can only modify your own perspectives') as Error & { response: unknown };
+			err.response = { errors: [{ message: err.message, extensions: { code: 'FORBIDDEN' } }] };
+			capturedMutationOptions.onError(err, { userID: 42, contentID: 10, quality: 7500 });
+			expect(mockToastError).toHaveBeenCalledWith('You can only change your own perspectives');
+		});
+
 		it('shows generic message with a Retry action for unknown errors', () => {
 			capturedMutationOptions.onError(new Error('connection timeout'), { userID: 42, contentID: 10, quality: 7500 });
 			expect(mockToastError).toHaveBeenCalledWith('Failed to add perspective.', {

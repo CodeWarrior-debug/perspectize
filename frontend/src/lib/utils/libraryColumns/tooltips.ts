@@ -1,4 +1,4 @@
-import type { CellCtx, ColTooltipSpec } from './tooltipSpec';
+import type { CellCtx, ColTooltipSpec } from '#lib/utils/tooltipSpec.js';
 import {
 	authorValueGetter,
 	bookAuthors,
@@ -6,11 +6,9 @@ import {
 	ratingValueGetter,
 	readersTooltip,
 	readersValueGetter,
-} from './bookFormatting';
+} from '#lib/utils/bookFormatting.js';
 import {
 	formatCountExact,
-	percentLikedTooltip,
-	percentLikedValueGetter,
 	castTooltipItems,
 	castTooltipCopyValues,
 	boxOfficeTooltip,
@@ -27,11 +25,11 @@ import {
 	budgetValueGetter,
 	formatDate,
 	formatClaimDate,
-} from './formatting';
-import { webPageAuthor, webPagePublished, webPageRoleLabel, webPageRolesOf, webPageSite } from './webPage';
+} from '#lib/utils/formatting.js';
+import { webPageAuthor, webPagePublished, webPageRoleLabel, webPageRolesOf, webPageSite } from '#lib/utils/webPage.js';
 
-/** Per-column hover popover specs for ContentLibrary, keyed by colId. */
-export const LIBRARY_TOOLTIP_SPECS = {
+/** Hover popover specs for the Library columns, referenced by each column definition. */
+export const TIP = {
 	perspectize: false,
 	item: {
 		text: (c: CellCtx) => c.data?.name ?? '',
@@ -53,10 +51,6 @@ export const LIBRARY_TOOLTIP_SPECS = {
 	likes: {
 		text: (c: CellCtx) => formatCountExact(c.data?.likeCount ?? null),
 		copyValue: (c: CellCtx) => c.data?.likeCount,
-	},
-	percentLiked: {
-		text: (c: CellCtx) => percentLikedTooltip({ data: c.data }),
-		copyValue: (c: CellCtx) => percentLikedValueGetter({ data: c.data }),
 	},
 	tags: { mode: 'multi', emptyText: 'No tags', items: (c: CellCtx) => contentTags(c.data) ?? [] },
 	cast: {

@@ -10,9 +10,6 @@ import {
 	formatDateTime,
 	formatCount,
 	formatCountExact,
-	percentLikedValueGetter,
-	formatPercentLiked,
-	percentLikedTooltip,
 	formatPublishDate,
 	formatClaimDate,
 	formatTags,
@@ -513,65 +510,6 @@ describe('formatCountExact', () => {
 
 	it('formats millions with commas', () => {
 		expect(formatCountExact(1000000)).toBe('1,000,000');
-	});
-});
-
-describe('percentLikedValueGetter', () => {
-	it('computes likes as a percentage of views', () => {
-		expect(percentLikedValueGetter({ data: { viewCount: 1000, likeCount: 42 } })).toBeCloseTo(4.2);
-	});
-
-	it('returns null when views is 0', () => {
-		expect(percentLikedValueGetter({ data: { viewCount: 0, likeCount: 5 } })).toBeNull();
-	});
-
-	it('returns null when views is null', () => {
-		expect(percentLikedValueGetter({ data: { viewCount: null, likeCount: 5 } })).toBeNull();
-	});
-
-	it('returns null when likes is null', () => {
-		expect(percentLikedValueGetter({ data: { viewCount: 1000, likeCount: null } })).toBeNull();
-	});
-
-	it('returns null when data is missing', () => {
-		expect(percentLikedValueGetter({})).toBeNull();
-	});
-
-	it('returns 0 when likes is 0 but views is positive', () => {
-		expect(percentLikedValueGetter({ data: { viewCount: 1000, likeCount: 0 } })).toBe(0);
-	});
-});
-
-describe('formatPercentLiked', () => {
-	it('formats to 1 decimal place', () => {
-		expect(formatPercentLiked(4.2)).toBe('4.2%');
-		expect(formatPercentLiked(4.234)).toBe('4.2%');
-	});
-
-	it('renders — for null', () => {
-		expect(formatPercentLiked(null)).toBe('—');
-	});
-
-	it('formats 0 as 0.0%, not —', () => {
-		expect(formatPercentLiked(0)).toBe('0.0%');
-	});
-});
-
-describe('percentLikedTooltip', () => {
-	it('shows the exact calculation with math symbols, 3 decimal places', () => {
-		expect(percentLikedTooltip({ data: { viewCount: 1000, likeCount: 42 } })).toBe('42 ÷ 1,000 × 100 = 4.200%');
-	});
-
-	it('shows a no-views message when views is 0', () => {
-		expect(percentLikedTooltip({ data: { viewCount: 0, likeCount: 5 } })).toBe('No views recorded');
-	});
-
-	it('shows a no-views message when views is null', () => {
-		expect(percentLikedTooltip({ data: { viewCount: null, likeCount: 5 } })).toBe('No views recorded');
-	});
-
-	it('shows a no-views message when likes is null', () => {
-		expect(percentLikedTooltip({ data: { viewCount: 1000, likeCount: null } })).toBe('No views recorded');
 	});
 });
 

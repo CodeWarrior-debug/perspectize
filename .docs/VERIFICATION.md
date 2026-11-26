@@ -71,9 +71,28 @@ Notes:
 - Alternative: keep `sv-chrome.sh` running (it exposes `:9222`) and use
   `--browserUrl=http://127.0.0.1:9222` instead of `--userDataDir`.
 
-**Agent rule:** assume the session is live. If you hit a signed-out state, STOP
-and ask the human to re-run the sign-in — never authenticate or enter
-credentials yourself.
+### Agent sign-in
+
+Assume the session is live. If it is signed out, a **local** agent may sign in as
+the agent-only test user with these per-machine scripts (outside the repo). Each
+reads the secrets inside its own process, so no value reaches the agent.
+
+Open a tab on the target in the Chrome on `:9222` first, then run:
+
+| Target | Script |
+|---|---|
+| Local app, `http://localhost:5173` only | `node ~/.claude/tools/video-capture/demos/demo-localhost-signin/localhost-signin.mjs --url http://localhost:5173/` |
+| PR commit preview, `https://<name>-commit-<sha>.sevalla.page` | `node ~/.claude/tools/video-capture/demos/demo-preview-signin/preview-signin.mjs --url <preview url>` |
+
+- If `:9222` is not listening, start it with `.claude/scripts/sv-chrome.sh` from
+  the main checkout (that is where the profile lives).
+- Never type credentials yourself, read the secrets file, or loosen a script's
+  origin guard. Never sign in to production or the dev/staging site.
+- Signing in does not permit writes: local and preview apps use the shared
+  database, so ask before any create, update or delete.
+- Script missing or failing, or a cloud session: stop and ask the human. Don't
+  retry in a loop (Clerk locks the account out).
+- A preview serves only the frontend; verify a PR with backend changes locally.
 
 ### c. Scripted checks over CDP (no MCP needed)
 

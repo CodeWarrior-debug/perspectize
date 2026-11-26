@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/CodeWarrior-debug/perspectize/backend/internal/core/domain"
+	"github.com/CodeWarrior-debug/perspectize/backend/internal/core/services"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	svixwebhook "github.com/svix/svix-webhooks/go"
@@ -57,82 +58,17 @@ func signedWebhookRequest(t *testing.T, body string) *http.Request {
 func serveWebhook(t *testing.T, repo *stubUserRepo, secret string, req *http.Request) *httptest.ResponseRecorder {
 	t.Helper()
 	rec := httptest.NewRecorder()
-	(&WebhookHandler{WebhookSecret: secret, UserRepo: repo}).ServeHTTP(rec, req)
+	(&WebhookHandler{WebhookSecret: secret, Resolver: services.NewIdentityResolver(repo, noDirectory{t}), UserRepo: repo}).ServeHTTP(rec, req)
 	return rec
 }
 
-// --- clerkUserData helpers ---
+// noDirectory fails the test if the webhook path reaches for the Clerk API: a
+// webhook carries its own profile and must never call back to Clerk.
+type noDirectory struct{ t *testing.T }
 
-func TestClerkUserData_PrimaryEmail(t *testing.T) {
-	t.Run("prefers the address matching primary_email_address_id", func(t *testing.T) {
-		d := &clerkUserData{PrimaryEmailAddressID: "idn_2"}
-		d.EmailAddresses = append(d.EmailAddresses, struct {
-			ID           string `json:"id"`
-			EmailAddress string `json:"email_address"`
-		}{ID: "idn_1", EmailAddress: "first@example.com"}, struct {
-			ID           string `json:"id"`
-			EmailAddress string `json:"email_address"`
-		}{ID: "idn_2", EmailAddress: "primary@example.com"})
-
-		assert.Equal(t, "primary@example.com", d.primaryEmail())
-	})
-
-	t.Run("falls back to the first address when the primary id does not match", func(t *testing.T) {
-		d := &clerkUserData{PrimaryEmailAddressID: "idn_missing"}
-		d.EmailAddresses = append(d.EmailAddresses, struct {
-			ID           string `json:"id"`
-			EmailAddress string `json:"email_address"`
-		}{ID: "idn_1", EmailAddress: "first@example.com"})
-
-		assert.Equal(t, "first@example.com", d.primaryEmail())
-	})
-
-	t.Run("returns empty string when there are no addresses", func(t *testing.T) {
-		assert.Equal(t, "", (&clerkUserData{}).primaryEmail())
-	})
-}
-
-func TestClerkUserData_Username(t *testing.T) {
-	name := "alice"
-	empty := ""
-
-	t.Run("uses the explicit username when present", func(t *testing.T) {
-		assert.Equal(t, "alice", (&clerkUserData{ID: "user_abc", Username: &name}).username())
-	})
-
-	t.Run("empty username string falls through to the email prefix", func(t *testing.T) {
-		d := &clerkUserData{ID: "user_abc", Username: &empty, PrimaryEmailAddressID: "idn_1"}
-		d.EmailAddresses = append(d.EmailAddresses, struct {
-			ID           string `json:"id"`
-			EmailAddress string `json:"email_address"`
-		}{ID: "idn_1", EmailAddress: "bob@example.com"})
-
-		assert.Equal(t, "bob", d.username())
-	})
-
-	t.Run("nil username falls through to the email prefix", func(t *testing.T) {
-		d := &clerkUserData{ID: "user_abc", PrimaryEmailAddressID: "idn_1"}
-		d.EmailAddresses = append(d.EmailAddresses, struct {
-			ID           string `json:"id"`
-			EmailAddress string `json:"email_address"`
-		}{ID: "idn_1", EmailAddress: "carol@example.com"})
-
-		assert.Equal(t, "carol", d.username())
-	})
-
-	t.Run("an email with no @ falls back to the Clerk id", func(t *testing.T) {
-		d := &clerkUserData{ID: "user_abc", PrimaryEmailAddressID: "idn_1"}
-		d.EmailAddresses = append(d.EmailAddresses, struct {
-			ID           string `json:"id"`
-			EmailAddress string `json:"email_address"`
-		}{ID: "idn_1", EmailAddress: "no-at-sign"})
-
-		assert.Equal(t, "user_abc", d.username())
-	})
-
-	t.Run("no username and no email falls back to the Clerk id", func(t *testing.T) {
-		assert.Equal(t, "user_abc", (&clerkUserData{ID: "user_abc"}).username())
-	})
+func (d noDirectory) Profile(context.Context, string) (domain.ClerkProfile, error) {
+	d.t.Error("webhook must not call the Clerk API")
+	return domain.ClerkProfile{}, domain.ErrNotFound
 }
 
 // --- signature and payload handling ---
@@ -326,7 +262,7 @@ func TestWebhookHandler_UserUpdated(t *testing.T) {
 		assert.True(t, createCalled, "a missing user must be created on user.updated")
 	})
 
-	t.Run("ErrNotFound with a failing fallback create still returns 200", func(t *testing.T) {
+	t.Run("ErrNotFound with a failing fallback create returns 500 so Svix retries", func(t *testing.T) {
 		repo := &stubUserRepo{
 			updateByClerkIDFn: func(ctx context.Context, clerkID, username, email string) error {
 				return domain.ErrNotFound
@@ -337,7 +273,7 @@ func TestWebhookHandler_UserUpdated(t *testing.T) {
 		}
 
 		rec := serveWebhook(t, repo, testWebhookSecret, signedWebhookRequest(t, updatedEventBody))
-		assert.Equal(t, http.StatusOK, rec.Code, "the fallback create failure is logged, not surfaced")
+		assert.Equal(t, http.StatusInternalServerError, rec.Code, "a transient fallback failure must be retried, not acknowledged")
 	})
 
 	t.Run("a non-ErrNotFound failure yields 500", func(t *testing.T) {

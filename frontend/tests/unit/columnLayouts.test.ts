@@ -2,14 +2,14 @@ import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
 import {
 	COLUMN_LAYOUTS_KEY,
 	COLUMN_VIEW_LABEL,
-	columnViewFor,
 	loadLayout,
 	saveLayout,
 	clearLayout,
 	defaultLayout,
 	planColumnSwitch,
 } from '#lib/utils/columnLayouts.js';
-import { togglableColIds } from '#lib/utils/grid-config.js';
+import { columnViewFor } from '#lib/utils/grid-config.js';
+import { togglableColIds } from '#lib/utils/libraryColumns/index.js';
 
 describe('columnViewFor', () => {
 	it('is movie only when the type filter is exactly MOVIE', () => {
