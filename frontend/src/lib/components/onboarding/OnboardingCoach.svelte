@@ -20,7 +20,6 @@
 	import { ONBOARDING_VIDEOS, CURRENT_INTRO_VERSION } from '#lib/onboarding/config.js';
 	import {
 		advanceCoachStep,
-		skipCoachStep,
 		coachStepTitle,
 		coachStepBody,
 		type CoachStep,
@@ -101,7 +100,7 @@
 	}
 
 	function handleSkipStep() {
-		const next = skipCoachStep(step);
+		const next = advanceCoachStep(step);
 		if (next === 'complete') {
 			finishIntro();
 		} else {
