@@ -55,6 +55,15 @@ jobs:
         working-directory: frontend
         run: scripts/arch-check.sh
 
+      # Chunk grouping can pull the editor into first load with no import changing, so only the build shows it.
+      - name: Build
+        working-directory: frontend
+        run: pnpm run build
+
+      - name: First-load check
+        working-directory: frontend
+        run: node scripts/check-first-load.mjs
+
   unit:
     name: Unit tests (coverage)
     runs-on: ubuntu-latest
