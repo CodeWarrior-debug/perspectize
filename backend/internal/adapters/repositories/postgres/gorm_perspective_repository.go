@@ -9,7 +9,6 @@ import (
 	"github.com/CodeWarrior-debug/perspectize/backend/internal/core/domain"
 	"github.com/CodeWarrior-debug/perspectize/backend/internal/core/ports/repositories"
 	"github.com/jackc/pgx/v5/pgconn"
-	paginator "github.com/pilagod/gorm-cursor-paginator/v2/paginator"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 )
@@ -141,24 +140,13 @@ func (r *GormPerspectiveRepository) Delete(ctx context.Context, id int, ownerUse
 
 // List retrieves a paginated list of perspectives
 func (r *GormPerspectiveRepository) List(ctx context.Context, params domain.PerspectiveListParams) (*domain.PaginatedPerspectives, error) {
-	limit := 10
-	if params.First != nil {
-		limit = *params.First
+	window, err := domain.ResolvePage(params.First, params.Last, params.After, params.Before)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list perspectives: %w", err)
 	}
 
 	// Build sort rules using helper from helpers.go
 	rules := buildPerspectiveSortRules(params.SortBy, params.SortOrder)
-
-	// Configure paginator options
-	opts := []paginator.Option{
-		paginator.WithRules(rules...),
-		paginator.WithLimit(limit),
-		paginator.WithAllowTupleCmp(paginator.TRUE),
-	}
-	if params.After != nil {
-		opts = append(opts, paginator.WithAfter(*params.After))
-	}
-	p := paginator.New(opts...)
 
 	// Start query with context and apply filters BEFORE pagination
 	query := r.db.WithContext(ctx).Model(&PerspectiveModel{})
@@ -210,12 +198,9 @@ func (r *GormPerspectiveRepository) List(ctx context.Context, params domain.Pers
 
 	// Execute pagination
 	var models []PerspectiveModel
-	pageResult, cursor, err := p.Paginate(query, &models)
+	cursor, err := listPage(query, rules, window, &models)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list perspectives: %w", err)
-	}
-	if pageResult.Error != nil {
-		return nil, fmt.Errorf("failed to list perspectives: %w", pageResult.Error)
 	}
 
 	// Map results to domain
@@ -224,18 +209,14 @@ func (r *GormPerspectiveRepository) List(ctx context.Context, params domain.Pers
 		items[i] = perspectiveModelToDomain(&models[i])
 	}
 
-	result := &domain.PaginatedPerspectives{
-		Items:      items,
-		HasNext:    cursor.After != nil,
-		HasPrev:    cursor.Before != nil,
-		TotalCount: totalCountInt,
-	}
-
-	// StartCursor = cursor.Before, EndCursor = cursor.After
-	result.StartCursor = cursor.Before
-	result.EndCursor = cursor.After
-
-	return result, nil
+	return &domain.PaginatedPerspectives{
+		Items:       items,
+		HasNext:     cursor.HasNext,
+		HasPrev:     cursor.HasPrev,
+		StartCursor: cursor.StartCursor,
+		EndCursor:   cursor.EndCursor,
+		TotalCount:  totalCountInt,
+	}, nil
 }
 
 // aggregateRow is the scan target for the grouped count/avg query below.
