@@ -88,3 +88,6 @@ frontend/demo/out/
 
 # claude plugin eval output
 evals/**/results/
+
+# Chrome extension build output
+extension/dist/
