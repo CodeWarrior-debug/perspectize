@@ -27,6 +27,10 @@
 
 	let { children } = $props();
 
+	// Routes that render their own signed-out state instead of the guest landing page.
+	// /add keeps a shared link on screen while the visitor signs in.
+	const SIGNED_OUT_ROUTES = new Set(['/add']);
+	const openToGuests = $derived(SIGNED_OUT_ROUTES.has(page.route.id ?? ''));
 	const pageTitle = $derived(pageTitleFor(page.url.pathname));
 
 	const publishableKey = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY;
@@ -73,15 +77,23 @@
 			<DemoPersonaDialog />
 		{/if}
 		<Header />
-		<AuthShow when="signed-out">
-			<GuestLanding />
-		</AuthShow>
+		{#if !openToGuests}
+			<AuthShow when="signed-out">
+				<GuestLanding />
+			</AuthShow>
+		{/if}
 		<AuthShow when="signed-in">
 			<InboxStreamMount />
 			<MessagingWidget />
 			<OnboardingShell />
-			{@render children()}
+			{#if !openToGuests}
+				{@render children()}
+			{/if}
 		</AuthShow>
+		<!-- Outside the auth wrappers so signing in does not remount the page and drop its input. -->
+		{#if openToGuests}
+			{@render children()}
+		{/if}
 	</div>
 {/snippet}
 
