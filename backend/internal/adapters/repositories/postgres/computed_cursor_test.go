@@ -60,7 +60,6 @@ func TestList_ComputedSortKeyCursor(t *testing.T) {
 	}{
 		{"views", domain.ContentSortByViewCount, domain.SortOrderDesc, "view_count", int64(9000), `9000`, int64(9000)},
 		{"likes", domain.ContentSortByLikeCount, domain.SortOrderDesc, "like_count", int64(40), `40`, int64(40)},
-		{"percent liked", domain.ContentSortByPercentLiked, domain.SortOrderDesc, "percent_liked", 0.25, `0.25`, 0.25},
 		{"published at", domain.ContentSortByPublishedAt, domain.SortOrderDesc, "published_at_sort", "2024-01-02T00:00:00Z", `"2024-01-02T00:00:00Z"`, "2024-01-02T00:00:00Z"},
 		{"channel title", domain.ContentSortByChannelTitle, domain.SortOrderAsc, "channel_title_sort", "Chan", `"Chan"`, "Chan"},
 		{"box office desc", domain.ContentSortByBoxOffice, domain.SortOrderDesc, "box_office", int64(161000000), `161000000`, int64(161000000)},

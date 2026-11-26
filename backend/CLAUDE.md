@@ -4,7 +4,7 @@ Go GraphQL API: gqlgen (schema-first), GORM + pgx, hexagonal architecture.
 
 ## Architecture
 
-**Dependencies point inward:** `core/domain` (pure Go) ← `core/ports` (interfaces) ← `core/services` ← `adapters/`; everything is wired in `cmd/server/main.go`. Domain never imports adapters. Layout: [.docs/ARCHITECTURE.md](../.docs/ARCHITECTURE.md); domain rules: [.docs/DOMAIN_GUIDE.md](../.docs/DOMAIN_GUIDE.md); error handling and DB query patterns: [.docs/GO_PATTERNS.md](../.docs/GO_PATTERNS.md).
+**Dependencies point inward:** `core/domain` (pure Go) ← `core/ports` (interfaces) ← `core/services` ← `adapters/`; repositories and services are wired in `cmd/server/main.go`, outside-world clients in `internal/assembly/externals.go`. Domain never imports adapters. Layout: [.docs/ARCHITECTURE.md](../.docs/ARCHITECTURE.md); domain rules: [.docs/DOMAIN_GUIDE.md](../.docs/DOMAIN_GUIDE.md); error handling and DB query patterns: [.docs/GO_PATTERNS.md](../.docs/GO_PATTERNS.md).
 
 ### Deep Modules
 
@@ -18,9 +18,9 @@ Small interface, lots of work hidden behind it (Ousterhout). Hexagonal decides w
 ### ORM: GORM (Hex-Clean Separate Model Pattern)
 
 - **Domain models** (`core/domain/`) — zero GORM imports.
-- **GORM models** (`adapters/repositories/postgres/gorm_models.go`, `gorm:` tags) ↔ domain via **mappers** (`gorm_mappers.go`); **repositories** (`gorm_*_repository.go`) chain GORM for dynamic queries; **shared helpers** (`helpers.go`): cursor encoding, sort mapping, enum converters.
-- **Pagination gotcha (`gorm-cursor-paginator` v2.7.0):** `Paginate()`'s `err` stays nil on a `Find()` failure; only the returned `*gorm.DB`'s `.Error` is set. Always check both: `if err != nil {...}; if pageResult.Error != nil {...}` (#327). `GormUserRepository`/`GormCategoryRepository` still use hand-rolled `encodeCursor`/`decodeCursor`.
-- **Cursor pagination:** opaque base64 (`cursor:<id>`), keyset (not OFFSET), fetch `limit+1` for `hasNextPage`, whitelist sort columns (SQL injection prevention).
+- **GORM models** (`adapters/repositories/postgres/gorm_models.go`, `gorm:` tags) ↔ domain via **mappers** (`gorm_mappers.go`); **repositories** (`gorm_*_repository.go`) chain GORM for dynamic queries; **shared helpers**: paging (`paging.go`), sort mapping and enum converters (`helpers.go`).
+- **Paged lists go through `listPage` (`paging.go`)**, the one place that drives `gorm-cursor-paginator`. **Pagination gotcha (v2.7.0):** `Paginate()`'s `err` stays nil on a `Find()` failure; only the returned `*gorm.DB`'s `.Error` is set. Always check both: `if err != nil {...}; if pageResult.Error != nil {...}` (#327).
+- **Cursor pagination:** opaque cursors, keyset (not OFFSET), whitelist sort columns (SQL injection prevention).
 
 ## Configuration
 
@@ -70,7 +70,7 @@ Full table and examples: [.docs/QUERY_BUDGET.md](../.docs/QUERY_BUDGET.md).
 
 ## Adding a New Feature
 
-Order: domain model (`core/domain/`) → repository port (`core/ports/repositories/`) → service (`core/services/`) → repository impl (`adapters/repositories/postgres/`) → `schema.graphql` + `make graphql-gen` → resolver in the per-domain file (see GraphQL) → wire in `cmd/server/main.go` → tests in `test/services/`, `test/repositories/`.
+Order: domain model (`core/domain/`) → repository port (`core/ports/repositories/`) → service (`core/services/`) → repository impl (`adapters/repositories/postgres/`) → `schema.graphql` + `make graphql-gen` → resolver in the per-domain file (see GraphQL) → wire in `cmd/server/main.go` (a new outside-world client instead goes in `internal/assembly/externals.go`, with a case in `externals_test.go`) → tests in `test/services/`, `test/repositories/`.
 
 **A feature that bounds work (worker count, concurrency cap, batch size, pool) gets a measured limit, not a guessed one:** make it a setting, find the max by the ramp in [.docs/CAPACITY_TESTING.md](../.docs/CAPACITY_TESTING.md), ship half as the initial default, and update the feature's row in [.docs/CAPACITY_REGISTER.md](../.docs/CAPACITY_REGISTER.md). Measure against the deployed process's CPU and memory limits, not your dev machine's (register section 1). Never run **write** load (imports, mutations) against the shared Neon database; the read-only k6 ramp in `backend/perf/k6/` is existing practice.
 
@@ -136,6 +136,14 @@ Order: domain model (`core/domain/`) → repository port (`core/ports/repositori
 ## Agent Delegation
 
 Backend subagents: `go-backend`, `graphql-designer`, `db-migration`, `code-reviewer`, `test-writer` (`.claude/agents/`); architecture decisions stay in the main session. Each agent's model is set in its `model:` frontmatter; don't override it with the Agent tool's `model` parameter.
+
+## Architecture rules (enforced: `scripts/arch-check.sh`, CI step "Architecture rules")
+
+`.go-arch-lint.yml` is the allow-list of package edges (B1 core imports no adapters or gorm; B3 adapters import only domain/ports, never each other or `internal/demo`). Pattern checks add B2 (mutation resolvers derive the actor, `@auth` on every mutation), B5 (`Paginate()` callers check `pageResult.Error`), B6 (service writers take the actor), B7 (no `time.Now()` in services/repositories: inject a clock), B8 (wrap with `%w`; never branch on error text), B4 (a new repository method ships a `querycount` test; diff gate).
+
+- **Baselined violations** are in `.arch-baseline.txt`; **files over 500 lines** have a ceiling in `.size-ceilings.txt` (tests exempt). Both may only shrink. Never add a line to either to make a check pass; fix the code.
+- **Off-limits:** don't add code to a file listed in `.size-ceilings.txt` or to one named in `.arch-baseline.txt`. Put new code in a new file in the same package (a new `_<topic>.go` beside it).
+- After fixing a baselined violation run `scripts/arch-check.sh --update` and commit the smaller baseline.
 
 ## Self-Verification
 

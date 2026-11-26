@@ -511,10 +511,8 @@
 	// sortChanged event matches those sorts, so onSortChanged leaves the URL alone.
 	$effect(() => {
 		if (!gridApi || !gridReady || mode !== 'all') return;
-		gridApi.applyColumnState({
-			state: view.serverSorts.map((s, i) => ({ colId: s.col, sort: s.dir, sortIndex: i })),
-			defaultState: { sort: null },
-		});
+		const state = view.serverSorts.map((s, i) => ({ colId: s.col, sort: s.dir, sortIndex: i }));
+		return grid.afterFrame((api) => api.applyColumnState({ state, defaultState: { sort: null } }));
 	});
 
 	// Client-only sort columns (no ContentSortBy key) can sort in "Loaded" mode but would

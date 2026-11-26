@@ -1,0 +1,62 @@
+[
+  {
+    "type": "cycle",
+    "from": "src/lib/utils/bookFormatting.ts",
+    "to": "src/lib/utils/formatting.ts",
+    "unresolvedTo": "./formatting",
+    "dependencyTypes": [
+      "local",
+      "import"
+    ],
+    "rule": {
+      "severity": "error",
+      "name": "no-circular"
+    },
+    "cycle": [
+      {
+        "name": "src/lib/utils/formatting.ts",
+        "dependencyTypes": [
+          "local",
+          "import"
+        ]
+      },
+      {
+        "name": "src/lib/utils/bookFormatting.ts",
+        "dependencyTypes": [
+          "local",
+          "import"
+        ]
+      }
+    ]
+  },
+  {
+    "type": "cycle",
+    "from": "src/lib/utils/plan-grid-config.ts",
+    "to": "src/lib/utils/planItemCellRenderer.ts",
+    "unresolvedTo": "./planItemCellRenderer",
+    "dependencyTypes": [
+      "local",
+      "import"
+    ],
+    "rule": {
+      "severity": "error",
+      "name": "no-circular"
+    },
+    "cycle": [
+      {
+        "name": "src/lib/utils/planItemCellRenderer.ts",
+        "dependencyTypes": [
+          "local",
+          "import"
+        ]
+      },
+      {
+        "name": "src/lib/utils/plan-grid-config.ts",
+        "dependencyTypes": [
+          "local",
+          "import"
+        ]
+      }
+    ]
+  }
+]

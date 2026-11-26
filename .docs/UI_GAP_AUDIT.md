@@ -260,6 +260,8 @@ Do the same for `selectedRowBackgroundColor`, `columnHoverColor` and `headerColu
 
 ## 7. % Liked sorts in the grid only ✅
 
+**Retired:** the % Liked column and its sort were removed, because YouTube's API policy forbids deriving metrics from like counts. The rest of this section is history; don't build from it.
+
 **Context**
 - The `percentLiked` column (`ContentLibrary.svelte:576-591`) can be sorted and has its own comparator.
 - It is missing from:

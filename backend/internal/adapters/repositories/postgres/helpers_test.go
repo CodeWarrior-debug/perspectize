@@ -96,14 +96,6 @@ const (
 		"THEN (response->'items'->0->'statistics'->>'viewCount')::BIGINT ELSE NULL END)"
 	guardedLikes = "(CASE WHEN (response->'items'->0->'statistics'->>'likeCount') ~ '^[0-9]+$' " +
 		"THEN (response->'items'->0->'statistics'->>'likeCount')::BIGINT ELSE NULL END)"
-	guardedPercentLiked = "CASE " +
-		"WHEN " + guardedViews + " IS NULL " +
-		"  OR " + guardedLikes + " IS NULL " +
-		"  OR " + guardedViews + " = 0 " +
-		"THEN NULL " +
-		"ELSE " + guardedLikes + "::FLOAT8 " +
-		"     / NULLIF(" + guardedViews + ", 0) " +
-		"END"
 )
 
 func TestBuildContentSortRules(t *testing.T) {
@@ -135,30 +127,6 @@ func TestBuildContentSortRules(t *testing.T) {
 				Order:           paginator.DESC,
 				SQLRepr:         guardedLikes,
 				NULLReplacement: int64(0),
-			},
-			wantTieOrder: paginator.DESC,
-		},
-		{
-			name:   "percent liked ascending uses a JSONB CASE expression with float64 null replacement",
-			sortBy: domain.ContentSortByPercentLiked,
-			order:  domain.SortOrderAsc,
-			wantPrimary: paginator.Rule{
-				Key:             "PercentLiked",
-				Order:           paginator.ASC,
-				SQLRepr:         guardedPercentLiked,
-				NULLReplacement: float64(-1),
-			},
-			wantTieOrder: paginator.ASC,
-		},
-		{
-			name:   "percent liked descending",
-			sortBy: domain.ContentSortByPercentLiked,
-			order:  domain.SortOrderDesc,
-			wantPrimary: paginator.Rule{
-				Key:             "PercentLiked",
-				Order:           paginator.DESC,
-				SQLRepr:         guardedPercentLiked,
-				NULLReplacement: float64(-1),
 			},
 			wantTieOrder: paginator.DESC,
 		},
@@ -307,13 +275,13 @@ func TestBuildContentSortRulesMulti(t *testing.T) {
 		assert.Equal(t, paginator.Rule{Key: "ID", Order: paginator.ASC}, rules[2])
 	})
 
-	t.Run("percent liked composes with another column", func(t *testing.T) {
+	t.Run("a computed column composes with a real one", func(t *testing.T) {
 		rules := buildContentSortRulesMulti([]domain.ContentSortRule{
-			{Field: domain.ContentSortByPercentLiked, Order: domain.SortOrderDesc},
+			{Field: domain.ContentSortByVsBudget, Order: domain.SortOrderDesc},
 			{Field: domain.ContentSortByName, Order: domain.SortOrderAsc},
 		})
 		require.Len(t, rules, 3)
-		assert.Equal(t, "PercentLiked", rules[0].Key)
+		assert.Equal(t, "VsBudget", rules[0].Key)
 		assert.Equal(t, paginator.DESC, rules[0].Order)
 		assert.Equal(t, "Name", rules[1].Key)
 		assert.Equal(t, paginator.ASC, rules[1].Order)

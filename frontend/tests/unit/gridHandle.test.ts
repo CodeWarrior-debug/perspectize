@@ -26,7 +26,7 @@ function preDestroy(
 }
 
 describe('createGridHandle', () => {
-	beforeEach(() => vi.useFakeTimers({ toFake: ['requestAnimationFrame', 'cancelAnimationFrame'] }));
+	beforeEach(() => vi.useFakeTimers({ toFake: ['requestAnimationFrame', 'cancelAnimationFrame', 'setTimeout', 'clearTimeout'] }));
 	afterEach(() => vi.useRealTimers());
 
 	it('starts with no API and not ready', () => {
@@ -88,15 +88,53 @@ describe('createGridHandle', () => {
 		expect(handle.live()).toBeNull();
 	});
 
+	// One frame, then the timer queued from it.
+	const runPending = () => {
+		vi.advanceTimersToNextFrame();
+		vi.advanceTimersByTime(1);
+	};
+
 	describe('afterFrame', () => {
-		it('runs on the next frame, not straight away', () => {
+		it('waits for a timer queued after the frame, since AG Grid finishes starting up in timers', () => {
+			const handle = createGridHandle<Row>();
+			ready(handle, fakeApi());
+			const order: string[] = [];
+			handle.afterFrame(() => order.push('work'));
+			requestAnimationFrame(() => setTimeout(() => order.push('timer queued by the same frame')));
+			runPending();
+			expect(order).toEqual(['work', 'timer queued by the same frame']);
+		});
+
+		it('does not run on the frame itself', () => {
+			const handle = createGridHandle<Row>();
+			ready(handle, fakeApi());
+			const fn = vi.fn();
+			handle.afterFrame(fn);
+			let ranByFrame = true;
+			requestAnimationFrame(() => (ranByFrame = fn.mock.calls.length > 0));
+			runPending();
+			expect(ranByFrame).toBe(false);
+			expect(fn).toHaveBeenCalledOnce();
+		});
+
+		it('can still be cancelled between the frame and the timer', () => {
+			const handle = createGridHandle<Row>();
+			ready(handle, fakeApi());
+			const fn = vi.fn();
+			const cancel = handle.afterFrame(fn);
+			requestAnimationFrame(cancel);
+			runPending();
+			expect(fn).not.toHaveBeenCalled();
+		});
+
+		it('runs after the next frame, not straight away', () => {
 			const handle = createGridHandle<Row>();
 			const api = fakeApi();
 			ready(handle, api);
 			const fn = vi.fn();
 			handle.afterFrame(fn);
 			expect(fn).not.toHaveBeenCalled();
-			vi.advanceTimersToNextFrame();
+			runPending();
 			expect(fn).toHaveBeenCalledWith(api);
 		});
 
@@ -107,7 +145,7 @@ describe('createGridHandle', () => {
 			const fn = vi.fn();
 			handle.afterFrame(fn);
 			api.destroy();
-			vi.advanceTimersToNextFrame();
+			runPending();
 			expect(fn).not.toHaveBeenCalled();
 		});
 
@@ -117,7 +155,7 @@ describe('createGridHandle', () => {
 			const fn = vi.fn();
 			const cancel = handle.afterFrame(fn);
 			cancel();
-			vi.advanceTimersToNextFrame();
+			runPending();
 			expect(fn).not.toHaveBeenCalled();
 		});
 
@@ -125,7 +163,7 @@ describe('createGridHandle', () => {
 			const handle = createGridHandle<Row>();
 			const fn = vi.fn();
 			const cancel = handle.afterFrame(fn);
-			vi.advanceTimersToNextFrame();
+			runPending();
 			expect(fn).not.toHaveBeenCalled();
 			expect(cancel).not.toThrow();
 		});
@@ -137,7 +175,7 @@ describe('createGridHandle', () => {
 			const fn = vi.fn();
 			handle.afterFrame(fn);
 			ready(handle, fakeApi());
-			vi.advanceTimersToNextFrame();
+			runPending();
 			expect(fn).toHaveBeenCalledWith(first);
 		});
 	});
