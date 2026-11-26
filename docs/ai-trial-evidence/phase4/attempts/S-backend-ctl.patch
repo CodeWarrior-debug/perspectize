@@ -1,0 +1,173 @@
+diff --git a/backend/internal/core/services/import_service.go b/backend/internal/core/services/import_service.go
+index 05ebf754..cf285d59 100644
+--- a/backend/internal/core/services/import_service.go
++++ b/backend/internal/core/services/import_service.go
+@@ -11,6 +11,7 @@ import (
+ 	"time"
+ 	"unicode/utf8"
+ 
++	"github.com/CodeWarrior-debug/perspectize/backend/internal/adapters/tmdb"
+ 	"github.com/CodeWarrior-debug/perspectize/backend/internal/core/domain"
+ 	"github.com/CodeWarrior-debug/perspectize/backend/internal/core/ports/repositories"
+ 	portservices "github.com/CodeWarrior-debug/perspectize/backend/internal/core/ports/services"
+@@ -281,6 +282,27 @@ func (s *ImportService) GetImportItemDetails(ctx context.Context, itemID int) (*
+ 	return item, err
+ }
+ 
++// NormalizeMovieLink turns a pasted TMDB movie link into the canonical movie URL
++// the content service stores (https://www.themoviedb.org/movie/603), so an
++// import list holds the same URL the row is later created under. It uses the
++// content service's own parser and URL builder, so the two cannot disagree on
++// what counts as a movie link.
++//
++// Only a TMDB link is accepted. An IMDb link or id parses as a movie reference
++// but names no TMDB id until TMDB resolves it, which is a network call a list
++// build does not make; it is refused like any other string. Every failure wraps
++// domain.ErrInvalidInput.
++func (s *ImportService) NormalizeMovieLink(raw string) (string, error) {
++	tmdbID, imdbID, err := tmdb.ParseMovieInput(raw)
++	if err != nil {
++		return "", fmt.Errorf("%w: %v", domain.ErrInvalidInput, err)
++	}
++	if tmdbID == 0 {
++		return "", fmt.Errorf("%w: %q is an IMDb title; paste its TMDB movie link instead", domain.ErrInvalidInput, imdbID)
++	}
++	return tmdb.CanonicalMovieURL(tmdbID), nil
++}
++
+ // resolvedSource pairs a saved source with what its lister resolved.
+ type resolvedSource struct {
+ 	lister   portservices.ImportSourceLister
+diff --git a/backend/test/services/import_service_movie_link_test.go b/backend/test/services/import_service_movie_link_test.go
+new file mode 100644
+index 00000000..ef579945
+--- /dev/null
++++ b/backend/test/services/import_service_movie_link_test.go
+@@ -0,0 +1,127 @@
++package services_test
++
++import (
++	"context"
++	"testing"
++
++	"github.com/stretchr/testify/assert"
++	"github.com/stretchr/testify/require"
++
++	"github.com/CodeWarrior-debug/perspectize/backend/internal/core/domain"
++	portservices "github.com/CodeWarrior-debug/perspectize/backend/internal/core/ports/services"
++	"github.com/CodeWarrior-debug/perspectize/backend/internal/core/services"
++)
++
++// tmdbMovieLinks are pasted forms of the TMDB link for movie 603 (The Matrix).
++var tmdbMovieLinks = []string{
++	"https://www.themoviedb.org/movie/603-the-matrix?language=en",
++	"https://www.themoviedb.org/movie/603-the-matrix",
++	"https://www.themoviedb.org/movie/603",
++	"https://www.themoviedb.org/movie/603/",
++	"https://www.themoviedb.org/movie/603/cast",
++	"https://www.themoviedb.org/movie/603?language=en",
++	"https://www.themoviedb.org/movie/603#cast",
++	"http://themoviedb.org/movie/603-the-matrix",
++	"HTTPS://WWW.THEMOVIEDB.ORG/MOVIE/603-the-matrix",
++	"  https://www.themoviedb.org/movie/603-the-matrix\n",
++}
++
++func TestImportService_NormalizeMovieLink_TMDBLinkBecomesTheCanonicalURL(t *testing.T) {
++	svc := newImportService(newFakeImportRepo(), nil, nil, &fakeCreator{})
++
++	for _, raw := range tmdbMovieLinks {
++		t.Run(raw, func(t *testing.T) {
++			got, err := svc.NormalizeMovieLink(raw)
++			require.NoError(t, err)
++			assert.Equal(t, "https://www.themoviedb.org/movie/603", got)
++		})
++	}
++}
++
++func TestImportService_NormalizeMovieLink_KeepsTheMovieID(t *testing.T) {
++	svc := newImportService(newFakeImportRepo(), nil, nil, &fakeCreator{})
++
++	got, err := svc.NormalizeMovieLink("https://www.themoviedb.org/movie/27205-inception?language=fr")
++	require.NoError(t, err)
++	assert.Equal(t, "https://www.themoviedb.org/movie/27205", got)
++}
++
++func TestImportService_NormalizeMovieLink_IsIdempotent(t *testing.T) {
++	svc := newImportService(newFakeImportRepo(), nil, nil, &fakeCreator{})
++
++	once, err := svc.NormalizeMovieLink("https://www.themoviedb.org/movie/603-the-matrix?language=en")
++	require.NoError(t, err)
++	twice, err := svc.NormalizeMovieLink(once)
++	require.NoError(t, err)
++	assert.Equal(t, once, twice)
++}
++
++func TestImportService_NormalizeMovieLink_RefusesAnythingElse(t *testing.T) {
++	svc := newImportService(newFakeImportRepo(), nil, nil, &fakeCreator{})
++
++	cases := map[string]string{
++		"imdb url":            "https://www.imdb.com/title/tt0133093/",
++		"imdb url with query": "https://www.imdb.com/title/tt0133093/?ref_=fn_al_tt_1",
++		"bare imdb id":        "tt0133093",
++		"upper case imdb id":  "TT0133093",
++		"short imdb id":       "tt123",
++		"tmdb tv show":        "https://www.themoviedb.org/tv/1396-breaking-bad",
++		"tmdb person":         "https://www.themoviedb.org/person/525-christopher-nolan",
++		"tmdb movie no id":    "https://www.themoviedb.org/movie/the-matrix",
++		"tmdb movie id zero":  "https://www.themoviedb.org/movie/0",
++		"tmdb movie id glued": "https://www.themoviedb.org/movie/603abc",
++		"youtube video":       "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
++		"web page":            "https://example.com/some/article",
++		"bare number":         "603",
++		"plain text":          "the matrix",
++		"empty":               "",
++		"whitespace":          "   \t\n",
++	}
++	for name, raw := range cases {
++		t.Run(name, func(t *testing.T) {
++			got, err := svc.NormalizeMovieLink(raw)
++			require.Error(t, err)
++			assert.ErrorIs(t, err, domain.ErrInvalidInput)
++			assert.Empty(t, got, "a refused link yields no URL")
++		})
++	}
++}
++
++func TestImportService_NormalizeMovieLink_IMDbRefusalPointsToTMDB(t *testing.T) {
++	svc := newImportService(newFakeImportRepo(), nil, nil, &fakeCreator{})
++
++	_, err := svc.NormalizeMovieLink("https://www.imdb.com/title/tt0133093/")
++	require.Error(t, err)
++	assert.ErrorIs(t, err, domain.ErrInvalidInput)
++	assert.Contains(t, err.Error(), "tt0133093")
++	assert.Contains(t, err.Error(), "TMDB")
++}
++
++// The list URL and the stored URL must be the same string, or the "already in
++// your library" match on an import row misses. Run the same links through the
++// content service's create path and compare what it saves.
++func TestImportService_NormalizeMovieLink_MatchesWhatContentServiceStores(t *testing.T) {
++	svc := newImportService(newFakeImportRepo(), nil, nil, &fakeCreator{})
++
++	for _, raw := range tmdbMovieLinks {
++		t.Run(raw, func(t *testing.T) {
++			mc := &mockMovieClient{getMovieFn: func(context.Context, int) (*portservices.MovieMetadata, error) {
++				return movieMeta(nil), nil
++			}}
++			var stored string
++			repo := &mockContentRepository{getOrCreateByURLFn: func(_ context.Context, c *domain.Content, _ bool) (*domain.Content, bool, error) {
++				require.NotNil(t, c.URL)
++				stored = *c.URL
++				return c, false, nil
++			}}
++			content := services.NewContentService(repo, nil, mc)
++
++			_, err := content.CreateFromMovie(context.Background(), raw, 1)
++			require.NoError(t, err)
++
++			got, err := svc.NormalizeMovieLink(raw)
++			require.NoError(t, err)
++			assert.Equal(t, stored, got)
++		})
++	}
++}

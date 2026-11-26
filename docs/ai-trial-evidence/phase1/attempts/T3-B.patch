@@ -1,0 +1,487 @@
+diff --git a/backend/internal/core/services/import_listing_progress.go b/backend/internal/core/services/import_listing_progress.go
+index 35d6a2ac..67172e0e 100644
+--- a/backend/internal/core/services/import_listing_progress.go
++++ b/backend/internal/core/services/import_listing_progress.go
+@@ -21,10 +21,6 @@ import (
+ // Like importProgressTracker, it is per process (one server instance).
+ type listingTracker struct {
+ 	*latestHub[int, jobListing, domain.ImportListingProgress]
+-	// jobs aliases the hub's per-job entries so the unsubscribe tests can read
+-	// each job's subscriber set under mu. Nothing in production reads it. The
+-	// hub's lock guards the map.
+-	jobs map[int]*hubEntry[jobListing, domain.ImportListingProgress]
+ }
+ 
+ // jobListing is one import's state in the hub: each source's listing progress,
+@@ -45,7 +41,7 @@ func newListingTracker(interval time.Duration, now func() time.Time) *listingTra
+ 		},
+ 		(*jobListing).listingLocked,
+ 	)
+-	return &listingTracker{latestHub: hub, jobs: hub.entries}
++	return &listingTracker{latestHub: hub}
+ }
+ 
+ // source returns the source's progress, or a fresh LISTING entry if the tracker hasn't seen it.
+diff --git a/backend/internal/core/services/import_listing_progress_test.go b/backend/internal/core/services/import_listing_progress_test.go
+index 42b4febf..330da560 100644
+--- a/backend/internal/core/services/import_listing_progress_test.go
++++ b/backend/internal/core/services/import_listing_progress_test.go
+@@ -157,6 +157,30 @@ func TestListingTracker_SourcesAreOrderedBySourceID(t *testing.T) {
+ 	assert.Equal(t, 30, p.Sources[2].SourceID)
+ }
+ 
++func TestListingTracker_FinishedJobsAreBoundedButAListingJobIsKept(t *testing.T) {
++	tr := newListingTracker(10*time.Millisecond, time.Now)
++	tr.begin(1_000_000, 9) // still listing when everything else has come and gone
++	finished := defaultMaxIdleEntries + 50
++	for id := 1; id <= finished; id++ {
++		tr.begin(id, 1)
++		tr.finish(id, 1, domain.ImportSourceStatusReady)
++	}
++
++	assert.Equal(t, defaultMaxIdleEntries+1, tr.entryCount(), "the listing job plus the idle bound")
++	assert.False(t, tr.hasEntry(1), "the job that finished first is forgotten")
++	assert.True(t, tr.hasEntry(finished), "the job that finished last is remembered")
++
++	ctx, cancel := context.WithCancel(context.Background())
++	defer cancel()
++	listing := nextListing(t, tr.subscribe(ctx, 1_000_000))
++	assert.True(t, listing.Listing)
++	require.Len(t, listing.Sources, 1, "a listing job's sources are never lost")
++	forgotten := nextListing(t, tr.subscribe(ctx, 1))
++	assert.False(t, forgotten.Listing)
++	assert.Empty(t, forgotten.Sources, "a forgotten job reads as one that has not started")
++	tr.finish(1_000_000, 9, domain.ImportSourceStatusReady) // lets the listing job's ticker stop
++}
++
+ func TestListingTracker_UnsubscribeClosesTheChannel(t *testing.T) {
+ 	tr := newListingTracker(time.Hour, time.Now)
+ 	ctx, cancel := context.WithCancel(context.Background())
+@@ -169,9 +193,7 @@ func TestListingTracker_UnsubscribeClosesTheChannel(t *testing.T) {
+ 	case <-time.After(time.Second):
+ 		t.Fatal("not closed")
+ 	}
+-	tr.mu.Lock()
+-	assert.Empty(t, tr.jobs[8].subs)
+-	tr.mu.Unlock()
++	assert.Equal(t, 0, tr.subscriberCount(8), "the closed channel's subscriber is gone")
+ 	tr.begin(8, 1) // publishing after the subscriber left is safe
+ 	tr.finish(8, 1, domain.ImportSourceStatusReady)
+ }
+diff --git a/backend/internal/core/services/import_progress.go b/backend/internal/core/services/import_progress.go
+index 30a572f4..fea7e870 100644
+--- a/backend/internal/core/services/import_progress.go
++++ b/backend/internal/core/services/import_progress.go
+@@ -23,10 +23,6 @@ const defaultProgressInterval = 500 * time.Millisecond
+ // It is per process, like the import workers themselves (one server instance).
+ type importProgressTracker struct {
+ 	*latestHub[int, jobProgress, domain.ImportProgress]
+-	// jobs aliases the hub's per-job entries so the unsubscribe tests can read
+-	// each job's subscriber set under mu. Nothing in production reads it. The
+-	// hub's lock guards the map.
+-	jobs map[int]*hubEntry[jobProgress, domain.ImportProgress]
+ }
+ 
+ // jobProgress is one import's state in the hub: its count so far and how many
+@@ -50,7 +46,7 @@ func newImportProgressTracker(interval time.Duration, now func() time.Time) *imp
+ 		},
+ 		func(jp *jobProgress) bool { return jp.batches > 0 },
+ 	)
+-	return &importProgressTracker{latestHub: hub, jobs: hub.entries}
++	return &importProgressTracker{latestHub: hub}
+ }
+ 
+ // begin records a batch of n rows starting. A batch starting while none is
+diff --git a/backend/internal/core/services/import_progress_test.go b/backend/internal/core/services/import_progress_test.go
+index 8fc7a085..1cb9bdd1 100644
+--- a/backend/internal/core/services/import_progress_test.go
++++ b/backend/internal/core/services/import_progress_test.go
+@@ -132,6 +132,30 @@ func TestProgress_BatchesOverlapThenANewRunStartsFresh(t *testing.T) {
+ 	assert.Equal(t, 0, fresh.Done)
+ }
+ 
++func TestProgress_FinishedJobsAreBoundedButARunningJobIsKept(t *testing.T) {
++	tr := newImportProgressTracker(10*time.Millisecond, time.Now)
++	tr.begin(1_000_000, 5) // still running when everything else has come and gone
++	finished := defaultMaxIdleEntries + 50
++	for id := 1; id <= finished; id++ {
++		tr.begin(id, 1)
++		tr.end(id)
++	}
++
++	assert.Equal(t, defaultMaxIdleEntries+1, tr.entryCount(), "the running job plus the idle bound")
++	assert.False(t, tr.hasEntry(1), "the job that finished first is forgotten")
++	assert.True(t, tr.hasEntry(finished), "the job that finished last is remembered")
++
++	ctx, cancel := context.WithCancel(context.Background())
++	defer cancel()
++	running := next(t, tr.subscribe(ctx, 1_000_000))
++	assert.True(t, running.Running)
++	assert.Equal(t, 5, running.Total, "a running job's count is never lost")
++	forgotten := next(t, tr.subscribe(ctx, 1))
++	assert.Equal(t, domain.ImportProgress{JobID: 1}, domain.ImportProgress{JobID: forgotten.JobID, Total: forgotten.Total, Running: forgotten.Running},
++		"a forgotten job reads as one that has not started")
++	tr.end(1_000_000) // lets the running job's ticker stop
++}
++
+ func TestProgress_UnsubscribeClosesTheChannel(t *testing.T) {
+ 	tr := newImportProgressTracker(time.Hour, time.Now)
+ 	ctx, cancel := context.WithCancel(context.Background())
+@@ -144,9 +168,7 @@ func TestProgress_UnsubscribeClosesTheChannel(t *testing.T) {
+ 	case <-time.After(time.Second):
+ 		t.Fatal("not closed")
+ 	}
+-	tr.mu.Lock()
+-	assert.Empty(t, tr.jobs[4].subs)
+-	tr.mu.Unlock()
++	assert.Equal(t, 0, tr.subscriberCount(4), "the closed channel's subscriber is gone")
+ 	tr.begin(4, 1) // publishing after the subscriber left is safe
+ 	tr.end(4)
+ }
+diff --git a/backend/internal/core/services/latest_hub.go b/backend/internal/core/services/latest_hub.go
+index d6c11f10..7091e9cd 100644
+--- a/backend/internal/core/services/latest_hub.go
++++ b/backend/internal/core/services/latest_hub.go
+@@ -6,6 +6,12 @@ import (
+ 	"time"
+ )
+ 
++// defaultMaxIdleEntries bounds how many idle keys a hub remembers. A key is
++// idle when its state is not active and nobody subscribes to it; such a key
++// only keeps its last snapshot around for a late subscriber, so past this many
++// the one that went idle longest ago is forgotten.
++const defaultMaxIdleEntries = 256
++
+ // publishMode is what an update asks the hub to do with subscribers.
+ type publishMode int
+ 
+@@ -38,6 +44,11 @@ const (
+ // snapshot and active run under the hub's lock and must not call back into
+ // the hub. Snapshots go to every subscriber of a key, so a snapshot must not
+ // share mutable memory with the state it came from.
++//
++// The hub keeps at most maxIdle idle keys (see defaultMaxIdleEntries). A key
++// whose state is active, or that has a subscriber, is never forgotten; the
++// number of those is up to the callers. A forgotten key comes back as a fresh
++// newState the next time it is updated or subscribed to.
+ type latestHub[K comparable, V any, S any] struct {
+ 	mu       sync.Mutex
+ 	interval time.Duration
+@@ -46,6 +57,10 @@ type latestHub[K comparable, V any, S any] struct {
+ 	snapshot func(K, *V, time.Time) S
+ 	active   func(*V) bool
+ 	entries  map[K]*hubEntry[V, S]
++
++	maxIdle   int    // most idle entries kept
++	idleCount int    // entries with a non-zero idleSeq
++	idleSeq   uint64 // last sequence number handed to an entry that went idle
+ }
+ 
+ // hubEntry is one key's state, publish bookkeeping and subscribers.
+@@ -55,6 +70,11 @@ type hubEntry[V any, S any] struct {
+ 	dirty     bool      // changed since the last publish
+ 	ticking   bool      // a ticker goroutine is running for this key
+ 	subs      map[chan S]struct{}
++	// idleSeq is zero while the key is active or has a subscriber. When it goes
++	// idle it takes the hub's next sequence number, so a smaller one means idle
++	// for longer. A counter, not a timestamp, so a coarse or frozen clock can't
++	// tie two keys.
++	idleSeq uint64
+ }
+ 
+ func newLatestHub[K comparable, V any, S any](
+@@ -71,9 +91,13 @@ func newLatestHub[K comparable, V any, S any](
+ 		snapshot: snapshot,
+ 		active:   active,
+ 		entries:  map[K]*hubEntry[V, S]{},
++		maxIdle:  defaultMaxIdleEntries,
+ 	}
+ }
+ 
++// entryLocked returns the key's entry, creating it if the hub has none. A new
++// entry is not yet counted idle; callers pass it to settleLocked once its
++// state and subscribers are in place.
+ func (h *latestHub[K, V, S]) entryLocked(key K) *hubEntry[V, S] {
+ 	e, ok := h.entries[key]
+ 	if !ok {
+@@ -83,6 +107,48 @@ func (h *latestHub[K, V, S]) entryLocked(key K) *hubEntry[V, S] {
+ 	return e
+ }
+ 
++// settleLocked records whether e is idle (inactive state, no subscribers)
++// after a change to its state or its subscribers. An entry that has just gone
++// idle takes the next sequence number, and if that leaves more than maxIdle
++// idle entries the longest-idle ones are dropped. An entry that stops being
++// idle leaves the count. Call it after every change to e's state or subs.
++func (h *latestHub[K, V, S]) settleLocked(e *hubEntry[V, S]) {
++	idle := len(e.subs) == 0 && !h.active(e.state)
++	switch {
++	case idle && e.idleSeq == 0:
++		h.idleSeq++
++		e.idleSeq = h.idleSeq
++		h.idleCount++
++		for h.idleCount > h.maxIdle && h.evictOldestIdleLocked() {
++		}
++	case !idle && e.idleSeq != 0:
++		e.idleSeq = 0
++		h.idleCount--
++	}
++}
++
++// evictOldestIdleLocked forgets the entry that has been idle longest and
++// reports whether there was one. It looks at every entry, which is cheap
++// because it runs only when an entry goes idle with the hub already full of
++// them. A key's ticker may still be winding down when its entry is dropped; it
++// holds the entry itself, finds the state inactive at its next tick and exits,
++// and a later update of the key starts a ticker of its own on a fresh entry.
++func (h *latestHub[K, V, S]) evictOldestIdleLocked() bool {
++	var oldestKey K
++	var oldest *hubEntry[V, S]
++	for key, e := range h.entries {
++		if e.idleSeq != 0 && (oldest == nil || e.idleSeq < oldest.idleSeq) {
++			oldestKey, oldest = key, e
++		}
++	}
++	if oldest == nil {
++		return false
++	}
++	delete(h.entries, oldestKey)
++	h.idleCount--
++	return true
++}
++
+ // update runs fn on the key's state under the hub's lock and acts on the mode
+ // it returns. If the state is active afterwards and the key has no ticker, one
+ // starts. fn runs under the hub's lock and must not call back into the hub (a
+@@ -101,6 +167,7 @@ func (h *latestHub[K, V, S]) update(key K, fn func(*V) publishMode) {
+ 		e.ticking = true
+ 		go h.tick(key, e)
+ 	}
++	h.settleLocked(e)
+ }
+ 
+ // tick publishes the key's changes once per interval, and stops when the
+@@ -138,6 +205,7 @@ func (h *latestHub[K, V, S]) subscribe(ctx context.Context, key K) <-chan S {
+ 	h.mu.Lock()
+ 	e := h.entryLocked(key)
+ 	e.subs[ch] = struct{}{}
++	h.settleLocked(e)
+ 	at := e.updatedAt
+ 	if at.IsZero() {
+ 		at = h.now().UTC()
+@@ -149,6 +217,7 @@ func (h *latestHub[K, V, S]) subscribe(ctx context.Context, key K) <-chan S {
+ 		h.mu.Lock()
+ 		delete(e.subs, ch)
+ 		close(ch)
++		h.settleLocked(e)
+ 		h.mu.Unlock()
+ 	})
+ 	return ch
+diff --git a/backend/internal/core/services/latest_hub_test.go b/backend/internal/core/services/latest_hub_test.go
+index 9571cc26..64335398 100644
+--- a/backend/internal/core/services/latest_hub_test.go
++++ b/backend/internal/core/services/latest_hub_test.go
+@@ -2,6 +2,7 @@ package services
+ 
+ import (
+ 	"context"
++	"fmt"
+ 	"runtime"
+ 	"sync"
+ 	"testing"
+@@ -61,6 +62,26 @@ func (h *latestHub[K, V, S]) subscriberCount(key K) int {
+ 	return len(e.subs)
+ }
+ 
++// entryCount reports how many keys the hub currently remembers.
++func (h *latestHub[K, V, S]) entryCount() int {
++	h.mu.Lock()
++	defer h.mu.Unlock()
++	return len(h.entries)
++}
++
++// hasEntry reports whether the hub still remembers key.
++func (h *latestHub[K, V, S]) hasEntry(key K) bool {
++	h.mu.Lock()
++	defer h.mu.Unlock()
++	_, ok := h.entries[key]
++	return ok
++}
++
++// goIdle makes key a remembered, idle key: inactive state, no subscribers.
++func goIdle(h *latestHub[string, hubCounter, hubSnap], key string, n int) {
++	h.update(key, setCounter(n, false, keep))
++}
++
+ func recvHub(t *testing.T, ch <-chan hubSnap) hubSnap {
+ 	t.Helper()
+ 	select {
+@@ -365,6 +386,168 @@ func TestHub_NoGoroutineLeakAfterManySubscribers(t *testing.T) {
+ 		"goroutines: baseline %d", baseline)
+ }
+ 
++func TestHub_IdleKeysAreBoundedByDefault(t *testing.T) {
++	require.Equal(t, 256, defaultMaxIdleEntries)
++	h := newTestHub(time.Hour, time.Now)
++	total := defaultMaxIdleEntries + 44
++
++	for i := 0; i < total; i++ {
++		goIdle(h, fmt.Sprintf("k%d", i), i)
++	}
++
++	assert.Equal(t, defaultMaxIdleEntries, h.entryCount(), "idle keys are capped")
++	for i := 0; i < total-defaultMaxIdleEntries; i++ {
++		assert.False(t, h.hasEntry(fmt.Sprintf("k%d", i)), "k%d went idle first and is the one dropped", i)
++	}
++	for i := total - defaultMaxIdleEntries; i < total; i++ {
++		assert.True(t, h.hasEntry(fmt.Sprintf("k%d", i)), "k%d is among the newest idle keys and stays", i)
++	}
++}
++
++func TestHub_EvictsTheKeyThatWentIdleLongestAgo(t *testing.T) {
++	// A frozen clock: order must come from when keys went idle, not from the
++	// time a clock reads.
++	frozen := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
++	h := newTestHub(time.Hour, func() time.Time { return frozen })
++	h.maxIdle = 3
++
++	h.update("a", setCounter(1, true, keep)) // created first, but running
++	goIdle(h, "b", 1)
++	goIdle(h, "c", 1)
++	h.update("a", setCounter(1, false, keep)) // a goes idle after b and c
++	goIdle(h, "d", 1)                         // four idle keys: b went idle longest ago
++
++	assert.False(t, h.hasEntry("b"), "b has been idle longest, though a was created before it")
++	assert.True(t, h.hasEntry("a"))
++	assert.True(t, h.hasEntry("c"))
++	assert.True(t, h.hasEntry("d"))
++}
++
++func TestHub_UpdatingAnIdleKeyDoesNotRestartItsIdleTime(t *testing.T) {
++	h := newTestHub(time.Hour, time.Now)
++	h.maxIdle = 2
++
++	goIdle(h, "a", 1)
++	goIdle(h, "b", 1)
++	goIdle(h, "a", 2) // still idle, so it is no younger than before
++	goIdle(h, "c", 1)
++
++	assert.False(t, h.hasEntry("a"), "a has been idle since before b; touching it while idle changes nothing")
++	assert.True(t, h.hasEntry("b"))
++	assert.True(t, h.hasEntry("c"))
++}
++
++func TestHub_ActiveKeyIsNeverEvicted(t *testing.T) {
++	h := newTestHub(10*time.Millisecond, time.Now)
++	h.maxIdle = 2
++
++	h.update("running", setCounter(7, true, keep))
++	for i := 0; i < 20; i++ {
++		goIdle(h, fmt.Sprintf("idle%d", i), i)
++	}
++
++	assert.True(t, h.hasEntry("running"), "a running key outlives any number of idle ones")
++	assert.Equal(t, 3, h.entryCount(), "the running key plus the idle bound")
++
++	ctx, cancel := context.WithCancel(context.Background())
++	defer cancel()
++	assert.Equal(t, 7, recvHub(t, h.subscribe(ctx, "running")).N, "its state was kept")
++	h.update("running", setCounter(7, false, keep)) // lets the ticker stop
++}
++
++func TestHub_ASubscribedKeyIsNeverEvicted(t *testing.T) {
++	h := newTestHub(time.Hour, time.Now)
++	h.maxIdle = 2
++	ctx, cancel := context.WithCancel(context.Background())
++	defer cancel()
++
++	goIdle(h, "watched", 4)
++	ch := h.subscribe(ctx, "watched")
++	assert.Equal(t, 4, recvHub(t, ch).N)
++	for i := 0; i < 20; i++ {
++		goIdle(h, fmt.Sprintf("idle%d", i), i)
++	}
++
++	assert.True(t, h.hasEntry("watched"), "a subscribed key stays however idle its state")
++	assert.Equal(t, 3, h.entryCount())
++
++	h.update("watched", setCounter(5, false, publishNow))
++	assert.Equal(t, 5, recvHub(t, ch).N, "the subscriber still hears about changes")
++}
++
++func TestHub_AKeyCountsAsIdleOnceItsLastSubscriberLeaves(t *testing.T) {
++	h := newTestHub(time.Hour, time.Now)
++	h.maxIdle = 2
++	ctx, cancel := context.WithCancel(context.Background())
++
++	h.subscribe(ctx, "watched")
++	goIdle(h, "a", 1)
++	goIdle(h, "b", 1)
++	require.Equal(t, 3, h.entryCount())
++
++	cancel()
++
++	require.Eventually(t, func() bool { return h.entryCount() == 2 }, time.Second, 5*time.Millisecond,
++		"the unwatched key joins the idle ones and the longest-idle of them goes")
++	assert.True(t, h.hasEntry("watched"), "it went idle last, so it is the newest idle key")
++	assert.True(t, h.hasEntry("b"))
++	assert.False(t, h.hasEntry("a"))
++}
++
++func TestHub_AKeyThatBecomesActiveLeavesTheIdleCount(t *testing.T) {
++	h := newTestHub(10*time.Millisecond, time.Now)
++	h.maxIdle = 2
++
++	goIdle(h, "a", 1)
++	goIdle(h, "b", 1)
++	h.update("a", setCounter(2, true, keep)) // a leaves the idle keys
++	goIdle(h, "c", 1)                        // idle: b, c, so within the bound
++
++	assert.Equal(t, 3, h.entryCount(), "nothing is dropped while only two keys are idle")
++	assert.True(t, h.hasEntry("a"))
++	assert.True(t, h.hasEntry("b"))
++
++	goIdle(h, "d", 1) // idle: b, c, d, over the bound
++
++	assert.False(t, h.hasEntry("b"))
++	assert.True(t, h.hasEntry("a"), "a is still running")
++	h.update("a", setCounter(2, false, keep)) // lets the ticker stop
++}
++
++func TestHub_AnEvictedKeyStartsFresh(t *testing.T) {
++	h := newTestHub(time.Hour, time.Now)
++	h.maxIdle = 1
++	goIdle(h, "a", 9)
++	goIdle(h, "b", 1)
++	require.False(t, h.hasEntry("a"))
++	ctx, cancel := context.WithCancel(context.Background())
++	defer cancel()
++
++	s := recvHub(t, h.subscribe(ctx, "a"))
++
++	assert.Equal(t, 0, s.N, "a forgotten key comes back as a new, empty one")
++}
++
++func TestHub_EvictingAKeyWhoseTickerIsStillRunningIsSafe(t *testing.T) {
++	h := newTestHub(10*time.Millisecond, time.Now)
++	h.maxIdle = 1
++	h.update("a", setCounter(1, true, markDirty))
++	require.True(t, h.isTicking("a"))
++	h.update("a", setCounter(1, false, keep)) // idle, ticker not yet stopped
++	goIdle(h, "b", 1)                         // pushes "a" out
++	require.False(t, h.hasEntry("a"))
++
++	ctx, cancel := context.WithCancel(context.Background())
++	defer cancel()
++	ch := h.subscribe(ctx, "a")
++	recvHub(t, ch) // fresh idle snapshot
++	h.update("a", setCounter(3, true, markDirty))
++
++	assert.Equal(t, 3, recvHub(t, ch).N, "the fresh entry gets a ticker of its own")
++	h.update("a", setCounter(3, false, keep))
++	require.Eventually(t, func() bool { return !h.isTicking("a") }, time.Second, 5*time.Millisecond)
++}
++
+ func TestHub_SlowSubscriberNeverBlocksPublisher(t *testing.T) {
+ 	h := newTestHub(time.Hour, time.Now)
+ 	ctx, cancel := context.WithCancel(context.Background())

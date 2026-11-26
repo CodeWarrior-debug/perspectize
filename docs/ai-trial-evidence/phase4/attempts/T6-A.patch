@@ -1,0 +1,324 @@
+diff --git a/frontend/src/lib/components/OmittedVerse.svelte b/frontend/src/lib/components/OmittedVerse.svelte
+new file mode 100644
+index 00000000..d69726ad
+--- /dev/null
++++ b/frontend/src/lib/components/OmittedVerse.svelte
+@@ -0,0 +1,12 @@
++<!-- frontend/src/lib/components/OmittedVerse.svelte -->
++<script lang="ts">
++	import VerseNumber from '$lib/components/VerseNumber.svelte';
++
++	// A verse the BSB prints no text for: keep its number so the numbering has no gap, and say why
++	// nothing follows it. The trailing space between verses stays with the caller.
++	let { verseId, verse }: { verseId: number; verse: number } = $props();
++</script>
++
++<VerseNumber {verseId} {verse} /><span data-omitted-verse={verseId} class="text-[13px] text-muted-foreground italic"
++	>omitted in the BSB</span
++>
+diff --git a/frontend/src/lib/components/PassageText.svelte b/frontend/src/lib/components/PassageText.svelte
+index 38daf165..a6ddaedd 100644
+--- a/frontend/src/lib/components/PassageText.svelte
++++ b/frontend/src/lib/components/PassageText.svelte
+@@ -5,8 +5,12 @@
+ 	import { queryKeys } from '$lib/queries/keys';
+ 	import OriginalLanguage from '$lib/components/interlinear/OriginalLanguage.svelte';
+ 	import VerseNumber from '$lib/components/VerseNumber.svelte';
++	import OmittedVerse from '$lib/components/OmittedVerse.svelte';
+ 	import VerseJumpPrompt from '$lib/components/VerseJumpPrompt.svelte';
+ 	import { setVerseJump } from '$lib/utils/verseJump';
++	import { formatReference, verseIdsToRange } from '$lib/utils/bible';
++	import { DEFAULT_VERSION, gatewayLink } from '$lib/utils/bibleLinks';
++	import { isOmittedPassage, isOmittedVerse } from '$lib/utils/omittedVerses';
+ 
+ 	let { startVerseId, endVerseId }: { startVerseId: number; endVerseId: number } = $props();
+ 
+@@ -80,6 +84,14 @@
+ 	const visibleVerses = $derived(
+ 		verseCount <= COLLAPSE_THRESHOLD || expanded ? verses : verses.slice(0, COLLAPSED_PREVIEW_COUNT),
+ 	);
++
++	// Some BSB verses carry no text of their own. A passage made only of those has nothing to
++	// render, so it gets an explanation and an outbound link in the default Gateway version
++	// (the BSB itself cannot be opened there) instead of a blank box.
++	const allOmitted = $derived(isOmittedPassage(verses));
++	const range = $derived(verseIdsToRange(startVerseId, endVerseId));
++	const omittedReference = $derived(range ? formatReference(range) : null);
++	const omittedGatewayUrl = $derived(range ? gatewayLink(range, DEFAULT_VERSION).url : null);
+ </script>
+ 
+ {#snippet plain()}
+@@ -87,7 +99,10 @@
+ 		{#each visibleVerses as v (v.verseId)}
+ 			<!-- The explicit trailing space keeps a verse number from running into the previous verse's last word. -->
+ 			<span
+-				>{#if v.text}<VerseNumber verseId={v.verseId} verse={v.verse} />{v.text}{' '}{/if}</span
++				>{#if isOmittedVerse(v)}<OmittedVerse verseId={v.verseId} verse={v.verse} />{' '}{:else}<VerseNumber
++						verseId={v.verseId}
++						verse={v.verse}
++					/>{v.text}{' '}{/if}</span
+ 			>
+ 		{/each}
+ 	</div>
+@@ -108,27 +123,44 @@
+ 		<p class="text-destructive">Couldn't load this passage.</p>
+ 	{:else if query.data}
+ 		{@const { translation, copyright } = query.data.passageText}
+-		{#if showOriginal}
+-			<OriginalLanguage {startVerseId} {endVerseId} verses={visibleVerses} {plain} />
++		{#if allOmitted}
++			<p class="text-muted-foreground">
++				{omittedReference ?? (verses.length === 1 ? 'This verse' : 'These verses')}
++				{verses.length === 1 ? 'is' : 'are'} omitted in the BSB, so there is no verse text to show here.
++			</p>
++			{#if omittedGatewayUrl}
++				<a
++					href={omittedGatewayUrl}
++					target="_blank"
++					rel="noopener noreferrer"
++					class="mt-1 inline-block text-[13px] text-primary hover:underline"
++				>
++					Read {omittedReference} on Bible Gateway ({DEFAULT_VERSION})
++				</a>
++			{/if}
+ 		{:else}
+-			{@render plain()}
+-		{/if}
+-		<button
+-			type="button"
+-			aria-pressed={showOriginal}
+-			class="mt-2 mr-3 text-[13px] font-semibold text-primary hover:underline aria-pressed:underline"
+-			onclick={() => (showOriginal = !showOriginal)}
+-		>
+-			Show original language
+-		</button>
+-		{#if verseCount > COLLAPSE_THRESHOLD}
++			{#if showOriginal}
++				<OriginalLanguage {startVerseId} {endVerseId} verses={visibleVerses} {plain} />
++			{:else}
++				{@render plain()}
++			{/if}
+ 			<button
+ 				type="button"
+-				class="mt-2 text-[13px] font-semibold text-primary hover:underline"
+-				onclick={() => (expanded = !expanded)}
++				aria-pressed={showOriginal}
++				class="mt-2 mr-3 text-[13px] font-semibold text-primary hover:underline aria-pressed:underline"
++				onclick={() => (showOriginal = !showOriginal)}
+ 			>
+-				{expanded ? 'Show less' : 'Show full passage'}
++				Show original language
+ 			</button>
++			{#if verseCount > COLLAPSE_THRESHOLD}
++				<button
++					type="button"
++					class="mt-2 text-[13px] font-semibold text-primary hover:underline"
++					onclick={() => (expanded = !expanded)}
++				>
++					{expanded ? 'Show less' : 'Show full passage'}
++				</button>
++			{/if}
+ 		{/if}
+ 		<p class="mt-2 text-[11px] text-muted-foreground">{translation} · {copyright}</p>
+ 	{/if}
+diff --git a/frontend/src/lib/components/interlinear/InterlinearPassage.svelte b/frontend/src/lib/components/interlinear/InterlinearPassage.svelte
+index 33b22ccf..25c6f720 100644
+--- a/frontend/src/lib/components/interlinear/InterlinearPassage.svelte
++++ b/frontend/src/lib/components/interlinear/InterlinearPassage.svelte
+@@ -15,6 +15,8 @@
+ 	} from '$lib/utils/interlinear';
+ 	import WordPopover from './WordPopover.svelte';
+ 	import VerseNumber from '$lib/components/VerseNumber.svelte';
++	import OmittedVerse from '$lib/components/OmittedVerse.svelte';
++	import { isOmittedVerse } from '$lib/utils/omittedVerses';
+ 
+ 	let { verses, interlinear }: { verses: VerseText[]; interlinear: InterlinearVerse[] } = $props();
+ 
+@@ -156,7 +158,9 @@
+ 								>{seg.text}</button
+ 							>{:else}<span>{seg.text}</span>{/if}{/each}{' '}</span
+ 				>
+-			{:else if v.text}
++			{:else if isOmittedVerse(v)}
++				<span><OmittedVerse verseId={v.verseId} verse={v.verse} />{' '}</span>
++			{:else}
+ 				<span><VerseNumber verseId={v.verseId} verse={v.verse} />{v.text}{' '}</span>
+ 			{/if}
+ 		{/each}
+diff --git a/frontend/src/lib/utils/omittedVerses.ts b/frontend/src/lib/utils/omittedVerses.ts
+new file mode 100644
+index 00000000..90e276d5
+--- /dev/null
++++ b/frontend/src/lib/utils/omittedVerses.ts
+@@ -0,0 +1,12 @@
++/**
++ * A verse the BSB prints no text for (its content sits in footnotes), so the stored text is empty.
++ * Whitespace-only counts as empty. Callers show a marker instead of inventing text.
++ */
++export function isOmittedVerse(verse: { text: string }): boolean {
++	return verse.text.trim() === '';
++}
++
++/** True when there is at least one verse and every one of them is omitted. */
++export function isOmittedPassage(verses: readonly { text: string }[]): boolean {
++	return verses.length > 0 && verses.every(isOmittedVerse);
++}
+diff --git a/frontend/tests/components/PassageText.test.ts b/frontend/tests/components/PassageText.test.ts
+index 9457668a..f6e5a207 100644
+--- a/frontend/tests/components/PassageText.test.ts
++++ b/frontend/tests/components/PassageText.test.ts
+@@ -89,6 +89,100 @@ describe('PassageText', () => {
+ 		expect(container.textContent).toContain('Verse text 1 2Verse text 2');
+ 	});
+ 
++	describe('verses the BSB omits (empty text)', () => {
++		const withText = (verseId: number) => ({ verseId, chapter: 1, verse: verseId, text: `Verse text ${verseId}` });
++		const omitted = (verseId: number) => ({ verseId, chapter: 1, verse: verseId, text: '' });
++
++		it('keeps an omitted verse in the running text: its number and an "omitted in the BSB" marker', () => {
++			mocks.mockQueryState.data = {
++				passageText: {
++					translation: 'BSB',
++					copyright: COPYRIGHT,
++					verses: [withText(1), omitted(2), withText(3)],
++				},
++			};
++			const { container } = render(PassageText, { props: { startVerseId: 1, endVerseId: 3 } });
++			expect(screen.getByRole('button', { name: 'Verse 2' })).toHaveTextContent('2');
++			expect(screen.getAllByText('omitted in the BSB')).toHaveLength(1);
++			expect(container.textContent).toContain('Verse text 1 2omitted in the BSB 3Verse text 3');
++			// the passage is still a passage: toggles stay, no replacement explanation or Gateway link
++			expect(screen.getByRole('button', { name: /show original language/i })).toBeInTheDocument();
++			expect(screen.queryByRole('link')).not.toBeInTheDocument();
++		});
++
++		it('treats whitespace-only text as omitted and never invents verse text for it', () => {
++			mocks.mockQueryState.data = {
++				passageText: {
++					translation: 'BSB',
++					copyright: COPYRIGHT,
++					verses: [withText(1), { verseId: 2, chapter: 1, verse: 2, text: '  ' }],
++				},
++			};
++			render(PassageText, { props: { startVerseId: 1, endVerseId: 2 } });
++			expect(screen.getAllByText('omitted in the BSB')).toHaveLength(1);
++		});
++
++		it('shows the marker inside a collapsed preview too', () => {
++			mocks.mockQueryState.data = {
++				passageText: {
++					translation: 'BSB',
++					copyright: COPYRIGHT,
++					verses: [...makeVerses(60).slice(0, 4), omitted(5), ...makeVerses(60).slice(5)],
++				},
++			};
++			render(PassageText, { props: { startVerseId: 1, endVerseId: 60 } });
++			expect(screen.getByText('omitted in the BSB')).toBeInTheDocument();
++			expect(screen.getByRole('button', { name: /show full passage/i })).toBeInTheDocument();
++		});
++
++		it('keeps the marker in the original-language view, where the plain verses are still rendered', async () => {
++			mocks.mockQueryState.data = {
++				passageText: { translation: 'BSB', copyright: COPYRIGHT, verses: [withText(1), omitted(2)] },
++			};
++			render(PassageText, { props: { startVerseId: 1, endVerseId: 2 } });
++			await fireEvent.click(screen.getByRole('button', { name: /show original language/i }));
++			expect(screen.getByTestId('original-language-stub')).toHaveTextContent('omitted in the BSB');
++		});
++
++		it('replaces a passage made only of one omitted verse with an explanation and an ESV Bible Gateway link', () => {
++			mocks.mockQueryState.data = {
++				passageText: { translation: 'BSB', copyright: COPYRIGHT, verses: [omitted(1)] },
++			};
++			const { container } = render(PassageText, { props: { startVerseId: 1, endVerseId: 1 } });
++			expect(screen.getByText(/Genesis 1:1 is omitted in the BSB/)).toBeInTheDocument();
++
++			const link = screen.getByRole('link', { name: /Bible Gateway \(ESV\)/ });
++			const url = new URL(link.getAttribute('href') as string);
++			expect(url.origin + url.pathname).toBe('https://www.biblegateway.com/passage/');
++			expect(url.searchParams.get('search')).toBe('Genesis 1:1');
++			expect(url.searchParams.get('version')).toBe('ESV');
++			expect(link).toHaveAttribute('target', '_blank');
++			expect(link).toHaveAttribute('rel', expect.stringContaining('noopener'));
++
++			// no number, no inline marker, no toggles: nothing to number or to align
++			expect(container.querySelector('sup')).toBeNull();
++			expect(container.querySelector('[data-omitted-verse]')).toBeNull();
++			expect(screen.queryByRole('button')).not.toBeInTheDocument();
++			expect(screen.getByText(/public domain/i)).toBeInTheDocument();
++		});
++
++		it('words the explanation for a range of omitted verses in the plural', () => {
++			mocks.mockQueryState.data = {
++				passageText: { translation: 'BSB', copyright: COPYRIGHT, verses: [omitted(1), omitted(2)] },
++			};
++			render(PassageText, { props: { startVerseId: 1, endVerseId: 2 } });
++			expect(screen.getByText(/Genesis 1:1-2 are omitted in the BSB/)).toBeInTheDocument();
++			expect(screen.getByRole('link', { name: /Genesis 1:1-2 on Bible Gateway/ })).toBeInTheDocument();
++		});
++
++		it('does not claim omission when the response has no verses at all', () => {
++			mocks.mockQueryState.data = { passageText: { translation: 'BSB', copyright: COPYRIGHT, verses: [] } };
++			render(PassageText, { props: { startVerseId: 1, endVerseId: 1 } });
++			expect(screen.queryByText(/omitted in the BSB/)).not.toBeInTheDocument();
++			expect(screen.queryByRole('link')).not.toBeInTheDocument();
++		});
++	});
++
+ 	it('shows no verse text, does not fetch, and points to the links below above the hard cap', () => {
+ 		// Genesis 1:1 (id 1) through id 200 is 200 verses.
+ 		render(PassageText, { props: { startVerseId: 1, endVerseId: 200 } });
+diff --git a/frontend/tests/components/interlinear/InterlinearPassage.test.ts b/frontend/tests/components/interlinear/InterlinearPassage.test.ts
+index 07612e76..3378b58b 100644
+--- a/frontend/tests/components/interlinear/InterlinearPassage.test.ts
++++ b/frontend/tests/components/interlinear/InterlinearPassage.test.ts
+@@ -59,6 +59,16 @@ describe('InterlinearPassage', () => {
+ 		expect(screen.queryByText('ignored')).not.toBeInTheDocument();
+ 	});
+ 
++	it('an omitted verse (empty text, no alignment data) keeps its number and an "omitted in the BSB" marker', () => {
++		render(InterlinearPassage, {
++			props: { verses: [plain(1, 1, 'x'), plain(2, 2, '')], interlinear: [gen11] },
++		});
++		// no verse-jump context here, so the numbers are plain superscripts
++		const marker = screen.getByText('omitted in the BSB');
++		expect(marker.previousElementSibling?.tagName).toBe('SUP');
++		expect(marker.previousElementSibling).toHaveTextContent('2');
++	});
++
+ 	it('hovering a phrase shows the popover for its first source word; leaving hides it', async () => {
+ 		render(InterlinearPassage, { props: { verses: [plain(1, 1, 'x')], interlinear: [gen11] } });
+ 		const created = screen.getByRole('button', { name: 'created' });
+diff --git a/frontend/tests/unit/omittedVerses.test.ts b/frontend/tests/unit/omittedVerses.test.ts
+new file mode 100644
+index 00000000..14ec1fdf
+--- /dev/null
++++ b/frontend/tests/unit/omittedVerses.test.ts
+@@ -0,0 +1,27 @@
++import { describe, it, expect } from 'vitest';
++import { isOmittedPassage, isOmittedVerse } from '$lib/utils/omittedVerses';
++
++describe('isOmittedVerse', () => {
++	it('is true for empty and whitespace-only text', () => {
++		expect(isOmittedVerse({ text: '' })).toBe(true);
++		expect(isOmittedVerse({ text: ' \n\t ' })).toBe(true);
++	});
++
++	it('is false once there is any text', () => {
++		expect(isOmittedVerse({ text: 'In the beginning' })).toBe(false);
++		expect(isOmittedVerse({ text: ' x ' })).toBe(false);
++	});
++});
++
++describe('isOmittedPassage', () => {
++	it('is true only when every verse is omitted', () => {
++		expect(isOmittedPassage([{ text: '' }])).toBe(true);
++		expect(isOmittedPassage([{ text: '' }, { text: ' ' }])).toBe(true);
++		expect(isOmittedPassage([{ text: '' }, { text: 'text' }])).toBe(false);
++		expect(isOmittedPassage([{ text: 'text' }])).toBe(false);
++	});
++
++	it('is false for no verses, so an empty response is not reported as omitted', () => {
++		expect(isOmittedPassage([])).toBe(false);
++	});
++});

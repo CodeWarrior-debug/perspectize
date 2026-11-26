@@ -1,0 +1,146 @@
+diff --git a/frontend/src/lib/components/PassageText.svelte b/frontend/src/lib/components/PassageText.svelte
+index 38daf165..3b730c27 100644
+--- a/frontend/src/lib/components/PassageText.svelte
++++ b/frontend/src/lib/components/PassageText.svelte
+@@ -1,8 +1,10 @@
+ <script lang="ts">
+ 	import { createQuery } from '@tanstack/svelte-query';
+ 	import { graphqlRequest } from '$lib/queries/client';
+-	import { PASSAGE_TEXT_QUERY, type PassageTextResponse } from '$lib/queries/bible';
++	import { PASSAGE_TEXT_QUERY, type PassageTextResponse, type VerseText } from '$lib/queries/bible';
+ 	import { queryKeys } from '$lib/queries/keys';
++	import { formatReference, verseIdsToRange } from '$lib/utils/bible';
++	import { DEFAULT_VERSION, gatewayLink } from '$lib/utils/bibleLinks';
+ 	import OriginalLanguage from '$lib/components/interlinear/OriginalLanguage.svelte';
+ 	import VerseNumber from '$lib/components/VerseNumber.svelte';
+ 	import VerseJumpPrompt from '$lib/components/VerseJumpPrompt.svelte';
+@@ -80,6 +82,18 @@
+ 	const visibleVerses = $derived(
+ 		verseCount <= COLLAPSE_THRESHOLD || expanded ? verses : verses.slice(0, COLLAPSED_PREVIEW_COUNT),
+ 	);
++
++	// The BSB stores a few verses with empty text (their content sits in a footnote). They keep
++	// their verse number and get an inline marker; we never synthesize text for them.
++	function isOmitted(v: VerseText): boolean {
++		return !v.text || v.text.trim() === '';
++	}
++
++	// A passage made only of omitted verses has nothing to render, so it is replaced by an
++	// explanation and an outbound link in the default Bible Gateway version.
++	const allOmitted = $derived(verses.length > 0 && verses.every(isOmitted));
++	const omittedRange = $derived(allOmitted ? verseIdsToRange(startVerseId, endVerseId) : null);
++	const omittedLink = $derived(omittedRange ? gatewayLink(omittedRange, DEFAULT_VERSION).url : null);
+ </script>
+ 
+ {#snippet plain()}
+@@ -87,7 +101,9 @@
+ 		{#each visibleVerses as v (v.verseId)}
+ 			<!-- The explicit trailing space keeps a verse number from running into the previous verse's last word. -->
+ 			<span
+-				>{#if v.text}<VerseNumber verseId={v.verseId} verse={v.verse} />{v.text}{' '}{/if}</span
++				><VerseNumber verseId={v.verseId} verse={v.verse} />{#if isOmitted(v)}<span class="text-muted-foreground italic"
++						>omitted in the BSB</span
++					>{:else}{v.text}{/if}{' '}</span
+ 			>
+ 		{/each}
+ 	</div>
+@@ -106,6 +122,21 @@
+ 		<p class="text-muted-foreground">Loading passage…</p>
+ 	{:else if query.isError}
+ 		<p class="text-destructive">Couldn't load this passage.</p>
++	{:else if query.data && allOmitted}
++		<p class="text-muted-foreground">
++			{verses.length === 1 ? 'This verse is' : 'These verses are'} omitted in the BSB: the content sits in a footnote, so
++			there is no text to show here.
++		</p>
++		{#if omittedRange && omittedLink}
++			<a
++				href={omittedLink}
++				target="_blank"
++				rel="noopener noreferrer"
++				class="mt-2 inline-block text-[13px] text-primary hover:underline"
++			>
++				Read {formatReference(omittedRange)} on Bible Gateway ({DEFAULT_VERSION})
++			</a>
++		{/if}
+ 	{:else if query.data}
+ 		{@const { translation, copyright } = query.data.passageText}
+ 		{#if showOriginal}
+diff --git a/frontend/tests/components/PassageText.test.ts b/frontend/tests/components/PassageText.test.ts
+index 9457668a..e3df228d 100644
+--- a/frontend/tests/components/PassageText.test.ts
++++ b/frontend/tests/components/PassageText.test.ts
+@@ -89,6 +89,73 @@ describe('PassageText', () => {
+ 		expect(container.textContent).toContain('Verse text 1 2Verse text 2');
+ 	});
+ 
++	describe('verses the BSB omits (empty text)', () => {
++		it('keeps the verse number and marks the verse inline as omitted, leaving its neighbours untouched', () => {
++			const verses = makeVerses(3);
++			verses[1].text = '';
++			mocks.mockQueryState.data = { passageText: { translation: 'BSB', copyright: COPYRIGHT, verses } };
++			const { container } = render(PassageText, { props: { startVerseId: 1, endVerseId: 3 } });
++
++			expect(screen.getByRole('button', { name: 'Verse 2' })).toBeInTheDocument();
++			expect(screen.getByText('omitted in the BSB')).toBeInTheDocument();
++			expect(container.textContent).toContain('Verse text 1 2omitted in the BSB 3Verse text 3');
++			// Still a passage with text, so the attribution and toggle stay and there is no replacement notice.
++			expect(screen.getByText(/public domain/i)).toBeInTheDocument();
++			expect(screen.getByRole('button', { name: /show original language/i })).toBeInTheDocument();
++			expect(screen.queryByRole('link')).not.toBeInTheDocument();
++		});
++
++		it('treats whitespace-only text as omitted and never invents text for it', () => {
++			const verses = makeVerses(2);
++			verses[0].text = '  ';
++			mocks.mockQueryState.data = { passageText: { translation: 'BSB', copyright: COPYRIGHT, verses } };
++			const { container } = render(PassageText, { props: { startVerseId: 1, endVerseId: 2 } });
++			expect(container.textContent).toContain('1omitted in the BSB 2Verse text 2');
++		});
++
++		it('replaces a passage made only of an omitted verse with an explanation and an ESV Bible Gateway link', () => {
++			mocks.mockQueryState.data = {
++				passageText: {
++					translation: 'BSB',
++					copyright: COPYRIGHT,
++					verses: [{ verseId: 2, chapter: 1, verse: 2, text: '' }],
++				},
++			};
++			render(PassageText, { props: { startVerseId: 2, endVerseId: 2 } });
++
++			expect(screen.getByText(/This verse is omitted in the BSB/)).toBeInTheDocument();
++			const link = screen.getByRole('link', { name: /Genesis 1:2 on Bible Gateway \(ESV\)/ });
++			const url = new URL(link.getAttribute('href') ?? '');
++			expect(url.origin + url.pathname).toBe('https://www.biblegateway.com/passage/');
++			expect(url.searchParams.get('search')).toBe('Genesis 1:2');
++			expect(url.searchParams.get('version')).toBe('ESV');
++			expect(link).toHaveAttribute('target', '_blank');
++			expect(link).toHaveAttribute('rel', expect.stringContaining('noopener'));
++
++			// Nothing of the BSB is rendered, so no verse number, attribution or reading-mode toggle either.
++			expect(screen.queryByText(/public domain/i)).not.toBeInTheDocument();
++			expect(screen.queryByRole('button')).not.toBeInTheDocument();
++			expect(document.querySelector('sup')).toBeNull();
++		});
++
++		it('uses the plural explanation when every verse of a multi-verse passage is omitted', () => {
++			mocks.mockQueryState.data = {
++				passageText: {
++					translation: 'BSB',
++					copyright: COPYRIGHT,
++					verses: [
++						{ verseId: 2, chapter: 1, verse: 2, text: '' },
++						{ verseId: 3, chapter: 1, verse: 3, text: '' },
++					],
++				},
++			};
++			render(PassageText, { props: { startVerseId: 2, endVerseId: 3 } });
++			expect(screen.getByText(/These verses are omitted in the BSB/)).toBeInTheDocument();
++			expect(screen.getByRole('link', { name: /Genesis 1:2-3 on Bible Gateway \(ESV\)/ })).toBeInTheDocument();
++			expect(screen.queryByText('omitted in the BSB')).not.toBeInTheDocument();
++		});
++	});
++
+ 	it('shows no verse text, does not fetch, and points to the links below above the hard cap', () => {
+ 		// Genesis 1:1 (id 1) through id 200 is 200 verses.
+ 		render(PassageText, { props: { startVerseId: 1, endVerseId: 200 } });

@@ -1,0 +1,407 @@
+diff --git a/frontend/src/lib/components/ActivityTable.svelte b/frontend/src/lib/components/ActivityTable.svelte
+index c123715e..8ed044f3 100644
+--- a/frontend/src/lib/components/ActivityTable.svelte
++++ b/frontend/src/lib/components/ActivityTable.svelte
+@@ -40,6 +40,7 @@
+ 		filterToUrlParams,
+ 		filtersEqual,
+ 		nonGridFilters,
++		paramsForTypeSwitch,
+ 	} from '$lib/utils/gridUrlState';
+ 	import type { DataMode, GridParams, SortSpec } from '$lib/utils/gridUrlState';
+ 	import {
+@@ -159,6 +160,7 @@
+ 	import DataModeToggle from '$lib/components/DataModeToggle.svelte';
+ 	import FilterChips from '$lib/components/FilterChips.svelte';
+ 	import ColumnRelevanceCallout from '$lib/components/ColumnRelevanceCallout.svelte';
++	import TypeSwitcher from '$lib/components/TypeSwitcher.svelte';
+ 	import { ContentTypeFilter, AgeRatingFilter, WebRoleFilter } from '$lib/utils/contentTypeFilter';
+ 	import ActivityDetailsModal from '$lib/components/ActivityDetailsModal.svelte';
+ 	import ActivityCardList from '$lib/components/ActivityCardList.svelte';
+@@ -355,6 +357,13 @@
+ 		updateUrl({ filters: { ...gridParams.filters, [PERSON_FILTER_KEY]: personId }, page: 1 });
+ 	}
+ 
++	/** Switch the single shown type to another one (TypeSwitcher): a fresh first page of that type. */
++	function switchType(type: string) {
++		hover.close();
++		cursors = [null];
++		updateUrl(paramsForTypeSwitch(gridParams, type));
++	}
++
+ 	// ---------------------------------------------------------------------------
+ 	// URL update helper
+ 	// ---------------------------------------------------------------------------
+@@ -1719,6 +1728,10 @@
+ 		/>
+ 	{/if}
+ 
++	<!-- With exactly one type showing, offer the others as one-click switches (the card list has no
++	     filter popup, so this is also its only way to change type). Shows nothing for any other filter. -->
++	<TypeSwitcher typeFilter={filters.type} onSwitch={switchType} />
++
+ 	<!-- Error State -->
+ 	{#if contentQuery.isError}
+ 		<div class="flex-1 min-h-0 flex items-center justify-center">
+diff --git a/frontend/src/lib/components/TypeSwitcher.svelte b/frontend/src/lib/components/TypeSwitcher.svelte
+new file mode 100644
+index 00000000..38a0468e
+--- /dev/null
++++ b/frontend/src/lib/components/TypeSwitcher.svelte
+@@ -0,0 +1,45 @@
++<script lang="ts">
++	import { typeSwitchOptions } from '$lib/utils/grid-config';
++
++	let {
++		typeFilter,
++		onSwitch,
++	}: {
++		/** The `f.type` URL value. Shown only while it names exactly one known type. */
++		typeFilter: string | undefined;
++		/** Called with the chosen type's lowercase value (a CONTENT_TYPE_OPTIONS value). */
++		onSwitch: (type: string) => void;
++	} = $props();
++
++	const options = $derived(typeSwitchOptions(typeFilter));
++
++	/**
++	 * Float the row above the grid card, top right (#activity-callout-slot in the page), where the
++	 * "select one type" note sits while several types show. The two never show together. Without
++	 * the slot (tests, other pages) it simply stays where it was rendered.
++	 */
++	function moveToCalloutSlot(node: HTMLElement) {
++		document.getElementById('activity-callout-slot')?.appendChild(node);
++	}
++</script>
++
++{#if options.length > 0}
++	<div
++		role="group"
++		aria-label="Switch content type"
++		data-testid="type-switcher"
++		use:moveToCalloutSlot
++		class="flex min-w-0 flex-wrap items-center justify-end gap-1.5 pb-1.5 text-xs md:text-sm text-muted-foreground"
++	>
++		<span>Switch to</span>
++		{#each options as option (option.value)}
++			<button
++				type="button"
++				onclick={() => onSwitch(option.value)}
++				class="border-border bg-background text-foreground hover:bg-accent hover:text-accent-foreground rounded-full border px-2.5 py-0.5 transition-colors"
++			>
++				{option.label}
++			</button>
++		{/each}
++	</div>
++{/if}
+diff --git a/frontend/src/lib/utils/grid-config.ts b/frontend/src/lib/utils/grid-config.ts
+index 63862904..0eef57a9 100644
+--- a/frontend/src/lib/utils/grid-config.ts
++++ b/frontend/src/lib/utils/grid-config.ts
+@@ -670,6 +670,19 @@ export function showColumnRelevanceCallout(typeFilter: string | undefined): bool
+ 	return selectedTypes(typeFilter).length !== 1;
+ }
+ 
++/**
++ * The one-click switches offered while the `f.type` URL value names exactly one known type: every
++ * other type, in CONTENT_TYPE_OPTIONS order. Empty when it names none or several (the callout above
++ * covers that case), or a value the server would ignore (every type is showing, so nothing is being
++ * switched from). Bookmarked `youtube` URLs mean `youtube_video`, as in `parseSetValue`.
++ */
++export function typeSwitchOptions(typeFilter: string | undefined): { value: string; label: string }[] {
++	const solo = soloTypeFilter(typeFilter);
++	const current = solo === 'youtube' ? 'youtube_video' : solo;
++	if (!current || !CONTENT_TYPE_OPTIONS.some((o) => o.value === current)) return [];
++	return CONTENT_TYPE_OPTIONS.filter((o) => o.value !== current);
++}
++
+ /**
+  * Columns whose cells are numbers (counts, money, scores, durations). The grid right-aligns them
+  * and their headers so digits line up down the column: the one table rule every reference
+diff --git a/frontend/src/lib/utils/gridUrlState.ts b/frontend/src/lib/utils/gridUrlState.ts
+index 978e05a6..7b41ab84 100644
+--- a/frontend/src/lib/utils/gridUrlState.ts
++++ b/frontend/src/lib/utils/gridUrlState.ts
+@@ -225,6 +225,32 @@ function sameScopes(a: SearchScopeKey[], b: SearchScopeKey[]): boolean {
+ 	return a.length === b.length && a.every((s) => b.includes(s));
+ }
+ 
++/** `f.*` keys that mean the same on every content type (the User column, which "Mine" sets). A type switch keeps them. */
++const CROSS_TYPE_FILTER_KEYS = ['user'];
++
++/**
++ * The grid state after a one-click switch to `type` (a CONTENT_TYPE_OPTIONS value): the type filter
++ * is replaced and back to page 1, and the search text, sort and mode carry over. Column filters
++ * other than the cross-type ones are dropped, since most belong to the old type's columns (Rated,
++ * Author, Duration) and would empty the new view behind a chip. The search scopes follow the new
++ * type: untouched defaults become the new type's defaults (Cast and Director join in for Movie),
++ * and a customised pick keeps whichever of its scopes the new type still offers.
++ */
++export function paramsForTypeSwitch(params: GridParams, type: string): GridParams {
++	const filters: Record<string, string> = { type };
++	for (const key of CROSS_TYPE_FILTER_KEYS) {
++		if (params.filters[key]) filters[key] = params.filters[key];
++	}
++
++	let qFields = searchScopesFor(filters);
++	if (!sameScopes(params.qFields, searchScopesFor(params.filters))) {
++		const kept = qFields.filter((s) => params.qFields.includes(s));
++		if (kept.length > 0) qFields = kept;
++	}
++
++	return { ...params, filters, qFields, page: 1 };
++}
++
+ // ---------------------------------------------------------------------------
+ // AG Grid filter model types
+ // ---------------------------------------------------------------------------
+diff --git a/frontend/src/routes/content-library/+page.svelte b/frontend/src/routes/content-library/+page.svelte
+index 15e2d37b..dedf59cd 100644
+--- a/frontend/src/routes/content-library/+page.svelte
++++ b/frontend/src/routes/content-library/+page.svelte
+@@ -147,8 +147,8 @@
+ 		</div>
+ 	</div>
+ 
+-	<!-- ColumnRelevanceCallout (rendered by ActivityTable) moves itself here: above the card's top-right
+-	     corner, outside the table frame. Collapses to nothing when empty. -->
++	<!-- ColumnRelevanceCallout and TypeSwitcher (rendered by ActivityTable, never both at once) move
++	     themselves here: above the card's top-right corner, outside the table frame. Collapses to nothing when empty. -->
+ 	<div
+ 		id="activity-callout-slot"
+ 		class="w-full max-w-screen-xl mx-auto px-4 md:px-6 lg:px-8 flex justify-end empty:hidden"
+diff --git a/frontend/tests/components/TypeSwitcher.test.ts b/frontend/tests/components/TypeSwitcher.test.ts
+new file mode 100644
+index 00000000..aeffdeee
+--- /dev/null
++++ b/frontend/tests/components/TypeSwitcher.test.ts
+@@ -0,0 +1,65 @@
++import { describe, it, expect, vi } from 'vitest';
++import { render, screen, fireEvent } from '@testing-library/svelte';
++import TypeSwitcher from '$lib/components/TypeSwitcher.svelte';
++
++describe('TypeSwitcher', () => {
++	it('offers a button for every type except the one showing', () => {
++		render(TypeSwitcher, { props: { typeFilter: 'youtube_video', onSwitch: vi.fn() } });
++		const names = screen.getAllByRole('button').map((b) => b.textContent?.trim());
++		expect(names).toEqual(['Claim', 'Bible Passage', 'Movie', 'Book', 'Webpage']);
++		expect(screen.queryByRole('button', { name: 'YouTube Video' })).not.toBeInTheDocument();
++	});
++
++	it('hands the clicked type up as its lowercase filter value', async () => {
++		const onSwitch = vi.fn();
++		render(TypeSwitcher, { props: { typeFilter: 'youtube_video', onSwitch } });
++
++		await fireEvent.click(screen.getByRole('button', { name: 'Webpage' }));
++		expect(onSwitch).toHaveBeenCalledTimes(1);
++		expect(onSwitch).toHaveBeenCalledWith('web_page');
++
++		await fireEvent.click(screen.getByRole('button', { name: 'Movie' }));
++		expect(onSwitch).toHaveBeenLastCalledWith('movie');
++	});
++
++	it('names the group for assistive tech', () => {
++		render(TypeSwitcher, { props: { typeFilter: 'movie', onSwitch: vi.fn() } });
++		expect(screen.getByRole('group', { name: 'Switch content type' })).toBeInTheDocument();
++	});
++
++	it.each([
++		['no type filter', undefined],
++		['an empty type filter', ''],
++		['two types', 'youtube_video,movie'],
++		['an unknown type', 'podcast'],
++	])('renders nothing for %s', (_label, typeFilter) => {
++		render(TypeSwitcher, { props: { typeFilter, onSwitch: vi.fn() } });
++		expect(screen.queryByTestId('type-switcher')).not.toBeInTheDocument();
++		expect(screen.queryByRole('button')).not.toBeInTheDocument();
++	});
++
++	it('follows the filter: switching the shown type swaps which buttons are offered', async () => {
++		const { rerender } = render(TypeSwitcher, { props: { typeFilter: 'youtube_video', onSwitch: vi.fn() } });
++		expect(screen.getByRole('button', { name: 'Movie' })).toBeInTheDocument();
++		expect(screen.queryByRole('button', { name: 'YouTube Video' })).not.toBeInTheDocument();
++
++		await rerender({ typeFilter: 'movie', onSwitch: vi.fn() });
++		expect(screen.queryByRole('button', { name: 'Movie' })).not.toBeInTheDocument();
++		expect(screen.getByRole('button', { name: 'YouTube Video' })).toBeInTheDocument();
++
++		await rerender({ typeFilter: 'movie,book', onSwitch: vi.fn() });
++		expect(screen.queryByTestId('type-switcher')).not.toBeInTheDocument();
++	});
++
++	it('moves itself into the page slot above the table when one exists', () => {
++		const slot = document.createElement('div');
++		slot.id = 'activity-callout-slot';
++		document.body.appendChild(slot);
++		try {
++			render(TypeSwitcher, { props: { typeFilter: 'movie', onSwitch: vi.fn() } });
++			expect(slot.contains(screen.getByTestId('type-switcher'))).toBe(true);
++		} finally {
++			slot.remove();
++		}
++	});
++});
+diff --git a/frontend/tests/unit/gridUrlState.test.ts b/frontend/tests/unit/gridUrlState.test.ts
+index 1ddf05b6..823458db 100644
+--- a/frontend/tests/unit/gridUrlState.test.ts
++++ b/frontend/tests/unit/gridUrlState.test.ts
+@@ -6,6 +6,7 @@ import {
+ 	filterToUrlParams,
+ 	urlParamsToFilter,
+ 	urlParamsToGraphQLFilter,
++	paramsForTypeSwitch,
+ 	COL_TO_SORT,
+ 	SORT_TO_COL,
+ 	GRID_DEFAULTS,
+@@ -236,6 +237,92 @@ describe('serializeGridParams', () => {
+ 	});
+ });
+ 
++// ---------------------------------------------------------------------------
++// paramsForTypeSwitch
++// ---------------------------------------------------------------------------
++
++describe('paramsForTypeSwitch', () => {
++	const roundTrip = (state: ReturnType<typeof paramsForTypeSwitch>) =>
++		parseGridParams(new URLSearchParams(serializeGridParams(state)));
++
++	it('replaces the type filter and returns to page 1', () => {
++		const result = paramsForTypeSwitch({ ...GRID_DEFAULTS, page: 4 }, 'movie');
++		expect(result.filters).toEqual({ type: 'movie' });
++		expect(result.page).toBe(1);
++		expect(serializeGridParams(result)).toBe('f.type=movie');
++	});
++
++	it('keeps the search text, sort, mode and page size', () => {
++		const from = {
++			...GRID_DEFAULTS,
++			mode: 'all' as const,
++			pageSize: 25,
++			q: 'nolan',
++			sorts: [{ col: 'views', dir: 'asc' as const }],
++		};
++		const result = paramsForTypeSwitch(from, 'book');
++		expect(result).toMatchObject({ mode: 'all', pageSize: 25, q: 'nolan', sorts: from.sorts });
++	});
++
++	it('keeps the User filter ("Mine") and drops every other column filter', () => {
++		const from = {
++			...GRID_DEFAULTS,
++			filters: { type: 'movie', user: 'alice', rated: 'pg-13', genre: 'sci', person: '525:cast' },
++		};
++		expect(paramsForTypeSwitch(from, 'book').filters).toEqual({ type: 'book', user: 'alice' });
++	});
++
++	it('omits the URL filter when switching back to the default type with nothing else kept', () => {
++		const from = { ...GRID_DEFAULTS, filters: { type: 'movie', rated: 'r' } };
++		const result = paramsForTypeSwitch(from, 'youtube_video');
++		expect(result.filters).toEqual(GRID_DEFAULTS.filters);
++		expect(serializeGridParams(result)).toBe('');
++	});
++
++	it('does not mutate its input', () => {
++		const from = { ...GRID_DEFAULTS, page: 3, filters: { type: 'movie', rated: 'r' } };
++		paramsForTypeSwitch(from, 'book');
++		expect(from.page).toBe(3);
++		expect(from.filters).toEqual({ type: 'movie', rated: 'r' });
++	});
++
++	describe('search scopes', () => {
++		it('switching to Movie turns Cast and Director on when the scopes were the defaults', () => {
++			const result = paramsForTypeSwitch(GRID_DEFAULTS, 'movie');
++			expect(result.qFields).toEqual(['title', 'desc', 'channel', 'tags', 'cast', 'director']);
++			expect(serializeGridParams(result)).toBe('f.type=movie');
++		});
++
++		it('switching away from Movie drops Cast and Director from the default scopes', () => {
++			const from = parseGridParams(new URLSearchParams('f.type=movie'));
++			const result = paramsForTypeSwitch(from, 'book');
++			expect(result.qFields).toEqual(['title', 'desc', 'channel', 'tags']);
++			expect(serializeGridParams(result)).toBe('f.type=book');
++		});
++
++		it('keeps a customised pick, minus scopes the new type no longer offers', () => {
++			const from = parseGridParams(new URLSearchParams('f.type=movie&qf=title,cast'));
++			expect(from.qFields).toEqual(['title', 'cast']);
++			const result = paramsForTypeSwitch(from, 'book');
++			expect(result.qFields).toEqual(['title']);
++			expect(roundTrip(result).qFields).toEqual(['title']);
++		});
++
++		it('falls back to the new defaults when nothing of a customised pick survives', () => {
++			const from = parseGridParams(new URLSearchParams('f.type=movie&qf=cast,director'));
++			const result = paramsForTypeSwitch(from, 'book');
++			expect(result.qFields).toEqual(['title', 'desc', 'channel', 'tags']);
++		});
++
++		it('keeps a customised pick as is when the new type offers all of it', () => {
++			const from = parseGridParams(new URLSearchParams('qf=title'));
++			const result = paramsForTypeSwitch(from, 'claim');
++			expect(result.qFields).toEqual(['title']);
++			expect(roundTrip(result).qFields).toEqual(['title']);
++		});
++	});
++});
++
+ // ---------------------------------------------------------------------------
+ // filterToUrlParams
+ // ---------------------------------------------------------------------------
+diff --git a/frontend/tests/unit/type-switch-options.test.ts b/frontend/tests/unit/type-switch-options.test.ts
+new file mode 100644
+index 00000000..e65a9ebc
+--- /dev/null
++++ b/frontend/tests/unit/type-switch-options.test.ts
+@@ -0,0 +1,53 @@
++import { describe, it, expect } from 'vitest';
++import { CONTENT_TYPE_OPTIONS, showColumnRelevanceCallout, typeSwitchOptions } from '$lib/utils/grid-config';
++
++const values = (typeFilter: string | undefined) => typeSwitchOptions(typeFilter).map((o) => o.value);
++
++describe('typeSwitchOptions', () => {
++	it('offers every other type, in the Type filter order, when one type shows', () => {
++		expect(values('youtube_video')).toEqual(['claim', 'bible_passage', 'movie', 'book', 'web_page']);
++		expect(values('movie')).toEqual(['youtube_video', 'claim', 'bible_passage', 'book', 'web_page']);
++	});
++
++	it('never offers the type already showing, and carries the display labels', () => {
++		const options = typeSwitchOptions('book');
++		expect(options.map((o) => o.value)).not.toContain('book');
++		expect(options.find((o) => o.value === 'web_page')?.label).toBe('Webpage');
++		expect(options).toHaveLength(CONTENT_TYPE_OPTIONS.length - 1);
++	});
++
++	it('treats case, spaces and repeats of one type as that one type', () => {
++		expect(values('Movie')).toEqual(values('movie'));
++		expect(values(' movie ')).toEqual(values('movie'));
++		expect(values('movie,movie')).toEqual(values('movie'));
++	});
++
++	it('reads a bookmarked `youtube` as youtube_video', () => {
++		expect(values('youtube')).toEqual(values('youtube_video'));
++		expect(values('youtube')).not.toContain('youtube_video');
++	});
++
++	it('offers nothing with no type filter', () => {
++		expect(values(undefined)).toEqual([]);
++		expect(values('')).toEqual([]);
++		expect(values(' , ')).toEqual([]);
++	});
++
++	it('offers nothing with two or more types', () => {
++		expect(values('youtube_video,movie')).toEqual([]);
++		expect(values('youtube_video, movie ,bible_passage')).toEqual([]);
++	});
++
++	it('offers nothing for a value the server would ignore (every type is showing)', () => {
++		expect(values('podcast')).toEqual([]);
++	});
++
++	it('is the counterpart of the column-relevance callout for every known type', () => {
++		for (const { value } of CONTENT_TYPE_OPTIONS) {
++			expect(showColumnRelevanceCallout(value)).toBe(false);
++			expect(typeSwitchOptions(value).length).toBeGreaterThan(0);
++		}
++		expect(showColumnRelevanceCallout('youtube_video,movie')).toBe(true);
++		expect(typeSwitchOptions('youtube_video,movie')).toEqual([]);
++	});
++});

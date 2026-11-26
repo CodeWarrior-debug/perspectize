@@ -1,0 +1,157 @@
+diff --git a/frontend/src/lib/components/ActivityCardList.svelte b/frontend/src/lib/components/ActivityCardList.svelte
+index 185350f7..19968501 100644
+--- a/frontend/src/lib/components/ActivityCardList.svelte
++++ b/frontend/src/lib/components/ActivityCardList.svelte
+@@ -10,6 +10,7 @@
+ 	import PlayIcon from '@lucide/svelte/icons/play';
+ 	import PlusIcon from '@lucide/svelte/icons/plus';
+ 	import GlassesIcon from '@lucide/svelte/icons/glasses';
++	import MessageSquareTextIcon from '@lucide/svelte/icons/message-square-text';
+ 	import {
+ 		extractVideoIdFromUrl,
+ 		formatDuration,
+@@ -87,6 +88,7 @@
+ 	const isMovie = (row: CardRow) => row.contentType === 'MOVIE';
+ 	const isBook = (row: CardRow) => row.contentType === 'BOOK';
+ 	const isWebPage = (row: CardRow) => row.contentType === 'WEB_PAGE';
++	const isClaim = (row: CardRow) => row.contentType === 'CLAIM';
+ 
+ 	/** Site and published year for a webpage card (unknown parts are skipped). */
+ 	function webPageFacts(row: CardRow): string[] {
+@@ -133,9 +135,12 @@
+ 		return cover ? { src: cover, fitted: true } : null;
+ 	}
+ 
+-	/** Grey tile only behind a video thumbnail or an empty slot; posters, covers and the passage sit on the card colour. */
++	/**
++	 * Grey tile only behind a video thumbnail or an empty slot; posters, covers, the passage icon and the
++	 * claim icon sit on the card colour. A claim has no video, poster, cover or url, so its icon fills the slot.
++	 */
+ 	function thumbBg(row: CardRow): string {
+-		if (isPassage(row) || thumbSrc(row)?.fitted) return '';
++		if (isPassage(row) || isClaim(row) || thumbSrc(row)?.fitted) return '';
+ 		return 'bg-muted';
+ 	}
+ 
+@@ -157,6 +162,10 @@
+ 			>
+ 				{#if isPassage(row)}
+ 					<BiblePassageIcon {...passageIconLabels(row)} />
++				{:else if isClaim(row)}
++					<span class="flex h-full w-full items-center justify-center text-primary">
++						<MessageSquareTextIcon data-icon="claim" class="size-8" />
++					</span>
+ 				{:else}
+ 					{@const thumb = thumbSrc(row)}
+ 					{#if thumb}
+diff --git a/frontend/src/lib/components/ActivityDetailsModal.svelte b/frontend/src/lib/components/ActivityDetailsModal.svelte
+index b9dd4003..2e0a8183 100644
+--- a/frontend/src/lib/components/ActivityDetailsModal.svelte
++++ b/frontend/src/lib/components/ActivityDetailsModal.svelte
+@@ -7,6 +7,7 @@
+ 	import RefreshCwIcon from '@lucide/svelte/icons/refresh-cw';
+ 	import PlusIcon from '@lucide/svelte/icons/plus';
+ 	import ScaleIcon from '@lucide/svelte/icons/scale';
++	import MessageSquareTextIcon from '@lucide/svelte/icons/message-square-text';
+ 	import { MODAL_ACTION_CLASS } from '#lib/components/modal-action.js';
+ 	import { Dialog, DialogContent, DialogTitle, DialogClose } from '#lib/components/shadcn/index.js';
+ 	import {
+@@ -90,6 +91,7 @@
+ 	const isMovie = $derived(content?.contentType === 'MOVIE');
+ 	const isBook = $derived(content?.contentType === 'BOOK');
+ 	const isWebPage = $derived(content?.contentType === 'WEB_PAGE');
++	const isClaim = $derived(content?.contentType === 'CLAIM');
+ 	// A list row carries the shaped webpage payload but not `response` (the metadata behind the Fetched
+ 	// tile and the description). Load the details for that one page while the modal is open. A row that
+ 	// already has `response`, or a closed modal, makes no request. The hook's key is the one a deep link
+@@ -258,11 +260,19 @@
+ 				{:else}
+ 					<div class="flex items-start gap-3.5">
+ 						<div
++							data-testid="modal-thumb"
+ 							class={isMovie || isBook
+ 								? 'aspect-[2/3] w-[92px] flex-none overflow-hidden rounded-md bg-muted'
+-								: 'h-[68px] w-[120px] flex-none overflow-hidden rounded-md bg-muted'}
++								: isClaim
++									? // A claim has no video, poster or cover: its icon sits on the card colour, not a grey tile.
++										'h-[68px] w-[120px] flex-none overflow-hidden rounded-md'
++									: 'h-[68px] w-[120px] flex-none overflow-hidden rounded-md bg-muted'}
+ 						>
+-							{#if isMovie}
++							{#if isClaim}
++								<div class="flex h-full w-full items-center justify-center text-primary">
++									<MessageSquareTextIcon data-icon="claim" class="size-9" />
++								</div>
++							{:else if isMovie}
+ 								{#if posterSrc}
+ 									<img
+ 										src={posterSrc}
+diff --git a/frontend/tests/components/ActivityCardList.test.ts b/frontend/tests/components/ActivityCardList.test.ts
+index 01eeae3e..afb1a9b4 100644
+--- a/frontend/tests/components/ActivityCardList.test.ts
++++ b/frontend/tests/components/ActivityCardList.test.ts
+@@ -368,6 +368,36 @@ describe('ActivityCardList', () => {
+ 			expect(screen.queryByTestId('card-play-badge')).not.toBeInTheDocument();
+ 		});
+ 
++		it('claim: message-square-text icon on the card colour, no grey tile, no image, no play badge', () => {
++			render(ActivityCardList, {
++				props: {
++					rowData: [
++						{
++							id: '8',
++							name: 'Remote work is more productive',
++							url: null,
++							channelTitle: null,
++							length: null,
++							lengthUnits: null,
++							contentType: 'CLAIM',
++						},
++					],
++					onOpenDetails: vi.fn(),
++				},
++			});
++			expect(thumb('8').querySelector('svg.lucide-message-square-text')).not.toBeNull();
++			expect(thumb('8').querySelector('img')).toBeNull();
++			expect(thumb('8').className).not.toContain('bg-muted');
++			expect(screen.queryByTestId('card-play-badge')).not.toBeInTheDocument();
++		});
++
++		it('only claims get the message-square-text icon', () => {
++			render(ActivityCardList, { props: { rowData: [rowData[0], rowData[1], film], onOpenDetails: vi.fn() } });
++			for (const id of ['1', '2', '6']) {
++				expect(thumb(id).querySelector('svg.lucide-message-square-text')).toBeNull();
++			}
++		});
++
+ 		it('movie runtime shows to its reported precision (h:mm for MINUTES)', () => {
+ 			render(ActivityCardList, {
+ 				props: {
+diff --git a/frontend/tests/components/ActivityDetailsModal.test.ts b/frontend/tests/components/ActivityDetailsModal.test.ts
+index 44e1058d..e0bd0541 100644
+--- a/frontend/tests/components/ActivityDetailsModal.test.ts
++++ b/frontend/tests/components/ActivityDetailsModal.test.ts
+@@ -159,6 +159,23 @@ describe('ActivityDetailsModal', () => {
+ 		expect(screen.queryByText('YouTube Video')).not.toBeInTheDocument();
+ 	});
+ 
++	it("shows the message-square-text icon on the card colour in a claim's thumbnail slot", () => {
++		render(ActivityDetailsModal, {
++			props: { content: { ...content, url: null, contentType: 'CLAIM' }, open: true, onClose: vi.fn() },
++		});
++		const slot = screen.getByTestId('modal-thumb');
++		expect(slot.querySelector('svg.lucide-message-square-text')).not.toBeNull();
++		expect(slot.querySelector('img')).toBeNull();
++		expect(slot.className).not.toContain('bg-muted');
++	});
++
++	it('keeps the grey tile and no claim icon for a video', () => {
++		render(ActivityDetailsModal, { props: { content, open: true, onClose: vi.fn() } });
++		const slot = screen.getByTestId('modal-thumb');
++		expect(slot.className).toContain('bg-muted');
++		expect(slot.querySelector('svg.lucide-message-square-text')).toBeNull();
++	});
++
+ 	it('falls back to "YouTube Video" when contentType is not provided (backward compatibility)', () => {
+ 		const { contentType, ...withoutType } = content;
+ 		render(ActivityDetailsModal, { props: { content: withoutType, open: true, onClose: vi.fn() } });

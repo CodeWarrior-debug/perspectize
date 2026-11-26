@@ -1,0 +1,121 @@
+diff --git a/backend/internal/core/services/content_service.go b/backend/internal/core/services/content_service.go
+index f62454fa..6abfab8a 100644
+--- a/backend/internal/core/services/content_service.go
++++ b/backend/internal/core/services/content_service.go
+@@ -952,6 +952,22 @@ func (s *ContentService) CreateFromMovie(ctx context.Context, rawURL string, use
+ 	return created, nil
+ }
+ 
++// canonicalTMDBMovieURL turns a pasted TMDB movie link into the canonical URL
++// CreateFromMovie stores, using the same parser and URL builder. It makes no TMDB
++// call, so an IMDb link or id, which needs a lookup to find its TMDB id, is
++// refused along with anything else that is not a TMDB movie link. Every refusal
++// is ErrInvalidInput.
++func canonicalTMDBMovieURL(rawURL string) (string, error) {
++	tmdbID, _, err := tmdb.ParseMovieInput(rawURL)
++	if err != nil {
++		return "", fmt.Errorf("%w: %v", domain.ErrInvalidInput, err)
++	}
++	if tmdbID == 0 {
++		return "", fmt.Errorf("%w: an IMDb title is not a TMDB movie link", domain.ErrInvalidInput)
++	}
++	return tmdb.CanonicalMovieURL(tmdbID), nil
++}
++
+ // movieNotAllowed is the single content policy for movies: it rejects a shaped
+ // movie payload that is NC-17 (case-insensitive, whitespace-trimmed) or flagged
+ // adult by TMDB. Unparseable or empty payloads are allowed.
+diff --git a/backend/internal/core/services/import_service.go b/backend/internal/core/services/import_service.go
+index 05ebf754..21756d60 100644
+--- a/backend/internal/core/services/import_service.go
++++ b/backend/internal/core/services/import_service.go
+@@ -588,6 +588,15 @@ func (s *ImportService) resolveForListing(ctx context.Context, src *domain.Impor
+ 	return resolvedSource{lister: lister, resolved: *r}, true
+ }
+ 
++// NormalizeMovieLink returns the canonical movie URL for a pasted TMDB movie
++// link (https://www.themoviedb.org/movie/603-the-matrix?language=en becomes
++// https://www.themoviedb.org/movie/603), the form the content service stores and
++// dedupes on. It makes no network call, so anything that is not a TMDB movie
++// link, an IMDb link or id included, is ErrInvalidInput.
++func (s *ImportService) NormalizeMovieLink(raw string) (string, error) {
++	return canonicalTMDBMovieURL(raw)
++}
++
+ // listSource lists one source and saves how it ended. It holds a listing slot
+ // for all of that. The source counts as listing while it waits for the slot, so
+ // the sheet has nothing new to show; a shutdown while it waits ends it as
+diff --git a/backend/test/services/import_service_normalize_movie_test.go b/backend/test/services/import_service_normalize_movie_test.go
+new file mode 100644
+index 00000000..dbc5bb1e
+--- /dev/null
++++ b/backend/test/services/import_service_normalize_movie_test.go
+@@ -0,0 +1,68 @@
++package services_test
++
++import (
++	"testing"
++
++	"github.com/stretchr/testify/assert"
++	"github.com/stretchr/testify/require"
++
++	"github.com/CodeWarrior-debug/perspectize/backend/internal/core/domain"
++	"github.com/CodeWarrior-debug/perspectize/backend/internal/core/services"
++)
++
++func TestImportService_NormalizeMovieLink(t *testing.T) {
++	// The method needs no repository, lister or content creator: it makes no call.
++	svc := services.NewImportService(nil, nil, nil)
++
++	t.Run("a TMDB movie link becomes the canonical movie URL", func(t *testing.T) {
++		for name, raw := range map[string]string{
++			"slug and query":         "https://www.themoviedb.org/movie/603-the-matrix?language=en",
++			"slug only":              "https://www.themoviedb.org/movie/603-the-matrix",
++			"already canonical":      "https://www.themoviedb.org/movie/603",
++			"trailing slash":         "https://www.themoviedb.org/movie/603/",
++			"sub-page":               "https://www.themoviedb.org/movie/603/cast",
++			"query and no slug":      "https://www.themoviedb.org/movie/603?language=en",
++			"fragment":               "https://www.themoviedb.org/movie/603#cast",
++			"no scheme":              "themoviedb.org/movie/603-the-matrix",
++			"upper case host":        "HTTPS://WWW.THEMOVIEDB.ORG/movie/603-the-matrix",
++			"surrounding whitespace": "  https://www.themoviedb.org/movie/603-the-matrix\n",
++		} {
++			t.Run(name, func(t *testing.T) {
++				got, err := svc.NormalizeMovieLink(raw)
++				require.NoError(t, err)
++				assert.Equal(t, "https://www.themoviedb.org/movie/603", got)
++			})
++		}
++	})
++
++	t.Run("different movies stay different", func(t *testing.T) {
++		got, err := svc.NormalizeMovieLink("https://www.themoviedb.org/movie/27205-inception")
++		require.NoError(t, err)
++		assert.Equal(t, "https://www.themoviedb.org/movie/27205", got)
++	})
++
++	t.Run("anything else is invalid input and returns no URL", func(t *testing.T) {
++		for name, raw := range map[string]string{
++			"imdb link":           "https://www.imdb.com/title/tt0133093/",
++			"imdb link with path": "https://www.imdb.com/title/tt0133093/?ref_=fn_al_tt_1",
++			"bare imdb id":        "tt0133093",
++			"bare imdb id, upper": "TT0133093",
++			"tmdb tv link":        "https://www.themoviedb.org/tv/1396-breaking-bad",
++			"tmdb person link":    "https://www.themoviedb.org/person/6384",
++			"tmdb movie no id":    "https://www.themoviedb.org/movie/the-matrix",
++			"tmdb movie id zero":  "https://www.themoviedb.org/movie/0",
++			"youtube link":        "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
++			"bare number":         "603",
++			"plain text":          "the matrix",
++			"empty":               "",
++			"whitespace":          "   ",
++		} {
++			t.Run(name, func(t *testing.T) {
++				got, err := svc.NormalizeMovieLink(raw)
++				require.Error(t, err)
++				assert.ErrorIs(t, err, domain.ErrInvalidInput)
++				assert.Empty(t, got)
++			})
++		}
++	})
++}

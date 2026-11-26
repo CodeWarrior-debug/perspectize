@@ -1,0 +1,106 @@
+diff --git a/backend/internal/adapters/repositories/postgres/computed_cursor_test.go b/backend/internal/adapters/repositories/postgres/computed_cursor_test.go
+index 6e0deb76..a4721891 100644
+--- a/backend/internal/adapters/repositories/postgres/computed_cursor_test.go
++++ b/backend/internal/adapters/repositories/postgres/computed_cursor_test.go
+@@ -6,6 +6,7 @@ import (
+ 	"encoding/base64"
+ 	"encoding/json"
+ 	"reflect"
++	"regexp"
+ 	"testing"
+ 
+ 	"github.com/DATA-DOG/go-sqlmock"
+@@ -60,6 +61,10 @@ func TestList_ComputedSortKeyCursor(t *testing.T) {
+ 	}{
+ 		{"views", domain.ContentSortByViewCount, domain.SortOrderDesc, "view_count", int64(9000), `9000`, int64(9000)},
+ 		{"likes", domain.ContentSortByLikeCount, domain.SortOrderDesc, "like_count", int64(40), `40`, int64(40)},
++		// Hidden/non-numeric like count: the expression yields NULL, so the cursor carries null
++		// and page 2 binds 0 (unknown), in both directions.
++		{"likes null desc", domain.ContentSortByLikeCount, domain.SortOrderDesc, "like_count", nil, `null`, int64(0)},
++		{"likes null asc", domain.ContentSortByLikeCount, domain.SortOrderAsc, "like_count", nil, `null`, int64(0)},
+ 		{"percent liked", domain.ContentSortByPercentLiked, domain.SortOrderDesc, "percent_liked", 0.25, `0.25`, 0.25},
+ 		{"published at", domain.ContentSortByPublishedAt, domain.SortOrderDesc, "published_at_sort", "2024-01-02T00:00:00Z", `"2024-01-02T00:00:00Z"`, "2024-01-02T00:00:00Z"},
+ 		{"channel title", domain.ContentSortByChannelTitle, domain.SortOrderAsc, "channel_title_sort", "Chan", `"Chan"`, "Chan"},
+@@ -116,6 +121,31 @@ func TestList_ComputedSortKeyCursor(t *testing.T) {
+ 	}
+ }
+ 
++// TestList_LikeCountSortGuardsTheCast pins that a LIKE_COUNT sort never feeds a stored
++// likeCount to a bare ::BIGINT cast: YouTube stores "" for hidden likes and Postgres
++// rejects that cast, failing the whole list. The guard must be in the selected sort
++// column and in the ORDER BY, which the paginator builds from the same expression.
++func TestList_LikeCountSortGuardsTheCast(t *testing.T) {
++	guarded := regexp.QuoteMeta("CASE WHEN (response->'items'->0->'statistics'->>'likeCount') ~ '^[0-9]+$' " +
++		"THEN (response->'items'->0->'statistics'->>'likeCount')::BIGINT END")
++
++	for _, order := range []domain.SortOrder{domain.SortOrderAsc, domain.SortOrderDesc} {
++		t.Run(string(order), func(t *testing.T) {
++			db, mock := newMockDB(t)
++			first := 1
++			// Selected column, then the paginator's COALESCE(...) in ORDER BY.
++			mock.ExpectQuery(`SELECT content\.\*, \(` + guarded + `\) AS like_count .*ORDER BY COALESCE\(` + guarded + `, '0'\) ` + string(order)).
++				WillReturnRows(computedRows("like_count", nil))
++
++			_, err := NewGormContentRepository(db).List(context.Background(), domain.ContentListParams{
++				First: &first, SortBy: domain.ContentSortByLikeCount, SortOrder: order,
++			})
++			require.NoError(t, err)
++			assertAllExpectationsMet(t, mock)
++		})
++	}
++}
++
+ func TestList_RealColumnSortSelectsNoComputedColumns(t *testing.T) {
+ 	db, mock := newMockDB(t)
+ 	mock.ExpectQuery(`SELECT \* FROM "content"`).WillReturnRows(contentRows())
+diff --git a/backend/internal/adapters/repositories/postgres/helpers.go b/backend/internal/adapters/repositories/postgres/helpers.go
+index ac7b4ea9..b533d8a7 100644
+--- a/backend/internal/adapters/repositories/postgres/helpers.go
++++ b/backend/internal/adapters/repositories/postgres/helpers.go
+@@ -108,6 +108,14 @@ func intSliceToInt64Array(ints []int) Int64Array {
+ // computedSortColumns, so List selects it AS added_by for the cursor.
+ const addedBySortExpr = "LOWER((SELECT u.username FROM users u WHERE u.id = content.added_by_user_id))"
+ 
++// likeCountSortExpr is the LIKE_COUNT sort key: the stored YouTube likeCount as a bigint.
++// YouTube stores an empty string when a channel hides likes (and could store any other
++// text), which a bare ::BIGINT cast rejects, failing the whole list. Anything that is not
++// all digits yields NULL instead, which the paginator's COALESCE sorts as 0, the same as
++// a missing count (the GraphQL field also shows an empty count as 0).
++const likeCountSortExpr = "CASE WHEN (response->'items'->0->'statistics'->>'likeCount') ~ '^[0-9]+$' " +
++	"THEN (response->'items'->0->'statistics'->>'likeCount')::BIGINT END"
++
+ // computedSortColumns maps a content sort rule Key whose value is computed (no real
+ // column) to the alias List selects it under. Each alias is the column tag of the
+ // matching read-only ContentModel field, which is how gorm-cursor-paginator reads the
+@@ -205,7 +213,7 @@ func contentSortRule(sortBy domain.ContentSortBy, order domain.SortOrder) pagina
+ 		return paginator.Rule{
+ 			Key:             "LikeCount",
+ 			Order:           paginatorOrder,
+-			SQLRepr:         "(response->'items'->0->'statistics'->>'likeCount')::BIGINT",
++			SQLRepr:         likeCountSortExpr,
+ 			NULLReplacement: int64(0),
+ 		}
+ 	case domain.ContentSortByPercentLiked:
+diff --git a/backend/internal/adapters/repositories/postgres/helpers_test.go b/backend/internal/adapters/repositories/postgres/helpers_test.go
+index d2936c08..ee6ac433 100644
+--- a/backend/internal/adapters/repositories/postgres/helpers_test.go
++++ b/backend/internal/adapters/repositories/postgres/helpers_test.go
+@@ -145,13 +145,14 @@ func TestBuildContentSortRules(t *testing.T) {
+ 			wantTieOrder: paginator.ASC,
+ 		},
+ 		{
+-			name:   "like count descending",
++			name:   "like count descending casts only all-digit text, so a hidden (empty) count sorts as unknown",
+ 			sortBy: domain.ContentSortByLikeCount,
+ 			order:  domain.SortOrderDesc,
+ 			wantPrimary: paginator.Rule{
+-				Key:             "LikeCount",
+-				Order:           paginator.DESC,
+-				SQLRepr:         "(response->'items'->0->'statistics'->>'likeCount')::BIGINT",
++				Key:   "LikeCount",
++				Order: paginator.DESC,
++				SQLRepr: "CASE WHEN (response->'items'->0->'statistics'->>'likeCount') ~ '^[0-9]+$' " +
++					"THEN (response->'items'->0->'statistics'->>'likeCount')::BIGINT END",
+ 				NULLReplacement: int64(0),
+ 			},
+ 			wantTieOrder: paginator.DESC,

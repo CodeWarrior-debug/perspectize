@@ -1,0 +1,362 @@
+diff --git a/frontend/src/lib/components/ActivityTable.svelte b/frontend/src/lib/components/ActivityTable.svelte
+index 2404698c..b0766d34 100644
+--- a/frontend/src/lib/components/ActivityTable.svelte
++++ b/frontend/src/lib/components/ActivityTable.svelte
+@@ -12,7 +12,7 @@
+ 		CellMouseOverEvent,
+ 	} from '@ag-grid-community/core';
+ 	import { tick } from 'svelte';
+-	import { createQuery, keepPreviousData } from '@tanstack/svelte-query';
++	import { createQuery, hashKey, keepPreviousData } from '@tanstack/svelte-query';
+ 	import { page } from '$app/state';
+ 	import { goto } from '$app/navigation';
+ 	import { graphqlRequest } from '$lib/queries/client';
+@@ -109,6 +109,7 @@
+ 		NUMERIC_COL_IDS,
+ 		liveGridApi,
+ 	} from '$lib/utils/grid-config';
++	import { createRowOrderMemory } from '$lib/utils/rowOrder';
+ 	import { ACTIVITY_GRID_THEME } from '$lib/utils/grid-theme';
+ 	import { emptyCellClassRules } from '$lib/utils/grid-empty';
+ 	import { useCardMode, useResponsiveTier } from '$lib/utils/responsive.svelte';
+@@ -473,12 +474,24 @@
+ 	// Derived values from query
+ 	// Rows get their adder's username from the cached users list (see useUsernames).
+ 	const usernames = useUsernames();
+-	const rowData = $derived(
+-		(contentQuery.data?.content.items ?? []).map((item) => ({
++	// An edit bumps a row's updatedAt, so the refetch of the same list returns it first and it jumps
++	// out of view. In Loaded mode (grid and mobile card list alike, both read rowData) the order shown
++	// last for this query key is re-applied to the refetched rows; new rows still lead, and a new key
++	// (type filter, search, page size) starts from the server order. Placeholder rows belong to the
++	// previous key, so they are neither re-ordered nor remembered. "All Items" mode is server-sorted
++	// by the user's choice, so it keeps the server order as sent.
++	const rowOrder = createRowOrderMemory();
++	const rowData = $derived.by(() => {
++		const rows = (contentQuery.data?.content.items ?? []).map((item) => ({
+ 			...item,
+ 			addedByUsername: usernames.byId.get(item.addedByUserID) ?? null,
+-		})),
+-	);
++		}));
++		if (mode !== 'loaded') {
++			rowOrder.reset();
++			return rows;
++		}
++		return rowOrder.arrange(hashKey(activityRequest.queryKey), rows, contentQuery.isPlaceholderData);
++	});
+ 	const detailsModalRow = $derived(rowData.find((item) => String(item.id) === detailsModalContentId) ?? null);
+ 	// A deep-linked item (`?open=<id>`, e.g. from a "Go to" toast or a verse jump) is
+ 	// often not on the loaded page — fetch just that row so the modal can still open.
+diff --git a/frontend/src/lib/utils/rowOrder.ts b/frontend/src/lib/utils/rowOrder.ts
+new file mode 100644
+index 00000000..b7602503
+--- /dev/null
++++ b/frontend/src/lib/utils/rowOrder.ts
+@@ -0,0 +1,73 @@
++/**
++ * Keeps a list's displayed row order steady across refetches of the same query.
++ *
++ * The Library list comes back ordered by the server (default updatedAt desc), so editing a row
++ * bumps its updatedAt and the refetch returns it first: the row jumps out of view and the user
++ * loses their place. The memory below remembers the order last shown for a query key and re-applies
++ * it to later data for that key. Rows the memory has not seen lead (they are the newest, which is
++ * where the default sort puts them); rows that are gone drop out.
++ *
++ * Pure: no runes and no query client, so it unit-tests without a component.
++ */
++
++/** Anything with an id: GraphQL ids are strings, grid rows may carry numbers. Ids compare as strings. */
++export type RowWithId = { id: string | number };
++
++/**
++ * `rows` rearranged to follow `ids` (the order shown last time).
++ *
++ * - A row whose id is in `ids` keeps its place relative to the others in `ids`.
++ * - A row whose id is not in `ids` is new: it goes first, in the order it arrived.
++ * - An id with no matching row is ignored.
++ *
++ * Returns a new array; `rows` is never mutated.
++ */
++export function keepRowOrder<T extends RowWithId>(rows: T[], ids: string[]): T[] {
++	const rank = new Map<string, number>();
++	ids.forEach((id, index) => {
++		if (!rank.has(id)) rank.set(id, index);
++	});
++
++	const fresh: T[] = [];
++	const known: T[] = [];
++	for (const row of rows) (rank.has(String(row.id)) ? known : fresh).push(row);
++
++	// Array.prototype.sort is stable, so duplicate ids (and ties) keep their arrival order.
++	known.sort((a, b) => rank.get(String(a.id))! - rank.get(String(b.id))!);
++	return [...fresh, ...known];
++}
++
++export interface RowOrderMemory {
++	/**
++	 * `rows` in the order to display for the query `key`, recording that order for the next call.
++	 *
++	 * The memory holds one key: a call with a different key starts from the order the server
++	 * sent (a new sort, filter, search or page) and replaces what was held. Calling again with the
++	 * same key and rows returns the same order, so it is safe to call from a `$derived`.
++	 *
++	 * `placeholder` marks rows that belong to a previous key (keepPreviousData while the new key
++	 * loads): they are returned untouched and neither read from nor written to the memory.
++	 */
++	arrange<T extends RowWithId>(key: string, rows: T[], placeholder?: boolean): T[];
++	/** Forgets the recorded order, so the next call starts from the server order. */
++	reset(): void;
++}
++
++export function createRowOrderMemory(): RowOrderMemory {
++	let heldKey: string | null = null;
++	let heldIds: string[] = [];
++
++	return {
++		arrange(key, rows, placeholder = false) {
++			if (placeholder) return rows;
++			const arranged = keepRowOrder(rows, key === heldKey ? heldIds : []);
++			heldKey = key;
++			heldIds = arranged.map((row) => String(row.id));
++			return arranged;
++		},
++		reset() {
++			heldKey = null;
++			heldIds = [];
++		},
++	};
++}
+diff --git a/frontend/tests/unit/rowOrder.test.ts b/frontend/tests/unit/rowOrder.test.ts
+new file mode 100644
+index 00000000..efbc2ee0
+--- /dev/null
++++ b/frontend/tests/unit/rowOrder.test.ts
+@@ -0,0 +1,227 @@
++/**
++ * Row order memory for the Activity list. An edit bumps a row's updatedAt, so the refetch of the
++ * same list returns it first; the memory re-applies the order shown last for the same query key
++ * so the row stays where the user is looking. New rows still lead; a new key starts from the
++ * server order; placeholder rows are neither applied nor recorded.
++ */
++import { describe, it, expect, vi } from 'vitest';
++import { hashKey, keepPreviousData, QueryObserver } from '@tanstack/svelte-query';
++import { createRowOrderMemory, keepRowOrder } from '$lib/utils/rowOrder';
++import { activityListRequest } from '$lib/queries/content';
++import { parseGridParams } from '$lib/utils/gridUrlState';
++import { makeClient } from '../helpers/queryBudget';
++
++const row = (id: string, extra: Record<string, unknown> = {}) => ({ id, ...extra });
++const idsOf = (rows: { id: string | number }[]) => rows.map((r) => String(r.id));
++const rows = (...ids: string[]) => ids.map((id) => row(id));
++/** Polls until `condition` holds (query results settle on a later tick). */
++const settled = (condition: () => boolean) => vi.waitFor(() => expect(condition()).toBe(true));
++
++describe('keepRowOrder', () => {
++	it('puts known rows in the remembered order, whatever order the server sent', () => {
++		expect(idsOf(keepRowOrder(rows('c', 'a', 'b'), ['a', 'b', 'c']))).toEqual(['a', 'b', 'c']);
++	});
++
++	it('leads with rows it has not seen, in the order they arrived', () => {
++		expect(idsOf(keepRowOrder(rows('n2', 'n1', 'b', 'a'), ['a', 'b']))).toEqual(['n2', 'n1', 'a', 'b']);
++	});
++
++	it('drops remembered ids that have no row any more, without leaving a gap', () => {
++		expect(idsOf(keepRowOrder(rows('c', 'a'), ['a', 'gone', 'c']))).toEqual(['a', 'c']);
++	});
++
++	it('returns the server order when nothing is remembered', () => {
++		expect(idsOf(keepRowOrder(rows('b', 'a', 'c'), []))).toEqual(['b', 'a', 'c']);
++	});
++
++	it('returns an empty list for no rows', () => {
++		expect(keepRowOrder([], ['a', 'b'])).toEqual([]);
++	});
++
++	it('compares ids as strings, so a numeric id matches its remembered string', () => {
++		const result = keepRowOrder([{ id: 2 }, { id: 1 }], ['1', '2']);
++		expect(result.map((r) => r.id)).toEqual([1, 2]);
++	});
++
++	it('keeps the row objects themselves (fresh data, not the remembered rows)', () => {
++		const edited = row('a', { title: 'edited' });
++		const result = keepRowOrder([edited, row('b')], ['b', 'a']);
++		expect(result[1]).toBe(edited);
++	});
++
++	it('keeps arrival order for a repeated id', () => {
++		const first = row('a', { n: 1 });
++		const second = row('a', { n: 2 });
++		expect(keepRowOrder([first, row('b'), second], ['b', 'a'])).toEqual([row('b'), first, second]);
++	});
++
++	it('does not mutate its inputs and returns a new array', () => {
++		const input = rows('b', 'a');
++		const ids = ['a', 'b'];
++		const result = keepRowOrder(input, ids);
++		expect(result).not.toBe(input);
++		expect(idsOf(input)).toEqual(['b', 'a']);
++		expect(ids).toEqual(['a', 'b']);
++	});
++});
++
++describe('createRowOrderMemory', () => {
++	it('starts from the server order on the first call for a key', () => {
++		const memory = createRowOrderMemory();
++		expect(idsOf(memory.arrange('k', rows('c', 'b', 'a')))).toEqual(['c', 'b', 'a']);
++	});
++
++	it('keeps the displayed order when an edited row comes back first on a refetch', () => {
++		const memory = createRowOrderMemory();
++		memory.arrange('k', rows('a', 'b', 'c', 'd'));
++		// The user edits "c": the server now sorts it first.
++		expect(idsOf(memory.arrange('k', rows('c', 'a', 'b', 'd')))).toEqual(['a', 'b', 'c', 'd']);
++	});
++
++	it('shows the edited values at the old position', () => {
++		const memory = createRowOrderMemory();
++		memory.arrange('k', rows('a', 'b', 'c'));
++		const refetched = [row('c', { rating: 9 }), row('a'), row('b')];
++		expect(memory.arrange('k', refetched)[2]).toEqual(row('c', { rating: 9 }));
++	});
++
++	it('keeps holding the order across successive refetches of the same key', () => {
++		const memory = createRowOrderMemory();
++		memory.arrange('k', rows('a', 'b', 'c'));
++		memory.arrange('k', rows('b', 'a', 'c'));
++		expect(idsOf(memory.arrange('k', rows('c', 'b', 'a')))).toEqual(['a', 'b', 'c']);
++	});
++
++	it('is idempotent: the same rows again give the same order', () => {
++		const memory = createRowOrderMemory();
++		memory.arrange('k', rows('a', 'b', 'c'));
++		const refetched = rows('c', 'a', 'b');
++		const once = idsOf(memory.arrange('k', refetched));
++		expect(idsOf(memory.arrange('k', refetched))).toEqual(once);
++	});
++
++	it('leads with a new row and keeps the rest where they were', () => {
++		const memory = createRowOrderMemory();
++		memory.arrange('k', rows('a', 'b', 'c'));
++		expect(idsOf(memory.arrange('k', rows('new', 'c', 'a', 'b')))).toEqual(['new', 'a', 'b', 'c']);
++		// the new row is now part of the remembered order, not "new" again
++		expect(idsOf(memory.arrange('k', rows('c', 'new', 'a', 'b')))).toEqual(['new', 'a', 'b', 'c']);
++	});
++
++	it('forgets a deleted row, so a row that reappears is new and leads', () => {
++		const memory = createRowOrderMemory();
++		memory.arrange('k', rows('a', 'b', 'c'));
++		memory.arrange('k', rows('a', 'c'));
++		expect(idsOf(memory.arrange('k', rows('a', 'b', 'c')))).toEqual(['b', 'a', 'c']);
++	});
++
++	it('starts from the server order when the key changes', () => {
++		const memory = createRowOrderMemory();
++		memory.arrange('page-1', rows('a', 'b', 'c'));
++		expect(idsOf(memory.arrange('page-2', rows('c', 'a', 'b')))).toEqual(['c', 'a', 'b']);
++	});
++
++	it('does not bring an earlier key back: returning to it starts from the server order', () => {
++		const memory = createRowOrderMemory();
++		memory.arrange('one', rows('a', 'b', 'c'));
++		memory.arrange('two', rows('x', 'y'));
++		expect(idsOf(memory.arrange('one', rows('c', 'a', 'b')))).toEqual(['c', 'a', 'b']);
++	});
++
++	describe('placeholder rows', () => {
++		it('are returned untouched and not re-ordered', () => {
++			const memory = createRowOrderMemory();
++			memory.arrange('page-1', rows('a', 'b', 'c'));
++			const placeholder = rows('c', 'b', 'a');
++			expect(memory.arrange('page-2', placeholder, true)).toBe(placeholder);
++		});
++
++		it('are not recorded: the loaded rows for that key start from the server order', () => {
++			const memory = createRowOrderMemory();
++			memory.arrange('page-1', rows('a', 'b', 'c'));
++			memory.arrange('page-2', rows('c', 'b', 'a'), true);
++			expect(idsOf(memory.arrange('page-2', rows('x', 'y', 'z')))).toEqual(['x', 'y', 'z']);
++		});
++
++		it('do not disturb the order held for the key still in view', () => {
++			const memory = createRowOrderMemory();
++			memory.arrange('page-1', rows('a', 'b', 'c'));
++			memory.arrange('page-2', rows('p', 'q'), true);
++			expect(idsOf(memory.arrange('page-1', rows('c', 'a', 'b')))).toEqual(['a', 'b', 'c']);
++		});
++
++		it('are not applied even when the key matches what is held', () => {
++			const memory = createRowOrderMemory();
++			memory.arrange('k', rows('a', 'b', 'c'));
++			expect(idsOf(memory.arrange('k', rows('c', 'b', 'a'), true))).toEqual(['c', 'b', 'a']);
++		});
++	});
++
++	describe('reset', () => {
++		it('forgets the held order, so the next call starts from the server order', () => {
++			const memory = createRowOrderMemory();
++			memory.arrange('k', rows('a', 'b', 'c'));
++			memory.reset();
++			expect(idsOf(memory.arrange('k', rows('c', 'a', 'b')))).toEqual(['c', 'a', 'b']);
++		});
++	});
++
++	it('keeps separate memories independent', () => {
++		const first = createRowOrderMemory();
++		const second = createRowOrderMemory();
++		first.arrange('k', rows('a', 'b'));
++		expect(idsOf(second.arrange('k', rows('b', 'a')))).toEqual(['b', 'a']);
++	});
++});
++
++describe('with a real query: how ActivityTable feeds the memory', () => {
++	const request = (qs: string) => activityListRequest(parseGridParams(new URLSearchParams(qs)), null);
++	const keyOf = (qs: string) => hashKey(request(qs).queryKey);
++
++	/** What ActivityTable does on each render: key hash + isPlaceholderData from the live result. */
++	function shown(
++		memory: ReturnType<typeof createRowOrderMemory>,
++		observer: { getCurrentResult(): { data?: { items: { id: string }[] }; isPlaceholderData: boolean } },
++		qs: string,
++	) {
++		const result = observer.getCurrentResult();
++		return idsOf(memory.arrange(keyOf(qs), result.data?.items ?? [], result.isPlaceholderData));
++	}
++
++	it('holds the order across an invalidate-and-refetch, and resets on a new key (placeholder skipped)', async () => {
++		const client = makeClient();
++		const server: Record<string, string[]> = {
++			'': ['a', 'b', 'c'],
++			'q=zzz': ['z2', 'z1'],
++		};
++		const options = (qs: string) => ({
++			queryKey: request(qs).queryKey,
++			queryFn: async () => ({ items: (server[qs] ?? []).map((id) => ({ id })) }),
++			placeholderData: keepPreviousData,
++		});
++
++		const observer = new QueryObserver(client, options(''));
++		const unsubscribe = observer.subscribe(() => {});
++		const memory = createRowOrderMemory();
++
++		await settled(() => !observer.getCurrentResult().isPending);
++		expect(shown(memory, observer, '')).toEqual(['a', 'b', 'c']);
++
++		// The user edits "c"; the server now returns it first and the list refetches.
++		server[''] = ['c', 'a', 'b'];
++		await client.invalidateQueries({ queryKey: request('').queryKey });
++		await settled(() => observer.getCurrentResult().data?.items[0].id === 'c');
++		expect(shown(memory, observer, '')).toEqual(['a', 'b', 'c']);
++
++		// A new search switches the key: the previous rows are placeholder, so they are left alone.
++		observer.setOptions(options('q=zzz'));
++		const loading = observer.getCurrentResult();
++		expect(loading.isPlaceholderData).toBe(true);
++		expect(shown(memory, observer, 'q=zzz')).toEqual(['c', 'a', 'b']);
++
++		// Loaded: the new key starts from the server order.
++		await settled(() => !observer.getCurrentResult().isPlaceholderData);
++		expect(shown(memory, observer, 'q=zzz')).toEqual(['z2', 'z1']);
++		unsubscribe();
++	});
++});

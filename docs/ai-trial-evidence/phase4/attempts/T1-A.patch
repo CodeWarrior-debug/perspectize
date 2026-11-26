@@ -1,0 +1,454 @@
+diff --git a/backend/internal/adapters/repositories/postgres/gorm_content_repository.go b/backend/internal/adapters/repositories/postgres/gorm_content_repository.go
+index adf1e9ed..60d84073 100644
+--- a/backend/internal/adapters/repositories/postgres/gorm_content_repository.go
++++ b/backend/internal/adapters/repositories/postgres/gorm_content_repository.go
+@@ -208,6 +208,21 @@ func applyPersonFilter(query *gorm.DB, personID *int, role *domain.PersonRole) *
+ 	}
+ }
+ 
++// applyStatisticCountRange keeps rows whose YouTube statistics counter (see
++// statisticCountExpr) lies within the optional bounds. A row whose stored count is
++// missing, empty or non-numeric is unknown (NULL), so a set bound excludes it rather
++// than failing the query. The bounds are always bound.
++func applyStatisticCountRange(query *gorm.DB, field string, lo, hi *int) *gorm.DB {
++	count := statisticCountExpr(field)
++	if lo != nil {
++		query = query.Where(count+" >= ?", *lo)
++	}
++	if hi != nil {
++		query = query.Where(count+" <= ?", *hi)
++	}
++	return query
++}
++
+ // applyMovieColumnFilters applies the movie grid's per-column filters. All read the
+ // shaped TMDB payload in the response JSONB. Rows without the key (non-movies, or
+ // movies missing the value) yield NULL, so a set filter excludes them. Values are
+@@ -421,20 +436,9 @@ func (r *GormContentRepository) List(ctx context.Context, params domain.ContentL
+ 		query = applyMovieColumnFilters(query, params.Filter)
+ 		query = applyBookColumnFilters(query, params.Filter)
+ 		query = applyWebPageRoleFilter(query, params.Filter.WebPageRoles)
+-		// View count filters (JSONB extraction)
+-		if params.Filter.MinViewCount != nil {
+-			query = query.Where("(response->'items'->0->'statistics'->>'viewCount')::BIGINT >= ?", *params.Filter.MinViewCount)
+-		}
+-		if params.Filter.MaxViewCount != nil {
+-			query = query.Where("(response->'items'->0->'statistics'->>'viewCount')::BIGINT <= ?", *params.Filter.MaxViewCount)
+-		}
+-		// Like count filters (JSONB extraction)
+-		if params.Filter.MinLikeCount != nil {
+-			query = query.Where("(response->'items'->0->'statistics'->>'likeCount')::BIGINT >= ?", *params.Filter.MinLikeCount)
+-		}
+-		if params.Filter.MaxLikeCount != nil {
+-			query = query.Where("(response->'items'->0->'statistics'->>'likeCount')::BIGINT <= ?", *params.Filter.MaxLikeCount)
+-		}
++		// View and like count filters (JSONB extraction)
++		query = applyStatisticCountRange(query, "viewCount", params.Filter.MinViewCount, params.Filter.MaxViewCount)
++		query = applyStatisticCountRange(query, "likeCount", params.Filter.MinLikeCount, params.Filter.MaxLikeCount)
+ 		// Published date filters (JSONB extraction, ISO 8601 string comparison)
+ 		if params.Filter.PublishedAfter != nil {
+ 			query = query.Where("response->'items'->0->'snippet'->>'publishedAt' >= ?", *params.Filter.PublishedAfter)
+diff --git a/backend/internal/adapters/repositories/postgres/gorm_content_repository_test.go b/backend/internal/adapters/repositories/postgres/gorm_content_repository_test.go
+index e78e2b72..b85767b6 100644
+--- a/backend/internal/adapters/repositories/postgres/gorm_content_repository_test.go
++++ b/backend/internal/adapters/repositories/postgres/gorm_content_repository_test.go
+@@ -555,10 +555,12 @@ func TestGormContentRepository_List(t *testing.T) {
+ 		{"max length", &domain.ContentFilter{MaxLengthSeconds: cInt(600)}, `length <= `},
+ 		{"name search", &domain.ContentFilter{Search: cStr("go")}, `name ILIKE `},
+ 		{"empty name search is ignored", &domain.ContentFilter{Search: cStr("")}, `SELECT \* FROM "content"`},
+-		{"min view count", &domain.ContentFilter{MinViewCount: cInt(1000)}, `'statistics'->>'viewCount'.*>= `},
+-		{"max view count", &domain.ContentFilter{MaxViewCount: cInt(9000)}, `'statistics'->>'viewCount'.*<= `},
+-		{"min like count", &domain.ContentFilter{MinLikeCount: cInt(10)}, `'statistics'->>'likeCount'.*>= `},
+-		{"max like count", &domain.ContentFilter{MaxLikeCount: cInt(90)}, `'statistics'->>'likeCount'.*<= `},
++		// The count filters share the sort's cast guard: a stored "" must be unknown, not a
++		// BIGINT cast error that fails the whole list.
++		{"min view count", &domain.ContentFilter{MinViewCount: cInt(1000)}, `CASE WHEN \(response->'items'->0->'statistics'->>'viewCount'\) ~ '\^\[0-9\]\+\$' THEN .*::BIGINT ELSE NULL END >= `},
++		{"max view count", &domain.ContentFilter{MaxViewCount: cInt(9000)}, `CASE WHEN \(response->'items'->0->'statistics'->>'viewCount'\) ~ '\^\[0-9\]\+\$' THEN .*::BIGINT ELSE NULL END <= `},
++		{"min like count", &domain.ContentFilter{MinLikeCount: cInt(10)}, `CASE WHEN \(response->'items'->0->'statistics'->>'likeCount'\) ~ '\^\[0-9\]\+\$' THEN .*::BIGINT ELSE NULL END >= `},
++		{"max like count", &domain.ContentFilter{MaxLikeCount: cInt(90)}, `CASE WHEN \(response->'items'->0->'statistics'->>'likeCount'\) ~ '\^\[0-9\]\+\$' THEN .*::BIGINT ELSE NULL END <= `},
+ 		{"published after", &domain.ContentFilter{PublishedAfter: cStr("2026-01-01")}, `'snippet'->>'publishedAt' >= `},
+ 		{"published before", &domain.ContentFilter{PublishedBefore: cStr("2026-12-31")}, `'snippet'->>'publishedAt' <= `},
+ 		{"channel title", &domain.ContentFilter{ChannelTitle: cStr("chan")}, `'snippet'->>'channelTitle' ILIKE `},
+diff --git a/backend/internal/adapters/repositories/postgres/gorm_content_sort_integration_test.go b/backend/internal/adapters/repositories/postgres/gorm_content_sort_integration_test.go
+index a5addc7d..14689258 100644
+--- a/backend/internal/adapters/repositories/postgres/gorm_content_sort_integration_test.go
++++ b/backend/internal/adapters/repositories/postgres/gorm_content_sort_integration_test.go
+@@ -1,8 +1,8 @@
+ package postgres
+ 
+-// Runs the LIKE_COUNT sort expression against a real Postgres, so a cast that
+-// Postgres rejects shows up as a failing query here rather than only in the
+-// masked "failed to list content" error. Needs no schema: the expression is
++// Runs the statistics sort and filter expressions against a real Postgres, so a cast
++// that Postgres rejects shows up as a failing query here rather than only in the
++// masked "failed to list content" error. Needs no schema: the expressions are
+ // evaluated over inline JSON. Same local-testdb guard as the other integration tests.
+ //
+ //	DATABASE_URL="postgres://postgres:postgres@localhost:5432/testdb?sslmode=disable" \
+@@ -18,34 +18,163 @@ import (
+ 	"github.com/stretchr/testify/require"
+ )
+ 
++// statsRows is a VALUES list of stored responses. "" is how a hidden count can appear and
++// "n/a" stands for any other non-numeric value; a bare ::BIGINT cast rejects both and
++// fails the whole query.
++func statsRows(rows ...string) string {
++	out := ""
++	for i, r := range rows {
++		if i > 0 {
++			out += ",\n\t\t\t"
++		}
++		out += fmt.Sprintf("('%s'::jsonb)", r)
++	}
++	return out
++}
++
++func statsJSON(views, likes string) string {
++	stats := ""
++	add := func(key, val string) {
++		if val == "" {
++			return
++		}
++		if stats != "" {
++			stats += ","
++		}
++		stats += fmt.Sprintf(`"%s":%s`, key, val)
++	}
++	add("viewCount", views)
++	add("likeCount", likes)
++	return fmt.Sprintf(`{"items":[{"statistics":{%s}}]}`, stats)
++}
++
++func scanNullInt64s(t *testing.T, got []sql.NullInt64) (values []int64, nulls int) {
++	t.Helper()
++	for _, v := range got {
++		if v.Valid {
++			values = append(values, v.Int64)
++		} else {
++			nulls++
++		}
++	}
++	return values, nulls
++}
++
+ func TestContentSortIntegration_LikeCountExpressionIsCastSafe(t *testing.T) {
+ 	db := openLocalUserTodoTestDB(t)
+ 
+ 	expr := contentSortRule(domain.ContentSortByLikeCount, domain.SortOrderAsc).SQLRepr
+ 
+-	// Each row is a stored response. "" is how a hidden like count can appear; the
+-	// bare ::BIGINT cast rejects it and fails the whole query.
+ 	query := fmt.Sprintf(`SELECT (%s) AS like_count
+ 		FROM (VALUES
+-			('{"items":[{"statistics":{"likeCount":"5"}}]}'::jsonb),
+-			('{"items":[{"statistics":{"likeCount":""}}]}'::jsonb),
+-			('{"items":[{"statistics":{}}]}'::jsonb)
++			%s
+ 		) AS content(response)
+-		ORDER BY 1 NULLS FIRST`, expr)
++		ORDER BY 1 NULLS FIRST`, expr, statsRows(
++		statsJSON("", `"5"`),
++		statsJSON("", `""`),
++		`{"items":[{"statistics":{}}]}`,
++	))
+ 
+ 	var got []sql.NullInt64
+ 	require.NoError(t, db.Raw(query).Scan(&got).Error)
+ 	require.Len(t, got, 3)
+ 
+-	var values []int64
++	values, nulls := scanNullInt64s(t, got)
++	assert.Equal(t, []int64{5}, values, "a numeric likeCount is returned as its value")
++	assert.Equal(t, 2, nulls, "an empty or missing likeCount is NULL, which the sort replaces with 0")
++}
++
++func TestContentSortIntegration_ViewCountExpressionIsCastSafe(t *testing.T) {
++	db := openLocalUserTodoTestDB(t)
++
++	expr := contentSortRule(domain.ContentSortByViewCount, domain.SortOrderAsc).SQLRepr
++
++	query := fmt.Sprintf(`SELECT (%s) AS view_count
++		FROM (VALUES
++			%s
++		) AS content(response)
++		ORDER BY 1 NULLS FIRST`, expr, statsRows(
++		statsJSON(`"1200"`, ""),
++		statsJSON(`""`, ""),
++		statsJSON(`"n/a"`, ""),
++		`{"items":[{"statistics":{}}]}`,
++	))
++
++	var got []sql.NullInt64
++	require.NoError(t, db.Raw(query).Scan(&got).Error)
++	require.Len(t, got, 4)
++
++	values, nulls := scanNullInt64s(t, got)
++	assert.Equal(t, []int64{1200}, values, "a numeric viewCount is returned as its value")
++	assert.Equal(t, 3, nulls, "an empty, non-numeric or missing viewCount is NULL, which the sort replaces with 0")
++}
++
++func TestContentSortIntegration_PercentLikedExpressionIsCastSafe(t *testing.T) {
++	db := openLocalUserTodoTestDB(t)
++
++	expr := contentSortRule(domain.ContentSortByPercentLiked, domain.SortOrderAsc).SQLRepr
++
++	// Only the first row has a usable rate; every other row has an empty, non-numeric,
++	// missing or zero count on one side and must come back NULL rather than error.
++	query := fmt.Sprintf(`SELECT (%s) AS percent_liked
++		FROM (VALUES
++			%s
++		) AS content(response)
++		ORDER BY 1 NULLS FIRST`, expr, statsRows(
++		statsJSON(`"200"`, `"50"`),
++		statsJSON(`""`, `"50"`),
++		statsJSON(`"200"`, `""`),
++		statsJSON(`"n/a"`, `"50"`),
++		statsJSON(`"200"`, `"n/a"`),
++		statsJSON(`"0"`, `"50"`),
++		statsJSON(`"200"`, ""),
++		`{"items":[{"statistics":{}}]}`,
++	))
++
++	var got []sql.NullFloat64
++	require.NoError(t, db.Raw(query).Scan(&got).Error)
++	require.Len(t, got, 8)
++
++	var values []float64
+ 	nulls := 0
+ 	for _, v := range got {
+ 		if v.Valid {
+-			values = append(values, v.Int64)
++			values = append(values, v.Float64)
+ 		} else {
+ 			nulls++
+ 		}
+ 	}
+-	assert.Equal(t, []int64{5}, values, "a numeric likeCount is returned as its value")
+-	assert.Equal(t, 2, nulls, "an empty or missing likeCount is NULL, which the sort replaces with 0")
++	assert.Equal(t, []float64{0.25}, values, "likes as a fraction of views")
++	assert.Equal(t, 7, nulls, "any empty, non-numeric, missing or zero count makes the rate unknown")
++}
++
++func TestContentSortIntegration_StatisticCountRangeExcludesUnknownCounts(t *testing.T) {
++	db := openLocalUserTodoTestDB(t)
++
++	// id 1 = 5 views, 2 = 1000 views, 3 = "", 4 = "n/a", 5 = no statistics.
++	table := fmt.Sprintf(`(VALUES
++			(1, '%s'::jsonb),
++			(2, '%s'::jsonb),
++			(3, '%s'::jsonb),
++			(4, '%s'::jsonb),
++			(5, '%s'::jsonb)
++		) AS content(id, response)`,
++		statsJSON(`"5"`, ""),
++		statsJSON(`"1000"`, ""),
++		statsJSON(`""`, ""),
++		statsJSON(`"n/a"`, ""),
++		`{"items":[{"statistics":{}}]}`,
++	)
++	ids := func(lo, hi *int) []int {
++		var got []int
++		require.NoError(t, applyStatisticCountRange(db.Table(table), "viewCount", lo, hi).
++			Order("id").Pluck("id", &got).Error)
++		return got
++	}
++	five, thousand := 5, 1000
++
++	assert.Equal(t, []int{1, 2}, ids(&five, nil), "min bound keeps numeric counts at or above it")
++	assert.Equal(t, []int{1}, ids(nil, &five), "max bound keeps numeric counts at or below it")
++	assert.Equal(t, []int{2}, ids(&thousand, &thousand), "both bounds together")
++	assert.Equal(t, []int{1, 2, 3, 4, 5}, ids(nil, nil), "no bounds leaves every row, unknown counts included")
+ }
+diff --git a/backend/internal/adapters/repositories/postgres/helpers.go b/backend/internal/adapters/repositories/postgres/helpers.go
+index dc48dd99..eaffeb76 100644
+--- a/backend/internal/adapters/repositories/postgres/helpers.go
++++ b/backend/internal/adapters/repositories/postgres/helpers.go
+@@ -175,6 +175,17 @@ const (
+ 	nullPublishedAtDesc = ""
+ )
+ 
++// statisticCountExpr is the one place a YouTube statistics counter ("viewCount",
++// "likeCount") is read from the response JSONB as a BIGINT. YouTube stores these as
++// strings and can store "" (hidden likes) or another non-numeric value, which a bare
++// ::BIGINT cast rejects, failing the whole query. This yields NULL for anything that is
++// not all digits, so sorts treat it as unknown and range filters exclude the row.
++// field is one of our own constants, never request input: it is spliced into SQL.
++func statisticCountExpr(field string) string {
++	raw := "(response->'items'->0->'statistics'->>'" + field + "')"
++	return "CASE WHEN " + raw + " ~ '^[0-9]+$' THEN " + raw + "::BIGINT ELSE NULL END"
++}
++
+ // contentSortRule builds a single paginator.Rule for one content sort column.
+ func contentSortRule(sortBy domain.ContentSortBy, order domain.SortOrder) paginator.Rule {
+ 	boxOfficeNull, vsBudgetNull, ageRatingNull := nullBoxOfficeDesc, nullVsBudgetDesc, nullAgeRatingDesc
+@@ -198,34 +209,32 @@ func contentSortRule(sortBy domain.ContentSortBy, order domain.SortOrder) pagina
+ 		return paginator.Rule{
+ 			Key:             "ViewCount",
+ 			Order:           paginatorOrder,
+-			SQLRepr:         "(response->'items'->0->'statistics'->>'viewCount')::BIGINT",
++			SQLRepr:         statisticCountExpr("viewCount"),
+ 			NULLReplacement: int64(0),
+ 		}
+ 	case domain.ContentSortByLikeCount:
+ 		return paginator.Rule{
+-			Key:   "LikeCount",
+-			Order: paginatorOrder,
+-			// YouTube can store an empty likeCount for hidden likes; a bare ::BIGINT cast
+-			// fails the whole query on it. Non-numeric values sort like unknowns (0).
+-			SQLRepr: "CASE WHEN (response->'items'->0->'statistics'->>'likeCount') ~ '^[0-9]+$' " +
+-				"THEN (response->'items'->0->'statistics'->>'likeCount')::BIGINT ELSE NULL END",
++			Key:             "LikeCount",
++			Order:           paginatorOrder,
++			SQLRepr:         statisticCountExpr("likeCount"),
+ 			NULLReplacement: int64(0),
+ 		}
+ 	case domain.ContentSortByPercentLiked:
++		views, likes := statisticCountExpr("viewCount"), statisticCountExpr("likeCount")
+ 		return paginator.Rule{
+ 			Key: "PercentLiked",
+ 			// Computed the same way the frontend's percentLikedValueGetter does: likes as a
+ 			// fraction of views. NULL (and thus NULLReplacement, sorted like any other JSONB
+-			// rule here) when views is missing/zero or likes is missing -- there's no
+-			// meaningful rate to show.
++			// rule here) when views is missing/zero/non-numeric or likes is missing/non-numeric
++			// -- there's no meaningful rate to show.
+ 			Order: paginatorOrder,
+ 			SQLRepr: "CASE " +
+-				"WHEN (response->'items'->0->'statistics'->>'viewCount') IS NULL " +
+-				"  OR (response->'items'->0->'statistics'->>'likeCount') IS NULL " +
+-				"  OR (response->'items'->0->'statistics'->>'viewCount')::BIGINT = 0 " +
++				"WHEN (" + views + ") IS NULL " +
++				"  OR (" + likes + ") IS NULL " +
++				"  OR (" + views + ") = 0 " +
+ 				"THEN NULL " +
+-				"ELSE (response->'items'->0->'statistics'->>'likeCount')::FLOAT8 " +
+-				"     / NULLIF((response->'items'->0->'statistics'->>'viewCount')::BIGINT, 0) " +
++				"ELSE (" + likes + ")::FLOAT8 " +
++				"     / NULLIF((" + views + "), 0) " +
+ 				"END",
+ 			NULLReplacement: float64(-1),
+ 		}
+diff --git a/backend/internal/adapters/repositories/postgres/helpers_test.go b/backend/internal/adapters/repositories/postgres/helpers_test.go
+index ce266b08..4c94d035 100644
+--- a/backend/internal/adapters/repositories/postgres/helpers_test.go
++++ b/backend/internal/adapters/repositories/postgres/helpers_test.go
+@@ -2,6 +2,7 @@ package postgres
+ 
+ import (
+ 	"database/sql"
++	"strings"
+ 	"testing"
+ 
+ 	"github.com/CodeWarrior-debug/perspectize/backend/internal/core/domain"
+@@ -124,7 +125,47 @@ func TestIntSliceToInt64Array(t *testing.T) {
+ 	assert.Equal(t, Int64Array{1, -2, 3}, intSliceToInt64Array([]int{1, -2, 3}))
+ }
+ 
++// The statistics cast is pinned literally: it is the one expression every view/like
++// sort and filter shares, and a bare ::BIGINT here fails the whole list on a stored "".
++func TestStatisticCountExpr(t *testing.T) {
++	assert.Equal(t,
++		"CASE WHEN (response->'items'->0->'statistics'->>'viewCount') ~ '^[0-9]+$' "+
++			"THEN (response->'items'->0->'statistics'->>'viewCount')::BIGINT ELSE NULL END",
++		statisticCountExpr("viewCount"))
++	assert.Equal(t,
++		"CASE WHEN (response->'items'->0->'statistics'->>'likeCount') ~ '^[0-9]+$' "+
++			"THEN (response->'items'->0->'statistics'->>'likeCount')::BIGINT ELSE NULL END",
++		statisticCountExpr("likeCount"))
++}
++
++// Every sort that reads a statistics counter goes through statisticCountExpr: once the
++// guarded expressions are removed, no reference to the raw statistics path may remain
++// (a bare cast of a stored "" fails the whole query).
++func TestContentSortRules_StatisticsReadOnlyThroughGuardedExpr(t *testing.T) {
++	for _, sortBy := range []domain.ContentSortBy{
++		domain.ContentSortByViewCount, domain.ContentSortByLikeCount, domain.ContentSortByPercentLiked,
++	} {
++		for _, order := range []domain.SortOrder{domain.SortOrderAsc, domain.SortOrderDesc} {
++			repr := contentSortRule(sortBy, order).SQLRepr
++			require.Contains(t, repr, "'statistics'", "%s %s should read statistics", sortBy, order)
++			for _, field := range []string{"viewCount", "likeCount"} {
++				repr = strings.ReplaceAll(repr, statisticCountExpr(field), "")
++			}
++			assert.NotContains(t, repr, "'statistics'", "%s %s: statistics read outside the guarded expression", sortBy, order)
++		}
++	}
++}
++
+ func TestBuildContentSortRules(t *testing.T) {
++	views, likes := statisticCountExpr("viewCount"), statisticCountExpr("likeCount")
++	percentLikedSQL := "CASE " +
++		"WHEN (" + views + ") IS NULL " +
++		"  OR (" + likes + ") IS NULL " +
++		"  OR (" + views + ") = 0 " +
++		"THEN NULL " +
++		"ELSE (" + likes + ")::FLOAT8 " +
++		"     / NULLIF((" + views + "), 0) " +
++		"END"
+ 	tests := []struct {
+ 		name         string
+ 		sortBy       domain.ContentSortBy
+@@ -133,13 +174,14 @@ func TestBuildContentSortRules(t *testing.T) {
+ 		wantTieOrder paginator.Order
+ 	}{
+ 		{
+-			name:   "view count ascending uses JSONB SQLRepr with int64 null replacement",
++			name:   "view count ascending uses a cast-guarded JSONB SQLRepr with int64 null replacement",
+ 			sortBy: domain.ContentSortByViewCount,
+ 			order:  domain.SortOrderAsc,
+ 			wantPrimary: paginator.Rule{
+-				Key:             "ViewCount",
+-				Order:           paginator.ASC,
+-				SQLRepr:         "(response->'items'->0->'statistics'->>'viewCount')::BIGINT",
++				Key:   "ViewCount",
++				Order: paginator.ASC,
++				SQLRepr: "CASE WHEN (response->'items'->0->'statistics'->>'viewCount') ~ '^[0-9]+$' " +
++					"THEN (response->'items'->0->'statistics'->>'viewCount')::BIGINT ELSE NULL END",
+ 				NULLReplacement: int64(0),
+ 			},
+ 			wantTieOrder: paginator.ASC,
+@@ -158,20 +200,13 @@ func TestBuildContentSortRules(t *testing.T) {
+ 			wantTieOrder: paginator.DESC,
+ 		},
+ 		{
+-			name:   "percent liked ascending uses a JSONB CASE expression with float64 null replacement",
++			name:   "percent liked ascending uses a cast-guarded JSONB CASE expression with float64 null replacement",
+ 			sortBy: domain.ContentSortByPercentLiked,
+ 			order:  domain.SortOrderAsc,
+ 			wantPrimary: paginator.Rule{
+-				Key:   "PercentLiked",
+-				Order: paginator.ASC,
+-				SQLRepr: "CASE " +
+-					"WHEN (response->'items'->0->'statistics'->>'viewCount') IS NULL " +
+-					"  OR (response->'items'->0->'statistics'->>'likeCount') IS NULL " +
+-					"  OR (response->'items'->0->'statistics'->>'viewCount')::BIGINT = 0 " +
+-					"THEN NULL " +
+-					"ELSE (response->'items'->0->'statistics'->>'likeCount')::FLOAT8 " +
+-					"     / NULLIF((response->'items'->0->'statistics'->>'viewCount')::BIGINT, 0) " +
+-					"END",
++				Key:             "PercentLiked",
++				Order:           paginator.ASC,
++				SQLRepr:         percentLikedSQL,
+ 				NULLReplacement: float64(-1),
+ 			},
+ 			wantTieOrder: paginator.ASC,
+@@ -181,16 +216,9 @@ func TestBuildContentSortRules(t *testing.T) {
+ 			sortBy: domain.ContentSortByPercentLiked,
+ 			order:  domain.SortOrderDesc,
+ 			wantPrimary: paginator.Rule{
+-				Key:   "PercentLiked",
+-				Order: paginator.DESC,
+-				SQLRepr: "CASE " +
+-					"WHEN (response->'items'->0->'statistics'->>'viewCount') IS NULL " +
+-					"  OR (response->'items'->0->'statistics'->>'likeCount') IS NULL " +
+-					"  OR (response->'items'->0->'statistics'->>'viewCount')::BIGINT = 0 " +
+-					"THEN NULL " +
+-					"ELSE (response->'items'->0->'statistics'->>'likeCount')::FLOAT8 " +
+-					"     / NULLIF((response->'items'->0->'statistics'->>'viewCount')::BIGINT, 0) " +
+-					"END",
++				Key:             "PercentLiked",
++				Order:           paginator.DESC,
++				SQLRepr:         percentLikedSQL,
+ 				NULLReplacement: float64(-1),
+ 			},
+ 			wantTieOrder: paginator.DESC,

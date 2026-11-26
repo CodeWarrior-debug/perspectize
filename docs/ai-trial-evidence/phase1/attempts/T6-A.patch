@@ -1,0 +1,362 @@
+diff --git a/frontend/src/lib/components/OmittedVerse.svelte b/frontend/src/lib/components/OmittedVerse.svelte
+new file mode 100644
+index 00000000..b467a532
+--- /dev/null
++++ b/frontend/src/lib/components/OmittedVerse.svelte
+@@ -0,0 +1,13 @@
++<!-- frontend/src/lib/components/OmittedVerse.svelte -->
++<script lang="ts">
++	import VerseNumber from '$lib/components/VerseNumber.svelte';
++
++	let { verseId, verse }: { verseId: number; verse: number } = $props();
++</script>
++
++<!-- A verse the BSB leaves out of its main text: keep its number in the flow and say so, with no invented text. -->
++<span
++	><VerseNumber {verseId} {verse} /><em data-omitted-verse={verseId} class="text-[13px] text-muted-foreground"
++		>omitted in the BSB</em
++	>{' '}</span
++>
+diff --git a/frontend/src/lib/components/PassageText.svelte b/frontend/src/lib/components/PassageText.svelte
+index 38daf165..9c77cacb 100644
+--- a/frontend/src/lib/components/PassageText.svelte
++++ b/frontend/src/lib/components/PassageText.svelte
+@@ -5,8 +5,11 @@
+ 	import { queryKeys } from '$lib/queries/keys';
+ 	import OriginalLanguage from '$lib/components/interlinear/OriginalLanguage.svelte';
+ 	import VerseNumber from '$lib/components/VerseNumber.svelte';
++	import OmittedVerse from '$lib/components/OmittedVerse.svelte';
+ 	import VerseJumpPrompt from '$lib/components/VerseJumpPrompt.svelte';
+ 	import { setVerseJump } from '$lib/utils/verseJump';
++	import { formatReference, isOmittedPassage, isOmittedVerse, verseIdsToRange } from '$lib/utils/bible';
++	import { DEFAULT_VERSION, gatewayLink } from '$lib/utils/bibleLinks';
+ 
+ 	let { startVerseId, endVerseId }: { startVerseId: number; endVerseId: number } = $props();
+ 
+@@ -80,19 +83,45 @@
+ 	const visibleVerses = $derived(
+ 		verseCount <= COLLAPSE_THRESHOLD || expanded ? verses : verses.slice(0, COLLAPSED_PREVIEW_COUNT),
+ 	);
++
++	// A passage made only of verses the BSB omits has nothing to read here: explain it and point to a
++	// version that prints the verse (Bible Gateway, in the default version) instead of rendering blank.
++	const onlyOmitted = $derived(isOmittedPassage(verses));
++	const omittedRange = $derived(onlyOmitted ? verseIdsToRange(startVerseId, endVerseId) : null);
++	const omittedLink = $derived(
++		omittedRange
++			? {
++					url: gatewayLink(omittedRange, DEFAULT_VERSION).url,
++					label: `Read ${formatReference(omittedRange)} on Bible Gateway (${DEFAULT_VERSION})`,
++				}
++			: null,
++	);
+ </script>
+ 
+ {#snippet plain()}
+ 	<div>
+ 		{#each visibleVerses as v (v.verseId)}
+-			<!-- The explicit trailing space keeps a verse number from running into the previous verse's last word. -->
+-			<span
+-				>{#if v.text}<VerseNumber verseId={v.verseId} verse={v.verse} />{v.text}{' '}{/if}</span
+-			>
++			{#if isOmittedVerse(v)}
++				<OmittedVerse verseId={v.verseId} verse={v.verse} />
++			{:else}
++				<!-- The explicit trailing space keeps a verse number from running into the previous verse's last word. -->
++				<span><VerseNumber verseId={v.verseId} verse={v.verse} />{v.text}{' '}</span>
++			{/if}
+ 		{/each}
+ 	</div>
+ {/snippet}
+ 
++{#snippet omittedPassage()}
++	<p data-testid="omitted-passage" class="text-muted-foreground">
++		{verses.length === 1 ? 'This verse is' : 'These verses are'} omitted in the BSB.
++		{#if omittedLink}
++			<a href={omittedLink.url} target="_blank" rel="noopener noreferrer" class="text-primary hover:underline"
++				>{omittedLink.label}</a
++			>.
++		{/if}
++	</p>
++{/snippet}
++
+ <svelte:document onpointerdown={onDocumentPointerDown} />
+ <svelte:window onresize={() => closeJump()} />
+ 
+@@ -108,27 +137,31 @@
+ 		<p class="text-destructive">Couldn't load this passage.</p>
+ 	{:else if query.data}
+ 		{@const { translation, copyright } = query.data.passageText}
+-		{#if showOriginal}
+-			<OriginalLanguage {startVerseId} {endVerseId} verses={visibleVerses} {plain} />
++		{#if onlyOmitted}
++			{@render omittedPassage()}
+ 		{:else}
+-			{@render plain()}
+-		{/if}
+-		<button
+-			type="button"
+-			aria-pressed={showOriginal}
+-			class="mt-2 mr-3 text-[13px] font-semibold text-primary hover:underline aria-pressed:underline"
+-			onclick={() => (showOriginal = !showOriginal)}
+-		>
+-			Show original language
+-		</button>
+-		{#if verseCount > COLLAPSE_THRESHOLD}
++			{#if showOriginal}
++				<OriginalLanguage {startVerseId} {endVerseId} verses={visibleVerses} {plain} />
++			{:else}
++				{@render plain()}
++			{/if}
+ 			<button
+ 				type="button"
+-				class="mt-2 text-[13px] font-semibold text-primary hover:underline"
+-				onclick={() => (expanded = !expanded)}
++				aria-pressed={showOriginal}
++				class="mt-2 mr-3 text-[13px] font-semibold text-primary hover:underline aria-pressed:underline"
++				onclick={() => (showOriginal = !showOriginal)}
+ 			>
+-				{expanded ? 'Show less' : 'Show full passage'}
++				Show original language
+ 			</button>
++			{#if verseCount > COLLAPSE_THRESHOLD}
++				<button
++					type="button"
++					class="mt-2 text-[13px] font-semibold text-primary hover:underline"
++					onclick={() => (expanded = !expanded)}
++				>
++					{expanded ? 'Show less' : 'Show full passage'}
++				</button>
++			{/if}
+ 		{/if}
+ 		<p class="mt-2 text-[11px] text-muted-foreground">{translation} · {copyright}</p>
+ 	{/if}
+diff --git a/frontend/src/lib/components/interlinear/InterlinearPassage.svelte b/frontend/src/lib/components/interlinear/InterlinearPassage.svelte
+index 33b22ccf..5eb11d90 100644
+--- a/frontend/src/lib/components/interlinear/InterlinearPassage.svelte
++++ b/frontend/src/lib/components/interlinear/InterlinearPassage.svelte
+@@ -15,6 +15,8 @@
+ 	} from '$lib/utils/interlinear';
+ 	import WordPopover from './WordPopover.svelte';
+ 	import VerseNumber from '$lib/components/VerseNumber.svelte';
++	import OmittedVerse from '$lib/components/OmittedVerse.svelte';
++	import { isOmittedVerse } from '$lib/utils/bible';
+ 
+ 	let { verses, interlinear }: { verses: VerseText[]; interlinear: InterlinearVerse[] } = $props();
+ 
+@@ -141,7 +143,9 @@
+ 	>
+ 		{#each verses as v (v.verseId)}
+ 			{@const iv = byVerse.get(v.verseId)}
+-			{#if iv}
++			{#if isOmittedVerse(v)}
++				<OmittedVerse verseId={v.verseId} verse={v.verse} />
++			{:else if iv}
+ 				<span
+ 					><VerseNumber
+ 						verseId={iv.verseId}
+@@ -156,7 +160,7 @@
+ 								>{seg.text}</button
+ 							>{:else}<span>{seg.text}</span>{/if}{/each}{' '}</span
+ 				>
+-			{:else if v.text}
++			{:else}
+ 				<span><VerseNumber verseId={v.verseId} verse={v.verse} />{v.text}{' '}</span>
+ 			{/if}
+ 		{/each}
+diff --git a/frontend/src/lib/utils/bible.ts b/frontend/src/lib/utils/bible.ts
+index 4ea88c7c..7780bf32 100644
+--- a/frontend/src/lib/utils/bible.ts
++++ b/frontend/src/lib/utils/bible.ts
+@@ -142,6 +142,19 @@ export function formatReference(range: PassageRange): string {
+ 	return `${book.name} ${range.startChapter}:${range.startVerse}-${range.endChapter}:${range.endVerse}`;
+ }
+ 
++/**
++ * The BSB stores a verse it leaves out of its main text (the content sits in a footnote)
++ * with empty text, so an empty string means "omitted", not "not loaded".
++ */
++export function isOmittedVerse(verse: { text: string }): boolean {
++	return verse.text.trim() === '';
++}
++
++/** True when there is at least one verse and every one of them is omitted (nothing to read inline). */
++export function isOmittedPassage(verses: ReadonlyArray<{ text: string }>): boolean {
++	return verses.length > 0 && verses.every((v) => isOmittedVerse(v));
++}
++
+ /** Shortest known alias for a book (e.g. "Jn" for John) — used where space is tight (icon tiles). */
+ export function abbreviateBookName(bookId: number): string {
+ 	const book = bookById(bookId);
+diff --git a/frontend/tests/components/PassageText.test.ts b/frontend/tests/components/PassageText.test.ts
+index 9457668a..731cbf2a 100644
+--- a/frontend/tests/components/PassageText.test.ts
++++ b/frontend/tests/components/PassageText.test.ts
+@@ -1,6 +1,7 @@
+ import { describe, it, expect, vi, beforeEach } from 'vitest';
+ import { render, screen, fireEvent } from '@testing-library/svelte';
+ import PassageText from '$lib/components/PassageText.svelte';
++import { verseOrdinal } from '$lib/utils/bible';
+ 
+ const mocks = vi.hoisted(() => ({
+ 	mockQueryState: { data: null as unknown, isLoading: false, isError: false },
+@@ -89,6 +90,99 @@ describe('PassageText', () => {
+ 		expect(container.textContent).toContain('Verse text 1 2Verse text 2');
+ 	});
+ 
++	describe('verses the BSB omits (empty text)', () => {
++		// Matthew 17:21 is one of the BSB's 16 verses stored with empty text.
++		const MT_17_20 = verseOrdinal(40, 17, 20)!;
++		const MT_17_21 = MT_17_20 + 1;
++		const MT_17_22 = MT_17_20 + 2;
++		const verse = (verseId: number, v: number, text: string) => ({ verseId, chapter: 17, verse: v, text });
++
++		it('keeps the number of an omitted verse inline, marked "omitted in the BSB", between its neighbours', () => {
++			mocks.mockQueryState.data = {
++				passageText: {
++					translation: 'BSB',
++					copyright: COPYRIGHT,
++					verses: [
++						verse(MT_17_20, 20, 'Because of your little faith.'),
++						verse(MT_17_21, 21, ''),
++						verse(MT_17_22, 22, 'While they were gathering.'),
++					],
++				},
++			};
++			const { container } = render(PassageText, { props: { startVerseId: MT_17_20, endVerseId: MT_17_22 } });
++			expect(container.textContent).toContain(
++				'Because of your little faith. 21omitted in the BSB 22While they were gathering.',
++			);
++			const marker = container.querySelector(`[data-omitted-verse="${MT_17_21}"]`);
++			expect(marker).toHaveTextContent('omitted in the BSB');
++			expect(marker?.previousElementSibling?.tagName).toBe('SUP');
++			expect(marker?.previousElementSibling).toHaveTextContent('21');
++			// the surrounding verses still read normally and the passage is not replaced by the explanation
++			expect(screen.queryByTestId('omitted-passage')).not.toBeInTheDocument();
++			expect(screen.getByRole('button', { name: /show original language/i })).toBeInTheDocument();
++		});
++
++		it('makes the omitted verse number clickable like any other in a multi-verse passage', async () => {
++			mocks.mockQueryState.data = {
++				passageText: {
++					translation: 'BSB',
++					copyright: COPYRIGHT,
++					verses: [verse(MT_17_20, 20, 'Because of your little faith.'), verse(MT_17_21, 21, '')],
++				},
++			};
++			render(PassageText, { props: { startVerseId: MT_17_20, endVerseId: MT_17_21 } });
++			await fireEvent.click(screen.getByRole('button', { name: 'Verse 21' }));
++			expect(screen.getByRole('dialog', { name: /Matthew 17:21 on its own/ })).toBeInTheDocument();
++		});
++
++		it('a passage that is only an omitted verse says so and links to Bible Gateway (ESV) instead of rendering blank', () => {
++			mocks.mockQueryState.data = {
++				passageText: { translation: 'BSB', copyright: COPYRIGHT, verses: [verse(MT_17_21, 21, '')] },
++			};
++			const { container } = render(PassageText, { props: { startVerseId: MT_17_21, endVerseId: MT_17_21 } });
++			const note = screen.getByTestId('omitted-passage');
++			expect(note).toHaveTextContent('This verse is omitted in the BSB.');
++			const link = screen.getByRole('link', { name: 'Read Matthew 17:21 on Bible Gateway (ESV)' });
++			const url = new URL(link.getAttribute('href')!);
++			expect(url.origin + url.pathname).toBe('https://www.biblegateway.com/passage/');
++			expect(url.searchParams.get('search')).toBe('Matthew 17:21');
++			expect(url.searchParams.get('version')).toBe('ESV');
++			expect(link).toHaveAttribute('target', '_blank');
++			expect(link).toHaveAttribute('rel', 'noopener noreferrer');
++			// nothing is invented, no inline verse number, and the BSB attribution is still shown
++			expect(container.querySelector('sup')).toBeNull();
++			expect(screen.getByText(/public domain/i)).toBeInTheDocument();
++			// the interlinear toggle has nothing to show for it
++			expect(screen.queryByRole('button', { name: /original language/i })).not.toBeInTheDocument();
++		});
++
++		it('pluralises the explanation and links the whole range when several consecutive verses are all omitted', () => {
++			mocks.mockQueryState.data = {
++				passageText: {
++					translation: 'BSB',
++					copyright: COPYRIGHT,
++					verses: [verse(MT_17_21, 21, ''), verse(MT_17_22, 22, '   ')],
++				},
++			};
++			render(PassageText, { props: { startVerseId: MT_17_21, endVerseId: MT_17_22 } });
++			expect(screen.getByTestId('omitted-passage')).toHaveTextContent('These verses are omitted in the BSB.');
++			expect(screen.getByRole('link', { name: 'Read Matthew 17:21-22 on Bible Gateway (ESV)' })).toBeInTheDocument();
++		});
++
++		it('the interlinear view (plain fallback) marks an omitted verse the same way', async () => {
++			mocks.mockQueryState.data = {
++				passageText: {
++					translation: 'BSB',
++					copyright: COPYRIGHT,
++					verses: [verse(MT_17_20, 20, 'Because of your little faith.'), verse(MT_17_21, 21, '')],
++				},
++			};
++			render(PassageText, { props: { startVerseId: MT_17_20, endVerseId: MT_17_21 } });
++			await fireEvent.click(screen.getByRole('button', { name: /show original language/i }));
++			expect(screen.getByTestId('original-language-stub')).toHaveTextContent('omitted in the BSB');
++		});
++	});
++
+ 	it('shows no verse text, does not fetch, and points to the links below above the hard cap', () => {
+ 		// Genesis 1:1 (id 1) through id 200 is 200 verses.
+ 		render(PassageText, { props: { startVerseId: 1, endVerseId: 200 } });
+diff --git a/frontend/tests/components/interlinear/InterlinearPassage.test.ts b/frontend/tests/components/interlinear/InterlinearPassage.test.ts
+index 07612e76..7965d888 100644
+--- a/frontend/tests/components/interlinear/InterlinearPassage.test.ts
++++ b/frontend/tests/components/interlinear/InterlinearPassage.test.ts
+@@ -59,6 +59,20 @@ describe('InterlinearPassage', () => {
+ 		expect(screen.queryByText('ignored')).not.toBeInTheDocument();
+ 	});
+ 
++	it('an omitted (empty-text) verse keeps its number and an "omitted in the BSB" marker, with or without alignment data', () => {
++		const { container } = render(InterlinearPassage, {
++			props: {
++				verses: [plain(1, 1, 'ignored'), plain(2, 2, ''), plain(3, 3, '')],
++				interlinear: [gen11, { ...gen11, verseId: 3, verse: 3, segments: [], words: [] }],
++			},
++		});
++		for (const id of [2, 3]) {
++			const marker = container.querySelector(`[data-omitted-verse="${id}"]`);
++			expect(marker).toHaveTextContent('omitted in the BSB');
++			expect(marker?.previousElementSibling).toHaveTextContent(String(id));
++		}
++	});
++
+ 	it('hovering a phrase shows the popover for its first source word; leaving hides it', async () => {
+ 		render(InterlinearPassage, { props: { verses: [plain(1, 1, 'x')], interlinear: [gen11] } });
+ 		const created = screen.getByRole('button', { name: 'created' });
+diff --git a/frontend/tests/unit/bible.test.ts b/frontend/tests/unit/bible.test.ts
+index c48752e3..011ea5bc 100644
+--- a/frontend/tests/unit/bible.test.ts
++++ b/frontend/tests/unit/bible.test.ts
+@@ -11,6 +11,8 @@ import {
+ 	formatChapterVerse,
+ 	abbreviateReferenceFromVerseIds,
+ 	passageIconLabels,
++	isOmittedVerse,
++	isOmittedPassage,
+ 	type PassageRange,
+ } from '$lib/utils/bible';
+ import { BIBLE_BOOKS } from '$lib/utils/bibleStructure';
+@@ -162,6 +164,21 @@ describe('abbreviateReferenceFromVerseIds', () => {
+ 	});
+ });
+ 
++describe('isOmittedVerse / isOmittedPassage', () => {
++	it('treats empty or whitespace-only text as omitted and real text as present', () => {
++		expect(isOmittedVerse({ text: '' })).toBe(true);
++		expect(isOmittedVerse({ text: '  \n' })).toBe(true);
++		expect(isOmittedVerse({ text: 'In the beginning' })).toBe(false);
++	});
++
++	it('is an omitted passage only when it has verses and every one is omitted', () => {
++		expect(isOmittedPassage([])).toBe(false);
++		expect(isOmittedPassage([{ text: '' }])).toBe(true);
++		expect(isOmittedPassage([{ text: '' }, { text: ' ' }])).toBe(true);
++		expect(isOmittedPassage([{ text: '' }, { text: 'x' }])).toBe(false);
++	});
++});
++
+ describe('passageIconLabels', () => {
+ 	it('puts the book abbreviation on the left page and chapter:verse on the right', () => {
+ 		expect(passageIconLabels({ verseStartID: 26137, verseEndID: 26137 })).toEqual({ left: 'Jn', right: '3:16' });

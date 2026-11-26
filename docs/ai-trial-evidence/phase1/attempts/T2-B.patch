@@ -1,0 +1,247 @@
+diff --git a/backend/internal/adapters/repositories/postgres/gorm_content_repository_test.go b/backend/internal/adapters/repositories/postgres/gorm_content_repository_test.go
+index 18d7f87e..fcf93904 100644
+--- a/backend/internal/adapters/repositories/postgres/gorm_content_repository_test.go
++++ b/backend/internal/adapters/repositories/postgres/gorm_content_repository_test.go
+@@ -4,6 +4,7 @@ import (
+ 	"context"
+ 	"encoding/json"
+ 	"errors"
++	"regexp"
+ 	"testing"
+ 	"time"
+ 
+@@ -652,6 +653,51 @@ func TestGormContentRepository_List(t *testing.T) {
+ 	})
+ }
+ 
++// TestGormContentRepository_List_LikeCountSortGuardsBigintCast pins that every place the
++// LIKE_COUNT sort expression lands in the SQL (select list, ORDER BY, cursor WHERE)
++// carries the digits-only guard. A bare ::BIGINT on a stored "" makes Postgres reject
++// the whole list.
++func TestGormContentRepository_List_LikeCountSortGuardsBigintCast(t *testing.T) {
++	ctx := context.Background()
++	guard := regexp.QuoteMeta(`CASE WHEN (response->'items'->0->'statistics'->>'likeCount') ~ '^[0-9]{1,18}$' ` +
++		`THEN (response->'items'->0->'statistics'->>'likeCount')::BIGINT END`)
++
++	for _, order := range []struct {
++		name string
++		by   domain.SortOrder
++		sql  string
++	}{
++		{"descending", domain.SortOrderDesc, "DESC"},
++		{"ascending", domain.SortOrderAsc, "ASC"},
++	} {
++		t.Run(order.name, func(t *testing.T) {
++			db, mock := newMockDB(t)
++			repo := NewGormContentRepository(db)
++			first := 1
++			params := domain.ContentListParams{First: &first, SortBy: domain.ContentSortByLikeCount, SortOrder: order.by}
++
++			// Page 1: the select list and the ORDER BY both use the guarded expression. The
++			// last row's like_count is NULL (a hidden-likes video), so its cursor carries null.
++			mock.ExpectQuery(`SELECT content\.\*, \(` + guard + `\) AS like_count FROM "content" .*` +
++				`ORDER BY COALESCE\(` + guard + `, '0'\) ` + order.sql).
++				WillReturnRows(computedRows("like_count", nil))
++			page1, err := repo.List(ctx, params)
++			require.NoError(t, err)
++			require.NotNil(t, page1.EndCursor)
++
++			// Page 2: the cursor comparison uses the same guarded expression and binds the
++			// unknown-sort value 0 for the NULL row.
++			params.After = page1.EndCursor
++			mock.ExpectQuery(`WHERE content\.privacy = \$1 AND .*COALESCE\(`+guard+`, '0'\)`).
++				WithArgs("public", derefArg{int64(0)}, derefArg{int64(161)}, 2).
++				WillReturnRows(computedRows("like_count", nil))
++			_, err = repo.List(ctx, params)
++			require.NoError(t, err)
++			assertAllExpectationsMet(t, mock)
++		})
++	}
++}
++
+ func TestGormContentRepository_SetDisplayTitleIfEmpty(t *testing.T) {
+ 	ctx := context.Background()
+ 
+diff --git a/backend/internal/adapters/repositories/postgres/gorm_content_sort_integration_test.go b/backend/internal/adapters/repositories/postgres/gorm_content_sort_integration_test.go
+new file mode 100644
+index 00000000..a82394c8
+--- /dev/null
++++ b/backend/internal/adapters/repositories/postgres/gorm_content_sort_integration_test.go
+@@ -0,0 +1,104 @@
++package postgres
++
++// Integration test for the LIKE_COUNT content sort against a real Postgres.
++//
++// It runs only when DATABASE_URL points at the LOCAL throwaway database (host
++// localhost or 127.0.0.1, database name "testdb"); see openLocalUserTodoTestDB. Any
++// other URL, including the shared Neon database, makes it skip.
++//
++//	DATABASE_URL="postgres://postgres:postgres@localhost:5432/testdb?sslmode=disable" \
++//	  go test -p 1 ./internal/adapters/repositories/postgres/ -run LikeCountSortIntegration -v
++
++import (
++	"context"
++	"fmt"
++	"testing"
++	"time"
++
++	"github.com/CodeWarrior-debug/perspectize/backend/internal/core/domain"
++	"github.com/stretchr/testify/assert"
++	"github.com/stretchr/testify/require"
++)
++
++// TestGormContentRepository_LikeCountSortIntegration lists content sorted by LIKE_COUNT
++// when some rows store a likeCount that is not a number: "" (what YouTube stores for
++// hidden likes), other text, or no key at all. Postgres rejects a bare ::BIGINT cast on
++// "" and would fail the whole list; those rows must sort as unknown (0) and the list,
++// including its cursor pages, must work.
++func TestGormContentRepository_LikeCountSortIntegration(t *testing.T) {
++	db := openLocalUserTodoTestDB(t)
++	ctx := context.Background()
++	repo := NewGormContentRepository(db)
++
++	salt := time.Now().UnixNano()
++	var userID int
++	require.NoError(t, db.Raw("INSERT INTO users (username) VALUES (?) RETURNING id",
++		fmt.Sprintf("ls-%06x", salt&0xFFFFFF)).Scan(&userID).Error)
++
++	// Insertion order sets the ids, which break ties between rows that share a sort value.
++	prefix := fmt.Sprintf("likesort-%x", salt)
++	rows := []struct {
++		suffix   string
++		response string
++	}{
++		{"empty", `{"items":[{"statistics":{"viewCount":"10","likeCount":""}}]}`},
++		{"text", `{"items":[{"statistics":{"viewCount":"10","likeCount":"abc"}}]}`},
++		{"spaced", `{"items":[{"statistics":{"viewCount":"10","likeCount":"12 "}}]}`},
++		{"missing", `{"items":[{"statistics":{"viewCount":"10"}}]}`},
++		{"five", `{"items":[{"statistics":{"viewCount":"10","likeCount":"5"}}]}`},
++		{"threehundred", `{"items":[{"statistics":{"viewCount":"10","likeCount":"300"}}]}`},
++		{"thousand", `{"items":[{"statistics":{"viewCount":"10","likeCount":"1000"}}]}`},
++	}
++	ids := make([]int, 0, len(rows))
++	for _, r := range rows {
++		var id int
++		require.NoError(t, db.Raw(
++			"INSERT INTO content (name, content_type, added_by_user_id, response) VALUES (?, 'youtube_video', ?, ?::jsonb) RETURNING id",
++			prefix+"-"+r.suffix, userID, r.response).Scan(&id).Error)
++		ids = append(ids, id)
++	}
++	t.Cleanup(func() {
++		db.Exec("DELETE FROM content WHERE id IN ?", ids)
++		db.Exec("DELETE FROM users WHERE id = ?", userID)
++	})
++
++	// listAll walks every page of size pageSize and returns the row names in order.
++	listAll := func(t *testing.T, order domain.SortOrder, pageSize int) []string {
++		t.Helper()
++		search := prefix
++		params := domain.ContentListParams{
++			First:     &pageSize,
++			SortBy:    domain.ContentSortByLikeCount,
++			SortOrder: order,
++			Filter:    &domain.ContentFilter{Search: &search},
++		}
++		var names []string
++		for page := 0; page < len(rows)+2; page++ {
++			got, err := repo.List(ctx, params)
++			require.NoError(t, err, "a non-numeric likeCount must not fail the list")
++			for _, item := range got.Items {
++				names = append(names, item.Name[len(prefix)+1:])
++			}
++			if !got.HasNext {
++				return names
++			}
++			params.After = got.EndCursor
++		}
++		t.Fatalf("pagination did not finish; collected %v", names)
++		return nil
++	}
++
++	// Unknown likes count as 0, so they sort below every real count (descending) or above
++	// it (ascending), ties broken by id in the requested direction.
++	wantDesc := []string{"thousand", "threehundred", "five", "missing", "spaced", "text", "empty"}
++	wantAsc := []string{"empty", "text", "spaced", "missing", "five", "threehundred", "thousand"}
++
++	for _, pageSize := range []int{len(rows), 2, 1} {
++		t.Run(fmt.Sprintf("descending, page size %d", pageSize), func(t *testing.T) {
++			assert.Equal(t, wantDesc, listAll(t, domain.SortOrderDesc, pageSize))
++		})
++		t.Run(fmt.Sprintf("ascending, page size %d", pageSize), func(t *testing.T) {
++			assert.Equal(t, wantAsc, listAll(t, domain.SortOrderAsc, pageSize))
++		})
++	}
++}
+diff --git a/backend/internal/adapters/repositories/postgres/helpers.go b/backend/internal/adapters/repositories/postgres/helpers.go
+index ac7b4ea9..39481b5f 100644
+--- a/backend/internal/adapters/repositories/postgres/helpers.go
++++ b/backend/internal/adapters/repositories/postgres/helpers.go
+@@ -108,6 +108,17 @@ func intSliceToInt64Array(ints []int) Int64Array {
+ // computedSortColumns, so List selects it AS added_by for the cursor.
+ const addedBySortExpr = "LOWER((SELECT u.username FROM users u WHERE u.id = content.added_by_user_id))"
+ 
++// likeCountSortExpr is the LIKE_COUNT sort key: statistics.likeCount as a BIGINT, or
++// NULL when the stored text is not a plain run of digits (YouTube can store "" for a
++// channel that hides likes). A bare ::BIGINT cast raises "invalid input syntax" on such
++// a row and fails the whole list, so the cast only runs once the regex has matched
++// (CASE evaluates a THEN branch only for matching rows). NULL then takes the rule's
++// NULLReplacement (0), the same value the GraphQL field shows for an empty count. The
++// digit run is capped at 18 so a value past BIGINT range is unknown too, not an
++// "out of range" error.
++const likeCountSortExpr = "CASE WHEN (response->'items'->0->'statistics'->>'likeCount') ~ '^[0-9]{1,18}$' " +
++	"THEN (response->'items'->0->'statistics'->>'likeCount')::BIGINT END"
++
+ // computedSortColumns maps a content sort rule Key whose value is computed (no real
+ // column) to the alias List selects it under. Each alias is the column tag of the
+ // matching read-only ContentModel field, which is how gorm-cursor-paginator reads the
+@@ -205,7 +216,7 @@ func contentSortRule(sortBy domain.ContentSortBy, order domain.SortOrder) pagina
+ 		return paginator.Rule{
+ 			Key:             "LikeCount",
+ 			Order:           paginatorOrder,
+-			SQLRepr:         "(response->'items'->0->'statistics'->>'likeCount')::BIGINT",
++			SQLRepr:         likeCountSortExpr,
+ 			NULLReplacement: int64(0),
+ 		}
+ 	case domain.ContentSortByPercentLiked:
+diff --git a/backend/internal/adapters/repositories/postgres/helpers_test.go b/backend/internal/adapters/repositories/postgres/helpers_test.go
+index d2936c08..d78e3747 100644
+--- a/backend/internal/adapters/repositories/postgres/helpers_test.go
++++ b/backend/internal/adapters/repositories/postgres/helpers_test.go
+@@ -145,17 +145,33 @@ func TestBuildContentSortRules(t *testing.T) {
+ 			wantTieOrder: paginator.ASC,
+ 		},
+ 		{
+-			name:   "like count descending",
++			// The cast sits behind a digits-only guard: a stored "" (hidden likes) would make a
++			// bare ::BIGINT fail the whole list. Non-digit text becomes NULL, then 0.
++			name:   "like count descending guards the BIGINT cast so non-digit text sorts as 0",
+ 			sortBy: domain.ContentSortByLikeCount,
+ 			order:  domain.SortOrderDesc,
+ 			wantPrimary: paginator.Rule{
+-				Key:             "LikeCount",
+-				Order:           paginator.DESC,
+-				SQLRepr:         "(response->'items'->0->'statistics'->>'likeCount')::BIGINT",
++				Key:   "LikeCount",
++				Order: paginator.DESC,
++				SQLRepr: "CASE WHEN (response->'items'->0->'statistics'->>'likeCount') ~ '^[0-9]{1,18}$' " +
++					"THEN (response->'items'->0->'statistics'->>'likeCount')::BIGINT END",
+ 				NULLReplacement: int64(0),
+ 			},
+ 			wantTieOrder: paginator.DESC,
+ 		},
++		{
++			name:   "like count ascending uses the same guarded cast and 0 null replacement",
++			sortBy: domain.ContentSortByLikeCount,
++			order:  domain.SortOrderAsc,
++			wantPrimary: paginator.Rule{
++				Key:   "LikeCount",
++				Order: paginator.ASC,
++				SQLRepr: "CASE WHEN (response->'items'->0->'statistics'->>'likeCount') ~ '^[0-9]{1,18}$' " +
++					"THEN (response->'items'->0->'statistics'->>'likeCount')::BIGINT END",
++				NULLReplacement: int64(0),
++			},
++			wantTieOrder: paginator.ASC,
++		},
+ 		{
+ 			name:   "percent liked ascending uses a JSONB CASE expression with float64 null replacement",
+ 			sortBy: domain.ContentSortByPercentLiked,

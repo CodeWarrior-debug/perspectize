@@ -1,0 +1,269 @@
+diff --git a/frontend/CLAUDE.md b/frontend/CLAUDE.md
+index 3b2a1c60..0fb5a7d3 100644
+--- a/frontend/CLAUDE.md
++++ b/frontend/CLAUDE.md
+@@ -121,7 +121,7 @@ Uses `ag-grid-svelte5` (bundles AG Grid v32.x). **Do NOT install `ag-grid-commun
+ 
+ **AG Grid paints row hover on `.ag-row-hover::before`**, above the row background and below cell content. So an opaque hover colour is safe and keeps hover identical on odd and even rows (an alpha hover composites differently over the zebra). The left hover bar is an `inset` box-shadow on that same `::before` (`app.css`).
+ 
+-**Column minimum widths must fit the page container.** The Library page (`/content-library`) is capped at `max-w-screen-xl` (1280px), leaving a 1212px grid, and each default lg set's minimums must sum to at most that (`movieColumns.test.ts`). Every column's floor is `headerMinWidth` (`lib/utils/grid-header-width.ts`): the label measured from Geist's own glyph widths (`grid-header-metrics.ts`, regenerate with `scripts/gen-header-metrics.py`) plus padding, sort arrow and funnel read from the theme (`headerChrome`), so a heading never truncates or runs into its funnel. An explicit colDef `minWidth` only raises that floor (for cell content). Changing the header layout in `app.css` means changing `headerChrome` too, and the Activity label's uppercase and letter-spacing (`.activity-grid .ag-header-cell-text`) are mirrored in `ACTIVITY_HEADER_TEXT_CASE` (a test checks they agree). The `?f.type=youtube` URL filter goes through the grid's filter model, so the mobile card list (grid unmounted) ignores it.
++**Column minimum widths must fit the page container.** The Library page (`/content-library`) is capped at `max-w-screen-xl` (1280px), leaving a 1212px grid, and each default lg set's minimums must sum to at most that (`movieColumns.test.ts`). Every column's floor is `headerMinWidth` (`lib/utils/grid-header-width.ts`): the label measured from Geist's own glyph widths (`grid-header-metrics.ts`, regenerate with `scripts/gen-header-metrics.py`) plus padding, sort arrow and funnel read from the theme (`headerChrome`), so a heading never truncates or runs into its funnel. An explicit colDef `minWidth` only raises that floor (for cell content). The Plan grid applies the same floor to both `width` and `minWidth` in `planColumnMinWidth` (`plan-grid-config.ts`), against `PLAN_HEADER_CHROME` (its own 14px, non-uppercase header, no funnel) rather than the Activity chrome. Changing the header layout in `app.css` means changing `headerChrome` too, and the Activity label's uppercase and letter-spacing (`.activity-grid .ag-header-cell-text`) are mirrored in `ACTIVITY_HEADER_TEXT_CASE` (a test checks they agree). The `?f.type=youtube` URL filter goes through the grid's filter model, so the mobile card list (grid unmounted) ignores it.
+ 
+ ## Figma Design Workflow
+ 
+diff --git a/frontend/src/lib/components/plan/PlanTable.svelte b/frontend/src/lib/components/plan/PlanTable.svelte
+index 566207af..b3429b3c 100644
+--- a/frontend/src/lib/components/plan/PlanTable.svelte
++++ b/frontend/src/lib/components/plan/PlanTable.svelte
+@@ -1,7 +1,6 @@
+ <script lang="ts">
+ 	import AgGridSvelte5Component from 'ag-grid-svelte5';
+ 	import { ClientSideRowModelModule } from '@ag-grid-community/client-side-row-model';
+-	import { themeBalham } from '@ag-grid-community/theming';
+ 	import type {
+ 		CellClickedEvent,
+ 		GridApi,
+@@ -10,7 +9,7 @@
+ 		SortChangedEvent,
+ 	} from '@ag-grid-community/core';
+ 	import type { UserTodoItem, UserTodoSortBy } from '$lib/queries/userTodos';
+-	import { GRID_THEME_PARAMS } from '$lib/utils/grid-theme';
++	import { PLAN_GRID_THEME } from '$lib/utils/grid-theme';
+ 	import { emptyCellClassRules } from '$lib/utils/grid-empty';
+ 	import EmptyAware from '$lib/components/EmptyAware.svelte';
+ 	import { useCardMode, useResponsiveTier } from '$lib/utils/responsive.svelte';
+@@ -61,7 +60,7 @@
+ 	const cardMode = $derived(card.current);
+ 
+ 	const modules = [ClientSideRowModelModule];
+-	const theme = themeBalham.withParams(GRID_THEME_PARAMS);
++	const theme = PLAN_GRID_THEME;
+ 
+ 	function buildGridOptions(inListMode: boolean): GridOptions<UserTodoItem> {
+ 		return {
+diff --git a/frontend/src/lib/utils/grid-theme.ts b/frontend/src/lib/utils/grid-theme.ts
+index 054d0bca..f069f87d 100644
+--- a/frontend/src/lib/utils/grid-theme.ts
++++ b/frontend/src/lib/utils/grid-theme.ts
+@@ -53,7 +53,7 @@ export const ACTIVITY_HEADER_PARAMS = {
+  * horizontal only: cell and header padding halve (16px -> 8px), which untruncates the movie
+  * view's "Genre" / "Rated" / "Released" headers and some channel names. Descender margin, hover,
+  * zebra and every preset stay as they were (see the PR for the measurements). The Plan grid also
+- * uses `themeBalham` with the shared params, without the Activity header tweaks.
++ * uses `themeBalham` with the shared params, without the Activity header tweaks (`PLAN_GRID_THEME`).
+  */
+ export const ACTIVITY_GRID_THEME = themeBalham.withParams(GRID_THEME_PARAMS).withParams(ACTIVITY_HEADER_PARAMS);
+ 
+@@ -130,3 +130,16 @@ export function headerChrome(
+ 
+ /** The Activity grid's header chrome, computed once. */
+ export const ACTIVITY_HEADER_CHROME: HeaderChrome = headerChrome(ACTIVITY_GRID_THEME, ACTIVITY_HEADER_TEXT_CASE);
++
++/**
++ * The Plan table's theme: Balham under the shared params, with none of the Activity header tweaks,
++ * so its headers are 14px (`fontSize`), in the normal case and without letter-spacing.
++ */
++export const PLAN_GRID_THEME = themeBalham.withParams(GRID_THEME_PARAMS);
++
++/**
++ * The Plan grid's header chrome, read from `PLAN_GRID_THEME` itself (the default text case: its
++ * labels are not uppercased or letter-spaced). It differs from the Activity chrome in font size and
++ * case, so measuring Plan headings with the Activity chrome would size them for 11px capitals.
++ */
++export const PLAN_HEADER_CHROME: HeaderChrome = headerChrome(PLAN_GRID_THEME);
+diff --git a/frontend/src/lib/utils/plan-grid-config.ts b/frontend/src/lib/utils/plan-grid-config.ts
+index c47fc192..ab4163aa 100644
+--- a/frontend/src/lib/utils/plan-grid-config.ts
++++ b/frontend/src/lib/utils/plan-grid-config.ts
+@@ -7,6 +7,8 @@
+ import type { ColDef, ICellRendererParams, ValueFormatterParams, ValueGetterParams } from '@ag-grid-community/core';
+ import type { TodoPrivacy, UserTodoItem, UserTodoSortBy, UserTodoStatus } from '$lib/queries/userTodos';
+ import { contentTypeLabel, type ResponsiveTier } from './grid-config';
++import { headerMinWidth } from './grid-header-width';
++import { PLAN_HEADER_CHROME } from './grid-theme';
+ import { EMPTY_VALUE } from './formatting';
+ import { ratingToDisplay } from './ratings';
+ import { addPerspectiveDisabledReason, type TodoFocusField } from './plan-todo-helpers';
+@@ -31,7 +33,10 @@ export interface PlanColumnMeta {
+ 	colId: PlanColId;
+ 	/** Header text. */
+ 	label: string;
+-	/** Fixed width, or the floor for a flex column. */
++	/**
++	 * Fixed width, or the floor for a flex column, sized for the cell content. It only raises the
++	 * floor: a column is never narrower than `planColumnMinWidth` (its whole heading plus sort arrow).
++	 */
+ 	minWidth: number;
+ 	/** `flex` for the columns that absorb spare width; omitted for fixed-width columns. */
+ 	flex?: number;
+@@ -106,6 +111,20 @@ export const PLAN_COLUMNS: readonly PlanColumnMeta[] = [
+ 
+ const TIER_RANK: Record<ResponsiveTier, number> = { xs: 0, sm: 1, md: 2, lg: 3 };
+ 
++/**
++ * The narrowest a Plan column goes: the larger of its `minWidth` (cell content) and the width its
++ * whole heading needs next to the sort arrow, measured against the Plan theme's own header chrome
++ * (`headerMinWidth`, as the Activity grid does). The Plan grid has no column filters, so no funnel
++ * is reserved. The arrow room is kept in list mode too, where no header sorts, so a column is the
++ * same width in both modes.
++ */
++export function planColumnMinWidth(meta: PlanColumnMeta): number {
++	return Math.max(
++		meta.minWidth,
++		headerMinWidth(meta.label, { filter: false, sortable: meta.sortable }, PLAN_HEADER_CHROME),
++	);
++}
++
+ /** The columns that show at a tier, in header order. */
+ export function planColumnsForTier(tier: ResponsiveTier): PlanColId[] {
+ 	return PLAN_COLUMNS.filter((c) => TIER_RANK[c.minTier] <= TIER_RANK[tier]).map((c) => c.colId);
+@@ -243,9 +262,9 @@ export function buildPlanColumnDefs(listMode: boolean, tier: ResponsiveTier = 'l
+ 
+ 	const sizing = (colId: PlanColId): Partial<ColDef<UserTodoItem>> => {
+ 		const meta = metaFor(colId);
+-		return meta.flex !== undefined
+-			? { flex: meta.flex, minWidth: meta.minWidth }
+-			: { width: meta.minWidth, minWidth: meta.minWidth };
++		// Both width and minWidth take the header floor, in both list modes.
++		const floor = planColumnMinWidth(meta);
++		return meta.flex !== undefined ? { flex: meta.flex, minWidth: floor } : { width: floor, minWidth: floor };
+ 	};
+ 
+ 	const common = (colId: PlanColId): ColDef<UserTodoItem> => {
+diff --git a/frontend/tests/unit/gridHeaderWidth.test.ts b/frontend/tests/unit/gridHeaderWidth.test.ts
+index f7b21a53..46a333ea 100644
+--- a/frontend/tests/unit/gridHeaderWidth.test.ts
++++ b/frontend/tests/unit/gridHeaderWidth.test.ts
+@@ -9,6 +9,8 @@ import {
+ 	ACTIVITY_HEADER_CHROME,
+ 	ACTIVITY_HEADER_TEXT_CASE,
+ 	GRID_THEME_PARAMS,
++	PLAN_GRID_THEME,
++	PLAN_HEADER_CHROME,
+ 	headerChrome,
+ } from '$lib/utils/grid-theme';
+ 
+@@ -55,6 +57,27 @@ describe('headerChrome', () => {
+ 		expect(appCss).toMatch(/\.ag-header-cell \.ag-sort-indicator-icon \{\s*padding-left: 0;\s*padding-right: 0;/);
+ 	});
+ 
++	it('reads the Plan theme: 14px headers in the normal case, with the same 4px Balham spacing', () => {
++		expect(PLAN_HEADER_CHROME).toEqual(headerChrome(PLAN_GRID_THEME));
++		expect(PLAN_HEADER_CHROME).toEqual({
++			fontSize: 14,
++			padding: 8,
++			sort: 20,
++			sortOrder: 4 + WIDEST_DIGIT_EM * 14,
++			filter: 20,
++			uppercase: false,
++			letterSpacingEm: 0,
++		});
++	});
++
++	it('the Plan grid uses PLAN_GRID_THEME and no uppercase rule reaches its headers', () => {
++		const planTable = readFileSync(resolve(process.cwd(), 'src/lib/components/plan/PlanTable.svelte'), 'utf8');
++		expect(planTable).toMatch(/const theme = PLAN_GRID_THEME;/);
++		// Uppercase and letter-spacing are scoped to .activity-grid, which the Plan grid is not under.
++		expect(planTable).not.toContain('activity-grid');
++		expect(appCss).not.toMatch(/(^|\n)\.ag-header-cell-text \{[^}]*text-transform/);
++	});
++
+ 	it('app.css sets the Activity header label the way ACTIVITY_HEADER_TEXT_CASE says', () => {
+ 		const rule = appCss.match(/\.activity-grid \.ag-header-cell-text \{([^}]*)\}/)?.[1] ?? '';
+ 		expect(/text-transform:\s*uppercase/.test(rule)).toBe(ACTIVITY_HEADER_TEXT_CASE.uppercase);
+diff --git a/frontend/tests/unit/plan-grid-config.test.ts b/frontend/tests/unit/plan-grid-config.test.ts
+index 8b67c75a..13e31b77 100644
+--- a/frontend/tests/unit/plan-grid-config.test.ts
++++ b/frontend/tests/unit/plan-grid-config.test.ts
+@@ -1,10 +1,13 @@
+ import { EMPTY_VALUE } from '$lib/utils/formatting';
+ import { describe, it, expect } from 'vitest';
++import { headerMinWidth } from '$lib/utils/grid-header-width';
++import { ACTIVITY_HEADER_CHROME, PLAN_HEADER_CHROME } from '$lib/utils/grid-theme';
+ import {
+ 	PLAN_COLUMNS,
+ 	PLAN_COL_IDS,
+ 	buildPlanColumnDefs,
+ 	editFieldFor,
++	planColumnMinWidth,
+ 	planColumnsForTier,
+ 	planCommentsPreview,
+ 	planContentLabel,
+@@ -78,6 +81,77 @@ describe('PLAN_COLUMNS metadata', () => {
+ 	});
+ });
+ 
++describe('Plan column header floor', () => {
++	const meta = (colId: string) => PLAN_COLUMNS.find((c) => c.colId === colId)!;
++	// The Plan grid has no column filters, so only the sort arrow is reserved beside the heading.
++	const headerFloor = (colId: string) =>
++		headerMinWidth(meta(colId).label, { filter: false, sortable: meta(colId).sortable }, PLAN_HEADER_CHROME);
++
++	it('measures against the Plan theme (14px, not uppercased), not the Activity header chrome', () => {
++		expect(PLAN_HEADER_CHROME.fontSize).toBe(14);
++		expect(PLAN_HEADER_CHROME.uppercase).toBe(false);
++		expect(PLAN_HEADER_CHROME.letterSpacingEm).toBe(0);
++		expect(PLAN_HEADER_CHROME).not.toEqual(ACTIVITY_HEADER_CHROME);
++	});
++
++	it('widens Priority (was 84px) and % Complete (was 100px) to fit their whole heading and sort arrow', () => {
++		expect(meta('priority').minWidth).toBe(84);
++		expect(meta('percentComplete').minWidth).toBe(100);
++		expect(planColumnMinWidth(meta('priority'))).toBe(103);
++		expect(planColumnMinWidth(meta('percentComplete'))).toBe(133);
++	});
++
++	it('is never below the hand-set content minimum or the header floor, for every column', () => {
++		for (const c of PLAN_COLUMNS) {
++			expect(planColumnMinWidth(c)).toBe(Math.max(c.minWidth, headerFloor(c.colId)));
++		}
++	});
++
++	it('keeps the hand-set minimum when it already clears the heading (e.g. Comments, Action)', () => {
++		expect(planColumnMinWidth(meta('comments'))).toBe(meta('comments').minWidth);
++		expect(planColumnMinWidth(meta('action'))).toBe(meta('action').minWidth);
++	});
++
++	describe.each([false, true])('in list mode = %s', (listMode) => {
++		const defs = () => buildPlanColumnDefs(listMode);
++		const def = (colId: string) => defs().find((d) => d.colId === colId)!;
++
++		it('gives every column a minWidth at or above its header floor', () => {
++			for (const c of PLAN_COLUMNS) {
++				expect(def(c.colId).minWidth, c.colId).toBeGreaterThanOrEqual(headerFloor(c.colId));
++			}
++		});
++
++		it('sets the width of every fixed-width column to its floor too, not just minWidth', () => {
++			for (const c of PLAN_COLUMNS.filter((m) => m.flex === undefined)) {
++				expect(def(c.colId).width, c.colId).toBe(planColumnMinWidth(c));
++				expect(def(c.colId).width, c.colId).toBeGreaterThanOrEqual(headerFloor(c.colId));
++			}
++		});
++
++		it('leaves a flex column flexing, from its floor', () => {
++			for (const c of PLAN_COLUMNS.filter((m) => m.flex !== undefined)) {
++				expect(def(c.colId).flex, c.colId).toBe(c.flex);
++				expect(def(c.colId).width, c.colId).toBeUndefined();
++				expect(def(c.colId).minWidth, c.colId).toBe(planColumnMinWidth(c));
++			}
++		});
++
++		it('gives Priority and % Complete room for their headings', () => {
++			expect(def('priority').width).toBeGreaterThanOrEqual(103);
++			expect(def('priority').minWidth).toBeGreaterThanOrEqual(103);
++			expect(def('percentComplete').width).toBeGreaterThanOrEqual(133);
++			expect(def('percentComplete').minWidth).toBeGreaterThanOrEqual(133);
++		});
++	});
++
++	it('is the same width in both list modes, so toggling a list does not reflow the columns', () => {
++		const widths = (listMode: boolean) =>
++			buildPlanColumnDefs(listMode).map((d) => [d.colId, d.width, d.minWidth, d.flex]);
++		expect(widths(true)).toEqual(widths(false));
++	});
++});
++
+ describe('editFieldFor: the Edit Todo field a cell click focuses', () => {
+ 	it.each([
+ 		['action', 'action'],

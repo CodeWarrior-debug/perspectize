@@ -1,0 +1,662 @@
+diff --git a/frontend/src/lib/components/PerspectivePopover.svelte b/frontend/src/lib/components/PerspectivePopover.svelte
+index 07d4d683..75512566 100644
+--- a/frontend/src/lib/components/PerspectivePopover.svelte
++++ b/frontend/src/lib/components/PerspectivePopover.svelte
+@@ -29,6 +29,7 @@
+ 	import { useCreatePerspective } from '#lib/queries/perspectives/useCreatePerspective.js';
+ 	import { useUpdatePerspective } from '#lib/queries/perspectives/useUpdatePerspective.js';
+ 	import { useDeletePerspective } from '#lib/queries/perspectives/useDeletePerspective.js';
++	import { useFeelingStats } from '#lib/queries/perspectives/useFeelingStats.js';
+ 	import { useFetchUserTodos } from '#lib/queries/userTodos/useFetchUserTodos.js';
+ 	import { useUpdateUserTodo } from '#lib/queries/userTodos/useUpdateUserTodo.js';
+ 	import { completedTodoInput, openConsumeOrReviewTodos } from '#lib/utils/plan-todo-helpers.js';
+@@ -233,6 +234,23 @@
+ 	const fetchTodos = useFetchUserTodos();
+ 	const updateTodo = useUpdateUserTodo();
+ 
++	// How many of this content's perspectives felt the first picked feeling. Primitives, not the
++	// feeling object: an intensity or note edit replaces that object, and must not touch the query.
++	const firstFeelingEmoji = $derived(feelings[0]?.emoji ?? null);
++	const firstFeelingLabel = $derived(feelings[0]?.label || null);
++	const feelingStats = useFeelingStats(() =>
++		firstFeelingEmoji === null ? null : { contentId, emoji: firstFeelingEmoji, label: firstFeelingLabel },
++	);
++	// Empty until the numbers have arrived, and again if the request fails (isSuccess, not just
++	// data: a failed refetch keeps the old data but must not keep showing it).
++	const feelingStatsLine = $derived(
++		firstFeelingEmoji !== null && feelingStats.isSuccess && feelingStats.data
++			? `${feelingStats.data.count} of ${feelingStats.data.totalPerspectives} perspectives felt ${firstFeelingEmoji}${
++					firstFeelingLabel ? ` ${firstFeelingLabel}` : ''
++				}`
++			: null,
++	);
++
+ 	/**
+ 	 * After a save succeeds: if the user has an open consume or review todo for this
+ 	 * content, offer to mark it done. Looked up here, on save, so opening the
+@@ -549,6 +567,11 @@
+ 						data-testid="feel-wheel-column"
+ 					>
+ 						<FeelWheel bind:value={feelings} />
++						{#if feelingStatsLine}
++							<p class="mt-3 text-center text-xs text-muted-foreground" data-testid="feeling-stats">
++								{feelingStatsLine}
++							</p>
++						{/if}
+ 					</div>
+ 				</div>
+ 
+diff --git a/frontend/src/lib/queries/keys.ts b/frontend/src/lib/queries/keys.ts
+index f593b37f..4d947ab2 100644
+--- a/frontend/src/lib/queries/keys.ts
++++ b/frontend/src/lib/queries/keys.ts
+@@ -37,6 +37,14 @@ export const queryKeys = {
+ 		// viewer: perspective counts and the import a row came from both resolve per viewer.
+ 		aggregates: (id: string, viewerId: string | null) =>
+ 			[...queryKeys.content.detail(id), 'aggregates', viewerId ?? 'anonymous'] as const,
++		// How many of one content's perspectives carry a feeling (useFeelingStats, the
++		// perspective editor's "N of M felt ..." line). A child of `detail(id)` on purpose:
++		// creating, editing or deleting a perspective on this content changes the counts,
++		// and those mutations already invalidate `detail(id)`, so they evict this too and
++		// nothing else. `label` is in the key because the request narrows by it, and null
++		// (none sent) is a different request from any label.
++		feelingStats: (id: string, emoji: string, label: string | null) =>
++			[...queryKeys.content.detail(id), 'feeling-stats', emoji, label] as const,
+ 		// ListComparableContent (ComparePicker.svelte) — a distinct shape/query
+ 		// from `list` above (adds perspectiveCount, no pagination), keyed by
+ 		// the debounced search term.
+diff --git a/frontend/src/lib/queries/perspectives/index.ts b/frontend/src/lib/queries/perspectives/index.ts
+index 63d615a0..ddf80184 100644
+--- a/frontend/src/lib/queries/perspectives/index.ts
++++ b/frontend/src/lib/queries/perspectives/index.ts
+@@ -134,6 +134,28 @@ export const LIST_PERSPECTIVES_BY_USER = gql`
+ 	}
+ `;
+ 
++export interface FeelingStats {
++	/** Perspectives in scope that carry the feeling. */
++	count: number;
++	/** Every perspective in scope, with or without feelings. */
++	totalPerspectives: number;
++}
++
++export interface FeelingStatsResponse {
++	feelingStats: FeelingStats;
++}
++
++// One feeling's reach across one content item's perspectives (public and private alike, which is
++// how the backend counts). Only the two numbers the editor's line shows are selected.
++export const GET_FEELING_STATS = gql`
++	query FeelingStats($contentID: IntID, $emoji: String!, $label: String) {
++		feelingStats(contentID: $contentID, emoji: $emoji, label: $label) {
++			count
++			totalPerspectives
++		}
++	}
++`;
++
+ export interface ListPerspectivesByContentResponse {
+ 	perspectives: {
+ 		// `user` comes from the server on fetch; rows patched in by the
+diff --git a/frontend/src/lib/queries/perspectives/useFeelingStats.ts b/frontend/src/lib/queries/perspectives/useFeelingStats.ts
+new file mode 100644
+index 00000000..833047b4
+--- /dev/null
++++ b/frontend/src/lib/queries/perspectives/useFeelingStats.ts
+@@ -0,0 +1,47 @@
++import { createQuery } from '@tanstack/svelte-query';
++import { graphqlRequest } from '../client';
++import { GET_FEELING_STATS, type FeelingStats, type FeelingStatsResponse } from './index';
++import { queryKeys } from '../keys';
++
++/**
++ * Other people's perspectives move these counts only slowly, and this viewer's own writes evict the
++ * entry through `content.detail(id)` (see `queryKeys.content.feelingStats`), so re-opening the editor
++ * on the same feeling within five minutes costs no request. Deliberate, not the default 0.
++ */
++export const FEELING_STATS_STALE_TIME_MS = 5 * 60 * 1000;
++
++export interface FeelingStatsArgs {
++	contentId: number;
++	emoji: string;
++	/** Omitted from the request, and the key, when empty: the feeling has no label to narrow by. */
++	label?: string | null;
++}
++
++/**
++ * How many of one content item's perspectives carry a feeling (`feelingStats`).
++ *
++ * `getArgs` returns `null` while there is no feeling to look up, which disables the query so no
++ * request is sent. Must be called during component init.
++ */
++export function useFeelingStats(getArgs: () => FeelingStatsArgs | null) {
++	return createQuery(() => {
++		// Read the args synchronously, so the key and the request always agree on them.
++		const args = getArgs();
++		const label = args?.label || null;
++		return {
++			queryKey: queryKeys.content.feelingStats(String(args?.contentId ?? ''), args?.emoji ?? '', label),
++			queryFn: async (): Promise<FeelingStats | null> => {
++				if (args === null) return null;
++				// `undefined` drops the variable from the request instead of sending a null label.
++				const res = await graphqlRequest<FeelingStatsResponse>(GET_FEELING_STATS, {
++					contentID: args.contentId,
++					emoji: args.emoji,
++					label: label ?? undefined,
++				});
++				return res.feelingStats ?? null;
++			},
++			enabled: args !== null,
++			staleTime: FEELING_STATS_STALE_TIME_MS,
++		};
++	});
++}
+diff --git a/frontend/tests/components/PerspectivePopover.feelingStats.test.ts b/frontend/tests/components/PerspectivePopover.feelingStats.test.ts
+new file mode 100644
+index 00000000..dd27367a
+--- /dev/null
++++ b/frontend/tests/components/PerspectivePopover.feelingStats.test.ts
+@@ -0,0 +1,249 @@
++/**
++ * The "N of M perspectives felt ..." line under the feel wheel in PerspectivePopover.
++ *
++ * Unlike PerspectivePopover.test.ts (which mocks every query hook and renders without a
++ * QueryClient), this file runs the real `useFeelingStats` hook against a real QueryClient and
++ * mocks only the network (`graphqlRequest`), so what is asserted is the request that would go over
++ * the wire and what the viewer sees while it is in flight, after it fails, and once it lands.
++ */
++import { describe, it, expect, vi, beforeEach } from 'vitest';
++import { render, screen, fireEvent } from '@testing-library/svelte';
++import { tick } from 'svelte';
++import PerspectivePopover from '#lib/components/PerspectivePopover.svelte';
++import { GET_FEELING_STATS } from '#lib/queries/perspectives/index.js';
++import { queryKeys } from '#lib/queries/keys.js';
++import TestWrapper from '../helpers/TestWrapper.svelte';
++import { makeClient } from '../helpers/queryBudget';
++import { warmUp } from '../helpers/warmUp';
++
++const mocks = vi.hoisted(() => ({
++	graphqlRequest: vi.fn<(document: string, variables?: Record<string, unknown>) => Promise<unknown>>(),
++}));
++
++vi.mock('#lib/queries/client.js', () => ({ graphqlRequest: mocks.graphqlRequest }));
++
++// Everything else the popover calls at init that needs a network or a Tiptap editor.
++vi.mock('#lib/queries/userTodos/useFetchUserTodos.js', () => ({
++	useFetchUserTodos: vi.fn(() => vi.fn(async () => [])),
++}));
++vi.mock('#lib/queries/userTodos/useUpdateUserTodo.js', () => ({
++	useUpdateUserTodo: vi.fn(() => ({ mutateAsync: vi.fn(), isPending: false })),
++}));
++vi.mock('#lib/queries/perspectives/useCreatePerspective.js', () => ({
++	useCreatePerspective: vi.fn(() => ({ mutateAsync: vi.fn(), isPending: false })),
++}));
++vi.mock('#lib/queries/perspectives/useUpdatePerspective.js', () => ({
++	useUpdatePerspective: vi.fn(() => ({ mutateAsync: vi.fn(), isPending: false })),
++}));
++vi.mock('#lib/queries/perspectives/useDeletePerspective.js', () => ({
++	useDeletePerspective: vi.fn(() => ({ mutate: vi.fn(), isPending: false })),
++}));
++vi.mock('#lib/utils/toast.js', () => ({ toastWithAction: vi.fn() }));
++vi.mock('#lib/utils/perspectiveDraft.js', () => ({
++	draftKey: (contentId: number, userId: number) => `draft:${contentId}:${userId}`,
++	saveDraft: vi.fn(),
++	loadDraft: vi.fn(() => null),
++	clearDraft: vi.fn(),
++}));
++vi.mock('#lib/components/CommentsEditor.svelte', async () => {
++	const mod = await import('../helpers/FakeCommentsEditor.svelte');
++	return { default: mod.default };
++});
++vi.mock('svelte-sonner', () => ({ toast: { success: vi.fn(), error: vi.fn(), info: vi.fn() } }));
++
++const CONTENT_ID = 21;
++
++/** Numbers the fake backend reports, by emoji. */
++const STATS: Record<string, { count: number; totalPerspectives: number }> = {
++	'🥰': { count: 3, totalPerspectives: 12 },
++	'😄': { count: 5, totalPerspectives: 12 },
++	'🫠': { count: 1, totalPerspectives: 4 },
++};
++
++function deferred<T>() {
++	let resolve!: (value: T) => void;
++	const promise = new Promise<T>((r) => (resolve = r));
++	return { promise, resolve };
++}
++
++function renderPopover(props: Record<string, unknown> = {}) {
++	const queryClient = makeClient();
++	render(TestWrapper, {
++		props: {
++			queryClient,
++			component: PerspectivePopover,
++			props: { contentId: CONTENT_ID, contentName: 'Test Content', userId: 42, onClose: vi.fn(), open: true, ...props },
++		},
++	});
++	return queryClient;
++}
++
++/** An existing perspective carrying the given feelings, so the popover opens with them picked. */
++function perspectiveWith(feelings: { emoji: string; label: string | null }[]) {
++	return {
++		id: '4',
++		quality: null,
++		agreement: null,
++		importance: null,
++		confidence: null,
++		like: null,
++		feelings: feelings.map((f) => ({ ...f, intensity: 7000, note: null })),
++	};
++}
++
++const wheelButton = (label: string) => screen.getByRole('button', { name: label });
++const statsLine = () => screen.queryByTestId('feeling-stats');
++const lineText = () => statsLine()?.textContent;
++/** What `graphqlClient.request` would put in the JSON body: `undefined` variables are dropped. */
++const sentVariables = (call: number) => JSON.parse(JSON.stringify(mocks.graphqlRequest.mock.calls[call][1]));
++const settle = async () => {
++	await new Promise<void>((resolve) => setTimeout(resolve, 0));
++	await tick();
++};
++
++// Pay the popover's first-render cost before any test, not inside the first one (#728).
++warmUp(() => renderPopover());
++
++describe('PerspectivePopover: feeling stats under the wheel', () => {
++	beforeEach(() => {
++		mocks.graphqlRequest.mockReset();
++		mocks.graphqlRequest.mockImplementation(async (_doc, variables) => ({
++			feelingStats: STATS[String(variables?.emoji)] ?? { count: 0, totalPerspectives: 0 },
++		}));
++	});
++
++	it('shows nothing, and sends no request, until a feeling is picked', async () => {
++		renderPopover();
++		await settle();
++		expect(statsLine()).not.toBeInTheDocument();
++		expect(mocks.graphqlRequest).not.toHaveBeenCalled();
++	});
++
++	it('after picking a feeling, asks for it scoped to the content being edited and shows "N of M perspectives felt <emoji> <label>"', async () => {
++		renderPopover();
++		await fireEvent.click(wheelButton('Love'));
++
++		expect(await screen.findByTestId('feeling-stats')).toBeInTheDocument();
++		expect(lineText()).toBe('3 of 12 perspectives felt 🥰 Love');
++		expect(mocks.graphqlRequest).toHaveBeenCalledTimes(1);
++		expect(mocks.graphqlRequest.mock.calls[0][0]).toBe(GET_FEELING_STATS);
++		expect(sentVariables(0)).toEqual({ contentID: CONTENT_ID, emoji: '🥰', label: 'Love' });
++	});
++
++	it('places the line under the wheel, inside the wheel column', async () => {
++		renderPopover();
++		await fireEvent.click(wheelButton('Love'));
++		const line = await screen.findByTestId('feeling-stats');
++		expect(screen.getByTestId('feel-wheel-column')).toContainElement(line);
++		expect(wheelButton('Love').compareDocumentPosition(line) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
++	});
++
++	it('shows nothing while the numbers load, then the line once they arrive', async () => {
++		const pending = deferred<unknown>();
++		mocks.graphqlRequest.mockImplementation(() => pending.promise);
++		renderPopover();
++		await fireEvent.click(wheelButton('Love'));
++		await vi.waitFor(() => expect(mocks.graphqlRequest).toHaveBeenCalledTimes(1));
++		await settle();
++		expect(statsLine()).not.toBeInTheDocument();
++
++		pending.resolve({ feelingStats: STATS['🥰'] });
++		expect(await screen.findByTestId('feeling-stats')).toHaveTextContent('3 of 12 perspectives felt 🥰 Love');
++	});
++
++	it('shows nothing when the request fails', async () => {
++		mocks.graphqlRequest.mockRejectedValue(new Error('network down'));
++		const queryClient = renderPopover();
++		await fireEvent.click(wheelButton('Love'));
++		const loveKey = queryKeys.content.feelingStats(String(CONTENT_ID), '🥰', 'Love');
++		await vi.waitFor(() => expect(queryClient.getQueryState(loveKey)?.status).toBe('error'));
++		await settle();
++		expect(statsLine()).not.toBeInTheDocument();
++		// The picked feeling is untouched: a failed lookup never blocks the editor.
++		expect(screen.getByRole('button', { name: 'Remove Love' })).toBeInTheDocument();
++	});
++
++	it('hides a line it was already showing when a later refetch fails, rather than keep showing old numbers', async () => {
++		const queryClient = renderPopover();
++		await fireEvent.click(wheelButton('Love'));
++		await screen.findByTestId('feeling-stats');
++
++		mocks.graphqlRequest.mockRejectedValue(new Error('network down'));
++		const loveKey = queryKeys.content.feelingStats(String(CONTENT_ID), '🥰', 'Love');
++		await queryClient.invalidateQueries({ queryKey: loveKey });
++		await vi.waitFor(() => expect(queryClient.getQueryState(loveKey)?.status).toBe('error'));
++		// TanStack keeps the last good data on a failed refetch; the line must not.
++		expect(queryClient.getQueryData(loveKey)).toEqual(STATS['🥰']);
++		await settle();
++		expect(statsLine()).not.toBeInTheDocument();
++	});
++
++	it('omits the label, in the request and in the line, when the feeling has none', async () => {
++		renderPopover({ existingPerspective: perspectiveWith([{ emoji: '🫠', label: null }]) });
++
++		expect(await screen.findByTestId('feeling-stats')).toBeInTheDocument();
++		expect(sentVariables(0)).toEqual({ contentID: CONTENT_ID, emoji: '🫠' });
++		expect(lineText()).toBe('1 of 4 perspectives felt 🫠');
++	});
++
++	it('treats an empty label as no label', async () => {
++		renderPopover({ existingPerspective: perspectiveWith([{ emoji: '🥰', label: '' }]) });
++
++		expect(await screen.findByTestId('feeling-stats')).toBeInTheDocument();
++		expect(sentVariables(0)).toEqual({ contentID: CONTENT_ID, emoji: '🥰' });
++		expect(lineText()).toBe('3 of 12 perspectives felt 🥰');
++	});
++
++	it('edit mode: feelings the perspective already carries count as picked', async () => {
++		renderPopover({ existingPerspective: perspectiveWith([{ emoji: '😄', label: 'Joyful' }]) });
++
++		expect(await screen.findByTestId('feeling-stats')).toBeInTheDocument();
++		expect(lineText()).toBe('5 of 12 perspectives felt 😄 Joyful');
++	});
++
++	it('describes only the first picked feeling, and moves to the next one when it is removed', async () => {
++		renderPopover();
++		await fireEvent.click(wheelButton('Love'));
++		await screen.findByTestId('feeling-stats');
++
++		// A second pick neither changes the line nor costs a request.
++		await fireEvent.click(wheelButton('Joyful'));
++		await settle();
++		expect(lineText()).toBe('3 of 12 perspectives felt 🥰 Love');
++		expect(mocks.graphqlRequest).toHaveBeenCalledTimes(1);
++
++		// Removing the first leaves Joyful first: its numbers load, and Love's never show against it.
++		const joyful = deferred<unknown>();
++		mocks.graphqlRequest.mockImplementation(() => joyful.promise);
++		await fireEvent.click(screen.getByRole('button', { name: 'Remove Love' }));
++		await vi.waitFor(() => expect(mocks.graphqlRequest).toHaveBeenCalledTimes(2));
++		await settle();
++		expect(statsLine()).not.toBeInTheDocument();
++		expect(sentVariables(1)).toEqual({ contentID: CONTENT_ID, emoji: '😄', label: 'Joyful' });
++
++		joyful.resolve({ feelingStats: STATS['😄'] });
++		await screen.findByTestId('feeling-stats');
++		expect(lineText()).toBe('5 of 12 perspectives felt 😄 Joyful');
++	});
++
++	it('goes away when the last feeling is removed', async () => {
++		renderPopover();
++		await fireEvent.click(wheelButton('Love'));
++		await screen.findByTestId('feeling-stats');
++
++		await fireEvent.click(screen.getByRole('button', { name: 'Remove Love' }));
++		await settle();
++		expect(statsLine()).not.toBeInTheDocument();
++	});
++
++	it('editing the picked feeling (a note) neither refetches nor hides the line', async () => {
++		renderPopover();
++		await fireEvent.click(wheelButton('Love'));
++		await screen.findByTestId('feeling-stats');
++
++		await fireEvent.input(screen.getByPlaceholderText(/Why \/ nuance/), { target: { value: 'it was lovely' } });
++		await settle();
++		expect(lineText()).toBe('3 of 12 perspectives felt 🥰 Love');
++		expect(mocks.graphqlRequest).toHaveBeenCalledTimes(1);
++	});
++});
+diff --git a/frontend/tests/components/PerspectivePopover.test.ts b/frontend/tests/components/PerspectivePopover.test.ts
+index 940d8e60..a9dd6d7a 100644
+--- a/frontend/tests/components/PerspectivePopover.test.ts
++++ b/frontend/tests/components/PerspectivePopover.test.ts
+@@ -67,6 +67,12 @@ vi.mock('#lib/queries/perspectives/useDeletePerspective.js', () => ({
+ 	})),
+ }));
+ 
++// Inert here: the feeling-stats line under the wheel is covered, against a real QueryClient, in
++// PerspectivePopover.feelingStats.test.ts. This file renders without a QueryClient provider.
++vi.mock('#lib/queries/perspectives/useFeelingStats.js', () => ({
++	useFeelingStats: vi.fn(() => ({ data: undefined, isSuccess: false })),
++}));
++
+ vi.mock('svelte-sonner', () => ({
+ 	toast: {
+ 		success: vi.fn(),
+diff --git a/frontend/tests/unit/hooks-useFeelingStats.test.ts b/frontend/tests/unit/hooks-useFeelingStats.test.ts
+new file mode 100644
+index 00000000..3e0f49ef
+--- /dev/null
++++ b/frontend/tests/unit/hooks-useFeelingStats.test.ts
+@@ -0,0 +1,112 @@
++import { describe, it, expect, vi, beforeEach } from 'vitest';
++import { hashKey } from '@tanstack/svelte-query';
++import { preloadLazy } from '../helpers/warmUp';
++
++const { mockGraphqlRequest } = vi.hoisted(() => ({ mockGraphqlRequest: vi.fn() }));
++
++let capturedQueryOptions: any;
++
++vi.mock('@tanstack/svelte-query', async (importOriginal) => {
++	const actual = await importOriginal<typeof import('@tanstack/svelte-query')>();
++	return {
++		...actual,
++		createQuery: vi.fn((optionsFn: () => any) => {
++			capturedQueryOptions = optionsFn();
++			return { data: undefined, isPending: true };
++		}),
++	};
++});
++
++vi.mock('#lib/queries/client.js', () => ({ graphqlRequest: mockGraphqlRequest }));
++
++type Args = { contentId: number; emoji: string; label?: string | null } | null;
++
++async function mountStats(args: Args) {
++	const { useFeelingStats } = await import('#lib/queries/perspectives/useFeelingStats.js');
++	useFeelingStats(() => args);
++	return capturedQueryOptions;
++}
++
++// The tests import these inside their bodies; load them once up front so the first
++// test doesn't pay the module transform, which balloons under full-suite load (#728).
++preloadLazy(
++	() => import('#lib/queries/perspectives/index.js'),
++	() => import('#lib/queries/perspectives/useFeelingStats.js'),
++	() => import('#lib/queries/keys.js'),
++);
++
++describe('useFeelingStats', () => {
++	beforeEach(() => {
++		vi.clearAllMocks();
++		capturedQueryOptions = undefined;
++	});
++
++	it('is disabled while there is no feeling, so no request is sent', async () => {
++		const options = await mountStats(null);
++		expect(options.enabled).toBe(false);
++		// Even if something ran the queryFn of a disabled query, it must not hit the network.
++		expect(await options.queryFn()).toBeNull();
++		expect(mockGraphqlRequest).not.toHaveBeenCalled();
++	});
++
++	it('is enabled for a feeling', async () => {
++		const options = await mountStats({ contentId: 3, emoji: '🥰', label: 'Love' });
++		expect(options.enabled).toBe(true);
++	});
++
++	it('sends the content, emoji and label through the authenticated graphqlRequest wrapper and unwraps feelingStats', async () => {
++		mockGraphqlRequest.mockResolvedValue({ feelingStats: { count: 3, totalPerspectives: 12 } });
++		const { GET_FEELING_STATS } = await import('#lib/queries/perspectives/index.js');
++		const options = await mountStats({ contentId: 3, emoji: '🥰', label: 'Love' });
++		const result = await options.queryFn();
++		expect(mockGraphqlRequest).toHaveBeenCalledWith(GET_FEELING_STATS, { contentID: 3, emoji: '🥰', label: 'Love' });
++		expect(result).toEqual({ count: 3, totalPerspectives: 12 });
++	});
++
++	it.each([
++		['null', null],
++		['undefined', undefined],
++		['empty', ''],
++	])('sends no label variable at all when the label is %s', async (_name, label) => {
++		mockGraphqlRequest.mockResolvedValue({ feelingStats: { count: 1, totalPerspectives: 2 } });
++		const options = await mountStats({ contentId: 3, emoji: '🫠', label });
++		await options.queryFn();
++		const sent = mockGraphqlRequest.mock.calls[0][1];
++		// What graphql-request would serialize: an undefined variable is dropped from the body.
++		expect(JSON.parse(JSON.stringify(sent))).toEqual({ contentID: 3, emoji: '🫠' });
++	});
++
++	it('returns null (not undefined, which TanStack rejects) when the server sends no stats', async () => {
++		mockGraphqlRequest.mockResolvedValue({ feelingStats: null });
++		const options = await mountStats({ contentId: 3, emoji: '🥰', label: 'Love' });
++		expect(await options.queryFn()).toBeNull();
++	});
++
++	it('mirrors every variable it sends in the query key: content, emoji and label each change the hash', async () => {
++		const base = await mountStats({ contentId: 3, emoji: '🥰', label: 'Love' });
++		const same = await mountStats({ contentId: 3, emoji: '🥰', label: 'Love' });
++		const otherContent = await mountStats({ contentId: 4, emoji: '🥰', label: 'Love' });
++		const otherEmoji = await mountStats({ contentId: 3, emoji: '😄', label: 'Love' });
++		const otherLabel = await mountStats({ contentId: 3, emoji: '🥰', label: 'Adoring' });
++		const noLabel = await mountStats({ contentId: 3, emoji: '🥰', label: null });
++
++		const hash = (o: { queryKey: readonly unknown[] }) => hashKey(o.queryKey);
++		expect(hash(same)).toBe(hash(base));
++		expect(new Set([base, otherContent, otherEmoji, otherLabel, noLabel].map(hash)).size).toBe(5);
++	});
++
++	it('treats a missing, null and empty label as one request (one key)', async () => {
++		const a = await mountStats({ contentId: 3, emoji: '🥰' });
++		const b = await mountStats({ contentId: 3, emoji: '🥰', label: null });
++		const c = await mountStats({ contentId: 3, emoji: '🥰', label: '' });
++		expect(hashKey(a.queryKey)).toBe(hashKey(b.queryKey));
++		expect(hashKey(a.queryKey)).toBe(hashKey(c.queryKey));
++	});
++
++	it('is cached for a deliberate window, not the default 0', async () => {
++		const { FEELING_STATS_STALE_TIME_MS } = await import('#lib/queries/perspectives/useFeelingStats.js');
++		const options = await mountStats({ contentId: 3, emoji: '🥰', label: 'Love' });
++		expect(options.staleTime).toBe(FEELING_STATS_STALE_TIME_MS);
++		expect(FEELING_STATS_STALE_TIME_MS).toBeGreaterThan(0);
++	});
++});
+diff --git a/frontend/tests/unit/query-cache-contract.test.ts b/frontend/tests/unit/query-cache-contract.test.ts
+index 1f126d1c..c43ad7fe 100644
+--- a/frontend/tests/unit/query-cache-contract.test.ts
++++ b/frontend/tests/unit/query-cache-contract.test.ts
+@@ -48,6 +48,8 @@ preloadLazy(
+ 	() => import('#lib/queries/content/useAddMovie.js'),
+ 	() => import('#lib/queries/content/useUpdateSourceData.js'),
+ 	() => import('#lib/queries/perspectives/useDeletePerspective.js'),
++	() => import('#lib/queries/perspectives/useCreatePerspective.js'),
++	() => import('#lib/queries/perspectives/useUpdatePerspective.js'),
+ );
+ 
+ describe('de-duplication and freshness', () => {
+@@ -62,6 +64,17 @@ describe('de-duplication and freshness', () => {
+ 		stop();
+ 	});
+ 
++	it('three editors asking after the same feeling on the same content cost one network call', async () => {
++		const fetcher = countingFetch({ feelingStats: { count: 3, totalPerspectives: 12 } });
++		const stop = await mountConsumers(
++			client,
++			{ queryKey: queryKeys.content.feelingStats('3', '🥰', 'Love'), queryFn: fetcher, staleTime: 60_000 },
++			3,
++		);
++		expect(fetcher.fetches()).toBe(1);
++		stop();
++	});
++
+ 	it('a consumer mounting inside staleTime does not refetch', async () => {
+ 		const fetcher = countingFetch({ id: '3' });
+ 		const options = { queryKey: queryKeys.content.detail('3'), queryFn: fetcher, staleTime: 60_000 };
+@@ -141,6 +154,32 @@ describe('query key hygiene', () => {
+ 	});
+ });
+ 
++describe('feeling stats key', () => {
++	it('every variable the request sends changes the key hash', () => {
++		const hash = (id: string, emoji: string, label: string | null) =>
++			hashKey(queryKeys.content.feelingStats(id, emoji, label));
++		const base = hash('3', '🥰', 'Love');
++		expect(hash('3', '🥰', 'Love')).toBe(base);
++		expect(hash('4', '🥰', 'Love')).not.toBe(base);
++		expect(hash('3', '😄', 'Love')).not.toBe(base);
++		expect(hash('3', '🥰', 'Adoring')).not.toBe(base);
++		expect(hash('3', '🥰', null)).not.toBe(base);
++	});
++
++	it('sits under its content detail prefix, and collides with no other detail entry', () => {
++		const stats = queryKeys.content.feelingStats('3', '🥰', 'Love');
++		expect(stats.slice(0, queryKeys.content.detail('3').length)).toEqual(queryKeys.content.detail('3'));
++		const hashes = [
++			queryKeys.content.detail('3'),
++			queryKeys.content.aggregates('3', null),
++			queryKeys.content.banner('3'),
++			queryKeys.content.row('3'),
++			stats,
++		].map((k) => hashKey(k));
++		expect(new Set(hashes).size).toBe(hashes.length);
++	});
++});
++
+ describe('eviction: useDeletePerspective.onSuccess evicts exactly what changed', () => {
+ 	it('invalidates the affected entries and leaves unrelated caches alone', async () => {
+ 		const affected = [
+@@ -148,6 +187,8 @@ describe('eviction: useDeletePerspective.onSuccess evicts exactly what changed',
+ 			queryKeys.content.detail('3'),
+ 			queryKeys.perspectives.listByContent(3),
+ 			queryKeys.perspectives.listByUser(42),
++			queryKeys.content.feelingStats('3', '🥰', 'Love'),
++			queryKeys.content.feelingStats('3', '🫠', null),
+ 		];
+ 		const unrelated = [
+ 			queryKeys.perspectives.detail('8'),
+@@ -156,6 +197,7 @@ describe('eviction: useDeletePerspective.onSuccess evicts exactly what changed',
+ 			queryKeys.users.list(),
+ 			queryKeys.messaging.threads.list(),
+ 			queryKeys.bible.passageText(1, 2),
++			queryKeys.content.feelingStats('4', '🥰', 'Love'),
+ 		];
+ 		for (const k of [...affected, ...unrelated]) seed(client, k);
+ 
+@@ -169,6 +211,37 @@ describe('eviction: useDeletePerspective.onSuccess evicts exactly what changed',
+ 	});
+ });
+ 
++describe("eviction: creating or editing a perspective evicts that content's feeling stats, and only that content's", () => {
++	const mine = [queryKeys.content.feelingStats('3', '🥰', 'Love'), queryKeys.content.feelingStats('3', '🫠', null)];
++	const others = [queryKeys.content.feelingStats('4', '🥰', 'Love'), queryKeys.content.detail('4')];
++
++	it('useCreatePerspective.onSuccess', async () => {
++		for (const k of [...mine, ...others]) seed(client, k);
++		const { useCreatePerspective } = await import('#lib/queries/perspectives/useCreatePerspective.js');
++		useCreatePerspective();
++		capturedDeleteOptions.onSuccess(
++			{ createPerspective: { id: '9', contentID: '3' } },
++			{ userID: 42, contentID: 3 },
++			{ previous: [], tempId: 'optimistic-1' },
++		);
++
++		const outcome = invalidationOutcome(client, [...mine, ...others]);
++		expect(outcome.invalidated).toEqual(mine);
++		expect(outcome.untouched).toEqual(others);
++	});
++
++	it('useUpdatePerspective.onSuccess', async () => {
++		for (const k of [...mine, ...others]) seed(client, k);
++		const { useUpdatePerspective } = await import('#lib/queries/perspectives/useUpdatePerspective.js');
++		useUpdatePerspective();
++		capturedDeleteOptions.onSuccess({ updatePerspective: { id: '9', contentID: '3' } });
++
++		const outcome = invalidationOutcome(client, [...mine, ...others]);
++		expect(outcome.invalidated).toEqual(mine);
++		expect(outcome.untouched).toEqual(others);
++	});
++});
++
+ describe('eviction: useSetPassageDisplayTitle.onSuccess patches in place, evicts nothing', () => {
+ 	it('updates only that passage in cached lists/rows and invalidates no entry', async () => {
+ 		const listKey = queryKeys.content.list({ first: 50 });

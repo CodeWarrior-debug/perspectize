@@ -1,0 +1,119 @@
+diff --git a/backend/internal/adapters/repositories/postgres/computed_cursor_test.go b/backend/internal/adapters/repositories/postgres/computed_cursor_test.go
+index 6e0deb76..66291671 100644
+--- a/backend/internal/adapters/repositories/postgres/computed_cursor_test.go
++++ b/backend/internal/adapters/repositories/postgres/computed_cursor_test.go
+@@ -6,6 +6,7 @@ import (
+ 	"encoding/base64"
+ 	"encoding/json"
+ 	"reflect"
++	"strings"
+ 	"testing"
+ 
+ 	"github.com/DATA-DOG/go-sqlmock"
+@@ -116,6 +117,51 @@ func TestList_ComputedSortKeyCursor(t *testing.T) {
+ 	}
+ }
+ 
++// TestList_LikeCountSortNeverCastsUnguarded pins the hidden-likes failure: YouTube can
++// store statistics.likeCount as "", and Postgres rejects "" cast to BIGINT, which failed
++// the whole list ("failed to list content"). Every place the sort expression appears (the
++// selected cursor column, ORDER BY, and page 2's keyset WHERE) must put the cast behind
++// the all-digits guard, so a non-numeric value becomes NULL and sorts as 0.
++func TestList_LikeCountSortNeverCastsUnguarded(t *testing.T) {
++	const (
++		bareCast = `(response->'items'->0->'statistics'->>'likeCount')::BIGINT`
++		guarded  = `CASE WHEN (response->'items'->0->'statistics'->>'likeCount') ~ '^[0-9]{1,18}$' THEN ` + bareCast + ` END`
++	)
++	for _, order := range []domain.SortOrder{domain.SortOrderAsc, domain.SortOrderDesc} {
++		t.Run(string(order), func(t *testing.T) {
++			ctx := context.Background()
++			db, mock := newMockDB(t)
++			repo := NewGormContentRepository(db)
++			first := 1
++			params := domain.ContentListParams{First: &first, SortBy: domain.ContentSortByLikeCount, SortOrder: order}
++
++			mock.ExpectQuery(`SELECT content\.\*, \(.+\) AS like_count`).WillReturnRows(computedRows("like_count", int64(0)))
++			c := querycount.Attach(t, db)
++			page1, err := repo.List(ctx, params)
++			require.NoError(t, err)
++			require.NotNil(t, page1.EndCursor)
++
++			params.After = page1.EndCursor
++			mock.ExpectQuery(`WHERE content\.privacy = \$1 AND .*COALESCE`).
++				WillReturnRows(computedRows("like_count", int64(0)))
++			_, err = repo.List(ctx, params)
++			require.NoError(t, err)
++			assertAllExpectationsMet(t, mock)
++
++			stmts := c.Statements()
++			require.Len(t, stmts, 2)
++			for i, stmt := range stmts {
++				assert.Contains(t, stmt, "("+guarded+") AS like_count", "statement %d: selected cursor column", i+1)
++				assert.Contains(t, stmt, "ORDER BY COALESCE("+guarded+", ", "statement %d: ORDER BY", i+1)
++				assert.Equal(t, strings.Count(stmt, guarded), strings.Count(stmt, bareCast),
++					"statement %d: every BIGINT cast of likeCount must sit inside the digit guard", i+1)
++			}
++			assert.Contains(t, stmts[1], "WHERE content.privacy = $1 AND (COALESCE("+guarded+", ",
++				"page 2 keyset comparison must use the guarded expression")
++		})
++	}
++}
++
+ func TestList_RealColumnSortSelectsNoComputedColumns(t *testing.T) {
+ 	db, mock := newMockDB(t)
+ 	mock.ExpectQuery(`SELECT \* FROM "content"`).WillReturnRows(contentRows())
+diff --git a/backend/internal/adapters/repositories/postgres/helpers.go b/backend/internal/adapters/repositories/postgres/helpers.go
+index ac7b4ea9..92430bcf 100644
+--- a/backend/internal/adapters/repositories/postgres/helpers.go
++++ b/backend/internal/adapters/repositories/postgres/helpers.go
+@@ -175,6 +175,18 @@ const (
+ 	nullPublishedAtDesc = ""
+ )
+ 
++// likeCountText is the stored YouTube statistics.likeCount, still text.
++const likeCountText = "(response->'items'->0->'statistics'->>'likeCount')"
++
++// likeCountSortExpr is the LIKE_COUNT sort key. YouTube stores likeCount as a string and
++// it can be empty (hidden likes), which a bare ::BIGINT cast rejects, failing the whole
++// list. Only a plain digit string is cast; anything else yields NULL, which the rule's
++// NULLReplacement sorts as 0 (the same "unknown" the GraphQL likeCount field shows for an
++// empty value). Postgres evaluates a CASE branch only for rows that match its WHEN, so
++// the cast never sees a non-numeric value. The 18-digit cap keeps the cast inside BIGINT.
++const likeCountSortExpr = "CASE WHEN " + likeCountText + " ~ '^[0-9]{1,18}$' " +
++	"THEN " + likeCountText + "::BIGINT END"
++
+ // contentSortRule builds a single paginator.Rule for one content sort column.
+ func contentSortRule(sortBy domain.ContentSortBy, order domain.SortOrder) paginator.Rule {
+ 	boxOfficeNull, vsBudgetNull, ageRatingNull := nullBoxOfficeDesc, nullVsBudgetDesc, nullAgeRatingDesc
+@@ -205,7 +217,7 @@ func contentSortRule(sortBy domain.ContentSortBy, order domain.SortOrder) pagina
+ 		return paginator.Rule{
+ 			Key:             "LikeCount",
+ 			Order:           paginatorOrder,
+-			SQLRepr:         "(response->'items'->0->'statistics'->>'likeCount')::BIGINT",
++			SQLRepr:         likeCountSortExpr,
+ 			NULLReplacement: int64(0),
+ 		}
+ 	case domain.ContentSortByPercentLiked:
+diff --git a/backend/internal/adapters/repositories/postgres/helpers_test.go b/backend/internal/adapters/repositories/postgres/helpers_test.go
+index d2936c08..1604106f 100644
+--- a/backend/internal/adapters/repositories/postgres/helpers_test.go
++++ b/backend/internal/adapters/repositories/postgres/helpers_test.go
+@@ -145,13 +145,14 @@ func TestBuildContentSortRules(t *testing.T) {
+ 			wantTieOrder: paginator.ASC,
+ 		},
+ 		{
+-			name:   "like count descending",
++			name:   "like count descending casts only all-digit values, so an empty string sorts as unknown",
+ 			sortBy: domain.ContentSortByLikeCount,
+ 			order:  domain.SortOrderDesc,
+ 			wantPrimary: paginator.Rule{
+-				Key:             "LikeCount",
+-				Order:           paginator.DESC,
+-				SQLRepr:         "(response->'items'->0->'statistics'->>'likeCount')::BIGINT",
++				Key:   "LikeCount",
++				Order: paginator.DESC,
++				SQLRepr: "CASE WHEN (response->'items'->0->'statistics'->>'likeCount') ~ '^[0-9]{1,18}$' " +
++					"THEN (response->'items'->0->'statistics'->>'likeCount')::BIGINT END",
+ 				NULLReplacement: int64(0),
+ 			},
+ 			wantTieOrder: paginator.DESC,

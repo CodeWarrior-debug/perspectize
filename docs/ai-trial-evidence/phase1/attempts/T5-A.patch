@@ -1,0 +1,582 @@
+diff --git a/frontend/src/lib/components/ActivityTable.svelte b/frontend/src/lib/components/ActivityTable.svelte
+index 2404698c..cb176918 100644
+--- a/frontend/src/lib/components/ActivityTable.svelte
++++ b/frontend/src/lib/components/ActivityTable.svelte
+@@ -12,13 +12,14 @@
+ 		CellMouseOverEvent,
+ 	} from '@ag-grid-community/core';
+ 	import { tick } from 'svelte';
+-	import { createQuery, keepPreviousData } from '@tanstack/svelte-query';
++	import { createQuery, hashKey, keepPreviousData } from '@tanstack/svelte-query';
+ 	import { page } from '$app/state';
+ 	import { goto } from '$app/navigation';
+ 	import { graphqlRequest } from '$lib/queries/client';
+ 	import {
+ 		ACTIVITY_LIST_STALE_TIME_MS,
+ 		cursorsAfterPage,
++		DisplayedOrder,
+ 		LIST_CONTENT,
+ 		activityListRequest,
+ 		type ContentItem,
+@@ -470,11 +471,27 @@
+ 		});
+ 	});
+ 
++	// "Loaded" mode keeps the order on screen while the same query refetches: the server sorts by
++	// updatedAt desc, so an edited row would otherwise come back first and jump out of view. A new key
++	// (sort, filter, search, page, mode) starts from the server order; placeholder rows are neither
++	// reordered nor remembered. "All Items" shows the server order, since the sort and page are the point.
++	// The grid and the mobile card list both read rowData, so both get the kept order.
++	const displayedOrder = new DisplayedOrder();
++	const listOrderKey = $derived(mode === 'loaded' ? hashKey(activityRequest.queryKey) : null);
++	const orderedItems = $derived(
++		displayedOrder.arrange(listOrderKey, contentQuery.data?.content.items ?? [], contentQuery.isPlaceholderData),
++	);
++	// An effect, not part of the derived above: it runs after the query result for the current key
++	// has settled, so a key change that has not yet swapped in its placeholder cannot record the old rows.
++	$effect(() => {
++		displayedOrder.record(listOrderKey, orderedItems, contentQuery.isPlaceholderData);
++	});
++
+ 	// Derived values from query
+ 	// Rows get their adder's username from the cached users list (see useUsernames).
+ 	const usernames = useUsernames();
+ 	const rowData = $derived(
+-		(contentQuery.data?.content.items ?? []).map((item) => ({
++		orderedItems.map((item) => ({
+ 			...item,
+ 			addedByUsername: usernames.byId.get(item.addedByUserID) ?? null,
+ 		})),
+diff --git a/frontend/src/lib/queries/content/displayedOrder.ts b/frontend/src/lib/queries/content/displayedOrder.ts
+new file mode 100644
+index 00000000..35793549
+--- /dev/null
++++ b/frontend/src/lib/queries/content/displayedOrder.ts
+@@ -0,0 +1,51 @@
++/**
++ * Keeps the Library list in the order the user is looking at while the same query refetches.
++ *
++ * The server returns Loaded-mode rows by updatedAt desc, so editing a row bumps it to the top of the
++ * next response and the row the user just touched jumps out of view. `DisplayedOrder` remembers the
++ * order last shown for one query key and re-applies it to the next response of that key:
++ *
++ *  - rows already shown keep their place (with their fresh data);
++ *  - rows that were not shown before lead, in server order, matching the default sort;
++ *  - rows the response no longer has drop out.
++ *
++ * A different key (another sort, filter, search or page, or leaving Loaded mode) starts over from the
++ * server order. Placeholder data (the previous key's rows shown while the new key loads) is neither
++ * reordered nor remembered.
++ *
++ * Pure: no runes, no network. `arrange` only reads and `record` only writes, so ActivityTable can call
++ * `arrange` from a `$derived` and `record` from an `$effect`, which runs once the query result for the
++ * current key has settled.
++ */
++export interface OrderedRow {
++	id: string | number;
++}
++
++export class DisplayedOrder {
++	#key: string | null = null;
++	#ids: readonly string[] | null = null;
++
++	/**
++	 * `items` (server order) in the remembered order for `key`, or untouched when there is nothing to
++	 * keep. `key` is null when this view keeps the server order (not Loaded mode).
++	 */
++	arrange<T extends OrderedRow>(key: string | null, items: readonly T[], placeholder: boolean): readonly T[] {
++		if (key === null || placeholder || key !== this.#key || this.#ids === null) return items;
++		const place = new Map(this.#ids.map((id, index) => [id, index] as const));
++		const fresh: T[] = [];
++		const kept: T[] = [];
++		for (const item of items) (place.has(String(item.id)) ? kept : fresh).push(item);
++		kept.sort((a, b) => place.get(String(a.id))! - place.get(String(b.id))!);
++		return [...fresh, ...kept];
++	}
++
++	/** Remember what is displayed for `key`. A new key forgets the old order first, even for placeholder data. */
++	record<T extends OrderedRow>(key: string | null, shown: readonly T[], placeholder: boolean): void {
++		if (key !== this.#key) {
++			this.#key = key;
++			this.#ids = null;
++		}
++		if (key === null || placeholder) return;
++		this.#ids = shown.map((item) => String(item.id));
++	}
++}
+diff --git a/frontend/src/lib/queries/content/index.ts b/frontend/src/lib/queries/content/index.ts
+index e01c076a..ee24f1fc 100644
+--- a/frontend/src/lib/queries/content/index.ts
++++ b/frontend/src/lib/queries/content/index.ts
+@@ -9,6 +9,7 @@ export interface LengthDisplay {
+ 
+ export type { ContentFilterInput } from '$lib/utils/gridUrlState';
+ export { activityListRequest, cursorsAfterPage, ACTIVITY_LIST_STALE_TIME_MS, LOADED_MODE_FIRST } from './activityList';
++export { DisplayedOrder } from './displayedOrder';
+ 
+ // Values the API returns in Content.contentType (a String, not a GraphQL enum).
+ export type ContentType = 'YOUTUBE_VIDEO' | 'CLAIM' | 'BIBLE_PASSAGE' | 'MOVIE' | 'BOOK' | 'WEB_PAGE';
+diff --git a/frontend/tests/components/ActivityTable.displayedOrder.test.ts b/frontend/tests/components/ActivityTable.displayedOrder.test.ts
+new file mode 100644
+index 00000000..76a016e7
+--- /dev/null
++++ b/frontend/tests/components/ActivityTable.displayedOrder.test.ts
+@@ -0,0 +1,245 @@
++/**
++ * ActivityTable keeps the Library list in the order the user sees while the same query refetches,
++ * so an edited row (which the server returns first, by updatedAt desc) does not jump out of view.
++ *
++ * AG Grid does not render in jsdom, so these run on the mobile card list, which reads the same
++ * rowData the grid does. A real QueryClient drives real refetches; the page URL is reactive
++ * (tests/helpers/livePage.svelte.ts) so a search change re-keys the query like a navigation would.
++ */
++import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
++import { render, waitFor } from '@testing-library/svelte';
++import { QueryClient } from '@tanstack/svelte-query';
++import TestWrapper from '../helpers/TestWrapper.svelte';
++import { livePage } from '../helpers/livePage.svelte';
++import { queryKeys } from '$lib/queries/keys';
++
++const { mockRequest, clerkState } = vi.hoisted(() => ({
++	mockRequest: vi.fn(),
++	clerkState: { isLoaded: false, auth: { userId: null as string | null } },
++}));
++
++vi.mock('ag-grid-svelte5', () => ({
++	default: vi.fn(() => ({ $$: {}, $set: vi.fn(), $on: vi.fn(), $destroy: vi.fn() })),
++}));
++vi.mock('$lib/queries/client', () => ({ graphqlRequest: mockRequest }));
++vi.mock('svelte-clerk', () => ({ useClerkContext: () => clerkState }));
++vi.mock('$app/state', async () => {
++	const { livePage } = await import('../helpers/livePage.svelte');
++	return { page: livePage, updated: { current: false, check: vi.fn(async () => false) } };
++});
++
++import ActivityTable from '$lib/components/ActivityTable.svelte';
++import { preloadLazy, warmUp } from '../helpers/warmUp';
++
++const pageInfo = { hasNextPage: false, hasPreviousPage: false, startCursor: null, endCursor: null };
++
++function video(id: string, name = `Video ${id}`) {
++	return {
++		id,
++		name,
++		url: `https://youtube.com/watch?v=v${id}`,
++		contentType: 'YOUTUBE_VIDEO',
++		length: 300,
++		lengthUnits: 'seconds',
++		viewCount: 1500,
++		likeCount: 100,
++		channelTitle: 'Test Channel',
++		publishedAt: '2024-01-15T00:00:00Z',
++		tags: ['test'],
++		description: 'A test video',
++		createdAt: '2024-01-20',
++		updatedAt: '2024-01-25',
++	};
++}
++
++/** What the server would answer next: the rows in the order it sorts them. */
++let serverRows: ReturnType<typeof video>[] = [];
++
++function respond(query: unknown) {
++	if (!String(query).includes('ListContent')) return { content: { items: [], pageInfo, totalCount: 0 } };
++	return { content: { items: serverRows, pageInfo, totalCount: serverRows.length } };
++}
++
++function cardOrder(container: HTMLElement): string[] {
++	return Array.from(container.querySelectorAll('[data-testid^="card-thumb-"]')).map((el) =>
++		(el.getAttribute('data-testid') ?? '').replace('card-thumb-', ''),
++	);
++}
++
++function cardTitles(container: HTMLElement): string[] {
++	return Array.from(container.querySelectorAll('button[title="View content data + details"] > div:first-child')).map(
++		(el) => el.textContent?.trim() ?? '',
++	);
++}
++
++let queryClient: QueryClient;
++// The setup.ts matchMedia mock is not configurable, so put the original function back by reassignment.
++const originalMatchMedia = window.matchMedia;
++
++/** Below 860px the grid is replaced by the card list (see the media query in useCardMode). */
++function useCardViewport() {
++	window.matchMedia = vi.fn(
++		(query: string) =>
++			({
++				matches: query.includes('max-width: 859px'),
++				media: query,
++				onchange: null,
++				addListener: vi.fn(),
++				removeListener: vi.fn(),
++				addEventListener: vi.fn(),
++				removeEventListener: vi.fn(),
++				dispatchEvent: vi.fn(),
++			}) as unknown as MediaQueryList,
++	);
++}
++
++function renderTable() {
++	return render(TestWrapper, { props: { queryClient, component: ActivityTable, props: {} } });
++}
++
++/** The server now answers `rows`; refetch the Library list the way a saved edit does. */
++async function refetchWith(rows: ReturnType<typeof video>[]) {
++	serverRows = rows;
++	await queryClient.invalidateQueries({ queryKey: queryKeys.content.lists() });
++}
++
++preloadLazy(() => import('$lib/components/PerspectivePopover.svelte'));
++warmUp(() => {
++	queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
++	mockRequest.mockImplementation(async (query: unknown) => respond(query));
++	useCardViewport();
++	try {
++		return renderTable();
++	} finally {
++		window.matchMedia = originalMatchMedia;
++	}
++});
++
++describe('ActivityTable: displayed order while the list refetches (Loaded mode)', () => {
++	beforeEach(() => {
++		vi.clearAllMocks();
++		useCardViewport();
++		clerkState.isLoaded = false;
++		clerkState.auth.userId = null;
++		livePage.url = new URL('http://localhost/');
++		serverRows = [video('1'), video('2'), video('3'), video('4')];
++		mockRequest.mockImplementation(async (query: unknown) => respond(query));
++		queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
++	});
++
++	afterEach(() => {
++		window.matchMedia = originalMatchMedia;
++	});
++
++	it('starts in the server order', async () => {
++		const { container } = renderTable();
++		await waitFor(() => expect(cardOrder(container)).toEqual(['1', '2', '3', '4']));
++	});
++
++	it('keeps an edited row where it was when the server returns it first', async () => {
++		const { container } = renderTable();
++		await waitFor(() => expect(cardOrder(container)).toEqual(['1', '2', '3', '4']));
++		const listCalls = () => mockRequest.mock.calls.filter(([q]) => String(q).includes('ListContent')).length;
++		const before = listCalls();
++
++		await refetchWith([video('3', 'Video 3 (edited)'), video('1'), video('2'), video('4')]);
++
++		await waitFor(() => expect(cardTitles(container)).toContain('Video 3 (edited)'));
++		expect(listCalls()).toBe(before + 1);
++		expect(cardOrder(container)).toEqual(['1', '2', '3', '4']);
++	});
++
++	it('keeps the order through more than one refetch', async () => {
++		const { container } = renderTable();
++		await waitFor(() => expect(cardOrder(container)).toEqual(['1', '2', '3', '4']));
++
++		await refetchWith([video('4', 'Video 4 (edited)'), video('1'), video('2'), video('3')]);
++		await waitFor(() => expect(cardTitles(container)).toContain('Video 4 (edited)'));
++		await refetchWith([video('2', 'Video 2 (edited)'), video('4', 'Video 4 (edited)'), video('1'), video('3')]);
++		await waitFor(() => expect(cardTitles(container)).toContain('Video 2 (edited)'));
++
++		expect(cardOrder(container)).toEqual(['1', '2', '3', '4']);
++	});
++
++	it('puts a new row first and keeps the others where they were', async () => {
++		const { container } = renderTable();
++		await waitFor(() => expect(cardOrder(container)).toEqual(['1', '2', '3', '4']));
++
++		await refetchWith([video('9'), video('3', 'Video 3 (edited)'), video('1'), video('2'), video('4')]);
++
++		await waitFor(() => expect(cardOrder(container)).toEqual(['9', '1', '2', '3', '4']));
++	});
++
++	it('drops a row the server no longer returns without moving the rest', async () => {
++		const { container } = renderTable();
++		await waitFor(() => expect(cardOrder(container)).toEqual(['1', '2', '3', '4']));
++
++		await refetchWith([video('4'), video('3'), video('1')]);
++
++		await waitFor(() => expect(cardOrder(container)).toEqual(['1', '3', '4']));
++	});
++
++	it('starts from the server order when the search changes', async () => {
++		const { container } = renderTable();
++		await waitFor(() => expect(cardOrder(container)).toEqual(['1', '2', '3', '4']));
++		await refetchWith([video('3', 'Video 3 (edited)'), video('1'), video('2'), video('4')]);
++		await waitFor(() => expect(cardTitles(container)).toContain('Video 3 (edited)'));
++		expect(cardOrder(container)).toEqual(['1', '2', '3', '4']);
++
++		// A new search is a new key: its rows come back in the server order, not the one on screen.
++		serverRows = [video('4'), video('3', 'Video 3 (edited)'), video('2'), video('1')];
++		livePage.url = new URL('http://localhost/?q=video');
++
++		await waitFor(() => expect(cardOrder(container)).toEqual(['4', '3', '2', '1']));
++	});
++
++	it('starts from the server order when the Type filter changes', async () => {
++		const { container } = renderTable();
++		await waitFor(() => expect(cardOrder(container)).toEqual(['1', '2', '3', '4']));
++		await refetchWith([video('2', 'Video 2 (edited)'), video('1'), video('3'), video('4')]);
++		await waitFor(() => expect(cardTitles(container)).toContain('Video 2 (edited)'));
++
++		// `f=none` clears the default YouTube Type filter: a different request, so a different key.
++		serverRows = [video('4'), video('2'), video('3'), video('1')];
++		livePage.url = new URL('http://localhost/?f=none');
++
++		await waitFor(() => expect(cardOrder(container)).toEqual(['4', '2', '3', '1']));
++	});
++
++	it('neither orders nor records the placeholder rows while the next key loads', async () => {
++		const { container } = renderTable();
++		await waitFor(() => expect(cardOrder(container)).toEqual(['1', '2', '3', '4']));
++		await refetchWith([video('3', 'Video 3 (edited)'), video('1'), video('2'), video('4')]);
++		await waitFor(() => expect(cardTitles(container)).toContain('Video 3 (edited)'));
++
++		// Hold the next key's response so the placeholder (previous rows) stays on screen.
++		let release: (value: unknown) => void = () => {};
++		const gate = new Promise((resolve) => (release = resolve));
++		mockRequest.mockImplementation(async (query: unknown) => {
++			if (String(query).includes('ListContent')) await gate;
++			return respond(query);
++		});
++		serverRows = [video('2'), video('4'), video('1'), video('3')];
++		livePage.url = new URL('http://localhost/?q=video');
++
++		// While loading, the previous key's rows are the placeholder: shown as that response came from
++		// the server (3 first), not in the order kept for the previous key (1 2 3 4)...
++		await waitFor(() => expect(mockRequest.mock.calls.some(([, v]) => v?.filter?.search === 'video')).toBe(true));
++		expect(cardOrder(container)).toEqual(['3', '1', '2', '4']);
++
++		// ...and the real response is then shown in the order the server sent, not one recorded from the placeholder
++		// (that would put 3 1 2 4 back on top of it).
++		release(undefined);
++		await waitFor(() => expect(cardOrder(container)).toEqual(['2', '4', '1', '3']));
++	});
++
++	it('does not keep the order in "All Items" mode (server sort and page decide)', async () => {
++		livePage.url = new URL('http://localhost/?mode=all');
++		const { container } = renderTable();
++		await waitFor(() => expect(cardOrder(container)).toEqual(['1', '2', '3', '4']));
++
++		await refetchWith([video('3', 'Video 3 (edited)'), video('1'), video('2'), video('4')]);
++
++		await waitFor(() => expect(cardOrder(container)).toEqual(['3', '1', '2', '4']));
++	});
++});
+diff --git a/frontend/tests/helpers/livePage.svelte.ts b/frontend/tests/helpers/livePage.svelte.ts
+new file mode 100644
+index 00000000..fbad657b
+--- /dev/null
++++ b/frontend/tests/helpers/livePage.svelte.ts
+@@ -0,0 +1,14 @@
++/**
++ * A reactive stand-in for SvelteKit's `page` from `$app/state`: assigning `livePage.url` after render
++ * re-derives everything that reads `page.url`, the way a navigation does. `.svelte.ts` so `$state` works.
++ * Test-only; tests that never change the URL after render use `mockPageState` from `tests/setup.ts`.
++ */
++export const livePage = $state({
++	url: new URL('http://localhost/'),
++	params: {},
++	route: { id: '/' },
++	status: 200,
++	error: null,
++	data: {},
++	form: null,
++});
+diff --git a/frontend/tests/unit/activity-list-displayed-order.test.ts b/frontend/tests/unit/activity-list-displayed-order.test.ts
+new file mode 100644
+index 00000000..f626d3a4
+--- /dev/null
++++ b/frontend/tests/unit/activity-list-displayed-order.test.ts
+@@ -0,0 +1,187 @@
++/**
++ * DisplayedOrder keeps the Library list where the user left it while one query key refetches
++ * (an edited row comes back first from the server and must not jump out of view). A new key,
++ * leaving Loaded mode, and placeholder data all fall back to the server order.
++ */
++import { describe, it, expect } from 'vitest';
++import { hashKey } from '@tanstack/svelte-query';
++import { activityListRequest, DisplayedOrder } from '$lib/queries/content';
++import { parseGridParams } from '$lib/utils/gridUrlState';
++
++interface Row {
++	id: string;
++	name: string;
++}
++const row = (id: string, name = `row ${id}`): Row => ({ id, name });
++const ids = (rows: readonly Row[]) => rows.map((r) => r.id);
++
++/** One fetch the way ActivityTable sees it: arrange the response, then record what is shown. */
++function show(order: DisplayedOrder, key: string | null, items: Row[], placeholder = false) {
++	const shown = order.arrange(key, items, placeholder);
++	order.record(key, shown, placeholder);
++	return shown;
++}
++
++describe('DisplayedOrder: one key, refetched', () => {
++	it('shows the first response in server order', () => {
++		const order = new DisplayedOrder();
++		expect(ids(show(order, 'a', [row('1'), row('2'), row('3')]))).toEqual(['1', '2', '3']);
++	});
++
++	it('keeps an edited row in place when the server returns it first', () => {
++		const order = new DisplayedOrder();
++		show(order, 'a', [row('1'), row('2'), row('3')]);
++		const shown = show(order, 'a', [row('3', 'edited'), row('1'), row('2')]);
++		expect(ids(shown)).toEqual(['1', '2', '3']);
++		// The kept row still carries the fresh data from the refetch.
++		expect(shown[2].name).toBe('edited');
++	});
++
++	it('keeps the order across several refetches', () => {
++		const order = new DisplayedOrder();
++		show(order, 'a', [row('1'), row('2'), row('3')]);
++		show(order, 'a', [row('2'), row('1'), row('3')]);
++		expect(ids(show(order, 'a', [row('3'), row('2'), row('1')]))).toEqual(['1', '2', '3']);
++	});
++
++	it('puts new rows first, in server order, and keeps the rest where they were', () => {
++		const order = new DisplayedOrder();
++		show(order, 'a', [row('1'), row('2'), row('3')]);
++		const shown = show(order, 'a', [row('5'), row('4'), row('3'), row('1'), row('2')]);
++		expect(ids(shown)).toEqual(['5', '4', '1', '2', '3']);
++	});
++
++	it('remembers a new row at the front for the next refetch', () => {
++		const order = new DisplayedOrder();
++		show(order, 'a', [row('1'), row('2')]);
++		show(order, 'a', [row('9'), row('1'), row('2')]);
++		expect(ids(show(order, 'a', [row('2'), row('9'), row('1')]))).toEqual(['9', '1', '2']);
++	});
++
++	it('drops rows the response no longer has and leaves no gap', () => {
++		const order = new DisplayedOrder();
++		show(order, 'a', [row('1'), row('2'), row('3'), row('4')]);
++		expect(ids(show(order, 'a', [row('4'), row('3'), row('1')]))).toEqual(['1', '3', '4']);
++	});
++
++	it('does not bring a dropped row back at its old place when it returns later', () => {
++		const order = new DisplayedOrder();
++		show(order, 'a', [row('1'), row('2'), row('3')]);
++		show(order, 'a', [row('1'), row('3')]);
++		// 2 came back: it is new again, so it leads.
++		expect(ids(show(order, 'a', [row('2'), row('1'), row('3')]))).toEqual(['2', '1', '3']);
++	});
++
++	it('compares ids as strings, so 1 and "1" are the same row', () => {
++		const order = new DisplayedOrder();
++		order.record('a', [{ id: 1 }, { id: 2 }], false);
++		expect(order.arrange('a', [{ id: '2' }, { id: '1' }], false).map((r) => r.id)).toEqual(['1', '2']);
++	});
++
++	it('handles an empty response and recovers when rows arrive', () => {
++		const order = new DisplayedOrder();
++		expect(show(order, 'a', [])).toEqual([]);
++		expect(ids(show(order, 'a', [row('2'), row('1')]))).toEqual(['2', '1']);
++	});
++
++	it('arrange alone never changes what is remembered', () => {
++		const order = new DisplayedOrder();
++		show(order, 'a', [row('1'), row('2')]);
++		order.arrange('a', [row('2'), row('1')], false);
++		expect(ids(order.arrange('a', [row('2'), row('1')], false))).toEqual(['1', '2']);
++	});
++});
++
++describe('DisplayedOrder: a new key starts from the server order', () => {
++	it('uses the server order for another key', () => {
++		const order = new DisplayedOrder();
++		show(order, 'a', [row('1'), row('2'), row('3')]);
++		expect(ids(show(order, 'b', [row('3'), row('2'), row('1')]))).toEqual(['3', '2', '1']);
++	});
++
++	it('keeps the new key order after the key changed', () => {
++		const order = new DisplayedOrder();
++		show(order, 'a', [row('1'), row('2'), row('3')]);
++		show(order, 'b', [row('3'), row('2'), row('1')]);
++		expect(ids(show(order, 'b', [row('1'), row('3'), row('2')]))).toEqual(['3', '2', '1']);
++	});
++
++	it('forgets the first key: coming back to it starts from the server order again', () => {
++		const order = new DisplayedOrder();
++		show(order, 'a', [row('1'), row('2'), row('3')]);
++		show(order, 'a', [row('3'), row('1'), row('2')]);
++		show(order, 'b', [row('2'), row('3'), row('1')]);
++		expect(ids(show(order, 'a', [row('3'), row('1'), row('2')]))).toEqual(['3', '1', '2']);
++	});
++
++	it('forgets the order after leaving Loaded mode (null key) and returning', () => {
++		const order = new DisplayedOrder();
++		show(order, 'a', [row('1'), row('2'), row('3')]);
++		expect(ids(show(order, null, [row('3'), row('2'), row('1')]))).toEqual(['3', '2', '1']);
++		expect(ids(show(order, 'a', [row('3'), row('2'), row('1')]))).toEqual(['3', '2', '1']);
++	});
++
++	it('never reorders with a null key, however it was recorded', () => {
++		const order = new DisplayedOrder();
++		order.record(null, [row('1'), row('2')], false);
++		expect(ids(order.arrange(null, [row('2'), row('1')], false))).toEqual(['2', '1']);
++	});
++});
++
++describe('DisplayedOrder: placeholder data is neither applied nor recorded', () => {
++	it('does not apply the remembered order to placeholder rows', () => {
++		const order = new DisplayedOrder();
++		show(order, 'a', [row('1'), row('2'), row('3')]);
++		// Same key still, but the rows are a placeholder: leave them as given.
++		expect(ids(order.arrange('a', [row('3'), row('2'), row('1')], true))).toEqual(['3', '2', '1']);
++	});
++
++	it('does not record the placeholder rows for the new key', () => {
++		const order = new DisplayedOrder();
++		show(order, 'a', [row('1'), row('2'), row('3')]);
++		// Key b is loading and shows a's rows as a placeholder.
++		show(order, 'b', [row('1'), row('2'), row('3')], true);
++		// b's real response comes in another order and must be shown as sent.
++		expect(ids(show(order, 'b', [row('3'), row('1'), row('2')]))).toEqual(['3', '1', '2']);
++	});
++
++	it('does not carry a stale order back to the first key when the switch was only a placeholder', () => {
++		const order = new DisplayedOrder();
++		show(order, 'a', [row('1'), row('2'), row('3')]);
++		show(order, 'a', [row('3'), row('1'), row('2')]); // refetch, kept as 1 2 3
++		show(order, 'b', [row('1'), row('2'), row('3')], true); // placeholder for b, key changed
++		// Back on a before b ever loaded: the key did change in between, so a starts over.
++		expect(ids(show(order, 'a', [row('3'), row('1'), row('2')]))).toEqual(['3', '1', '2']);
++	});
++
++	it('keeps a placeholder first response in the order it was given', () => {
++		const order = new DisplayedOrder();
++		expect(ids(show(order, 'a', [row('2'), row('1')], true))).toEqual(['2', '1']);
++		expect(ids(show(order, 'a', [row('1'), row('2')]))).toEqual(['1', '2']);
++	});
++});
++
++describe('DisplayedOrder with the real Activity list key', () => {
++	const keyFor = (qs: string) => hashKey(activityListRequest(parseGridParams(new URLSearchParams(qs)), null).queryKey);
++
++	it('the same URL state gives the same key, so a refetch keeps the order', () => {
++		const order = new DisplayedOrder();
++		show(order, keyFor('f.type=youtube_video'), [row('1'), row('2')]);
++		expect(ids(show(order, keyFor('f.type=youtube_video'), [row('2'), row('1')]))).toEqual(['1', '2']);
++	});
++
++	it.each([
++		['search', 'q=matrix'],
++		['Type filter', 'f.type=movie'],
++		['mode', 'mode=all'],
++	])('a new %s changes the key, so the order starts over', (_name, qs) => {
++		const order = new DisplayedOrder();
++		show(order, keyFor(''), [row('1'), row('2')]);
++		expect(ids(show(order, keyFor(qs), [row('2'), row('1')]))).toEqual(['2', '1']);
++	});
++
++	it('a client-side column filter does not change the key, so the order is kept', () => {
++		// Loaded mode filters these rows in the grid; the request, and so the key, is unchanged.
++		expect(keyFor('f.type=youtube_video&f.views=100..')).toBe(keyFor('f.type=youtube_video'));
++	});
++});

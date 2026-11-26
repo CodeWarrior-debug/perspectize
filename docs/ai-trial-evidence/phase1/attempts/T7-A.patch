@@ -1,0 +1,331 @@
+diff --git a/frontend/src/lib/utils/gridUrlState.ts b/frontend/src/lib/utils/gridUrlState.ts
+index 978e05a6..08e97058 100644
+--- a/frontend/src/lib/utils/gridUrlState.ts
++++ b/frontend/src/lib/utils/gridUrlState.ts
+@@ -225,6 +225,38 @@ function sameScopes(a: SearchScopeKey[], b: SearchScopeKey[]): boolean {
+ 	return a.length === b.length && a.every((s) => b.includes(s));
+ }
+ 
++// ---------------------------------------------------------------------------
++// One-click type switching (Library page)
++// ---------------------------------------------------------------------------
++
++/**
++ * The type filters worth offering as one-click switches: every content type except the one shown,
++ * in CONTENT_TYPE_OPTIONS order, but only while the `f.type` URL value names exactly one known type.
++ * Returns null when it names none or several (the table already mixes types, and the column
++ * callout nudges the user to pick one). Unknown values count for nothing, as in
++ * `urlParamsToGraphQLFilter`, so `f.type=bogus` shows every type and offers no switch.
++ */
++export function otherTypeSwitches(filters: Record<string, string>): { value: string; label: string }[] | null {
++	const known = new Set(CONTENT_TYPE_OPTIONS.map((o) => o.value));
++	const shown = parseSetValue(filters.type ?? '').filter((v) => known.has(v));
++	if (shown.length !== 1) return null;
++	return CONTENT_TYPE_OPTIONS.filter((o) => o.value !== shown[0]);
++}
++
++/**
++ * `params` narrowed to the single content type `type` (a CONTENT_TYPE_OPTIONS value), back on page 1.
++ * Every other filter and the sort stay. The search scopes follow the type: an untouched selection
++ * moves to the new type's defaults (Cast/Director join or leave with Movie) and a customised one
++ * keeps what the new type still offers, so the URL never carries a hidden scope.
++ */
++export function switchTypeFilter(params: GridParams, type: string): GridParams {
++	const filters = { ...params.filters, type };
++	const offered = searchScopesFor(filters);
++	const untouched = sameScopes(params.qFields, searchScopesFor(params.filters));
++	const kept = params.qFields.filter((s) => offered.includes(s));
++	return { ...params, filters, page: 1, qFields: untouched || kept.length === 0 ? offered : kept };
++}
++
+ // ---------------------------------------------------------------------------
+ // AG Grid filter model types
+ // ---------------------------------------------------------------------------
+diff --git a/frontend/src/routes/content-library/+page.svelte b/frontend/src/routes/content-library/+page.svelte
+index 15e2d37b..1f75f945 100644
+--- a/frontend/src/routes/content-library/+page.svelte
++++ b/frontend/src/routes/content-library/+page.svelte
+@@ -15,13 +15,29 @@
+ 	import SlidersHorizontalIcon from '@lucide/svelte/icons/sliders-horizontal';
+ 	import { page } from '$app/state';
+ 	import { goto } from '$app/navigation';
+-	import { parseGridParams, serializeGridParams, searchScopesFor, type SearchScopeKey } from '$lib/utils/gridUrlState';
++	import {
++		parseGridParams,
++		serializeGridParams,
++		searchScopesFor,
++		otherTypeSwitches,
++		switchTypeFilter,
++		type SearchScopeKey,
++	} from '$lib/utils/gridUrlState';
+ 	import { useMe } from '$lib/queries/users/useMe.svelte';
+ 	import { LIBRARY_PATH } from '$lib/utils/contentLinks';
+ 
+ 	// Derive current grid params from URL
+ 	const gridParams = $derived(parseGridParams(page.url.searchParams));
+ 
++	// While exactly one content type is shown, offer a one-click switch to each of the others.
++	// Null (no type filter, or several types) renders nothing: the column callout covers that case.
++	const typeSwitches = $derived(otherTypeSwitches(gridParams.filters));
++
++	function switchType(type: string) {
++		const search = serializeGridParams(switchTypeFilter(gridParams, type));
++		goto(search ? `?${search}` : LIBRARY_PATH, { replaceState: true, keepFocus: true, noScroll: true });
++	}
++
+ 	// "Mine" is just a shortcut for the User column's text filter (`f.user=<my username>`) —
+ 	// the same filter the column menu sets, so it shows as a chip and survives a reload.
+ 	const meCtx = useMe();
+@@ -148,12 +164,35 @@
+ 	</div>
+ 
+ 	<!-- ColumnRelevanceCallout (rendered by ActivityTable) moves itself here: above the card's top-right
+-	     corner, outside the table frame. Collapses to nothing when empty. -->
++	     corner, outside the table frame. Collapses to nothing when empty. It shows only while the type
++	     filter names zero or several types, so the one-type switcher below takes the same band. -->
+ 	<div
+ 		id="activity-callout-slot"
+ 		class="w-full max-w-screen-xl mx-auto px-4 md:px-6 lg:px-8 flex justify-end empty:hidden"
+ 	></div>
+ 
++	{#if typeSwitches}
++		<div class="w-full max-w-screen-xl mx-auto px-4 md:px-6 lg:px-8 flex justify-end pb-1.5">
++			<div
++				role="group"
++				aria-label="Switch content type"
++				data-testid="library-type-switcher"
++				class="flex flex-wrap items-center justify-end gap-1.5"
++			>
++				<span class="text-xs md:text-sm text-muted-foreground">Switch to</span>
++				{#each typeSwitches as option (option.value)}
++					<button
++						type="button"
++						onclick={() => switchType(option.value)}
++						class="border-border bg-background text-foreground hover:bg-accent rounded-full border px-3 py-1 text-xs transition-colors"
++					>
++						{option.label}
++					</button>
++				{/each}
++			</div>
++		</div>
++	{/if}
++
+ 	<!-- Content Card -->
+ 	<!-- pb-4 (not pb-20: that reserved an ~80px dead strip that cost a grid row). The fixed Messages
+ 	     button is cleared by the pagination bar's own right padding instead (ActivityTable).
+diff --git a/frontend/tests/components/LibraryPage.test.ts b/frontend/tests/components/LibraryPage.test.ts
+index c68b7925..acc7d3a4 100644
+--- a/frontend/tests/components/LibraryPage.test.ts
++++ b/frontend/tests/components/LibraryPage.test.ts
+@@ -6,7 +6,7 @@
+  * search box + scope popover writing the right `q`/`qf` URL params.
+  */
+ import { describe, it, expect, vi, beforeEach } from 'vitest';
+-import { render, screen, fireEvent } from '@testing-library/svelte';
++import { render, screen, fireEvent, within } from '@testing-library/svelte';
+ import { tick } from 'svelte';
+ import { goto } from '$app/navigation';
+ import { mockPageState } from '../setup';
+@@ -128,6 +128,67 @@ describe('Library page search scope picker', () => {
+ 		}
+ 	});
+ 
++	describe('one-click type switcher', () => {
++		const switcher = () => screen.queryByRole('group', { name: 'Switch content type' });
++		const switchLabels = () =>
++			within(switcher()!)
++				.getAllByRole('button')
++				.map((b) => b.textContent?.trim());
++		const lastTarget = () => vi.mocked(goto).mock.calls.at(-1)![0] as string;
++
++		it('offers the other types on the default view, which shows YouTube only', () => {
++			render(Page);
++			expect(switchLabels()).toEqual(['Claim', 'Bible Passage', 'Movie', 'Book', 'Webpage']);
++		});
++
++		it('leaves out the type being shown', () => {
++			mockPageState.url = new URL('http://localhost/content-library?f.type=movie');
++			render(Page);
++			expect(switchLabels()).toEqual(['YouTube Video', 'Claim', 'Bible Passage', 'Book', 'Webpage']);
++		});
++
++		it('is hidden while several types are shown', () => {
++			mockPageState.url = new URL('http://localhost/content-library?f.type=movie,book');
++			render(Page);
++			expect(switcher()).not.toBeInTheDocument();
++		});
++
++		it('is hidden while the type filter is cleared', () => {
++			mockPageState.url = new URL('http://localhost/content-library?f=none');
++			render(Page);
++			expect(switcher()).not.toBeInTheDocument();
++		});
++
++		it('switches the type in one click', async () => {
++			render(Page);
++			await fireEvent.click(screen.getByRole('button', { name: 'Movie' }));
++
++			expect(goto).toHaveBeenCalledTimes(1);
++			expect(lastTarget()).toContain('f.type=movie');
++			expect(vi.mocked(goto).mock.calls[0][1]).toMatchObject({ replaceState: true, keepFocus: true, noScroll: true });
++		});
++
++		it('keeps the other filters and the search, and goes back to page 1', async () => {
++			mockPageState.url = new URL('http://localhost/content-library?f.type=movie&f.user=ann&q=heist&page=3');
++			render(Page);
++			await fireEvent.click(screen.getByRole('button', { name: 'Book' }));
++
++			const params = new URL(lastTarget(), 'http://localhost/content-library').searchParams;
++			expect(params.get('f.type')).toBe('book');
++			expect(params.get('f.user')).toBe('ann');
++			expect(params.get('q')).toBe('heist');
++			expect(params.has('page')).toBe(false);
++		});
++
++		it('stays on /content-library when switching back to the default view', async () => {
++			mockPageState.url = new URL('http://localhost/content-library?f.type=movie');
++			render(Page);
++			await fireEvent.click(screen.getByRole('button', { name: 'YouTube Video' }));
++
++			expect(goto).toHaveBeenCalledWith('/content-library', expect.anything());
++		});
++	});
++
+ 	describe('"Mine" shortcut', () => {
+ 		it('is hidden when signed out', () => {
+ 			render(Page);
+diff --git a/frontend/tests/unit/gridUrlState.test.ts b/frontend/tests/unit/gridUrlState.test.ts
+index 1ddf05b6..f6e329ef 100644
+--- a/frontend/tests/unit/gridUrlState.test.ts
++++ b/frontend/tests/unit/gridUrlState.test.ts
+@@ -6,10 +6,13 @@ import {
+ 	filterToUrlParams,
+ 	urlParamsToFilter,
+ 	urlParamsToGraphQLFilter,
++	otherTypeSwitches,
++	switchTypeFilter,
+ 	COL_TO_SORT,
+ 	SORT_TO_COL,
+ 	GRID_DEFAULTS,
+ } from '$lib/utils/gridUrlState';
++import { CONTENT_TYPE_OPTIONS } from '$lib/utils/grid-config';
+ 
+ // ---------------------------------------------------------------------------
+ // parseGridParams
+@@ -713,3 +716,116 @@ describe('sortsToGraphQL', () => {
+ 		expect(sortsToGraphQL([{ col: 'tags', dir: 'asc' }])).toBeUndefined();
+ 	});
+ });
++
++// ---------------------------------------------------------------------------
++// otherTypeSwitches / switchTypeFilter (Library one-click type switching)
++// ---------------------------------------------------------------------------
++
++describe('otherTypeSwitches', () => {
++	const values = (filters: Record<string, string>) => otherTypeSwitches(filters)?.map((o) => o.value);
++
++	it('offers every other type, in filter order, when one type is shown', () => {
++		const everyType = CONTENT_TYPE_OPTIONS.map((o) => o.value);
++		expect(values({ type: 'movie' })).toEqual(everyType.filter((v) => v !== 'movie'));
++	});
++
++	it('carries the label the Type filter uses', () => {
++		expect(otherTypeSwitches({ type: 'youtube_video' })).toContainEqual({ value: 'web_page', label: 'Webpage' });
++	});
++
++	it('never offers the type already shown', () => {
++		for (const { value } of CONTENT_TYPE_OPTIONS) {
++			expect(values({ type: value })).not.toContain(value);
++		}
++	});
++
++	it('offers a switch from the default Library filter', () => {
++		expect(otherTypeSwitches(GRID_DEFAULTS.filters)).not.toBeNull();
++	});
++
++	it('offers nothing when no type filter is set', () => {
++		expect(otherTypeSwitches({})).toBeNull();
++		expect(otherTypeSwitches({ type: '' })).toBeNull();
++		expect(otherTypeSwitches({ user: 'ann' })).toBeNull();
++	});
++
++	it('offers nothing when several types are shown', () => {
++		expect(otherTypeSwitches({ type: 'movie,book' })).toBeNull();
++	});
++
++	it('treats the legacy `youtube` alias as the YouTube type', () => {
++		expect(values({ type: 'youtube' })).not.toContain('youtube_video');
++		expect(values({ type: 'youtube' })).toContain('movie');
++	});
++
++	it('counts one type repeated, in any case or spacing, as one type', () => {
++		expect(values({ type: 'Movie, movie' })).not.toContain('movie');
++		expect(values({ type: 'Movie, movie' })).toContain('book');
++	});
++
++	it('ignores unknown values, as the server request does', () => {
++		expect(otherTypeSwitches({ type: 'bogus' })).toBeNull();
++		expect(values({ type: 'bogus,book' })).not.toContain('book');
++		expect(values({ type: 'bogus,book' })).toContain('movie');
++	});
++});
++
++describe('switchTypeFilter', () => {
++	it('replaces the type and goes back to page 1', () => {
++		const from = { ...GRID_DEFAULTS, page: 4, filters: { type: 'youtube_video' } };
++		const next = switchTypeFilter(from, 'movie');
++		expect(next.filters).toEqual({ type: 'movie' });
++		expect(next.page).toBe(1);
++	});
++
++	it('keeps every other filter, the sort, the search and the mode', () => {
++		const from = {
++			...GRID_DEFAULTS,
++			mode: 'all' as const,
++			sorts: [{ col: 'views', dir: 'asc' as const }],
++			q: 'cooking',
++			filters: { type: 'youtube_video', user: 'ann', views: '1000..' },
++		};
++		const next = switchTypeFilter(from, 'book');
++		expect(next.filters).toEqual({ type: 'book', user: 'ann', views: '1000..' });
++		expect(next.sorts).toEqual(from.sorts);
++		expect(next.q).toBe('cooking');
++		expect(next.mode).toBe('all');
++	});
++
++	it('does not mutate the params it was given', () => {
++		const from = { ...GRID_DEFAULTS, filters: { type: 'youtube_video' } };
++		switchTypeFilter(from, 'movie');
++		expect(from.filters).toEqual({ type: 'youtube_video' });
++	});
++
++	it('moves untouched search scopes to the new type defaults (Cast/Director join with Movie)', () => {
++		const toMovie = switchTypeFilter({ ...GRID_DEFAULTS, filters: { type: 'youtube_video' } }, 'movie');
++		expect(toMovie.qFields).toEqual(['title', 'desc', 'channel', 'tags', 'cast', 'director']);
++		const backToVideo = switchTypeFilter(toMovie, 'youtube_video');
++		expect(backToVideo.qFields).toEqual(['title', 'desc', 'channel', 'tags']);
++	});
++
++	it('keeps customised scopes the new type still offers, and drops the ones it does not', () => {
++		const from = { ...GRID_DEFAULTS, filters: { type: 'movie' }, qFields: ['title' as const, 'cast' as const] };
++		expect(switchTypeFilter(from, 'book').qFields).toEqual(['title']);
++	});
++
++	it('falls back to the defaults when no customised scope survives the switch', () => {
++		const from = { ...GRID_DEFAULTS, filters: { type: 'movie' }, qFields: ['cast' as const, 'director' as const] };
++		expect(switchTypeFilter(from, 'book').qFields).toEqual(['title', 'desc', 'channel', 'tags']);
++	});
++
++	it('serializes to a URL without a hidden search scope', () => {
++		const movie = parseGridParams(new URLSearchParams('f.type=movie'));
++		const search = serializeGridParams(switchTypeFilter(movie, 'youtube_video'));
++		expect(search).toBe('');
++	});
++
++	it('round-trips through the URL to the type switched to', () => {
++		const from = parseGridParams(new URLSearchParams('f.type=youtube_video&f.user=ann&page=3'));
++		const next = parseGridParams(new URLSearchParams(serializeGridParams(switchTypeFilter(from, 'claim'))));
++		expect(next.filters).toEqual({ type: 'claim', user: 'ann' });
++		expect(next.page).toBe(1);
++	});
++});

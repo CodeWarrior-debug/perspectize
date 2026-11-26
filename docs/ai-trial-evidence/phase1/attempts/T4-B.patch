@@ -1,0 +1,565 @@
+diff --git a/backend/internal/adapters/repositories/postgres/gorm_import_job_integration_test.go b/backend/internal/adapters/repositories/postgres/gorm_import_job_integration_test.go
+index eb6aecec..75aaf587 100644
+--- a/backend/internal/adapters/repositories/postgres/gorm_import_job_integration_test.go
++++ b/backend/internal/adapters/repositories/postgres/gorm_import_job_integration_test.go
+@@ -309,6 +309,58 @@ func TestImportJobIntegration_QueueAndOutcomes(t *testing.T) {
+ 	assert.Equal(t, []int{items[1].ID}, requeued)
+ }
+ 
++// FailQueuedItems is one statement for any number of rows (none for empty ids)
++// and changes only the named rows of that job that are still queued: a row that
++// already has an outcome, a row not named, and another job's row are untouched.
++func TestImportJobIntegration_FailQueuedItems(t *testing.T) {
++	f := newImportJobFixture(t)
++	ctx := context.Background()
++	job := f.newJob(t)
++	other := f.newJob(t)
++	require.NoError(t, f.repo.UpsertItems(ctx, []*domain.ImportItemWithDetails{f.videoItem(job, 1), f.videoItem(job, 2), f.videoItem(job, 3), f.videoItem(job, 4)}))
++	require.NoError(t, f.repo.UpsertItems(ctx, []*domain.ImportItemWithDetails{f.videoItem(other, 5)}))
++	items, err := f.repo.ListItems(ctx, job.ID)
++	require.NoError(t, err)
++	otherItems, err := f.repo.ListItems(ctx, other.ID)
++	require.NoError(t, err)
++
++	_, err = f.repo.MarkQueued(ctx, job.ID, []int{items[0].ID, items[1].ID, items[2].ID})
++	require.NoError(t, err)
++	_, err = f.repo.MarkQueued(ctx, other.ID, []int{otherItems[0].ID})
++	require.NoError(t, err)
++	require.NoError(t, f.repo.RecordOutcome(ctx, items[2].ID, domain.ImportItemStatusImported, nil, nil))
++
++	c := querycount.Attach(t, f.db)
++	failed, err := f.repo.FailQueuedItems(ctx, job.ID, nil, "cut short")
++	require.NoError(t, err)
++	c.AssertExactly(t, 0)
++	assert.Zero(t, failed)
++
++	// Named: a queued row, an imported row, a never-queued row, another job's queued row.
++	c.Reset()
++	failed, err = f.repo.FailQueuedItems(ctx, job.ID, []int{items[0].ID, items[2].ID, items[3].ID, otherItems[0].ID}, "cut short")
++	require.NoError(t, err)
++	c.AssertExactly(t, 1)
++	assert.Equal(t, 1, failed, "only the queued row of this job changed")
++
++	listed, err := f.repo.ListItems(ctx, job.ID)
++	require.NoError(t, err)
++	assert.Equal(t, domain.ImportItemStatusFailed, *listed[0].ImportStatus)
++	require.NotNil(t, listed[0].ImportError)
++	assert.Equal(t, "cut short", *listed[0].ImportError)
++	assert.Equal(t, domain.ImportItemStatusQueued, *listed[1].ImportStatus, "not named: still queued")
++	assert.Equal(t, domain.ImportItemStatusImported, *listed[2].ImportStatus, "a saved outcome is kept")
++	assert.Nil(t, listed[3].ImportStatus, "a row that was never queued stays unqueued")
++	otherListed, err := f.repo.ListItems(ctx, other.ID)
++	require.NoError(t, err)
++	assert.Equal(t, domain.ImportItemStatusQueued, *otherListed[0].ImportStatus, "another job's row is untouched")
++
++	// A failed row can be selected again.
++	requeued, err := f.repo.MarkQueued(ctx, job.ID, []int{items[0].ID})
++	require.NoError(t, err)
++	assert.Equal(t, []int{items[0].ID}, requeued)
++}
++
+ func TestImportJobIntegration_UpdateSourceAndReassign(t *testing.T) {
+ 	f := newImportJobFixture(t)
+ 	ctx := context.Background()
+diff --git a/backend/internal/adapters/repositories/postgres/gorm_import_job_repository.go b/backend/internal/adapters/repositories/postgres/gorm_import_job_repository.go
+index 2c8e208b..74ad541d 100644
+--- a/backend/internal/adapters/repositories/postgres/gorm_import_job_repository.go
++++ b/backend/internal/adapters/repositories/postgres/gorm_import_job_repository.go
+@@ -401,6 +401,23 @@ func (r *GormImportJobRepository) RecordOutcome(ctx context.Context, itemID int,
+ 	return nil
+ }
+ 
++// FailQueuedItems fails the named rows of a job in one UPDATE. The queued
++// condition is in the WHERE clause, so a row that has since recorded an outcome
++// keeps it.
++func (r *GormImportJobRepository) FailQueuedItems(ctx context.Context, jobID int, ids []int, detail string) (int, error) {
++	if len(ids) == 0 {
++		return 0, nil
++	}
++	result := r.db.WithContext(ctx).
++		Model(&ImportItemModel{}).
++		Where("job_id = ? AND id = ANY(CAST(? AS bigint[])) AND import_status = 'queued'", jobID, intsToArray(ids)).
++		Updates(map[string]any{"import_status": "failed", "import_error": detail})
++	if result.Error != nil {
++		return 0, fmt.Errorf("failed to fail queued import items: %w", result.Error)
++	}
++	return int(result.RowsAffected), nil
++}
++
+ // FailInterrupted fails sources still listing and rows still queued.
+ func (r *GormImportJobRepository) FailInterrupted(ctx context.Context, detail string) (int, int, error) {
+ 	src := r.db.WithContext(ctx).Model(&ImportSourceModel{}).
+diff --git a/backend/internal/adapters/repositories/postgres/gorm_import_job_repository_test.go b/backend/internal/adapters/repositories/postgres/gorm_import_job_repository_test.go
+new file mode 100644
+index 00000000..d7150c5f
+--- /dev/null
++++ b/backend/internal/adapters/repositories/postgres/gorm_import_job_repository_test.go
+@@ -0,0 +1,56 @@
++package postgres
++
++import (
++	"context"
++	"errors"
++	"testing"
++
++	"github.com/CodeWarrior-debug/perspectize/backend/internal/perf/querycount"
++	"github.com/DATA-DOG/go-sqlmock"
++	"github.com/stretchr/testify/assert"
++	"github.com/stretchr/testify/require"
++)
++
++// FailQueuedItems is one UPDATE scoped to the job, the named rows and the queued
++// status, and it reports how many rows that changed. These run on go-sqlmock, so
++// they check the statement without a database.
++func TestGormImportJobRepository_FailQueuedItems_OneScopedUpdate(t *testing.T) {
++	db, mock := newMockDB(t)
++	repo := NewGormImportJobRepository(db)
++	c := querycount.Attach(t, db)
++
++	mock.ExpectExec(`UPDATE "import_job_items" SET "import_error"=\$1,"import_status"=\$2,"updated_at"=\$3 WHERE job_id = \$4 AND id = ANY\(CAST\(\$5 AS bigint\[\]\)\) AND import_status = 'queued'`).
++		WithArgs("cut short", "failed", sqlmock.AnyArg(), 7, "{11,12,13}").
++		WillReturnResult(sqlmock.NewResult(0, 2))
++
++	failed, err := repo.FailQueuedItems(context.Background(), 7, []int{11, 12, 13}, "cut short")
++	require.NoError(t, err)
++	assert.Equal(t, 2, failed, "the count is the rows the UPDATE changed, not the rows named")
++	c.AssertExactly(t, 1)
++	assertAllExpectationsMet(t, mock)
++}
++
++func TestGormImportJobRepository_FailQueuedItems_NoIDsIssuesNothing(t *testing.T) {
++	db, mock := newMockDB(t)
++	repo := NewGormImportJobRepository(db)
++	c := querycount.Attach(t, db)
++
++	failed, err := repo.FailQueuedItems(context.Background(), 7, nil, "cut short")
++	require.NoError(t, err)
++	assert.Zero(t, failed)
++	c.AssertExactly(t, 0)
++	assertAllExpectationsMet(t, mock)
++}
++
++func TestGormImportJobRepository_FailQueuedItems_WrapsDatabaseError(t *testing.T) {
++	db, mock := newMockDB(t)
++	repo := NewGormImportJobRepository(db)
++
++	boom := errors.New("connection reset")
++	mock.ExpectExec(`UPDATE "import_job_items"`).WillReturnError(boom)
++
++	failed, err := repo.FailQueuedItems(context.Background(), 7, []int{11}, "cut short")
++	require.ErrorIs(t, err, boom)
++	assert.Zero(t, failed)
++	assertAllExpectationsMet(t, mock)
++}
+diff --git a/backend/internal/core/ports/repositories/import_job_repository.go b/backend/internal/core/ports/repositories/import_job_repository.go
+index b234abbf..89e7b5cb 100644
+--- a/backend/internal/core/ports/repositories/import_job_repository.go
++++ b/backend/internal/core/ports/repositories/import_job_repository.go
+@@ -86,6 +86,12 @@ type ImportJobRepository interface {
+ 	// RecordOutcome stores the result of importing one row (1 statement).
+ 	RecordOutcome(ctx context.Context, itemID int, status domain.ImportItemStatus, errMsg *string, contentID *int) error
+ 
++	// FailQueuedItems marks the rows of jobID among ids that are still QUEUED as
++	// failed with detail, and returns how many it changed (1 statement; 0 for
++	// empty ids). Rows with any other status, and rows of other jobs, are left
++	// alone, so a row whose outcome was already saved is never overwritten.
++	FailQueuedItems(ctx context.Context, jobID int, ids []int, detail string) (int, error)
++
+ 	// FailInterrupted marks sources still LISTING and rows still QUEUED as
+ 	// failed, for work a restart cut short (2 statements). Returns how many of
+ 	// each it changed.
+diff --git a/backend/internal/core/services/import_service.go b/backend/internal/core/services/import_service.go
+index fccf983b..c91af72f 100644
+--- a/backend/internal/core/services/import_service.go
++++ b/backend/internal/core/services/import_service.go
+@@ -31,6 +31,10 @@ const importTimeout = 30 * time.Minute
+ // interruptedDetail is what a row or source shows after a restart cut it short.
+ const interruptedDetail = "Interrupted by a server restart. Select it again to retry."
+ 
++// cutShortDetail is what a row shows when its batch ran out of time before it
++// finished, whether it was importing or still waiting for a slot.
++const cutShortDetail = "The import was cut short. Select it again to retry."
++
+ // importContentCreator is the slice of ContentService the import workers use.
+ type importContentCreator interface {
+ 	CreateFromYouTube(ctx context.Context, url string, userID int) (*domain.Content, error)
+@@ -75,6 +79,8 @@ type ImportService struct {
+ 	listing *listingTracker
+ 	// progressInterval is how often live progress is pushed (tests shorten it).
+ 	progressInterval time.Duration
++	// batchTimeout bounds one importItems batch (tests shorten it).
++	batchTimeout time.Duration
+ }
+ 
+ var _ portservices.ImportService = (*ImportService)(nil)
+@@ -97,6 +103,12 @@ func WithImportProgressInterval(d time.Duration) ImportServiceOption {
+ 	return func(s *ImportService) { s.progressInterval = d }
+ }
+ 
++// WithImportBatchTimeout sets how long one batch of rows may run before the
++// rows it did not save are failed (default importTimeout).
++func WithImportBatchTimeout(d time.Duration) ImportServiceOption {
++	return func(s *ImportService) { s.batchTimeout = d }
++}
++
+ // WithImportClock replaces the clock used for fetchedAt.
+ func WithImportClock(now func() time.Time) ImportServiceOption {
+ 	return func(s *ImportService) { s.now = now }
+@@ -139,6 +151,7 @@ func NewImportService(
+ 		sources: noLimit{},
+ 
+ 		progressInterval: defaultProgressInterval,
++		batchTimeout:     importTimeout,
+ 	}
+ 	for _, opt := range opts {
+ 		opt(s)
+@@ -750,14 +763,17 @@ func workersFor(capacity, rows int) int {
+ // hand).
+ //
+ // A worker holds a row limiter slot only while it imports a row, so the cap is
+-// global across batches. A row still waiting for a slot when the batch ends
+-// (shutdown or timeout) stays queued, like a row never sent to a worker.
++// global across batches. A row still waiting for a slot, or never sent to a
++// worker, when the batch ends is not saved. If the end is the batch timeout,
++// those rows are failed in one UPDATE and counted as failed, so they can be
++// selected again. If it is a shutdown they stay queued, for RecoverInterrupted
++// to fail at the next start.
+ //
+ // Progress is a fan-in: every worker sends its row's outcome down one
+ // outcomes channel, and a single collector counts them into the progress
+ // tracker, which pushes to subscribers at most twice a second.
+ func (s *ImportService) runImports(jobID, actorID int, items []*domain.ImportItem) {
+-	ctx, cancel := context.WithTimeout(s.bg, importTimeout)
++	ctx, cancel := context.WithTimeout(s.bg, s.batchTimeout)
+ 	defer cancel()
+ 
+ 	workers := workersFor(s.workers, len(items))
+@@ -774,6 +790,11 @@ func (s *ImportService) runImports(jobID, actorID int, items []*domain.ImportIte
+ 		s.progress.end(jobID)
+ 	}()
+ 
++	// saved holds the rows whose outcome was recorded; the rest of the batch is
++	// what a spent timeout has to fail.
++	var savedMu sync.Mutex
++	saved := make(map[int]struct{}, len(items))
++
+ 	queue := make(chan *domain.ImportItem)
+ 	var wg sync.WaitGroup
+ 	for range workers {
+@@ -783,11 +804,14 @@ func (s *ImportService) runImports(jobID, actorID int, items []*domain.ImportIte
+ 			for it := range queue {
+ 				release, err := s.rows.Acquire(ctx)
+ 				if err != nil {
+-					return // ctx ended while waiting: the row stays queued, nothing is recorded
++					return // ctx ended while waiting: nothing is recorded for this row
+ 				}
+ 				st, ok := s.importOne(ctx, actorID, it)
+ 				release() // before the send, so a slow collector never holds a slot
+ 				if ok {
++					savedMu.Lock()
++					saved[it.ID] = struct{}{}
++					savedMu.Unlock()
+ 					outcomes <- st
+ 				}
+ 			}
+@@ -802,15 +826,46 @@ feed:
+ 		select {
+ 		case queue <- it:
+ 		case <-ctx.Done():
+-			// Unsent rows stay queued; RecoverInterrupted fails them at the next start.
++			// Unsent rows are not saved: failed below on a timeout, left queued on a shutdown.
+ 			break feed
+ 		}
+ 	}
+ 	close(queue)
+ 	wg.Wait()
++	// Only the batch's own timeout fails rows. A shutdown cancels the parent
++	// instead, and those rows stay queued for RecoverInterrupted.
++	if errors.Is(ctx.Err(), context.DeadlineExceeded) {
++		for range s.failUnsaved(ctx, jobID, items, saved) {
++			outcomes <- domain.ImportItemStatusFailed
++		}
++	}
+ 	close(outcomes)
+ }
+ 
++// failUnsaved fails the batch rows that have no saved outcome, in one UPDATE
++// scoped to the job, those rows and the queued status, and returns how many it
++// failed. The batch context is spent by now, so the write gets its own. A
++// failed write is logged and the rows stay queued for RecoverInterrupted.
++func (s *ImportService) failUnsaved(ctx context.Context, jobID int, items []*domain.ImportItem, saved map[int]struct{}) int {
++	ids := make([]int, 0, len(items)-len(saved))
++	for _, it := range items {
++		if _, ok := saved[it.ID]; !ok {
++			ids = append(ids, it.ID)
++		}
++	}
++	if len(ids) == 0 {
++		return 0
++	}
++	writeCtx, writeCancel := context.WithTimeout(context.WithoutCancel(ctx), 10*time.Second)
++	defer writeCancel()
++	failed, err := s.repo.FailQueuedItems(writeCtx, jobID, ids, cutShortDetail)
++	if err != nil {
++		slog.Error("import rows not failed after the batch timed out", "jobID", jobID, "rows", len(ids), "error", err)
++		return 0
++	}
++	return failed
++}
++
+ // importJobIDKey is the context key carrying the import a content create belongs to.
+ type importJobIDKey struct{}
+ 
+@@ -826,11 +881,12 @@ func importJobIDFrom(ctx context.Context) (int, bool) {
+ 	return jobID, ok
+ }
+ 
+-// importOne imports one row and records its outcome; ok is false when it
+-// was left queued because the import is shutting down.
++// importOne imports one row and records its outcome; ok is false when the
++// batch had already ended, so nothing was recorded and runImports decides what
++// becomes of the row.
+ func (s *ImportService) importOne(ctx context.Context, actorID int, it *domain.ImportItem) (domain.ImportItemStatus, bool) {
+ 	if ctx.Err() != nil {
+-		return "", false // left queued; RecoverInterrupted fails it at the next start
++		return "", false
+ 	}
+ 	createCtx := WithImportJobID(ctx, it.JobID)
+ 	var (
+@@ -913,7 +969,7 @@ func importFailureDetail(err error) string {
+ 	case errors.Is(err, domain.ErrNotFound):
+ 		return "The source no longer has this item."
+ 	case errors.Is(err, context.DeadlineExceeded), errors.Is(err, context.Canceled):
+-		return "The import was cut short. Select it again to retry."
++		return cutShortDetail
+ 	default:
+ 		return "The source API refused the request. Try again later."
+ 	}
+diff --git a/backend/test/services/import_limiter_test.go b/backend/test/services/import_limiter_test.go
+index 1e5ed3a6..0696597c 100644
+--- a/backend/test/services/import_limiter_test.go
++++ b/backend/test/services/import_limiter_test.go
+@@ -257,43 +257,142 @@ func TestImportService_RowLimiter_ShutdownLeavesWaitingRowsQueued(t *testing.T)
+ 	assert.Equal(t, aURLs, creator.youtube, "the creator never saw batch B's rows")
+ 	assertAllStatus(t, repo, aIDs, domain.ImportItemStatusImported)
+ 	assertAllStatus(t, repo, bIDs, domain.ImportItemStatusQueued)
++	assert.Empty(t, failQueuedCallsOf(repo), "a shutdown fails nothing: RecoverInterrupted does at the next start")
+ 	assert.Equal(t, limiter.Stats{}, lim.Stats(), "every slot is given back")
+ }
+ 
+-// RF4: the batch timeout cannot be shortened from a test, so the batch context
+-// is ended by cancelling its parent and the limiter stub reports the end as a
+-// deadline, which is what a spent timeout looks like to a row still waiting.
+-func TestImportService_RowLimiter_BatchTimeoutWhileQueued(t *testing.T) {
++// cutShort is the detail a row shows when its batch ran out of time.
++const cutShort = "The import was cut short. Select it again to retry."
++
++// testBatchTimeout is the shortened batch time limit these tests set. Rows that
++// are meant to finish do so in microseconds; the margin is for a slow machine.
++const testBatchTimeout = 300 * time.Millisecond
++
++// failQueuedCallsOf is a copy of the FailQueuedItems calls the repository got.
++func failQueuedCallsOf(repo *fakeImportRepo) []failQueuedCall {
++	repo.mu.Lock()
++	defer repo.mu.Unlock()
++	return append([]failQueuedCall(nil), repo.failQueuedCalls...)
++}
++
++// importError is a row's saved failure detail, or "" while it has none.
++func importError(repo *fakeImportRepo, id int) string {
++	repo.mu.Lock()
++	defer repo.mu.Unlock()
++	if msg := repo.items[id].Item.ImportError; msg != nil {
++		return *msg
++	}
++	return ""
++}
++
++// progressOf is the progress an import shows right now, without the timestamp.
++func progressOf(t *testing.T, svc *services.ImportService, jobID int) domain.ImportProgress {
++	t.Helper()
++	ctx, cancel := context.WithCancel(context.Background())
++	defer cancel()
++	ch, err := svc.SubscribeImportProgress(ctx, importUser, jobID)
++	require.NoError(t, err)
++	p := <-ch
++	p.UpdatedAt = time.Time{}
++	return p
++}
++
++// stallingCreator holds every create until its context ends, as a slow source
++// API does, then reports why.
++type stallingCreator struct{ started atomic.Int32 }
++
++func (c *stallingCreator) stall(ctx context.Context) (*domain.Content, error) {
++	c.started.Add(1)
++	<-ctx.Done()
++	return nil, ctx.Err()
++}
++
++func (c *stallingCreator) CreateFromYouTube(ctx context.Context, _ string, _ int) (*domain.Content, error) {
++	return c.stall(ctx)
++}
++
++func (c *stallingCreator) CreateFromMovie(ctx context.Context, _ string, _ int) (*domain.Content, error) {
++	return c.stall(ctx)
++}
++
++// RF4: when the batch time limit ends, rows that never got a slot (one waiting
++// for it, one never handed to a worker) are failed so they can be selected
++// again, in one statement that names the job, those rows and nothing else. The
++// finished row is not touched, and progress counts all three. The limiter stub
++// holds every Acquire after the first until the batch context ends.
++func TestImportService_RowLimiter_BatchTimeoutFailsUnsavedRows(t *testing.T) {
+ 	repo := newFakeImportRepo()
+ 	job := approvedJob(t, repo)
+ 	lim := &expiringLimiter{waiting: make(chan struct{}, 1)}
+ 	creator := &fakeCreator{}
+-	bg, expire := context.WithCancel(context.Background())
+-	t.Cleanup(expire)
+ 	var wg sync.WaitGroup
+-	spawn, bDone := goSpawnDone(&wg, 2)
+-	svc := newImportService(repo, nil, nil, creator, services.WithImportRowLimiter(lim), services.WithImportBackground(bg), spawn)
++	svc := newImportService(repo, nil, nil, creator, services.WithImportRowLimiter(lim),
++		services.WithImportBatchTimeout(testBatchTimeout), goSpawn(&wg))
+ 
+-	aIDs, aURLs := seedRows(t, repo, job.ID, "a", 1)
+-	importBatch(t, svc, job.ID, aIDs)
+-	require.Eventually(t, func() bool { return statusOf(repo, aIDs[0]) == domain.ImportItemStatusImported }, waitFor, tick, "batch A's row got the slot")
+-	bIDs, _ := seedRows(t, repo, job.ID, "b", 2)
+-	importBatch(t, svc, job.ID, bIDs)
+-	select {
+-	case <-lim.waiting:
+-	case <-time.After(waitFor):
+-		require.Fail(t, "batch B's row never started waiting for a slot")
++	ids, urls := seedRows(t, repo, job.ID, "a", 3)
++	importBatch(t, svc, job.ID, ids)
++	waitDone(t, &wg)
++
++	assert.Equal(t, urls[:1], creator.youtube, "only the row that got a slot reached the creator")
++	assert.Equal(t, domain.ImportItemStatusImported, statusOf(repo, ids[0]))
++	assertAllStatus(t, repo, ids[1:], domain.ImportItemStatusFailed)
++	for _, id := range ids[1:] {
++		assert.Equal(t, cutShort, importError(repo, id), "row %d", id)
+ 	}
++	calls := failQueuedCallsOf(repo)
++	require.Len(t, calls, 1, "one statement for every unsaved row")
++	assert.Equal(t, job.ID, calls[0].jobID)
++	assert.ElementsMatch(t, ids[1:], calls[0].ids, "the row that finished is not named")
++	assert.Equal(t, cutShort, calls[0].detail)
++	assert.Equal(t, domain.ImportProgress{JobID: job.ID, Total: 3, Done: 3, Imported: 1, Failed: 2}, progressOf(t, svc, job.ID),
++		"the failed rows are counted, and the import is no longer running")
++
++	// They are not stuck: a user can select them again.
++	res, err := svc.ImportItems(context.Background(), importUser, job.ID, ids[1:])
++	require.NoError(t, err)
++	assert.Equal(t, 2, res.Queued)
++	waitDone(t, &wg) // the new batch hits the same stub and times out too
++}
+ 
+-	expire()
+-	select {
+-	case <-bDone:
+-	case <-time.After(waitFor):
+-		require.Fail(t, "batch B did not return after its context expired while its rows waited for a slot")
++// RF4: a row still importing when the limit ends records its own failure, so
++// the batch's statement names only the rows nothing was saved for.
++func TestImportService_BatchTimeoutKeepsRowsAlreadySaved(t *testing.T) {
++	repo := newFakeImportRepo()
++	job := approvedJob(t, repo)
++	creator := &stallingCreator{}
++	var wg sync.WaitGroup
++	svc := services.NewImportService(repo, nil, creator, fixedNow, goSpawn(&wg),
++		services.WithImportRowLimiter(limiter.New("rows", 1)), services.WithImportBatchTimeout(testBatchTimeout))
++
++	ids, _ := seedRows(t, repo, job.ID, "a", 3)
++	importBatch(t, svc, job.ID, ids)
++	waitDone(t, &wg)
++
++	assert.Equal(t, int32(1), creator.started.Load(), "one slot: only one row started")
++	assertAllStatus(t, repo, ids, domain.ImportItemStatusFailed)
++	for _, id := range ids {
++		assert.Equal(t, cutShort, importError(repo, id), "row %d", id)
+ 	}
+-	wg.Wait()
+-	assert.Equal(t, aURLs, creator.youtube, "the creator never saw batch B's rows")
+-	assertAllStatus(t, repo, bIDs, domain.ImportItemStatusQueued)
++	calls := failQueuedCallsOf(repo)
++	require.Len(t, calls, 1)
++	assert.Len(t, calls[0].ids, 2, "the row that was importing saved its own outcome")
++	assert.Equal(t, domain.ImportProgress{JobID: job.ID, Total: 3, Done: 3, Failed: 3}, progressOf(t, svc, job.ID))
++}
++
++// A batch that finishes inside its limit has nothing to fail, so it issues no statement.
++func TestImportService_BatchFinishingInTimeFailsNothing(t *testing.T) {
++	repo := newFakeImportRepo()
++	job := approvedJob(t, repo)
++	var wg sync.WaitGroup
++	svc := newImportService(repo, nil, nil, &fakeCreator{}, services.WithImportBatchTimeout(time.Minute), goSpawn(&wg))
++
++	ids, _ := seedRows(t, repo, job.ID, "a", 3)
++	importBatch(t, svc, job.ID, ids)
++	waitDone(t, &wg)
++
++	assertAllStatus(t, repo, ids, domain.ImportItemStatusImported)
++	assert.Empty(t, failQueuedCallsOf(repo))
++	assert.Equal(t, domain.ImportProgress{JobID: job.ID, Total: 3, Done: 3, Imported: 3}, progressOf(t, svc, job.ID))
+ }
+ 
+ // --- listing slots ------------------------------------------------------------
+diff --git a/backend/test/services/import_service_test.go b/backend/test/services/import_service_test.go
+index 2be0b693..cd3354b1 100644
+--- a/backend/test/services/import_service_test.go
++++ b/backend/test/services/import_service_test.go
+@@ -30,6 +30,15 @@ type fakeImportRepo struct {
+ 	nextID      int
+ 	upsertErr   error
+ 	updates     []repositories.ImportSourceUpdate
++
++	failQueuedCalls []failQueuedCall
++}
++
++// failQueuedCall is one FailQueuedItems call a batch made.
++type failQueuedCall struct {
++	jobID  int
++	ids    []int
++	detail string
+ }
+ 
+ var _ repositories.ImportJobRepository = (*fakeImportRepo)(nil)
+@@ -306,6 +315,27 @@ func (r *fakeImportRepo) RecordOutcome(_ context.Context, itemID int, status dom
+ 	return nil
+ }
+ 
++// FailQueuedItems mirrors the SQL: only the named rows of the job that are still
++// queued change. Each call is kept so a test can count the statements.
++func (r *fakeImportRepo) FailQueuedItems(_ context.Context, jobID int, ids []int, detail string) (int, error) {
++	r.mu.Lock()
++	defer r.mu.Unlock()
++	r.failQueuedCalls = append(r.failQueuedCalls, failQueuedCall{jobID: jobID, ids: append([]int(nil), ids...), detail: detail})
++	n := 0
++	for _, id := range ids {
++		it, ok := r.items[id]
++		if !ok || it.Item.JobID != jobID {
++			continue
++		}
++		if st := it.Item.ImportStatus; st != nil && *st == domain.ImportItemStatusQueued {
++			failed := domain.ImportItemStatusFailed
++			it.Item.ImportStatus, it.Item.ImportError = &failed, &detail
++			n++
++		}
++	}
++	return n, nil
++}
++
+ func (r *fakeImportRepo) FailInterrupted(context.Context, string) (int, int, error) { return 1, 2, nil }
+ func (r *fakeImportRepo) ReassignByUser(context.Context, int, int) error            { return nil }
+ 
+@@ -746,6 +776,7 @@ func TestImportService_ImportWorkersStopOnShutdown(t *testing.T) {
+ 	assert.Equal(t, 1, res.Queued)
+ 	assert.Empty(t, creator.youtube, "nothing is imported once the server is shutting down")
+ 	assert.Equal(t, domain.ImportItemStatusQueued, *repo.items[id].Item.ImportStatus, "left queued for RecoverInterrupted")
++	assert.Empty(t, repo.failQueuedCalls, "a shutdown fails no row itself")
+ }
+ 
+ func TestImportService_Reads(t *testing.T) {

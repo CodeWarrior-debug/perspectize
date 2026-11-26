@@ -1,0 +1,422 @@
+diff --git a/frontend/src/lib/components/TypePills.svelte b/frontend/src/lib/components/TypePills.svelte
+new file mode 100644
+index 00000000..e64c55dc
+--- /dev/null
++++ b/frontend/src/lib/components/TypePills.svelte
+@@ -0,0 +1,30 @@
++<script lang="ts">
++	/**
++	 * TypePills: one-click switches to other content types, shown while the Library lists a
++	 * single type. Renders nothing when there is nothing to offer. The parent owns what a
++	 * switch does to the URL (see `otherTypeOptionsWhenOne` for which types to pass in).
++	 */
++	let {
++		options,
++		onSelect,
++	}: {
++		options: readonly { value: string; label: string }[];
++		/** Receives the option's `value` (lowercase, as used in `f.type=`), not its label. */
++		onSelect: (value: string) => void;
++	} = $props();
++</script>
++
++{#if options.length > 0}
++	<div class="flex flex-wrap items-center gap-1.5" role="group" aria-label="Switch content type">
++		<span class="text-muted-foreground text-xs" aria-hidden="true">Switch to</span>
++		{#each options as option (option.value)}
++			<button
++				type="button"
++				onclick={() => onSelect(option.value)}
++				class="border-border bg-background text-foreground hover:bg-accent rounded-full border px-3 py-1 text-xs transition-colors"
++			>
++				{option.label}
++			</button>
++		{/each}
++	</div>
++{/if}
+diff --git a/frontend/src/lib/utils/gridUrlState.ts b/frontend/src/lib/utils/gridUrlState.ts
+index 978e05a6..455e16e9 100644
+--- a/frontend/src/lib/utils/gridUrlState.ts
++++ b/frontend/src/lib/utils/gridUrlState.ts
+@@ -225,6 +225,18 @@ function sameScopes(a: SearchScopeKey[], b: SearchScopeKey[]): boolean {
+ 	return a.length === b.length && a.every((s) => b.includes(s));
+ }
+ 
++/**
++ * The search scopes to carry when the URL filters change from `from.filters` to `filters`. Scopes
++ * still at their defaults stay at the defaults of the new filters (Cast/Director come and go with
++ * the Movie filter); otherwise the user's picks that are still offered, or the new defaults if none are.
++ */
++export function searchScopesAfterFilterChange(from: GridParams, filters: Record<string, string>): SearchScopeKey[] {
++	const offered = searchScopesFor(filters);
++	if (sameScopes(from.qFields, searchScopesFor(from.filters))) return offered;
++	const kept = offered.filter((s) => from.qFields.includes(s));
++	return kept.length > 0 ? kept : offered;
++}
++
+ // ---------------------------------------------------------------------------
+ // AG Grid filter model types
+ // ---------------------------------------------------------------------------
+@@ -248,6 +260,25 @@ export function parseSetValue(value: string): string[] {
+ 	];
+ }
+ 
++/**
++ * The lowercase content types a `f.type` URL value names, minus unknown values (a stale or
++ * hand-edited URL), since the server rejects anything outside its ContentType enum.
++ */
++function knownTypes(value: string): string[] {
++	const known = new Set(CONTENT_TYPE_OPTIONS.map((o) => o.value));
++	return parseSetValue(value).filter((v) => known.has(v));
++}
++
++/**
++ * The other content types, offered as one-click switches while exactly one type is shown. Empty
++ * when the type filter names none or several, since there is then no single current type to
++ * switch away from. Counts the types the way the server query does (unknown values dropped).
++ */
++export function otherTypeOptionsWhenOne(filters: Record<string, string>): readonly { value: string; label: string }[] {
++	const types = knownTypes(filters.type ?? '');
++	return types.length === 1 ? CONTENT_TYPE_OPTIONS.filter((o) => o.value !== types[0]) : [];
++}
++
+ // ---------------------------------------------------------------------------
+ // Column mappings: AG Grid colId ↔ URL f.* param key
+ // ---------------------------------------------------------------------------
+@@ -559,12 +590,8 @@ export function urlParamsToGraphQLFilter(
+ 
+ 		switch (filterKey) {
+ 			case 'type': {
+-				// Unknown values (a stale or hand-edited URL) are dropped rather than sent,
+-				// since the server rejects anything outside its ContentType enum.
+-				const known = new Set(CONTENT_TYPE_OPTIONS.map((o) => o.value));
+-				const types = parseSetValue(value)
+-					.filter((v) => known.has(v))
+-					.map((v) => v.toUpperCase());
++				// Unknown values are dropped rather than sent (see knownTypes).
++				const types = knownTypes(value).map((v) => v.toUpperCase());
+ 				if (types.length > 0) {
+ 					result.contentTypes = types;
+ 					hasAny = true;
+diff --git a/frontend/src/routes/content-library/+page.svelte b/frontend/src/routes/content-library/+page.svelte
+index 15e2d37b..2359b7e7 100644
+--- a/frontend/src/routes/content-library/+page.svelte
++++ b/frontend/src/routes/content-library/+page.svelte
+@@ -11,11 +11,19 @@
+ <script lang="ts">
+ 	import { Input, Popover, PopoverContent, PopoverTrigger, buttonVariants } from '$lib/components/shadcn';
+ 	import LazyLoadError from '$lib/components/LazyLoadError.svelte';
++	import TypePills from '$lib/components/TypePills.svelte';
+ 	import SearchIcon from '@lucide/svelte/icons/search';
+ 	import SlidersHorizontalIcon from '@lucide/svelte/icons/sliders-horizontal';
+ 	import { page } from '$app/state';
+ 	import { goto } from '$app/navigation';
+-	import { parseGridParams, serializeGridParams, searchScopesFor, type SearchScopeKey } from '$lib/utils/gridUrlState';
++	import {
++		parseGridParams,
++		serializeGridParams,
++		searchScopesFor,
++		otherTypeOptionsWhenOne,
++		searchScopesAfterFilterChange,
++		type SearchScopeKey,
++	} from '$lib/utils/gridUrlState';
+ 	import { useMe } from '$lib/queries/users/useMe.svelte';
+ 	import { LIBRARY_PATH } from '$lib/utils/contentLinks';
+ 
+@@ -38,6 +46,17 @@
+ 		goto(search ? `?${search}` : LIBRARY_PATH, { replaceState: true, keepFocus: true, noScroll: true });
+ 	}
+ 
++	// While exactly one type is shown, offer a one-click switch to each of the others. Like "Mine", it
++	// edits the same `f.type` filter the Type column menu sets, so the chip, URL and grid stay in step.
++	const otherTypes = $derived(otherTypeOptionsWhenOne(gridParams.filters));
++
++	function switchType(type: string) {
++		const filters = { ...gridParams.filters, type };
++		const qFields = searchScopesAfterFilterChange(gridParams, filters);
++		const search = serializeGridParams({ ...gridParams, filters, qFields, page: 1 });
++		goto(search ? `?${search}` : LIBRARY_PATH, { replaceState: true, keepFocus: true, noScroll: true });
++	}
++
+ 	// Local search input state (tracks what user has typed)
+ 	// Initialized from URL on mount; user typing updates this independently of URL
+ 	let searchInput = $state(page.url.searchParams.get('q') ?? '');
+@@ -86,7 +105,7 @@
+ 
+ <div class="flex flex-col h-[calc(100vh-4rem)]">
+ 	<!-- Page Header: Title + Search -->
+-	<div class="w-full max-w-screen-xl mx-auto px-4 md:px-6 lg:px-8 py-4">
++	<div class="w-full max-w-screen-xl mx-auto px-4 md:px-6 lg:px-8 py-4 flex flex-col gap-3">
+ 		<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+ 			<div>
+ 				<h1 class="text-2xl font-semibold text-foreground">Library</h1>
+@@ -145,6 +164,8 @@
+ 				</Popover>
+ 			</div>
+ 		</div>
++		<!-- One-click type switches: only while a single type is shown (renders nothing otherwise). -->
++		<TypePills options={otherTypes} onSelect={switchType} />
+ 	</div>
+ 
+ 	<!-- ColumnRelevanceCallout (rendered by ActivityTable) moves itself here: above the card's top-right
+diff --git a/frontend/tests/components/LibraryPage.test.ts b/frontend/tests/components/LibraryPage.test.ts
+index c68b7925..4594f8ef 100644
+--- a/frontend/tests/components/LibraryPage.test.ts
++++ b/frontend/tests/components/LibraryPage.test.ts
+@@ -6,7 +6,7 @@
+  * search box + scope popover writing the right `q`/`qf` URL params.
+  */
+ import { describe, it, expect, vi, beforeEach } from 'vitest';
+-import { render, screen, fireEvent } from '@testing-library/svelte';
++import { render, screen, fireEvent, within } from '@testing-library/svelte';
+ import { tick } from 'svelte';
+ import { goto } from '$app/navigation';
+ import { mockPageState } from '../setup';
+@@ -128,6 +128,74 @@ describe('Library page search scope picker', () => {
+ 		}
+ 	});
+ 
++	describe('one-click type switch', () => {
++		const typeButtons = () =>
++			within(screen.getByRole('group', { name: 'Switch content type' }))
++				.getAllByRole('button')
++				.map((b) => b.textContent?.trim());
++
++		it('offers the other types while only the default YouTube type is shown', () => {
++			render(Page);
++			expect(typeButtons()).toEqual(['Claim', 'Bible Passage', 'Movie', 'Book', 'Webpage']);
++		});
++
++		it('leaves out the type already shown', () => {
++			mockPageState.url = new URL('http://localhost/content-library?f.type=movie');
++			render(Page);
++			const labels = typeButtons();
++			expect(labels).not.toContain('Movie');
++			expect(labels).toContain('YouTube Video');
++		});
++
++		it('offers nothing while several types are shown', () => {
++			mockPageState.url = new URL('http://localhost/content-library?f.type=movie,book');
++			render(Page);
++			expect(screen.queryByRole('group', { name: 'Switch content type' })).toBeNull();
++		});
++
++		it('offers nothing once the type filter is cleared', () => {
++			mockPageState.url = new URL('http://localhost/content-library?f=none');
++			render(Page);
++			expect(screen.queryByRole('group', { name: 'Switch content type' })).toBeNull();
++		});
++
++		it('switches the type filter, keeping the other filters and search, and resets to page 1', async () => {
++			mockPageState.url = new URL(
++				'http://localhost/content-library?f.type=youtube_video&f.channel=ted&q=cooking&page=3',
++			);
++			render(Page);
++
++			await fireEvent.click(screen.getByRole('button', { name: 'Movie' }));
++
++			const target = vi.mocked(goto).mock.calls[0][0] as string;
++			const params = new URLSearchParams(target.slice(1));
++			expect(params.get('f.type')).toBe('movie');
++			expect(params.get('f.channel')).toBe('ted');
++			expect(params.get('q')).toBe('cooking');
++			expect(params.has('page')).toBe(false);
++			expect(vi.mocked(goto).mock.calls[0][1]).toMatchObject({ replaceState: true, noScroll: true });
++		});
++
++		it('does not leave a stale search-field list behind when switching away from Movie', async () => {
++			mockPageState.url = new URL('http://localhost/content-library?f.type=movie');
++			render(Page);
++
++			await fireEvent.click(screen.getByRole('button', { name: 'Book' }));
++
++			const target = vi.mocked(goto).mock.calls[0][0] as string;
++			expect(target).toBe('?f.type=book');
++		});
++
++		it('returns to the bare Library URL when switching back to the default type with nothing else set', async () => {
++			mockPageState.url = new URL('http://localhost/content-library?f.type=movie');
++			render(Page);
++
++			await fireEvent.click(screen.getByRole('button', { name: 'YouTube Video' }));
++
++			expect(goto).toHaveBeenCalledWith('/content-library', expect.anything());
++		});
++	});
++
+ 	describe('"Mine" shortcut', () => {
+ 		it('is hidden when signed out', () => {
+ 			render(Page);
+diff --git a/frontend/tests/components/TypePills.test.ts b/frontend/tests/components/TypePills.test.ts
+new file mode 100644
+index 00000000..3e816759
+--- /dev/null
++++ b/frontend/tests/components/TypePills.test.ts
+@@ -0,0 +1,47 @@
++import { describe, it, expect, vi } from 'vitest';
++import { render, screen, fireEvent } from '@testing-library/svelte';
++import TypePills from '$lib/components/TypePills.svelte';
++
++const OPTIONS = [
++	{ value: 'movie', label: 'Movie' },
++	{ value: 'web_page', label: 'Webpage' },
++	{ value: 'youtube_video', label: 'YouTube Video' },
++];
++
++describe('TypePills', () => {
++	it('renders one button per option, labelled with the type name', () => {
++		render(TypePills, { props: { options: OPTIONS, onSelect: vi.fn() } });
++		const group = screen.getByRole('group', { name: 'Switch content type' });
++		expect(group).toBeInTheDocument();
++		expect(screen.getAllByRole('button').map((b) => b.textContent?.trim())).toEqual([
++			'Movie',
++			'Webpage',
++			'YouTube Video',
++		]);
++	});
++
++	it('renders nothing when there is nothing to offer', () => {
++		const { container } = render(TypePills, { props: { options: [], onSelect: vi.fn() } });
++		expect(screen.queryByRole('group')).toBeNull();
++		expect(screen.queryAllByRole('button')).toHaveLength(0);
++		expect(container.textContent?.trim()).toBe('');
++	});
++
++	it('hands up the option value, not the label, on click', async () => {
++		const onSelect = vi.fn();
++		render(TypePills, { props: { options: OPTIONS, onSelect } });
++
++		await fireEvent.click(screen.getByRole('button', { name: 'Webpage' }));
++
++		expect(onSelect).toHaveBeenCalledTimes(1);
++		expect(onSelect).toHaveBeenCalledWith('web_page');
++	});
++
++	it('is a plain action button, not a toggle (the shown type is simply absent)', () => {
++		render(TypePills, { props: { options: OPTIONS, onSelect: vi.fn() } });
++		for (const button of screen.getAllByRole('button')) {
++			expect(button).toHaveAttribute('type', 'button');
++			expect(button).not.toHaveAttribute('aria-pressed');
++		}
++	});
++});
+diff --git a/frontend/tests/unit/otherTypeOptions.test.ts b/frontend/tests/unit/otherTypeOptions.test.ts
+new file mode 100644
+index 00000000..1c2d1a37
+--- /dev/null
++++ b/frontend/tests/unit/otherTypeOptions.test.ts
+@@ -0,0 +1,114 @@
++import { describe, it, expect } from 'vitest';
++import {
++	ALL_SEARCH_SCOPES,
++	MOVIE_SEARCH_SCOPES,
++	otherTypeOptionsWhenOne,
++	parseGridParams,
++	searchScopesAfterFilterChange,
++	serializeGridParams,
++} from '$lib/utils/gridUrlState';
++import { CONTENT_TYPE_OPTIONS } from '$lib/utils/grid-config';
++
++const MOVIE_VIEW_SCOPES = [...ALL_SEARCH_SCOPES, ...MOVIE_SEARCH_SCOPES];
++
++const values = (filters: Record<string, string>) => otherTypeOptionsWhenOne(filters).map((o) => o.value);
++
++describe('otherTypeOptionsWhenOne', () => {
++	it('offers every other type, in the Type filter order, while exactly one type is shown', () => {
++		for (const solo of CONTENT_TYPE_OPTIONS) {
++			expect(otherTypeOptionsWhenOne({ type: solo.value })).toEqual(
++				CONTENT_TYPE_OPTIONS.filter((o) => o.value !== solo.value),
++			);
++		}
++	});
++
++	it('carries the display label with each value', () => {
++		expect(otherTypeOptionsWhenOne({ type: 'youtube_video' })).toContainEqual({ value: 'movie', label: 'Movie' });
++		expect(otherTypeOptionsWhenOne({ type: 'youtube_video' })).toContainEqual({ value: 'web_page', label: 'Webpage' });
++	});
++
++	it('never offers the type already shown', () => {
++		expect(values({ type: 'movie' })).not.toContain('movie');
++		expect(values({ type: 'movie' })).toHaveLength(CONTENT_TYPE_OPTIONS.length - 1);
++	});
++
++	it('offers nothing when there is no type filter', () => {
++		expect(otherTypeOptionsWhenOne({})).toEqual([]);
++		expect(otherTypeOptionsWhenOne({ type: '' })).toEqual([]);
++		expect(otherTypeOptionsWhenOne({ views: '1000..' })).toEqual([]);
++	});
++
++	it('offers nothing when two or more types are shown', () => {
++		expect(otherTypeOptionsWhenOne({ type: 'movie,book' })).toEqual([]);
++		expect(otherTypeOptionsWhenOne({ type: 'youtube_video,claim,movie' })).toEqual([]);
++	});
++
++	it('counts distinct types, so a repeated type still counts as one', () => {
++		expect(values({ type: 'movie,movie' })).toEqual(
++			CONTENT_TYPE_OPTIONS.map((o) => o.value).filter((v) => v !== 'movie'),
++		);
++	});
++
++	it('reads the URL value the way the type filter does: case, spaces and blanks', () => {
++		const others = CONTENT_TYPE_OPTIONS.map((o) => o.value).filter((v) => v !== 'movie');
++		expect(values({ type: 'Movie' })).toEqual(others);
++		expect(values({ type: ' movie , ' })).toEqual(others);
++	});
++
++	it('treats the pre-rename "youtube" value as YouTube Video', () => {
++		expect(values({ type: 'youtube' })).not.toContain('youtube_video');
++		expect(values({ type: 'youtube' })).toHaveLength(CONTENT_TYPE_OPTIONS.length - 1);
++		expect(values({ type: 'youtube,youtube_video' })).toHaveLength(CONTENT_TYPE_OPTIONS.length - 1);
++	});
++
++	it('ignores unknown values, as the server query does', () => {
++		// Only an unknown type: the query sends no type filter, so every type is shown.
++		expect(otherTypeOptionsWhenOne({ type: 'podcast' })).toEqual([]);
++		// One known type beside an unknown one: the query asks for just that type.
++		expect(values({ type: 'movie,podcast' })).not.toContain('movie');
++		expect(values({ type: 'movie,podcast' })).toHaveLength(CONTENT_TYPE_OPTIONS.length - 1);
++		// Two known types beside an unknown one is still several.
++		expect(otherTypeOptionsWhenOne({ type: 'movie,book,podcast' })).toEqual([]);
++	});
++
++	it('does not depend on the other filters', () => {
++		expect(values({ type: 'book', author: 'tolkien', views: '10..' })).toEqual(values({ type: 'book' }));
++	});
++});
++
++describe('searchScopesAfterFilterChange (search scopes carried through a type switch)', () => {
++	const from = (query: string) => parseGridParams(new URLSearchParams(query));
++
++	it('keeps the defaults of the new type: Cast and Director join in for Movie', () => {
++		expect(searchScopesAfterFilterChange(from('f.type=book'), { type: 'movie' })).toEqual(MOVIE_VIEW_SCOPES);
++	});
++
++	it('drops Cast and Director again when leaving Movie on the defaults', () => {
++		expect(searchScopesAfterFilterChange(from('f.type=movie'), { type: 'book' })).toEqual(ALL_SEARCH_SCOPES);
++	});
++
++	it('keeps the picks the user made that the new type still offers', () => {
++		expect(searchScopesAfterFilterChange(from('f.type=book&qf=title,tags'), { type: 'movie' })).toEqual([
++			'title',
++			'tags',
++		]);
++		expect(searchScopesAfterFilterChange(from('f.type=movie&qf=title,cast'), { type: 'book' })).toEqual(['title']);
++	});
++
++	it('falls back to the new defaults when none of the picks are still offered', () => {
++		expect(searchScopesAfterFilterChange(from('f.type=movie&qf=cast,director'), { type: 'book' })).toEqual(
++			ALL_SEARCH_SCOPES,
++		);
++	});
++
++	it('leaves no `qf` in the URL after a switch on the defaults', () => {
++		const state = from('f.type=movie');
++		const filters = { type: 'book' };
++		const search = serializeGridParams({
++			...state,
++			filters,
++			qFields: searchScopesAfterFilterChange(state, filters),
++		});
++		expect(search).not.toContain('qf=');
++	});
++});

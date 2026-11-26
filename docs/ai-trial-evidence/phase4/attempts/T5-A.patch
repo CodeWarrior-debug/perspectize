@@ -1,0 +1,465 @@
+diff --git a/frontend/src/lib/components/ActivityTable.svelte b/frontend/src/lib/components/ActivityTable.svelte
+index 2404698c..2a428225 100644
+--- a/frontend/src/lib/components/ActivityTable.svelte
++++ b/frontend/src/lib/components/ActivityTable.svelte
+@@ -12,17 +12,19 @@
+ 		CellMouseOverEvent,
+ 	} from '@ag-grid-community/core';
+ 	import { tick } from 'svelte';
+-	import { createQuery, keepPreviousData } from '@tanstack/svelte-query';
++	import { createQuery, hashKey, keepPreviousData } from '@tanstack/svelte-query';
+ 	import { page } from '$app/state';
+ 	import { goto } from '$app/navigation';
+ 	import { graphqlRequest } from '$lib/queries/client';
+ 	import {
+ 		ACTIVITY_LIST_STALE_TIME_MS,
+ 		cursorsAfterPage,
++		keepRowOrder,
+ 		LIST_CONTENT,
+ 		activityListRequest,
+ 		type ContentItem,
+ 		type ContentResponse,
++		type RowOrderMemo,
+ 	} from '$lib/queries/content';
+ 	import { useContentDetails } from '$lib/queries/content/useContentDetails';
+ 	import { OPEN_CONTENT_PARAM } from '$lib/utils/contentLinks';
+@@ -473,8 +475,25 @@
+ 	// Derived values from query
+ 	// Rows get their adder's username from the cached users list (see useUsernames).
+ 	const usernames = useUsernames();
++	// "Loaded" mode keeps the order the user is looking at while the query key is unchanged: the server
++	// orders by updatedAt desc, so a row the user just edited would otherwise come back first after the
++	// refetch and jump out of view. New rows still lead; any key change starts from the server order
++	// (keepRowOrder). The grid and the mobile card list both read this order. "All Items" is server-ordered.
++	// Plain, not $state: written by the derived that reads it (idempotent for the same data).
++	let shownOrder: RowOrderMemo | null = null;
++	const orderedItems = $derived.by(() => {
++		const data = contentQuery.data;
++		const result = keepRowOrder(shownOrder, {
++			key: hashKey(activityRequest.queryKey),
++			rows: data?.content.items ?? [],
++			placeholder: contentQuery.isPlaceholderData,
++			enabled: mode === 'loaded' && data !== undefined,
++		});
++		shownOrder = result.memo;
++		return result.rows;
++	});
+ 	const rowData = $derived(
+-		(contentQuery.data?.content.items ?? []).map((item) => ({
++		orderedItems.map((item) => ({
+ 			...item,
+ 			addedByUsername: usernames.byId.get(item.addedByUserID) ?? null,
+ 		})),
+@@ -839,8 +858,7 @@
+ 				filterValueGetter: durationFilterValueGetter,
+ 				comparator: durationComparator,
+ 				context: { tooltipSpec: ACTIVITY_TOOLTIP_SPECS.duration },
+-				headerTooltip:
+-					'Length of the item.',
++				headerTooltip: 'Length of the item.',
+ 			},
+ 			{
+ 				colId: 'views',
+diff --git a/frontend/src/lib/queries/content/activityList.ts b/frontend/src/lib/queries/content/activityList.ts
+index a5b76177..01caf305 100644
+--- a/frontend/src/lib/queries/content/activityList.ts
++++ b/frontend/src/lib/queries/content/activityList.ts
+@@ -30,6 +30,46 @@ export function cursorsAfterPage(
+ 	return [...cursors, pageInfo.endCursor];
+ }
+ 
++/** The row order a list was last shown in, remembered against the (hashed) query key it was shown for. */
++export interface RowOrderMemo {
++	key: string;
++	ids: string[];
++}
++
++/**
++ * Keeps a refetched list in the order the user is looking at. The server orders by `updatedAt desc`,
++ * so a row the user just edited comes back first and jumps out of view; this puts it back.
++ *
++ * While `key` matches the memo, rows already shown keep their shown order and rows the memo has
++ * not seen lead in server order (new rows lead, as the default sort does). A different `key` (a new
++ * sort, filter, search or page) starts from the server order, and so does a list that is not
++ * `enabled`, which also forgets the memo. A `placeholder` list (the previous key's rows shown while
++ * the new key loads) is returned as given and never recorded; the memo moves on to the new key with
++ * nothing remembered (a placeholder means this key has shown no rows), so the first real rows for it
++ * are shown in server order.
++ *
++ * Pure and idempotent: feeding its own output memo the same rows returns the same order, so the caller
++ * may evaluate it more than once per fetch. ActivityTable keeps the memo in a plain variable.
++ */
++export function keepRowOrder<T extends { id: string | number }>(
++	memo: RowOrderMemo | null,
++	input: { key: string; rows: readonly T[]; placeholder: boolean; enabled: boolean },
++): { rows: readonly T[]; memo: RowOrderMemo | null } {
++	const { key, rows, placeholder, enabled } = input;
++	if (!enabled) return { rows, memo: null };
++	if (placeholder) return { rows, memo: { key, ids: [] } };
++
++	const ids = memo?.key === key ? memo.ids : [];
++	const rank = new Map(ids.map((id, index) => [id, index]));
++	const fresh: T[] = [];
++	const kept: T[] = [];
++	for (const row of rows) (rank.has(String(row.id)) ? kept : fresh).push(row);
++	kept.sort((a, b) => (rank.get(String(a.id)) ?? 0) - (rank.get(String(b.id)) ?? 0));
++
++	const ordered = [...fresh, ...kept];
++	return { rows: ordered, memo: { key, ids: ordered.map((row) => String(row.id)) } };
++}
++
+ /** Builds the Activity list key and request for `params` at cursor `after` (null = first page). */
+ export function activityListRequest(params: GridParams, after: string | null) {
+ 	const isAll = params.mode === 'all';
+diff --git a/frontend/src/lib/queries/content/index.ts b/frontend/src/lib/queries/content/index.ts
+index e01c076a..09c2e266 100644
+--- a/frontend/src/lib/queries/content/index.ts
++++ b/frontend/src/lib/queries/content/index.ts
+@@ -8,7 +8,14 @@ export interface LengthDisplay {
+ }
+ 
+ export type { ContentFilterInput } from '$lib/utils/gridUrlState';
+-export { activityListRequest, cursorsAfterPage, ACTIVITY_LIST_STALE_TIME_MS, LOADED_MODE_FIRST } from './activityList';
++export {
++	activityListRequest,
++	cursorsAfterPage,
++	keepRowOrder,
++	ACTIVITY_LIST_STALE_TIME_MS,
++	LOADED_MODE_FIRST,
++} from './activityList';
++export type { RowOrderMemo } from './activityList';
+ 
+ // Values the API returns in Content.contentType (a String, not a GraphQL enum).
+ export type ContentType = 'YOUTUBE_VIDEO' | 'CLAIM' | 'BIBLE_PASSAGE' | 'MOVIE' | 'BOOK' | 'WEB_PAGE';
+diff --git a/frontend/tests/components/ActivityTable.test.ts b/frontend/tests/components/ActivityTable.test.ts
+index 53ff71bd..fce51ba9 100644
+--- a/frontend/tests/components/ActivityTable.test.ts
++++ b/frontend/tests/components/ActivityTable.test.ts
+@@ -13,6 +13,7 @@ import { render, screen, waitFor } from '@testing-library/svelte';
+ import { QueryClient } from '@tanstack/svelte-query';
+ import TestWrapper from '../helpers/TestWrapper.svelte';
+ import { mockPageState } from '../setup';
++import { queryKeys } from '$lib/queries/keys';
+ 
+ const { mockRequest, clerkState } = vi.hoisted(() => ({
+ 	mockRequest: vi.fn(),
+@@ -315,6 +316,103 @@ describe('ActivityTable', () => {
+ 		window.matchMedia = originalMatchMedia;
+ 	});
+ 
++	describe('row order across refetches (mobile card list)', () => {
++		// The mocked AG Grid draws no rows, so the card list is where the shown order can be read.
++		function forceCardMode() {
++			const originalMatchMedia = window.matchMedia;
++			window.matchMedia = vi.fn(
++				(query: string) =>
++					({
++						matches: query.includes('max-width: 859px'),
++						media: query,
++						onchange: null,
++						addListener: vi.fn(),
++						removeListener: vi.fn(),
++						addEventListener: vi.fn(),
++						removeEventListener: vi.fn(),
++						dispatchEvent: vi.fn(),
++					}) as unknown as MediaQueryList,
++			);
++			return () => {
++				window.matchMedia = originalMatchMedia;
++			};
++		}
++
++		const item = (id: string, name: string) => ({ ...mockDataResponse.content.items[0], id, name });
++		const listOf = (...items: ReturnType<typeof item>[]) => ({
++			content: { ...mockEmptyResponse.content, items, totalCount: items.length },
++		});
++		const cardIds = (container: HTMLElement) =>
++			Array.from(container.querySelectorAll('[data-testid^="card-thumb-"]')).map((el) =>
++				el.getAttribute('data-testid')!.replace('card-thumb-', ''),
++			);
++
++		async function renderCards(first: ReturnType<typeof listOf>) {
++			let current = first;
++			mockRequest.mockImplementation(async (query: string) =>
++				/query ListContent\(/.test(String(query)) ? current : mockEmptyResponse,
++			);
++			const queryClient = new QueryClient({
++				defaultOptions: { queries: { retry: false, gcTime: 0, staleTime: 0 }, mutations: { retry: false } },
++			});
++			const { container } = renderWithQuery(queryClient);
++			await waitFor(() => expect(cardIds(container).length).toBe(first.content.items.length));
++			return {
++				container,
++				// What the server returns from now on, then a refetch of the list (as after editing a row).
++				refetchWith: async (next: ReturnType<typeof listOf>) => {
++					current = next;
++					await queryClient.invalidateQueries({ queryKey: queryKeys.content.lists() });
++				},
++			};
++		}
++
++		it('Loaded mode: an edited row that the server now returns first stays where it was', async () => {
++			const restore = forceCardMode();
++			try {
++				const { container, refetchWith } = await renderCards(
++					listOf(item('1', 'One'), item('2', 'Two'), item('3', 'Three')),
++				);
++				expect(cardIds(container)).toEqual(['1', '2', '3']);
++
++				await refetchWith(listOf(item('3', 'Three (edited)'), item('1', 'One'), item('2', 'Two')));
++				await waitFor(() => expect(container.textContent).toContain('Three (edited)'));
++				expect(cardIds(container)).toEqual(['1', '2', '3']);
++			} finally {
++				restore();
++			}
++		});
++
++		it('Loaded mode: a new row leads, ahead of the order being kept', async () => {
++			const restore = forceCardMode();
++			try {
++				const { container, refetchWith } = await renderCards(
++					listOf(item('1', 'One'), item('2', 'Two'), item('3', 'Three')),
++				);
++				await refetchWith(listOf(item('4', 'Four'), item('3', 'Three (edited)'), item('1', 'One'), item('2', 'Two')));
++				await waitFor(() => expect(cardIds(container)).toEqual(['4', '1', '2', '3']));
++			} finally {
++				restore();
++			}
++		});
++
++		it('All Items mode: keeps the server order (the user chose that sort)', async () => {
++			mockPageState.url = new URL('http://localhost/?mode=all');
++			const restore = forceCardMode();
++			try {
++				const { container, refetchWith } = await renderCards(
++					listOf(item('1', 'One'), item('2', 'Two'), item('3', 'Three')),
++				);
++				expect(cardIds(container)).toEqual(['1', '2', '3']);
++
++				await refetchWith(listOf(item('3', 'Three (edited)'), item('1', 'One'), item('2', 'Two')));
++				await waitFor(() => expect(cardIds(container)).toEqual(['3', '1', '2']));
++			} finally {
++				restore();
++			}
++		});
++	});
++
+ 	it('shows the AG Grid table at/above the 860px breakpoint', async () => {
+ 		mockRequest.mockResolvedValue(mockDataResponse);
+ 		// Default window.matchMedia mock from tests/setup.ts always returns matches: false.
+diff --git a/frontend/tests/unit/keep-row-order.test.ts b/frontend/tests/unit/keep-row-order.test.ts
+new file mode 100644
+index 00000000..8f7fe9a7
+--- /dev/null
++++ b/frontend/tests/unit/keep-row-order.test.ts
+@@ -0,0 +1,210 @@
++/**
++ * keepRowOrder keeps the Library list in the order the user is looking at across refetches of the
++ * same query key (an edited row comes back first from the server, but must not jump), while a new
++ * key, a non-Loaded list or placeholder data never inherits an order.
++ */
++import { describe, it, expect } from 'vitest';
++import { hashKey } from '@tanstack/svelte-query';
++import { activityListRequest, keepRowOrder, type RowOrderMemo } from '$lib/queries/content';
++import { parseGridParams } from '$lib/utils/gridUrlState';
++
++type Row = { id: string; name: string };
++
++const row = (id: string, name = `row ${id}`): Row => ({ id, name });
++const rows = (...ids: string[]) => ids.map((id) => row(id));
++const idsOf = (list: readonly Row[]) => list.map((r) => r.id);
++
++const K1 = 'key-1';
++const K2 = 'key-2';
++
++/** One render of the list: feeds the memo from the previous step back in, like the component does. */
++function show(
++	memo: RowOrderMemo | null,
++	key: string,
++	list: readonly Row[],
++	opts: { placeholder?: boolean; enabled?: boolean } = {},
++) {
++	return keepRowOrder(memo, { key, rows: list, placeholder: false, enabled: true, ...opts });
++}
++
++describe('keepRowOrder', () => {
++	it('shows the first load in server order and remembers it', () => {
++		const first = show(null, K1, rows('a', 'b', 'c'));
++		expect(idsOf(first.rows)).toEqual(['a', 'b', 'c']);
++		expect(first.memo).toEqual({ key: K1, ids: ['a', 'b', 'c'] });
++	});
++
++	it('keeps the shown order when a refetch returns the edited row first', () => {
++		const first = show(null, K1, rows('a', 'b', 'c'));
++		const edited = [row('c', 'row c (edited)'), row('a'), row('b')];
++		const again = show(first.memo, K1, edited);
++		expect(idsOf(again.rows)).toEqual(['a', 'b', 'c']);
++		// The fresh data is what is shown, only the position is kept.
++		expect(again.rows[2]).toBe(edited[0]);
++		expect(again.rows[2].name).toBe('row c (edited)');
++	});
++
++	it('keeps the shown order across several refetches, edit after edit', () => {
++		let step = show(null, K1, rows('a', 'b', 'c', 'd'));
++		step = show(step.memo, K1, rows('d', 'a', 'b', 'c'));
++		step = show(step.memo, K1, rows('b', 'd', 'a', 'c'));
++		step = show(step.memo, K1, rows('c', 'b', 'd', 'a'));
++		expect(idsOf(step.rows)).toEqual(['a', 'b', 'c', 'd']);
++	});
++
++	it('puts new rows first, in server order, ahead of the kept order', () => {
++		const first = show(null, K1, rows('a', 'b', 'c'));
++		// x and y are new; c was edited, so the server also moved it to the front of the old rows.
++		const again = show(first.memo, K1, rows('x', 'y', 'c', 'a', 'b'));
++		expect(idsOf(again.rows)).toEqual(['x', 'y', 'a', 'b', 'c']);
++		// The new rows are now part of the shown order too.
++		const next = show(again.memo, K1, rows('b', 'x', 'y', 'a', 'c'));
++		expect(idsOf(next.rows)).toEqual(['x', 'y', 'a', 'b', 'c']);
++	});
++
++	it('drops a row the server no longer returns and keeps the rest in place', () => {
++		const first = show(null, K1, rows('a', 'b', 'c'));
++		const again = show(first.memo, K1, rows('c', 'a'));
++		expect(idsOf(again.rows)).toEqual(['a', 'c']);
++		expect(again.memo?.ids).toEqual(['a', 'c']);
++	});
++
++	it('does not bring a dropped row back at its old position when it returns (it is new)', () => {
++		const first = show(null, K1, rows('a', 'b', 'c'));
++		const gone = show(first.memo, K1, rows('a', 'c'));
++		const back = show(gone.memo, K1, rows('b', 'a', 'c'));
++		expect(idsOf(back.rows)).toEqual(['b', 'a', 'c']);
++	});
++
++	it('starts from the server order when the key changes (new sort, filter, search or page)', () => {
++		const first = show(null, K1, rows('a', 'b', 'c'));
++		const next = show(first.memo, K2, rows('c', 'a', 'b'));
++		expect(idsOf(next.rows)).toEqual(['c', 'a', 'b']);
++		expect(next.memo).toEqual({ key: K2, ids: ['c', 'a', 'b'] });
++	});
++
++	it('starts from the server order when going back to an earlier key', () => {
++		const one = show(null, K1, rows('a', 'b', 'c'));
++		const two = show(one.memo, K2, rows('x', 'y'));
++		const back = show(two.memo, K1, rows('c', 'a', 'b'));
++		expect(idsOf(back.rows)).toEqual(['c', 'a', 'b']);
++	});
++
++	describe('placeholder data', () => {
++		it('is returned as given, not reordered by the order shown for the previous key', () => {
++			const first = show(null, K1, rows('a', 'b', 'c'));
++			const placeholderRows = rows('c', 'a', 'b');
++			const loading = show(first.memo, K2, placeholderRows, { placeholder: true });
++			expect(loading.rows).toBe(placeholderRows);
++		});
++
++		it('is not recorded: the first real rows for the new key are in server order', () => {
++			const first = show(null, K1, rows('a', 'b', 'c'));
++			const loading = show(first.memo, K2, rows('a', 'b', 'c'), { placeholder: true });
++			expect(loading.memo).toEqual({ key: K2, ids: [] });
++			const real = show(loading.memo, K2, rows('c', 'b', 'a'));
++			expect(idsOf(real.rows)).toEqual(['c', 'b', 'a']);
++		});
++
++		it('does not let the order shown for the old key carry over to the new key', () => {
++			const first = show(null, K1, rows('a', 'b', 'c'));
++			// K1's order is a, b, c; if it carried over, K2's c, b, a would come out as a, b, c.
++			const loading = show(first.memo, K2, rows('a', 'b', 'c'), { placeholder: true });
++			const real = show(loading.memo, K2, rows('c', 'b', 'a'));
++			expect(idsOf(real.rows)).toEqual(['c', 'b', 'a']);
++		});
++
++		it('clears anything remembered for the key it is shown under', () => {
++			const first = show(null, K1, rows('a', 'b', 'c'));
++			const loading = show(first.memo, K1, rows('c', 'b', 'a'), { placeholder: true });
++			expect(loading.memo).toEqual({ key: K1, ids: [] });
++		});
++	});
++
++	describe('when not enabled ("All Items" mode, or no data yet)', () => {
++		it('returns the rows as given and forgets the memo', () => {
++			const first = show(null, K1, rows('a', 'b', 'c'));
++			const input = rows('c', 'a', 'b');
++			const off = show(first.memo, K1, input, { enabled: false });
++			expect(off.rows).toBe(input);
++			expect(off.memo).toBeNull();
++		});
++
++		it('starts from the server order when it is enabled again, even under the same key', () => {
++			const first = show(null, K1, rows('a', 'b', 'c'));
++			const off = show(first.memo, K1, rows('a', 'b', 'c'), { enabled: false });
++			const on = show(off.memo, K1, rows('c', 'a', 'b'));
++			expect(idsOf(on.rows)).toEqual(['c', 'a', 'b']);
++		});
++	});
++
++	it('is idempotent: evaluating the same rows again changes nothing', () => {
++		const first = show(null, K1, rows('a', 'b', 'c'));
++		const edited = rows('c', 'x', 'a', 'b');
++		const once = show(first.memo, K1, edited);
++		const twice = show(once.memo, K1, edited);
++		expect(idsOf(twice.rows)).toEqual(idsOf(once.rows));
++		expect(twice.memo).toEqual(once.memo);
++	});
++
++	it('does not mutate the rows it is given', () => {
++		const first = show(null, K1, rows('a', 'b', 'c'));
++		const input = rows('c', 'a', 'b');
++		show(first.memo, K1, input);
++		expect(idsOf(input)).toEqual(['c', 'a', 'b']);
++	});
++
++	it('handles an empty list and an empty memo', () => {
++		const empty = show(null, K1, []);
++		expect(empty.rows).toEqual([]);
++		expect(empty.memo).toEqual({ key: K1, ids: [] });
++		expect(idsOf(show(empty.memo, K1, rows('a', 'b')).rows)).toEqual(['a', 'b']);
++	});
++
++	it('treats numeric and string ids alike', () => {
++		const first = keepRowOrder(null, {
++			key: K1,
++			rows: [{ id: 1 }, { id: 2 }, { id: 3 }],
++			placeholder: false,
++			enabled: true,
++		});
++		const again = keepRowOrder(first.memo, {
++			key: K1,
++			rows: [{ id: '3' }, { id: '1' }, { id: '2' }],
++			placeholder: false,
++			enabled: true,
++		});
++		expect(again.rows.map((r) => String(r.id))).toEqual(['1', '2', '3']);
++	});
++});
++
++describe('keepRowOrder with the real Activity list key', () => {
++	const keyFor = (qs: string, after: string | null = null) =>
++		hashKey(activityListRequest(parseGridParams(new URLSearchParams(qs)), after).queryKey);
++
++	it('Loaded mode: an unchanged URL keeps the same key, so the order is kept', () => {
++		expect(keyFor('')).toBe(keyFor(''));
++	});
++
++	it('Loaded mode: a client-side sort or column filter does not change the key, so the order is kept under them', () => {
++		expect(keyFor('sort=views.desc')).toBe(keyFor(''));
++		expect(keyFor('f.type=youtube_video&f.views=100..')).toBe(keyFor('f.type=youtube_video'));
++	});
++
++	it('a new search, Type filter or page size changes the key, so the order restarts', () => {
++		const base = keyFor('');
++		expect(keyFor('q=matrix')).not.toBe(base);
++		expect(keyFor('f.type=movie')).not.toBe(base);
++		expect(keyFor('pageSize=25')).not.toBe(base);
++	});
++
++	it('"All Items" mode: a new sort or page changes the key', () => {
++		const base = keyFor('mode=all');
++		expect(keyFor('mode=all&sort=views.desc')).not.toBe(base);
++		expect(keyFor('mode=all', 'cursor:10')).not.toBe(base);
++	});
++
++	it('switching between Loaded and All Items changes the key', () => {
++		expect(keyFor('mode=all')).not.toBe(keyFor(''));
++	});
++});
