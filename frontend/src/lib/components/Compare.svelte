@@ -94,10 +94,11 @@
 	type PerspectiveRow = ListPerspectivesByContentResponse['perspectives']['items'][number];
 
 	// The picker's unit is a perspective, not a user: one person can hold
-	// several perspectives on the same content (nothing makes user+content
-	// unique), and the picker advertises content by perspective count. Keying
-	// by userID would collapse those rows, so a single-author content would show
-	// "3 perspectives" in the picker and "no other perspectives" here.
+	// two perspectives on the same content (one public and one private; the
+	// database is unique on user + content + privacy), and the picker advertises
+	// content by perspective count. Keying by userID would collapse those rows,
+	// so a single-author content would show "2 perspectives" in the picker and
+	// "no other perspectives" here.
 	// Only private is labelled (public carries no marker, matching the Take
 	// column). Compared case-insensitively, as PerspectivePopover does.
 	function isPrivatePerspective(p: { privacy: string }): boolean {

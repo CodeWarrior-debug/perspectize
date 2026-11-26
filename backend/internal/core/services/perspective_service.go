@@ -393,10 +393,9 @@ func (s *PerspectiveService) ListPerspectives(ctx context.Context, params domain
 }
 
 // AggregateByContentIDs computes the perspective count and average Quality
-// rating for each given content ID, across ALL perspectives (public and
-// private) — see the repository's AggregateByContentIDs doc comment. A thin
-// passthrough; no auth restriction needed since this never exposes any
-// individual perspective's content, only an aggregate count/average.
+// rating for each given content ID over PUBLIC perspectives only, so the result
+// is the same for every viewer and needs no auth restriction. See the
+// repository's AggregateByContentIDs doc comment.
 func (s *PerspectiveService) AggregateByContentIDs(ctx context.Context, contentIDs []int) (map[int]*domain.PerspectiveAggregate, error) {
 	aggregates, err := s.repo.AggregateByContentIDs(ctx, contentIDs)
 	if err != nil {
