@@ -1,12 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import {
-	CHART_TYPES,
-	CHART_TYPE_LABELS,
-	CHART_ELIGIBLE_COLS,
-	DEFAULT_CHART_TYPE,
-	defaultChartType,
-	isChartEligible,
-} from '#lib/utils/columnCharts';
+import { CHART_TYPES, CHART_TYPE_LABELS, DEFAULT_CHART_TYPE, defaultChartType } from '#lib/utils/columnCharts';
+import { CHART_ELIGIBLE_COLS, isChartEligible } from '#lib/utils/libraryColumns/index.js';
 
 describe('chart registry', () => {
 	it('has exactly 10 chart types, each with a label', () => {
@@ -16,9 +10,9 @@ describe('chart registry', () => {
 		expect(CHART_TYPE_LABELS.topBottom).toBe('Top and bottom 10');
 	});
 
-	it('lists the nine numeric columns and excludes released', () => {
+	it('lists the ten chartable columns, including Book pages and rating, and excludes released', () => {
 		expect([...CHART_ELIGIBLE_COLS].sort()).toEqual(
-			['budget', 'boxOffice', 'duration', 'likes', 'percentLiked', 'tmdbScore', 'views', 'votes', 'vsBudget'].sort(),
+			['budget', 'boxOffice', 'duration', 'likes', 'pages', 'rating', 'tmdbScore', 'views', 'votes', 'vsBudget'].sort(),
 		);
 		expect(CHART_ELIGIBLE_COLS.has('released')).toBe(false);
 	});

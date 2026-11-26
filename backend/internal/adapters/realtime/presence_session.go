@@ -96,10 +96,10 @@ func publishPresence(
 	envs := make([]domain.EventEnvelope, len(threads))
 	for i, t := range threads {
 		envs[i] = domain.EventEnvelope{
-			Type:     "PRESENCE_CHANGED",
+			Type:     domain.KindPresenceChanged,
 			ThreadID: t.ID,
 			UserID:   userID,
-			State:    string(state),
+			State:    state,
 		}
 	}
 	_ = notifier.PublishEphemeral(ctx, envs...)

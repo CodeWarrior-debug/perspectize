@@ -24,6 +24,8 @@
 		rankTitles,
 		titlesText,
 		TITLES_SHOWN,
+		MOVIE_NOUN,
+		type ItemNoun,
 	} from '#lib/utils/chartReadout';
 	import { CHART_TYPE_LABELS, type ChartType } from '#lib/utils/columnCharts';
 
@@ -34,6 +36,7 @@
 		total,
 		ranked,
 		format,
+		noun = MOVIE_NOUN,
 	}: {
 		type: ChartType;
 		values: number[];
@@ -43,6 +46,8 @@
 		total: number;
 		ranked?: TopBottom;
 		format: (n: number) => string;
+		/** What one row is called in the readouts. */
+		noun?: ItemNoun;
 	} = $props();
 
 	// viewBox units. The popover is 288px wide, so these render at about 1:1.
@@ -147,30 +152,30 @@
 				return bins.map((b, i) => ({
 					x: xs((b.lo + b.hi) / 2),
 					y: ys(b.count / binMax),
-					text: binReadout(b, format, binTitles[i]),
+					text: binReadout(b, format, binTitles[i], noun),
 				}));
 			case 'line':
 				return frequencyPoints(bins).map((p, i) => ({
 					x: xs(p.x),
 					y: ys(p.y / binMax),
-					text: lineReadout(bins[i], format, binTitles[i]),
+					text: lineReadout(bins[i], format, binTitles[i], noun),
 				}));
 			case 'cumulative': {
 				const pts = cumulative(values);
 				return pts.map((p, i) => ({
 					x: xs(p.x),
 					y: ys(p.share),
-					text: cumulativeReadout(p.x, i + 1, pts.length, format, cumTitles[i]),
+					text: cumulativeReadout(p.x, i + 1, pts.length, format, cumTitles[i], noun),
 				}));
 			}
 			case 'density':
 				return dens.map((p) => ({
 					x: xs(p.x),
 					y: ys(p.y / densMax),
-					text: densityReadout(p.x, p.y * values.length * bandWidth, bandWidth, format),
+					text: densityReadout(p.x, p.y * values.length * bandWidth, bandWidth, format, noun),
 				}));
 			case 'pie':
-				return slices.map((s) => ({ x: 0, y: 0, text: pieReadout(sliceLabel(s), s.count, values.length) }));
+				return slices.map((s) => ({ x: 0, y: 0, text: pieReadout(sliceLabel(s), s.count, values.length, noun) }));
 			case 'strip':
 				return rows.map((r, i) => ({
 					x: xs(r.value),

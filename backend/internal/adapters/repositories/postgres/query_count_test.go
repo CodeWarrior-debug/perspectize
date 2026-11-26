@@ -85,7 +85,7 @@ func TestQueryCount_PerspectiveCountVisibleByContentIDs_IsOneQueryForAnyBatchSiz
 func TestQueryCount_PerspectiveAggregateByContentIDs_IsOneQueryForAnyBatchSize(t *testing.T) {
 	ctx := context.Background()
 	db, mock := newMockDB(t)
-	mock.ExpectQuery(`FROM content AS c LEFT JOIN perspectives p ON p.content_id = c.id WHERE c.id = ANY\(CAST\(\$1 AS bigint\[\]\)\)`).
+	mock.ExpectQuery(`FROM content AS c LEFT JOIN perspectives p ON p.content_id = c.id AND p.privacy = \$1 WHERE c.id = ANY\(CAST\(\$2 AS bigint\[\]\)\)`).
 		WillReturnRows(sqlmock.NewRows([]string{"content_id", "count", "quality_count", "avg_quality"}).
 			AddRow(1, 2, 2, 5000.0))
 

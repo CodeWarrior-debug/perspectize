@@ -35,6 +35,7 @@ export default defineConfig({
 			// abort the dry run. Their mutants (buildTag.ts, bibleVersion) read as LIVED.
 			'tests/unit/bibleVersion.test.ts',
 			'tests/unit/buildTag.test.ts',
+			'tests/unit/contentTypes/registry.test.ts',
 		],
 		environment: 'jsdom',
 		globals: true,

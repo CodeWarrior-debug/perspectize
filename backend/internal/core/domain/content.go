@@ -190,8 +190,11 @@ type Content struct {
 // (PUBLIC, or unset) is visible to everyone. A caller that gets false should
 // answer exactly as it would for a missing row.
 func (c *Content) VisibleTo(viewerID int) bool {
-	if c.Privacy != PrivacyPrivate {
-		return true
-	}
-	return viewerID > 0 && viewerID == c.AddedByUserID
+	return c.Audience().ReadableBy(viewerID)
+}
+
+// Audience is the content row's audience. An unset privacy is PUBLIC, the same
+// default the mappers write.
+func (c *Content) Audience() Audience {
+	return ContentAudience(c.Privacy, c.AddedByUserID)
 }

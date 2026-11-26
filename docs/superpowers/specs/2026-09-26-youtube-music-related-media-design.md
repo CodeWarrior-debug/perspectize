@@ -116,7 +116,7 @@ Pasting a YouTube Music link into Add Content produces a **music track** item th
 
 ### Not verified yet
 
-- No browser run of any UI (cloud session; no Clerk sign-in). PR #440 carries `needs-demo-video` for a local session.
+- No browser run of any UI (cloud session; no Clerk sign-in). PR #440 carries `needs-demo-evidence` for a local session.
 - Migration 000032 is written, not applied anywhere, and not yet rehearsed on a Neon branch.
 - The InnerTube `next` endpoint has only been exercised on one real response (a live official video). The audio-track-with-counterpart shape is built from ytmusicapi's documented structure, not a capture.
 

@@ -450,3 +450,47 @@ func TestUpdateContentSourceDataMovie(t *testing.T) {
 	h.roundTrips(2, token, `mutation($id: IntID!) { updateContentSourceData(contentId: $id) { id name contentType } }`,
 		map[string]any{"id": created.ID})
 }
+
+// Backward paging through the content list: the page before page two is page
+// one, with the same rows in the same order and the flags at both ends right.
+func TestListContentBackwardPaging(t *testing.T) {
+	h := newHarness(t)
+	userID, token := h.user("backward")
+	tag := fmt.Sprintf("bw%d", time.Now().UnixNano())
+	for i := 0; i < 5; i++ {
+		h.content(userID, fmt.Sprintf("%s-%d", tag, i))
+	}
+	h.warm(token)
+
+	const backwardQuery = `query Content($first: Int, $after: String, $last: Int, $before: String, $filter: ContentFilter) {
+		content(first: $first, after: $after, last: $last, before: $before, filter: $filter) {
+			items { id }
+			pageInfo { hasNextPage hasPreviousPage startCursor endCursor }
+		}
+	}`
+	type page struct {
+		Items    []struct{ ID string } `json:"items"`
+		PageInfo struct {
+			HasNextPage     bool    `json:"hasNextPage"`
+			HasPreviousPage bool    `json:"hasPreviousPage"`
+			StartCursor     *string `json:"startCursor"`
+			EndCursor       *string `json:"endCursor"`
+		} `json:"pageInfo"`
+	}
+	filter := map[string]any{"search": tag}
+
+	first := decode[page](t, h.gql(token, backwardQuery, map[string]any{"first": 2, "filter": filter}), "content")
+	require.Len(t, first.Items, 2)
+	require.True(t, first.PageInfo.HasNextPage)
+	require.False(t, first.PageInfo.HasPreviousPage)
+
+	second := decode[page](t, h.gql(token, backwardQuery, map[string]any{"first": 2, "after": *first.PageInfo.EndCursor, "filter": filter}), "content")
+	require.Len(t, second.Items, 2)
+	require.True(t, second.PageInfo.HasPreviousPage)
+	require.NotNil(t, second.PageInfo.StartCursor)
+
+	back := decode[page](t, h.gql(token, backwardQuery, map[string]any{"last": 2, "before": *second.PageInfo.StartCursor, "filter": filter}), "content")
+	require.Equal(t, first.Items, back.Items, "the page before page two is page one, in list order")
+	require.False(t, back.PageInfo.HasPreviousPage)
+	require.True(t, back.PageInfo.HasNextPage)
+}

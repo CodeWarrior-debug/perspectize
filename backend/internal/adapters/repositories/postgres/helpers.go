@@ -1,7 +1,6 @@
 package postgres
 
 import (
-	"database/sql"
 	"database/sql/driver"
 	"strings"
 
@@ -53,41 +52,9 @@ func privacyToDBValue(p domain.Privacy) string {
 	return strings.ToLower(string(p))
 }
 
-// visiblePerspectivePredicate is the one definition of which perspective rows
-// a viewer may read: public ones, plus their own (public only when anonymous).
-// The perspectives list, the Content.visiblePerspectiveCount batch and the
-// content list's minPerspectiveCount filter all use it, so when visibility
-// grows beyond public/own (shared or friends-only perspectives) this is the
-// only place to change. Columns are unqualified; the caller's query supplies
-// the perspectives table.
-func visiblePerspectivePredicate(viewerID *int) (string, []any) {
-	public := privacyToDBValue(domain.PrivacyPublic)
-	if viewerID == nil {
-		return "privacy = ?", []any{public}
-	}
-	return "privacy = ? OR user_id = ?", []any{public, *viewerID}
-}
-
 // privacyFromDBValue converts lowercase database value to domain Privacy
 func privacyFromDBValue(s string) domain.Privacy {
 	return domain.Privacy(strings.ToUpper(s))
-}
-
-// reviewStatusToDBValue converts domain ReviewStatus to lowercase for database storage
-func reviewStatusToDBValue(rs *domain.ReviewStatus) sql.NullString {
-	if rs == nil {
-		return sql.NullString{}
-	}
-	return sql.NullString{String: strings.ToLower(string(*rs)), Valid: true}
-}
-
-// reviewStatusFromDBValue converts lowercase database value to domain ReviewStatus
-func reviewStatusFromDBValue(s sql.NullString) *domain.ReviewStatus {
-	if !s.Valid {
-		return nil
-	}
-	rs := domain.ReviewStatus(strings.ToUpper(s.String))
-	return &rs
 }
 
 // intSliceToInt64Array converts []int to Int64Array for database storage
@@ -295,7 +262,7 @@ func contentSortRule(sortBy domain.ContentSortBy, order domain.SortOrder) pagina
 		return paginator.Rule{
 			Key:             "PublishedAt",
 			Order:           paginatorOrder,
-			SQLRepr:         "CASE WHEN content_type = 'web_page' THEN response->>'publishedAt' ELSE response->'items'->0->'snippet'->>'publishedAt' END",
+			SQLRepr:         factText(domain.ContentFactPublishedAt),
 			NULLReplacement: publishedNull,
 		}
 	case domain.ContentSortByChannelTitle:

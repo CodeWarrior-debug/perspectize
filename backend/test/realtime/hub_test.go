@@ -143,7 +143,7 @@ func TestHub_InboxFanout(t *testing.T) {
 	defer unsubThread()
 
 	hub.PublishEnvelope(context.Background(), domain.EventEnvelope{
-		Type: "MESSAGE_POSTED", ThreadID: 1, Seq: 5, MessageID: 10,
+		Type: domain.KindMessagePosted, ThreadID: 1, Seq: 5, MessageID: 10,
 	})
 
 	select {
@@ -195,7 +195,7 @@ func TestHub_InboxFanoutToleratesMissingThread(t *testing.T) {
 	defer unsub()
 
 	assert.NotPanics(t, func() {
-		hub.PublishEnvelope(context.Background(), domain.EventEnvelope{Type: "MESSAGE_POSTED", ThreadID: 7, MessageID: 1})
+		hub.PublishEnvelope(context.Background(), domain.EventEnvelope{Type: domain.KindMessagePosted, ThreadID: 7, MessageID: 1})
 	})
 	select {
 	case <-ch:
@@ -209,7 +209,7 @@ func TestHub_FanOutMessagePosted(t *testing.T) {
 	ch, unsub := hub.Subscribe(1, 1)
 	defer unsub()
 
-	hub.PublishEnvelope(context.Background(), domain.EventEnvelope{Type: "MESSAGE_POSTED", ThreadID: 1, Seq: 3, MessageID: 10})
+	hub.PublishEnvelope(context.Background(), domain.EventEnvelope{Type: domain.KindMessagePosted, ThreadID: 1, Seq: 3, MessageID: 10})
 
 	select {
 	case evt := <-ch:
@@ -226,7 +226,7 @@ func TestHub_TypingEnvelopeBecomesTypingEvent(t *testing.T) {
 	ch, unsub := hub.Subscribe(2, 1)
 	defer unsub()
 
-	hub.PublishEnvelope(context.Background(), domain.EventEnvelope{Type: "TYPING_CHANGED", ThreadID: 2, UserID: 7, Typing: true})
+	hub.PublishEnvelope(context.Background(), domain.EventEnvelope{Type: domain.KindTypingChanged, ThreadID: 2, UserID: 7, Typing: true})
 
 	evt := <-ch
 	tc, ok := evt.(domain.TypingChangedEvent)
@@ -252,7 +252,7 @@ func TestHub_SlowConsumerDropped(t *testing.T) {
 
 	// Never drain ch. Publish 65 message events (buffer is 64) — the 65th forces a drop.
 	for i := 0; i < 65; i++ {
-		hub.PublishEnvelope(context.Background(), domain.EventEnvelope{Type: "MESSAGE_POSTED", ThreadID: 4, MessageID: 1})
+		hub.PublishEnvelope(context.Background(), domain.EventEnvelope{Type: domain.KindMessagePosted, ThreadID: 4, MessageID: 1})
 	}
 
 	// Drain what buffered, then expect a close. Reaching the end means the
@@ -292,7 +292,7 @@ func TestHub_ConcurrentPublishSubscribeUnsub(t *testing.T) {
 		go func() {
 			defer wg.Done()
 			for i := 0; i < 200; i++ {
-				hub.PublishEnvelope(context.Background(), domain.EventEnvelope{Type: "TYPING_CHANGED", ThreadID: 1, UserID: i})
+				hub.PublishEnvelope(context.Background(), domain.EventEnvelope{Type: domain.KindTypingChanged, ThreadID: 1, UserID: i})
 			}
 		}()
 	}
@@ -333,7 +333,7 @@ func TestHub_RemovedParticipantSubscriptionIsDropped(t *testing.T) {
 	defer unsubStaying()
 
 	hub.PublishEnvelope(context.Background(), domain.EventEnvelope{
-		Type: "PARTICIPANT_CHANGED", ThreadID: 6, UserID: 42, Change: "REMOVED",
+		Type: domain.KindParticipantChanged, ThreadID: 6, UserID: 42, Change: "REMOVED",
 	})
 
 	// The departing user still sees its own REMOVED notice...
@@ -350,7 +350,7 @@ func TestHub_RemovedParticipantSubscriptionIsDropped(t *testing.T) {
 	// Everyone else keeps receiving: drain the REMOVED notice, then a new event.
 	<-staying
 	hub.PublishEnvelope(context.Background(), domain.EventEnvelope{
-		Type: "TYPING_CHANGED", ThreadID: 6, UserID: 43, Typing: true,
+		Type: domain.KindTypingChanged, ThreadID: 6, UserID: 43, Typing: true,
 	})
 	select {
 	case e, open := <-staying:
@@ -388,14 +388,14 @@ func TestHub_MessagePostedSkipsLookupWithNoLocalSubscribers(t *testing.T) {
 	hub := realtime.NewHub(countingMsgRepo{loads: &loads}, stubThreadRepo{}, nil)
 
 	hub.PublishEnvelope(context.Background(), domain.EventEnvelope{
-		Type: "MESSAGE_POSTED", ThreadID: 77, MessageID: 5,
+		Type: domain.KindMessagePosted, ThreadID: 77, MessageID: 5,
 	})
 	assert.Equal(t, 0, loads, "no subscribers: no message load")
 
 	ch, unsub := hub.Subscribe(77, 1)
 	defer unsub()
 	hub.PublishEnvelope(context.Background(), domain.EventEnvelope{
-		Type: "MESSAGE_POSTED", ThreadID: 77, MessageID: 5,
+		Type: domain.KindMessagePosted, ThreadID: 77, MessageID: 5,
 	})
 	assert.Equal(t, 1, loads, "with a subscriber the message is loaded")
 	<-ch
@@ -406,7 +406,7 @@ func TestHub_PublishEnvelope_MessageEdited(t *testing.T) {
 	ch, unsub := hub.Subscribe(1, 1)
 	defer unsub()
 
-	hub.PublishEnvelope(context.Background(), domain.EventEnvelope{Type: "MESSAGE_EDITED", ThreadID: 1, MessageID: 10})
+	hub.PublishEnvelope(context.Background(), domain.EventEnvelope{Type: domain.KindMessageEdited, ThreadID: 1, MessageID: 10})
 
 	select {
 	case evt := <-ch:
@@ -426,7 +426,7 @@ func TestHub_PublishEnvelope_MessageDeleted(t *testing.T) {
 	defer unsub()
 
 	hub.PublishEnvelope(context.Background(), domain.EventEnvelope{
-		Type: "MESSAGE_DELETED", ThreadID: 1, MessageID: 10, Seq: 7,
+		Type: domain.KindMessageDeleted, ThreadID: 1, MessageID: 10, Seq: 7,
 	})
 
 	select {
@@ -444,6 +444,6 @@ func TestHub_PublishEnvelope_MessageDeleted(t *testing.T) {
 
 func TestHub_PublishEphemeralSatisfiesPort(t *testing.T) {
 	var pub portservices.EventPublisher = newHub(domain.Message{})
-	err := pub.PublishEphemeral(context.Background(), domain.EventEnvelope{Type: "PRESENCE_CHANGED", ThreadID: 9, UserID: 1, State: "ONLINE"})
+	err := pub.PublishEphemeral(context.Background(), domain.EventEnvelope{Type: domain.KindPresenceChanged, ThreadID: 9, UserID: 1, State: "ONLINE"})
 	assert.NoError(t, err)
 }

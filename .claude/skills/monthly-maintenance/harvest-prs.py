@@ -13,7 +13,7 @@ saved `--input` JSON array of {number,title,body,labels,mergedAt,url}) and extra
   3. QA Acceptance Criteria table rows whose Result cell is empty.
   4. Bullets under a "Known gaps" heading or bold label.
   5. Leftover labels: migrations-unapplied, check-migration-number-before-apply,
-     needs-demo-video, needs-local-session-takeover.
+     needs-demo-evidence, needs-local-session-takeover.
 Items are then fuzzy-matched (normalized title words) against open issues (`--issues`, a saved
 `gh issue list --state open --json number,title`) and FEATURE_BACKLOG.md headings, and marked
 "possibly tracked". The gitignored private bug backlog is never read.
@@ -25,11 +25,11 @@ case-insensitively by substring.
 import argparse, json, os, re, subprocess, sys
 
 LEFTOVER_LABELS = ["migrations-unapplied", "check-migration-number-before-apply",
-                   "needs-demo-video", "needs-local-session-takeover"]
+                   "needs-demo-evidence", "needs-local-session-takeover"]
 LABEL_FIX = {
     "migrations-unapplied": "apply migration per environment, then set migrations-applied",
     "check-migration-number-before-apply": "verify migration number vs main before applying",
-    "needs-demo-video": "record demo evidence or drop label with a one-line reason",
+    "needs-demo-evidence": "record demo evidence or drop label with a one-line reason",
     "needs-local-session-takeover": "finish in a local session, then drop label",
 }
 STOP = set("the and for with from that this into when then are was not but any all can add use via per its".split())
