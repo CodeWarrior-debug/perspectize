@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-**Perspectize** — platform for storing, refining, and sharing perspectives on content (initially YouTube videos). Monorepo: `backend/` (Go GraphQL API, see `backend/CLAUDE.md`) and `frontend/` (SvelteKit, see `frontend/CLAUDE.md`).
+**Perspectize** — platform for storing, refining, and sharing perspectives on content (initially YouTube videos). Monorepo: `backend/` (Go GraphQL API, see `backend/CLAUDE.md`), `frontend/` (SvelteKit, see `frontend/CLAUDE.md`) and `ai-tooling/` (Go module for the Jeeves assistant, evals and the `botler` CLI, see `ai-tooling/CLAUDE.md`; **teaching mode is on there**).
 
 **Where rules go:** this root file loads every session, so it holds only repo-wide rules. Stack rules live in `backend/CLAUDE.md` / `frontend/CLAUDE.md` (loaded once you touch files there); long procedures live in `.docs/`, linked below. A safety rule that must hold before a stack file is read keeps a one-line stub here.
 
@@ -62,7 +62,8 @@
 3. **Backend tests**: `go test ./...` in `backend/` — all pass
 4. **Frontend tests**: `pnpm run test:run` in `frontend/` — all pass
 5. **Query budget**: a change touching DB access or data fetching carries a query-count test (backend) / cache-contract test (frontend) — [.docs/QUERY_BUDGET.md](.docs/QUERY_BUDGET.md)
-6. **Stale references**: after renaming/moving files or paths, grep the whole repo for old names
+6. **AI tooling**: `go build ./...`, `gofmt -l .`, `go test ./...` in `ai-tooling/` (includes the app-guide lint, which checks guide `Source` paths against `frontend/`, so frontend renames and moves can fail it)
+7. **Stale references**: after renaming/moving files or paths, grep the whole repo for old names
 
 **Mutation testing** (`make mutate` in `backend/`, `pnpm run mutate` in `frontend/`; slow, run deliberately): a run where nothing survives is a harness bug, not a pass — hand-apply one mutant and confirm the suite fails before trusting a score. **Report what it says about the tests:** "your tests caught X of Y planted bugs (killed)", "missed Z (lived/survived)", "N places no test runs (not covered)"; "efficacy" is the tests' efficacy. Give the all-in figure (caught ÷ every planted bug) beside efficacy. Language table, baselines, pitfalls: `docs/superpowers/specs/2026-09-29-test-hardening-spike.md`.
 

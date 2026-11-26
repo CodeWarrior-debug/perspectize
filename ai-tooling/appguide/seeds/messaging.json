@@ -1,0 +1,12 @@
+[
+  { "question": "How do I check my messages?", "expect_ids": ["messaging.open"], "must_not_claim": [] },
+  { "question": "How can I tell if I have unread messages?", "expect_ids": ["messaging.open"], "must_not_claim": [] },
+  { "question": "How do I message someone new?", "expect_ids": ["messaging.start-conversation"], "must_not_claim": [] },
+  { "question": "How do I start a group chat with three people?", "expect_ids": ["messaging.start-conversation"], "must_not_claim": [] },
+  { "question": "The messages button is covering something on my screen. Can I move it?", "expect_ids": ["messaging.move-button"], "must_not_claim": [] },
+  { "question": "How do I fix a typo in a message I already sent?", "expect_ids": ["messaging.edit-delete-message"], "must_not_claim": [] },
+  { "question": "Someone sent me a link in a message. How do I open it without losing my conversation?", "expect_ids": ["messaging.open-links"], "must_not_claim": [] },
+  { "question": "What does the green dot next to someone's name in a conversation mean?", "expect_ids": ["messaging.presence-typing-receipts"], "must_not_claim": [] },
+  { "question": "Can I react to a message with an emoji?", "expect_ids": [], "must_not_claim": ["emoji reaction", "react to a message"] },
+  { "question": "How do I leave a group conversation or add someone to one I already have?", "expect_ids": ["messaging.start-conversation"], "must_not_claim": ["leave a conversation", "add people to an existing conversation"] }
+]

@@ -76,6 +76,8 @@ Order: domain model (`core/domain/`) → repository port (`core/ports/repositori
 
 ## Gotchas
 
+**Perspective privacy is enforced in the resolver, not the service:** `PerspectiveByID` checks `PrivacyPrivate`; `PerspectiveService.GetByID` doesn't, and `ListPerspectives` is only safe with `ViewerID` set. Code calling services directly (e.g. in-process Jeeves tools) must apply the check (planned fix: BRIDGE-02).
+
 **Owner-only mutations need a guard at every layer, not just `@owner`.** Re-derive the actor in the resolver via `auth.RequireAuth(ctx)` (never trust a client-supplied user ID), pass it to the service (e.g. `Delete(ctx, id, actorUserID)`) which returns `domain.ErrForbidden`, and scope the SQL (`WHERE user_id = ? AND id = ?`). See `deletePerspective`. `updatePerspective`/`deletePerspective` deliberately skip `@owner` (its lookup was a duplicate round trip); the service check plus owner-scoped SQL guard them, with the same not-found / access-denied split. A non-owner hitting someone else's **non-PUBLIC** perspective gets "resource not found", not "access denied", so the ID isn't confirmed (matches `perspectiveByID` returning null).
 
 **The owning user's column is always `user_id`** (FK `users(id)`). Other related users (participants, assignees) go in their own join table, not a second column.
