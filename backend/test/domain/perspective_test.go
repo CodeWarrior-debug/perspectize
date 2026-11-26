@@ -57,12 +57,6 @@ func TestPrivacyConstants(t *testing.T) {
 	assert.Equal(t, domain.Privacy("PRIVATE"), domain.PrivacyPrivate)
 }
 
-func TestReviewStatusConstants(t *testing.T) {
-	assert.Equal(t, domain.ReviewStatus("PENDING"), domain.ReviewStatusPending)
-	assert.Equal(t, domain.ReviewStatus("APPROVED"), domain.ReviewStatusApproved)
-	assert.Equal(t, domain.ReviewStatus("REJECTED"), domain.ReviewStatusRejected)
-}
-
 func TestRatingConstants(t *testing.T) {
 	assert.Equal(t, 0, domain.RatingMin)
 	assert.Equal(t, 10000, domain.RatingMax)

@@ -3,7 +3,6 @@ package postgres
 import (
 	"context"
 	"errors"
-	"fmt"
 
 	"github.com/CodeWarrior-debug/perspectize/backend/internal/core/domain"
 	repositories "github.com/CodeWarrior-debug/perspectize/backend/internal/core/ports/repositories"
@@ -151,16 +150,7 @@ func (r *GormUserRepository) Update(ctx context.Context, user *domain.User) (*do
 		})
 	if result.Error != nil {
 		// The unique constraints are the uniqueness check (no pre-query).
-		var pgErr *pgconn.PgError
-		if errors.As(result.Error, &pgErr) && pgErr.Code == pgUniqueViolation {
-			switch pgErr.ConstraintName {
-			case "users_unique_username":
-				return nil, fmt.Errorf("%w: username already taken", domain.ErrAlreadyExists)
-			case "users_unique_email":
-				return nil, fmt.Errorf("%w: email already registered", domain.ErrAlreadyExists)
-			}
-		}
-		return nil, result.Error
+		return nil, userWriteError(result.Error)
 	}
 	if result.RowsAffected == 0 {
 		return nil, domain.ErrNotFound
@@ -196,9 +186,28 @@ func (r *GormUserRepository) CreateFromClerk(ctx context.Context, clerkID string
 		Onboarding:  onboardingToJSON(domain.DefaultUserOnboarding()),
 	}
 	if err := r.db.WithContext(ctx).Create(model).Error; err != nil {
-		return nil, err
+		return nil, userWriteError(err)
 	}
 	return userModelToDomain(model), nil
+}
+
+// userWriteError maps a unique-constraint violation on users to the identity
+// sentinel for the constraint that fired, matched by constraint name. Any other
+// error is returned unchanged.
+func userWriteError(err error) error {
+	var pgErr *pgconn.PgError
+	if !errors.As(err, &pgErr) || pgErr.Code != pgUniqueViolation {
+		return err
+	}
+	switch pgErr.ConstraintName {
+	case "users_unique_username":
+		return domain.ErrUsernameTaken
+	case "users_unique_email":
+		return domain.ErrEmailTaken
+	case "users_clerk_user_id_key":
+		return domain.ErrClerkIDTaken
+	}
+	return err
 }
 
 // UpdateByClerkID updates username and email for the user with the given Clerk ID.

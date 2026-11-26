@@ -34,6 +34,6 @@ Perspectize is a platform for storing, refining and sharing **perspectives** on 
 | Source | Three different things: **data source** (the provider of metadata), **import source** (a channel or filmography), **source content** (what a claim was drawn from). |
 | Parent | **Parent content** is the hierarchy (show → season → episode). A claim's origin is **source content**. |
 | Plan | **Plan** is the page and a user's set of todos. A written implementation approach is an **implementation plan**. |
-| Review | **Review** is the text field on a perspective. Moderation is **review status**. An admin's decision on an import is a **request decision**. |
+| Review | **Review** is the text field on a perspective. An admin's decision on an import is a **request decision**. |
 | Category | **Category** is a Wikidata-backed grouping of content. A **categorized rating** is a rating on a named axis inside one perspective. |
 | Relevance | **Relevance** is a user-addable rating field ("does it matter now?"). The hint about which columns apply is the **column relevance callout**. |

@@ -1,8 +1,7 @@
 import { createMutation, useQueryClient } from '@tanstack/svelte-query';
 import { graphqlRequest } from '../client';
 import { MARK_THREAD_READ, type MarkThreadReadResponse } from './index';
-import { queryKeys } from '../keys';
-import { patchThreadInList } from '#lib/messaging/inboxCache.js';
+import { applyThreadResult } from '#lib/messaging/messagingCache.js';
 
 export function useMarkThreadRead() {
 	const queryClient = useQueryClient();
@@ -13,9 +12,8 @@ export function useMarkThreadRead() {
 				threadId: vars.threadId,
 				seq: vars.seq,
 			}),
-		onSuccess: (data: MarkThreadReadResponse, vars: { threadId: string; seq: number }) => {
-			queryClient.setQueryData(queryKeys.messaging.threads.detail(vars.threadId), data.markThreadRead);
-			patchThreadInList(queryClient, data.markThreadRead);
+		onSuccess: (data: MarkThreadReadResponse) => {
+			applyThreadResult(queryClient, data.markThreadRead);
 		},
 		onError: (err: unknown) => {
 			console.error('[markThreadRead] failed:', err);

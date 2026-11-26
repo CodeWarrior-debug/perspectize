@@ -85,10 +85,10 @@ func TestGormPerspectiveRepository_FeelingStats_StddevThreshold(t *testing.T) {
 			mock.ExpectQuery(`COUNT\(DISTINCT p\.id\)`).
 				WillReturnRows(sqlmock.NewRows([]string{"count", "avg_intensity", "stddev_intensity"}).
 					AddRow(tt.count, 5000.0, 250.0))
-			mock.ExpectQuery(`SELECT count\(\*\) FROM "perspectives"$`).
+			mock.ExpectQuery(`SELECT count\(\*\) FROM "perspectives" WHERE .*perspectives\.privacy = \$1`).
 				WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(10))
 
-			got, err := NewGormPerspectiveRepository(db).FeelingStats(ctx, nil, "x", nil)
+			got, err := NewGormPerspectiveRepository(db).FeelingStats(ctx, nil, "x", nil, nil)
 			require.NoError(t, err)
 			if tt.wantStddev {
 				require.NotNil(t, got.StdDevIntensity)

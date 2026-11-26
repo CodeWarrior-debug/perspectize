@@ -8,6 +8,7 @@ import {
 	densityReadout,
 	lineReadout,
 	displayName,
+	itemNounFor,
 	movieReadout,
 	rankTitles,
 	titlesText,
@@ -171,5 +172,39 @@ describe('chartHeading and chartCaption', () => {
 
 	it('histogram caption says what the height and across mean', () => {
 		expect(chartCaption('histogram', 'box office')).toBe('Number of movies (height) by box office (across)');
+	});
+});
+
+describe('readouts name rows by content type', () => {
+	const book = itemNounFor('book');
+	const fmt = (n: number) => String(n);
+
+	it('each view has its own noun; the All Items view says items', () => {
+		expect(itemNounFor('movie')).toEqual({ one: 'movie', many: 'movies' });
+		expect(book).toEqual({ one: 'book', many: 'books' });
+		expect(itemNounFor('webpage').many).toBe('webpages');
+		expect(itemNounFor('claim').many).toBe('claims');
+		expect(itemNounFor('general')).toEqual({ one: 'item', many: 'items' });
+	});
+
+	it('count text and every readout use the given noun', () => {
+		expect(moviesText(1, book)).toBe('1 book');
+		expect(moviesText(8, book)).toBe('8 books');
+		expect(binReadout({ lo: 0, hi: 100, count: 2 }, fmt, '', book)).toBe('0–100 · 2 books');
+		expect(lineReadout({ lo: 0, hi: 100, count: 1 }, fmt, '', book)).toBe('50: 1 book from 0 to 100');
+		expect(cumulativeReadout(300, 2, 4, fmt, '', book)).toBe('300 · 2 of 4 books (50%) at or below');
+		expect(densityReadout(10, 0.2, 5, fmt, book)).toBe('10 · under 1 book in the 5 band around it');
+		expect(densityReadout(10, 3, 5, fmt, book)).toBe('10 · about 3 books in the 5 band around it');
+		expect(pieReadout('0–100', 1, 4, book)).toBe('0–100 · 1 book (25%)');
+		expect(chartHeading('Pages', 8, book)).toBe('Pages · 8 books');
+	});
+
+	it('no caption says movies for books', () => {
+		for (const type of CHART_TYPES) {
+			expect(chartCaption(type, 'Pages', book)).not.toMatch(/movie/i);
+		}
+		expect(chartCaption('histogram', 'Pages', book)).toBe('Number of books (height) by Pages (across)');
+		expect(chartCaption('strip', 'Pages', book)).toBe('Each dot is one book, placed by Pages (across)');
+		expect(chartCaption('coverage', 'Pages', book)).toBe('Books with and without a Pages');
 	});
 });

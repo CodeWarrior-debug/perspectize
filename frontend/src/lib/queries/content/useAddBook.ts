@@ -4,7 +4,7 @@ import { silentToast } from '#lib/utils/toast.js';
 import { goto } from '$app/navigation';
 import { graphqlRequest } from '../client';
 import { CREATE_CONTENT_FROM_BOOK, type CreateContentFromBookResponse } from './index';
-import { queryKeys } from '../keys';
+import { evictAfterContentCreated } from './contentCreatedEviction';
 import { libraryContentHref } from '#lib/utils/contentLinks.js';
 import { contentNotAllowedMessage } from '#lib/utils/movie.js';
 
@@ -35,7 +35,7 @@ export function useAddBook(options: UseAddBookOptions = {}) {
 			});
 			// New or pre-existing rows both come back as Content, so refetch lists
 			// instead of blindly prepending (no duplicates). Detail caches are unchanged.
-			queryClient.invalidateQueries({ queryKey: queryKeys.content.lists() });
+			evictAfterContentCreated(queryClient);
 		},
 		onError: (err: Error) => {
 			console.error('[AddBook] mutation failed:', err);

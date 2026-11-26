@@ -1,8 +1,15 @@
 import { createMutation, useQueryClient } from '@tanstack/svelte-query';
 import { toast } from 'svelte-sonner';
 import { graphqlRequest } from '../client';
-import { DELETE_PERSPECTIVE, type DeletePerspectiveResponse, type ListPerspectivesByUserResponse } from './index';
-import { queryKeys } from '../keys';
+import { DELETE_PERSPECTIVE, type DeletePerspectiveResponse } from './index';
+import {
+	invalidateAllPerspectiveLists,
+	optimisticDelete,
+	rollbackLists,
+	settleDelete,
+	type ListSnapshot,
+} from './perspectiveCache';
+import { reportPerspectiveError } from './perspectiveErrors';
 
 export interface DeletePerspectiveInput {
 	id: string;
@@ -10,20 +17,16 @@ export interface DeletePerspectiveInput {
 	contentID: string | null;
 }
 
-type ListSnapshot = [readonly unknown[], ListPerspectivesByUserResponse | undefined][];
-
 interface DeleteContext {
 	previous: ListSnapshot;
 }
 
+/**
+ * Internal to the perspective save module (usePerspectiveSave). Components call that
+ * module, not this hook. The cache rules live in perspectiveCache.ts.
+ */
 export function useDeletePerspective() {
 	const queryClient = useQueryClient();
-	// Same PerspectiveItem-shaped branches useUpdatePerspective patches — removing a
-	// row by id is shape-safe there.
-	const rowListFilters: { queryKey: readonly unknown[] }[] = [
-		{ queryKey: queryKeys.perspectives.byUserLists() },
-		{ queryKey: queryKeys.perspectives.byContentLists() },
-	];
 
 	return createMutation(() => ({
 		mutationFn: async (input: DeletePerspectiveInput) => {
@@ -32,47 +35,15 @@ export function useDeletePerspective() {
 			return data;
 		},
 		onMutate: async (input: DeletePerspectiveInput): Promise<DeleteContext> => {
-			await Promise.all(rowListFilters.map((f) => queryClient.cancelQueries(f)));
-			const previous = rowListFilters.flatMap(
-				(f) => queryClient.getQueriesData<ListPerspectivesByUserResponse>(f) as ListSnapshot,
-			);
-			const drop = (old: ListPerspectivesByUserResponse | undefined) =>
-				old
-					? {
-							perspectives: {
-								...old.perspectives,
-								items: old.perspectives.items.filter((p) => p.id !== input.id),
-							},
-						}
-					: old;
-			for (const f of rowListFilters) {
-				queryClient.setQueriesData<ListPerspectivesByUserResponse>(f, drop);
-			}
-			return { previous };
+			return { previous: await optimisticDelete(queryClient, input.id) };
 		},
 		onError: (err: Error, _input: DeletePerspectiveInput, context?: DeleteContext) => {
-			context?.previous?.forEach(([key, data]) => queryClient.setQueryData(key, data));
-
-			const message = err.message.toLowerCase();
-			if (message.includes('access denied') || message.includes('authentication required')) {
-				toast.error('You can only delete your own perspectives');
-			} else if (message.includes('not found')) {
-				toast.error('That perspective no longer exists');
-				queryClient.invalidateQueries({ queryKey: queryKeys.perspectives.lists() });
-			} else {
-				toast.error('Failed to delete perspective. Please try again.');
-			}
+			rollbackLists(queryClient, context?.previous ?? []);
+			reportPerspectiveError(err, 'delete', { refetch: () => invalidateAllPerspectiveLists(queryClient) });
 		},
 		onSuccess: (_data: DeletePerspectiveResponse, input: DeletePerspectiveInput) => {
 			toast.success('Perspective deleted');
-			for (const f of rowListFilters) {
-				queryClient.invalidateQueries({ ...f, refetchType: 'none' });
-			}
-			queryClient.invalidateQueries({ queryKey: queryKeys.perspectives.detail(input.id) });
-			// perspectiveCount / averageRating on the content just changed.
-			if (input.contentID) {
-				queryClient.invalidateQueries({ queryKey: queryKeys.content.detail(input.contentID) });
-			}
+			settleDelete(queryClient, input.id, input.contentID);
 		},
 	}));
 }

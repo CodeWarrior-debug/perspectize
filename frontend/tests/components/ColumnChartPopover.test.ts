@@ -2,6 +2,7 @@ import { describe, it, expect, vi, afterEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/svelte';
 import ColumnChartPopover from '#lib/components/charts/ColumnChartPopover.svelte';
 import { CHART_TYPES, CHART_TYPE_LABELS, defaultChartType } from '#lib/utils/columnCharts';
+import { itemNounFor } from '#lib/utils/chartReadout';
 
 const values = [1, 2, 2, 3, 4, 5, 6, 8, 9, 10, 15, 40];
 const format = (n: number) => `#${Math.round(n * 100) / 100}`;
@@ -63,6 +64,15 @@ describe('ColumnChartPopover', () => {
 	it('uses the singular for one movie and shows zero empty rows', () => {
 		render(ColumnChartPopover, { props: props({ values: [5], total: 1 }) });
 		expect(screen.getByText('based on 1 loaded movie · 0 empty')).toBeInTheDocument();
+	});
+
+	it('names the rows by content type: books in the Book view', () => {
+		render(ColumnChartPopover, {
+			props: props({ label: 'Pages', noun: itemNounFor('book'), values: [5], total: 1 }),
+		});
+		expect(screen.getByText('Pages · 1 book')).toBeInTheDocument();
+		expect(screen.getByText('based on 1 loaded book · 0 empty')).toBeInTheDocument();
+		expect(screen.queryByText(/movie/)).toBeNull();
 	});
 
 	it('passes total through so coverage counts empty rows', async () => {

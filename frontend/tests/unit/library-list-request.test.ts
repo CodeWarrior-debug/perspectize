@@ -10,11 +10,11 @@ import { libraryListRequest, cursorsAfterPage, LOADED_MODE_FIRST } from '#lib/qu
 import { queryKeys } from '#lib/queries/keys.js';
 import {
 	ALL_SEARCH_SCOPES,
-	COL_TO_SORT,
 	parseGridParams,
 	searchScopesFor,
 	urlParamsToGraphQLFilter,
 } from '#lib/utils/gridUrlState.js';
+import { COL_TO_SORT } from '#lib/utils/libraryColumns/index.js';
 
 const params = (qs: string) => parseGridParams(new URLSearchParams(qs));
 

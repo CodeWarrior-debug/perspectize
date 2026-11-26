@@ -16,11 +16,7 @@
 	import { useMarkOnboardingSeen } from '#lib/queries/users/useMarkOnboardingSeen.js';
 	import { graphqlRequest } from '#lib/queries/client.js';
 	import { LIST_CONTENT, type ContentResponse } from '#lib/queries/content/index.js';
-	import {
-		LIST_PERSPECTIVES_BY_USER,
-		MAX_PERSPECTIVES_PER_LIST,
-		type ListPerspectivesByUserResponse,
-	} from '#lib/queries/perspectives/index.js';
+	import { useMyPerspectives } from '#lib/queries/perspectives/useMyPerspectives.js';
 	import { queryKeys } from '#lib/queries/keys.js';
 	import OnboardingCoach from '#lib/components/onboarding/OnboardingCoach.svelte';
 
@@ -58,16 +54,8 @@
 		staleTime: 60_000,
 	}));
 
-	const perspectivesQuery = createQuery(() => ({
-		queryKey: queryKeys.perspectives.listByUser(userId),
-		queryFn: () =>
-			graphqlRequest<ListPerspectivesByUserResponse>(LIST_PERSPECTIVES_BY_USER, {
-				userID: userId,
-				first: MAX_PERSPECTIVES_PER_LIST,
-			}),
-		enabled: needQuietCheck,
-		staleTime: 60_000,
-	}));
+	// Shares the by-user perspectives query with the library and Plan (one request, one key).
+	const perspectivesQuery = useMyPerspectives(() => (needQuietCheck ? userId : null));
 
 	const ownedContentCount = $derived(
 		(contentQuery.data?.content?.items ?? []).filter((c) => c.addedByUserID === userIdStr).length,

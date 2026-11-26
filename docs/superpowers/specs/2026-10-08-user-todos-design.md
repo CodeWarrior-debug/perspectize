@@ -232,7 +232,7 @@ Mutations (all `@auth`, ownership in service + SQL, no `@owner`): `createUserTod
 
 ### Frontend tests
 
-Vitest for the toast helper, rating/percent formatting, column metadata, and each hook (mocked in component tests per `frontend/CLAUDE.md`); component tests for the action picker (order + tooltip + add-new) and the done/100% prompts. A user-visible PR is labeled `needs-demo-video` from a cloud session.
+Vitest for the toast helper, rating/percent formatting, column metadata, and each hook (mocked in component tests per `frontend/CLAUDE.md`); component tests for the action picker (order + tooltip + add-new) and the done/100% prompts. A user-visible PR is labeled `needs-demo-evidence` from a cloud session.
 
 ## Future: assignees
 

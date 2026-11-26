@@ -10,11 +10,13 @@ import { validateYouTubeUrl } from '#lib/utils/youtube.js';
 import { contentNotAllowedMessage, validateMovieInput } from '#lib/utils/movie.js';
 import { validateBookInput } from '#lib/utils/book.js';
 import { detectContentType } from '#lib/utils/detectContentType.js';
+import { ADDABLE_CONTENT_TYPES, descriptorFor } from '#lib/contentTypes/registry.js';
 import type { PassageRange } from '#lib/utils/bible.js';
 import { defaultRange, isRangeInBounds, isRangeOrdered } from '#lib/utils/passageRange.js';
 
 export type ChosenType = 'YOUTUBE_VIDEO' | 'BIBLE_PASSAGE' | 'MOVIE' | 'BOOK' | 'WEB_PAGE';
-const CHOSEN_TYPES: readonly ChosenType[] = ['YOUTUBE_VIDEO', 'BIBLE_PASSAGE', 'MOVIE', 'BOOK', 'WEB_PAGE'];
+// The registry's addable types; tests/unit/contentTypes/registry.test.ts pins their order and membership to ChosenType.
+const CHOSEN_TYPES = ADDABLE_CONTENT_TYPES as readonly ChosenType[];
 export const isChosenType = (value: string | null): value is ChosenType => CHOSEN_TYPES.includes(value as ChosenType);
 
 /** Detection runs on every keystroke; the preview is requested only once the link has been still this long. */
@@ -109,8 +111,10 @@ export function useAddContent(options: AddContentOptions = {}) {
 			const r = webPageMutation.data?.createContentFromWebPage;
 			return { id: r?.content?.id ?? null, alreadyExisted: r?.alreadyExisted === true };
 		}
-		if (movieMutation.isSuccess) return { id: movieMutation.data?.createContentFromMovie?.id ?? null, alreadyExisted: false };
-		if (bookMutation.isSuccess) return { id: bookMutation.data?.createContentFromBook?.id ?? null, alreadyExisted: false };
+		if (movieMutation.isSuccess)
+			return { id: movieMutation.data?.createContentFromMovie?.id ?? null, alreadyExisted: false };
+		if (bookMutation.isSuccess)
+			return { id: bookMutation.data?.createContentFromBook?.id ?? null, alreadyExisted: false };
 		if (passageMutation.isSuccess)
 			return { id: passageMutation.data?.createContentFromPassage?.id ?? null, alreadyExisted: false };
 		return { id: null, alreadyExisted: false };
@@ -122,16 +126,7 @@ export function useAddContent(options: AddContentOptions = {}) {
 
 	const chipLabel = $derived.by(() => {
 		if (!effectiveType) return 'Select a type';
-		const name =
-			effectiveType === 'YOUTUBE_VIDEO'
-				? 'YouTube'
-				: effectiveType === 'BIBLE_PASSAGE'
-					? 'Bible passage'
-					: effectiveType === 'MOVIE'
-						? 'Movie'
-						: effectiveType === 'BOOK'
-							? 'Book'
-							: 'Webpage';
+		const name = descriptorFor(effectiveType).addLabel ?? effectiveType;
 		return manualType ? `Type: ${name}` : `Detected: ${name}`;
 	});
 

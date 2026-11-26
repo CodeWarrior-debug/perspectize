@@ -80,11 +80,11 @@ func TestBearerToken(t *testing.T) {
 
 // runDemoMiddleware drives the full Middleware (Clerk header middleware
 // included) with a demo verifier and the given Authorization header.
-func runDemoMiddleware(t *testing.T, repo *stubUserRepo, header string) (*domain.AuthenticatedUser, bool) {
+func runDemoMiddleware(t *testing.T, resolver *fakeResolver, header string) (*domain.AuthenticatedUser, bool) {
 	t.Helper()
 	var seen *domain.AuthenticatedUser
 	var found, nextCalled bool
-	handler := Middleware(repo, NewDemoTokenVerifier(NewClerkTokenVerifier()))(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	handler := Middleware(resolver, NewDemoTokenVerifier(NewClerkTokenVerifier()))(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		nextCalled = true
 		seen, found = ForContext(r.Context())
 	}))
@@ -96,39 +96,36 @@ func runDemoMiddleware(t *testing.T, repo *stubUserRepo, header string) (*domain
 }
 
 func TestMiddleware_DemoTokenResolvesSeededPersona(t *testing.T) {
-	repo := &stubUserRepo{
-		getByClerkIDFn: func(_ context.Context, clerkID string) (*domain.User, error) {
-			require.Equal(t, "demo_alice", clerkID)
-			return &domain.User{ID: 3, ClerkUserID: clerkID, Username: "alice_demo", Role: domain.UserRoleDefault}, nil
-		},
-	}
-	user, ok := runDemoMiddleware(t, repo, "Bearer demo.alice")
+	resolver := &fakeResolver{resolve: func(_ context.Context, clerkID string) (*domain.User, error) {
+		require.Equal(t, "demo_alice", clerkID)
+		return &domain.User{ID: 3, ClerkUserID: clerkID, Username: "alice_demo", Role: domain.UserRoleDefault, Active: true}, nil
+	}}
+	user, ok := runDemoMiddleware(t, resolver, "Bearer demo.alice")
 	require.True(t, ok)
 	assert.Equal(t, 3, user.ID)
 	assert.Equal(t, "alice_demo", user.Username)
 }
 
-func TestMiddleware_UnseededDemoPersonaIsNotCreatedOnDemand(t *testing.T) {
-	repo := &stubUserRepo{
-		createFromClerkFn: func(context.Context, string, string, string) (*domain.User, error) {
-			t.Fatal("demo personas must never be created on demand")
-			return nil, nil
-		},
-	}
-	user, ok := runDemoMiddleware(t, repo, "Bearer demo.ghost")
+// An unseeded persona is refused by the resolver (the demo directory decorator
+// reports not-found), so the request is a guest. The middleware never creates it.
+func TestMiddleware_UnseededDemoPersonaIsGuest(t *testing.T) {
+	resolver := &fakeResolver{resolve: func(context.Context, string) (*domain.User, error) {
+		return nil, domain.ErrNotFound
+	}}
+	user, ok := runDemoMiddleware(t, resolver, "Bearer demo.ghost")
 	assert.False(t, ok)
 	assert.Nil(t, user)
+	assert.Equal(t, []string{"demo_ghost"}, resolver.calls)
 }
 
 func TestMiddleware_DemoTokenIgnoredWithoutDemoVerifier(t *testing.T) {
 	// A production (Clerk-only) stack must treat demo tokens as anonymous.
 	var found bool
-	handler := Middleware(&stubUserRepo{
-		getByClerkIDFn: func(context.Context, string) (*domain.User, error) {
-			t.Fatal("no user lookup should happen for an unverifiable token")
-			return nil, nil
-		},
-	}, NewClerkTokenVerifier())(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	resolver := &fakeResolver{resolve: func(context.Context, string) (*domain.User, error) {
+		t.Fatal("no user lookup should happen for an unverifiable token")
+		return nil, nil
+	}}
+	handler := Middleware(resolver, NewClerkTokenVerifier())(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		_, found = ForContext(r.Context())
 	}))
 	req := httptest.NewRequest(http.MethodPost, "/graphql", nil)

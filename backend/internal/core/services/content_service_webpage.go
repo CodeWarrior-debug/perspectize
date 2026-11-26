@@ -14,7 +14,7 @@ import (
 
 // ErrWebPageClientUnavailable is returned by CreateFromWebPage and PreviewWebPage
 // when the service was built without a webpage client.
-var ErrWebPageClientUnavailable = errors.New("webpage lookup is unavailable: no webpage client configured")
+var ErrWebPageClientUnavailable = domain.Unavailable("webpage lookup is unavailable: no webpage client configured")
 
 // CreateFromWebPage saves a webpage by URL, attributed to userID. The URL is
 // canonicalised and checked against the library before any fetch, so a saved
@@ -30,55 +30,59 @@ func (s *ContentService) CreateFromWebPage(ctx context.Context, in portservices.
 	if s.webPage == nil {
 		return nil, ErrWebPageClientUnavailable
 	}
-	canonical, err := webpage.Canonicalize(in.URL)
-	if err != nil {
-		return nil, err
-	}
-	if webpage.IsSiteRoot(canonical) {
-		return nil, fmt.Errorf("%w: %w", domain.ErrInvalidInput, domain.ErrWebPageIsWebsite)
-	}
-	roles, err := normaliseWebPageRoles(in.Roles)
-	if err != nil {
-		return nil, err
-	}
+	// The roles are normalised in canonical, so an unknown role is refused before
+	// the dedupe lookup, as it always has been.
+	var roles []domain.WebPageRole
+	return s.createContent(ctx, contentCreation{
+		precheck: true,
+		canonical: func(ctx context.Context) (string, error) {
+			canonical, err := webpage.Canonicalize(in.URL)
+			if err != nil {
+				return "", err
+			}
+			if webpage.IsSiteRoot(canonical) {
+				return "", fmt.Errorf("%w: %w", domain.ErrInvalidInput, domain.ErrWebPageIsWebsite)
+			}
+			roles, err = normaliseWebPageRoles(in.Roles)
+			return canonical, err
+		},
+		build: func(ctx context.Context, canonical string) (*domain.Content, error) {
+			if in.ParentContentID != nil && !in.ParentValidated {
+				if err := s.validateWebsiteParent(ctx, *in.ParentContentID, canonical); err != nil {
+					return nil, err
+				}
+			}
 
-	if existing, err := s.existingByURL(ctx, canonical); err != nil || existing != nil {
-		return existing, orAlreadyExists(err)
-	}
+			var meta domain.WebPageMeta
+			if in.Prefetched != nil {
+				meta = *in.Prefetched
+				meta.Fetch.Status = domain.FetchStatusImported
+			} else {
+				var err error
+				if meta, err = s.fetchWebPage(ctx, in.URL); err != nil {
+					return nil, err
+				}
+			}
 
-	if in.ParentContentID != nil && !in.ParentValidated {
-		if err := s.validateWebsiteParent(ctx, *in.ParentContentID, canonical); err != nil {
-			return nil, err
-		}
-	}
-
-	var meta domain.WebPageMeta
-	if in.Prefetched != nil {
-		meta = *in.Prefetched
-		meta.Fetch.Status = domain.FetchStatusImported
-	} else if meta, err = s.fetchWebPage(ctx, in.URL); err != nil {
-		return nil, err
-	}
-
-	key := webPageKey(canonical, meta)
-	meta.Roles = roles
-	if meta.Domain == "" {
-		meta.Domain = hostPathOf(key).host
-	}
-	responseJSON, err := json.Marshal(meta)
-	if err != nil {
-		return nil, fmt.Errorf("failed to marshal webpage response: %w", err)
-	}
-
-	content := &domain.Content{
-		Name:            webPageName(meta, key),
-		URL:             &key,
-		ContentType:     domain.ContentTypeWebPage,
-		AddedByUserID:   userID,
-		Response:        responseJSON,
-		ParentContentID: in.ParentContentID,
-	}
-	return s.saveWebContent(ctx, content)
+			key := webPageKey(canonical, meta)
+			meta.Roles = roles
+			if meta.Domain == "" {
+				meta.Domain = hostPathOf(key).host
+			}
+			responseJSON, err := json.Marshal(meta)
+			if err != nil {
+				return nil, fmt.Errorf("failed to marshal webpage response: %w", err)
+			}
+			return &domain.Content{
+				Name:            webPageName(meta, key),
+				URL:             &key,
+				ContentType:     domain.ContentTypeWebPage,
+				AddedByUserID:   userID,
+				Response:        responseJSON,
+				ParentContentID: in.ParentContentID,
+			}, nil
+		},
+	})
 }
 
 // CreateFromWebsite saves the website a link belongs to, keyed on its root URL
@@ -89,61 +93,37 @@ func (s *ContentService) CreateFromWebsite(ctx context.Context, rawURL string, u
 	if s.webPage == nil {
 		return nil, ErrWebPageClientUnavailable
 	}
-	root, err := webpage.SiteRoot(rawURL)
-	if err != nil {
-		return nil, err
-	}
-	if existing, err := s.existingByURL(ctx, root); err != nil || existing != nil {
-		return existing, orAlreadyExists(err)
-	}
-
-	meta, err := s.fetchWebPage(ctx, root)
-	if err != nil {
-		return nil, err
-	}
-	host := hostPathOf(root).host
-	if meta.Domain == "" {
-		meta.Domain = host
-	}
-	responseJSON, err := marshalWebsiteResponse(meta)
-	if err != nil {
-		return nil, err
-	}
-
-	name := host
-	if meta.Title != nil && *meta.Title != "" {
-		name = *meta.Title
-	}
-	content := &domain.Content{
-		Name:          name,
-		URL:           &root,
-		ContentType:   domain.ContentTypeWebsite,
-		AddedByUserID: userID,
-		Response:      responseJSON,
-	}
-	return s.saveWebContent(ctx, content)
-}
-
-// existingByURL returns the saved row for a canonical URL, or (nil, nil) when
-// there is none.
-func (s *ContentService) existingByURL(ctx context.Context, canonical string) (*domain.Content, error) {
-	existing, err := s.repo.GetByURL(ctx, canonical)
-	if err == nil && existing != nil {
-		return existing, nil
-	}
-	if err != nil && !errors.Is(err, domain.ErrNotFound) {
-		return nil, fmt.Errorf("failed to check existing content: %w", err)
-	}
-	return nil, nil
-}
-
-// orAlreadyExists is the error to return alongside an existing row: the lookup's
-// own failure when it had one, else ErrAlreadyExists.
-func orAlreadyExists(err error) error {
-	if err != nil {
-		return err
-	}
-	return domain.ErrAlreadyExists
+	return s.createContent(ctx, contentCreation{
+		precheck: true,
+		canonical: func(ctx context.Context) (string, error) {
+			return webpage.SiteRoot(rawURL)
+		},
+		build: func(ctx context.Context, root string) (*domain.Content, error) {
+			meta, err := s.fetchWebPage(ctx, root)
+			if err != nil {
+				return nil, err
+			}
+			host := hostPathOf(root).host
+			if meta.Domain == "" {
+				meta.Domain = host
+			}
+			responseJSON, err := marshalWebsiteResponse(meta)
+			if err != nil {
+				return nil, err
+			}
+			name := host
+			if meta.Title != nil && *meta.Title != "" {
+				name = *meta.Title
+			}
+			return &domain.Content{
+				Name:          name,
+				URL:           &root,
+				ContentType:   domain.ContentTypeWebsite,
+				AddedByUserID: userID,
+				Response:      responseJSON,
+			}, nil
+		},
+	})
 }
 
 // validateWebsiteParent checks, with one GetByID, that parentID is a WEBSITE row
@@ -163,23 +143,6 @@ func (s *ContentService) validateWebsiteParent(ctx context.Context, parentID int
 		return fmt.Errorf("%w: %w", domain.ErrInvalidInput, domain.ErrParentOtherHost)
 	}
 	return nil
-}
-
-// saveWebContent inserts the row, tagging it with the running import job. A
-// concurrent insert of the same URL keeps the stored row (refreshOnConflict false)
-// and returns it with ErrAlreadyExists.
-func (s *ContentService) saveWebContent(ctx context.Context, content *domain.Content) (*domain.Content, error) {
-	if jobID, ok := importJobIDFrom(ctx); ok {
-		content.ImportJobID = &jobID
-	}
-	created, alreadyExisted, err := s.repo.GetOrCreateByURL(ctx, content, false)
-	if err != nil {
-		return nil, fmt.Errorf("failed to save content: %w", err)
-	}
-	if alreadyExisted {
-		return created, domain.ErrAlreadyExists
-	}
-	return created, nil
 }
 
 // marshalWebsiteResponse stores the fetched metadata without the page-only keys.
