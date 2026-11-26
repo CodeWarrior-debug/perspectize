@@ -16,27 +16,15 @@
 	import { useContentDetails } from '#lib/queries/content/useContentDetails.js';
 	import { OPEN_CONTENT_PARAM } from '#lib/utils/contentLinks.js';
 	import type { PerspectiveItem } from '#lib/queries/perspectives/index.js';
-	import {
-		parseGridParams,
-		serializeGridParams,
-		urlParamsToFilter,
-		filterToUrlParams,
-		filtersEqual,
-		nonGridFilters,
-	} from '#lib/utils/gridUrlState.js';
-	import type { DataMode, GridParams, SortSpec } from '#lib/utils/gridUrlState.js';
+	import { urlParamsToFilter, type SortSpec } from '#lib/utils/gridUrlState.js';
 	import { contentRowId, moviePeople, PERSON_ID_ATTR } from '#lib/utils/formatting.js';
 	import {
 		itemColumnHeader,
 		soloTypeFilter,
 		CLIENT_ONLY_SORT_COLS,
 		sortableColumnsFor,
-		compareContentBySorts,
-		filterContentRows,
 		togglableColIds,
 		syncItemHeader,
-		PERSON_FILTER_KEY,
-		parsePersonFilter,
 		rowMatchesPerson,
 		showColumnRelevanceCallout,
 	} from '#lib/utils/grid-config.js';
@@ -79,6 +67,7 @@
 	import { createLibraryExport } from '#lib/components/library/libraryExport.svelte.js';
 	import { createColumnCharts } from '#lib/components/library/columnCharts.svelte.js';
 	import { useLibraryList } from '#lib/queries/content/useLibraryList.svelte.js';
+	import { createLibraryViewState } from '#lib/components/library/libraryViewState.svelte.js';
 	import { useViewerPerspectives } from '#lib/queries/perspectives/viewerPerspectives.js';
 	import AddToPlanDialog from '#lib/components/plan/AddToPlanDialog.svelte';
 	import CategoryTypeahead from '#lib/components/CategoryTypeahead.svelte';
@@ -248,37 +237,31 @@
 	// URL-derived state
 	// ---------------------------------------------------------------------------
 
-	// Derive grid params from current URL (reactive to URL changes)
-	const gridParams = $derived(parseGridParams(new URLSearchParams(page.url.search)));
+	// The Library's URL-backed view state (libraryViewState.svelte.ts). The list is created from it
+	// below; the cursor reset only runs from handlers, after both exist.
+	const view = createLibraryViewState({
+		url: {
+			search: () => page.url.search,
+			pathname: () => page.url.pathname,
+			navigate: (href, replace) => {
+				goto(href, { replace, reset: false });
+			},
+		},
+		resetCursors: () => list.resetCursors(),
+	});
 
-	// Individual derived fields from URL
-	const mode = $derived(gridParams.mode);
-	const sorts = $derived(gridParams.sorts);
-	const pageNum = $derived(gridParams.page); // 1-indexed
-	const pageSize = $derived(gridParams.pageSize);
-	const searchText = $derived(gridParams.q);
-	const filters = $derived(gridParams.filters);
+	const mode = $derived(view.mode);
+	const pageNum = $derived(view.pageNum); // 1-indexed
+	const pageSize = $derived(view.pageSize);
+	const filters = $derived(view.filters);
 	/** Which saved/default column set applies (columnLayouts.ts): Movie, or the general set. */
 	const columnView = $derived(columnViewFor(filters.type));
-	// `f.person` (TMDB id, optional `:cast`/`:director`): has no grid column, so it is tracked apart from the grid filter model.
-	const personFilter = $derived(parsePersonFilter(filters[PERSON_FILTER_KEY]));
+	const personFilter = $derived(view.personFilter);
 
 	/** Filter to movies crediting this person (clicking a name in the Cast cell). */
 	function filterByPerson(personId: string) {
 		hover.close();
-		list.resetCursors();
-		updateUrl({ filters: { ...gridParams.filters, [PERSON_FILTER_KEY]: personId }, page: 1 });
-	}
-
-	// ---------------------------------------------------------------------------
-	// URL update helper
-	// ---------------------------------------------------------------------------
-
-	function updateUrl(changes: Partial<GridParams>, replace = true) {
-		const updated = { ...gridParams, ...changes };
-		const search = serializeGridParams(updated);
-		const url = search ? `?${search}` : page.url.pathname;
-		goto(url, { replace, reset: false });
+		view.filterByPerson(personId);
 	}
 
 	// ---------------------------------------------------------------------------
@@ -288,16 +271,7 @@
 	const gridApi = $derived(grid.api);
 	const gridReady = $derived(grid.ready);
 	let displayedRowCount = $state<number | null>(null);
-	let debounceTimer: ReturnType<typeof setTimeout>;
-	let skipNextSortEvent = $state(false);
-	// Mirrors gridParams.sorts's role for "All Items" mode, but for "Loaded" (client)
-	// mode — client-mode sort state lives in the grid (when there's a grid) or, on the
-	// mobile card list where there's no grid at all, nowhere but here. Kept as the
-	// source of truth the SortPickerDialog reads/writes in "Loaded" mode, and used to
-	// manually sort rows for the card list when there's no AG Grid instance to do it.
-	let clientSorts = $state<SortSpec[]>([]);
 	let sortPickerOpen = $state(false);
-	let activeFilterModel = $state<Record<string, any>>({});
 	// Responsive tier: 'xs' (<445px), 'sm' (445-639px), 'md' (640-899px), 'lg' (900px+)
 	const responsive = useResponsiveTier();
 	const responsiveTier = $derived(responsive.current);
@@ -327,7 +301,7 @@
 	);
 
 	// The content list for the current URL params: rows, counts, and the cursor stack for "All" mode.
-	const list = useLibraryList(() => gridParams);
+	const list = useLibraryList(() => view.params);
 	const rowData = $derived(list.rows);
 	const detailsModalRow = $derived(rowData.find((item) => String(item.id) === detailsModalContentId) ?? null);
 	// A deep-linked item (`?open=<id>`, e.g. from a "Go to" toast or a verse jump) is
@@ -367,119 +341,32 @@
 		}
 		return `TMDB #${personFilter.id}`;
 	});
-	const chipFilterModel = $derived<Record<string, any>>({
-		...(gridApi ? activeFilterModel : urlParamsToFilter(filters)),
-		...(personFilter ? { [PERSON_FILTER_KEY]: { filterType: 'person', filter: personChipLabel } } : {}),
-	});
-	const hasActiveFilters = $derived(Object.keys(filters).length > 0 || searchText !== '');
+	const chipFilterModel = $derived(view.chips(personChipLabel));
+	const hasActiveFilters = $derived(view.hasActiveFilters);
 
 	// ---------------------------------------------------------------------------
 	// Mode switch handler
 	// ---------------------------------------------------------------------------
 
-	// True when sorting is anything other than the default single updatedAt/desc —
-	// i.e. multiple sorted columns, a single non-default column, or explicitly cleared.
-	const hasActiveSort = $derived(
-		mode === 'loaded'
-			? clientSorts.length > 0
-			: sorts.length !== 1 || sorts[0].col !== 'updatedAt' || sorts[0].dir !== 'desc',
-	);
+	const hasActiveSort = $derived(view.hasActiveSort);
+	/** What the SortPickerDialog shows: the Loaded-mode list, or the URL sorts the server can honour. */
+	const activeSorts = $derived(view.activeSorts);
 
-	// What the SortPickerDialog reads/writes — the URL list in "All Items" mode,
-	// the grid-mirroring state in "Loaded" mode (works with or without a live grid).
-	const activeSorts = $derived(mode === 'loaded' ? clientSorts : sorts);
-
-	// The mobile card list has no AG Grid instance to sort or filter for it. In "All
-	// Items" mode the server already returned rows in the requested (and filtered)
-	// order; in "Loaded" mode, apply clientSorts and the URL filters by hand, or the
-	// mobile card view would silently ignore every column filter. On desktop, AG Grid
-	// does both itself, so this is a no-op there.
-	const sortedRowData = $derived(
-		mode === 'loaded' && cardMode
-			? (() => {
-					const byColumns = filterContentRows(rowData, urlParamsToFilter(filters));
-					const filtered = personFilter ? byColumns.filter((r) => rowMatchesPerson(r, personFilter)) : byColumns;
-					return clientSorts.length > 0
-						? [...filtered].sort((a, b) => compareContentBySorts(a, b, clientSorts))
-						: filtered;
-				})()
-			: rowData,
-	);
-
-	/**
-	 * Clear all sorting. In "Loaded" mode, reset both our own tracking state and (when
-	 * a grid exists) AG Grid's — the mobile card list has no grid, so clientSorts alone
-	 * drives it. In "All Items" mode, sorting is server-side via the URL — push an
-	 * explicit empty sort list (distinct from the param being absent, which means
-	 * "default") so the grid/cards show unsorted server order.
-	 */
+	/** Clear all sorting. In "Loaded" mode the grid's sort state is cleared too; the view state owns the rest. */
 	function handleClearSorts() {
-		if (mode === 'loaded') {
-			clientSorts = [];
-			gridApi?.applyColumnState({ defaultState: { sort: null } });
-		} else {
-			list.resetCursors();
-			updateUrl({ sorts: [], page: 1 });
-		}
+		view.clearSorts();
+		if (mode === 'loaded') gridApi?.applyColumnState({ defaultState: { sort: null } });
 	}
 
-	/**
-	 * Apply a full replacement sort list from the SortPickerDialog. In "All Items"
-	 * mode this is just another URL update (identical to what onSortChanged does for
-	 * grid-driven sorts). In "Loaded" mode, update our own tracking state and, when a
-	 * grid exists, mirror it there too — on mobile (no grid), clientSorts alone drives
-	 * the card list via sortedRowData above.
-	 */
+	/** Apply a full replacement sort list from the SortPickerDialog; in "Loaded" mode the grid mirrors it. */
 	function handleSortsApply(newSorts: SortSpec[]) {
-		if (mode === 'all') {
-			list.resetCursors();
-			updateUrl({ sorts: newSorts, page: 1 });
-			return;
+		view.setSorts(newSorts);
+		if (mode === 'loaded') {
+			gridApi?.applyColumnState({
+				state: newSorts.map((s, i) => ({ colId: s.col, sort: s.dir, sortIndex: i })),
+				defaultState: { sort: null },
+			});
 		}
-		clientSorts = newSorts;
-		gridApi?.applyColumnState({
-			state: newSorts.map((s, i) => ({ colId: s.col, sort: s.dir, sortIndex: i })),
-			defaultState: { sort: null },
-		});
-	}
-
-	function handleModeToggle(newMode: DataMode) {
-		// Reset pagination when switching modes
-		list.resetCursors();
-		if (newMode === 'loaded') clientSorts = [];
-
-		// When switching Loaded → All: sync AG Grid filter state to URL params
-		if (newMode === 'all' && gridApi) {
-			const filterModel = gridApi.getFilterModel();
-			const urlFilters = {
-				...filterToUrlParams(filterModel as Record<string, unknown>),
-				...nonGridFilters(gridParams.filters),
-			};
-			updateUrl({ mode: newMode, page: 1, filters: urlFilters });
-		} else {
-			updateUrl({ mode: newMode, page: 1 });
-		}
-	}
-
-	// ---------------------------------------------------------------------------
-	// Pagination handlers
-	// ---------------------------------------------------------------------------
-
-	function handleNextPage() {
-		if (pageNum < Math.ceil(totalCount / pageSize)) {
-			updateUrl({ page: pageNum + 1 });
-		}
-	}
-
-	function handlePrevPage() {
-		if (pageNum > 1) {
-			updateUrl({ page: pageNum - 1 });
-		}
-	}
-
-	function handlePageSizeChange(newSize: number) {
-		list.resetCursors();
-		updateUrl({ pageSize: newSize, page: 1 });
 	}
 
 	// ---------------------------------------------------------------------------
@@ -531,7 +418,10 @@
 		);
 	}
 
-	onDestroy(() => hover.destroy());
+	onDestroy(() => {
+		hover.destroy();
+		view.dispose();
+	});
 
 	const gridOptions: GridOptions<ContentItem> = {
 		columnDefs,
@@ -580,41 +470,17 @@
 		...grid.options({ onDetach: () => (displayedRowCount = null) }),
 		onSortChanged: (event: SortChangedEvent) => {
 			hover.close();
-			// In "Loaded" mode, AG Grid handles client-side sort (including multi-column
-			// via shift-click) entirely on its own — mirror its sort state into
-			// clientSorts (read by "Clear sorts", the SortPickerDialog, and the mobile
-			// card list, which has no grid of its own), then skip the URL update.
-			if (mode === 'loaded') {
-				clientSorts = event.api
-					.getColumnState()
-					.filter((col) => col.sort)
-					.sort((a, b) => (a.sortIndex ?? 0) - (b.sortIndex ?? 0))
-					.map((col) => ({
-						col: col.colId ?? 'updatedAt',
-						dir: col.sort === 'asc' ? ('asc' as const) : ('desc' as const),
-					}));
-				return;
-			}
-			// Skip if we triggered this event programmatically (to avoid loop)
-			if (skipNextSortEvent) {
-				skipNextSortEvent = false;
-				return;
-			}
-
-			// Server-side: read every sorted column (multi-column sort applies shift-click
-			// or ctrl-click in AG Grid), in priority order, and push the whole list to the URL.
+			// Every sorted column in priority order (shift- or ctrl-click builds a multi-column sort).
 			const sortModel = event.api
 				.getColumnState()
 				.filter((col) => col.sort)
 				.sort((a, b) => (a.sortIndex ?? 0) - (b.sortIndex ?? 0));
-
-			const newSorts: SortSpec[] = sortModel.map((col) => ({
-				col: col.colId ?? 'updatedAt',
-				dir: col.sort === 'asc' ? 'asc' : 'desc',
-			}));
-
-			list.resetCursors();
-			updateUrl({ sorts: newSorts.length > 0 ? newSorts : [], page: 1 });
+			view.sortsFromGrid(
+				sortModel.map((col) => ({
+					col: col.colId ?? 'updatedAt',
+					dir: col.sort === 'asc' ? 'asc' : 'desc',
+				})),
+			);
 		},
 		// The person filter has no column, so "Loaded" mode applies it here, alongside the column filters.
 		isExternalFilterPresent: () => personFilter != null,
@@ -624,28 +490,9 @@
 		},
 		onFilterChanged: (event: FilterChangedEvent) => {
 			hover.close();
-			// Immediate: update chip display
-			activeFilterModel = event.api.getFilterModel();
 			displayedRowCount = event.api.getDisplayedRowCount();
-
-			// Debounce → convert filter model → update URL. In "Loaded" mode AG Grid already
-			// filtered client-side; the URL write just keeps the URL authoritative, so a
-			// cleared default filter (f=none) isn't re-applied by the restore effect below.
-			clearTimeout(debounceTimer);
-			debounceTimer = setTimeout(() => {
-				const filterModel = event.api.getFilterModel();
-				const urlFilters = {
-					...filterToUrlParams(filterModel as Record<string, unknown>),
-					...nonGridFilters(gridParams.filters),
-				};
-				if (filtersEqual(urlFilters, gridParams.filters)) return;
-				if (mode === 'loaded') {
-					updateUrl({ filters: urlFilters });
-					return;
-				}
-				list.resetCursors();
-				updateUrl({ filters: urlFilters, page: 1 });
-			}, 500);
+			// The view state shows the model at once and writes it to the URL after a short debounce.
+			view.gridFilterChanged(event.api.getFilterModel());
 		},
 		// Prevent AG Grid from client-side re-sorting data that arrives pre-sorted from server
 		postSortRows: () => {
@@ -660,16 +507,12 @@
 	// Effects
 	// ---------------------------------------------------------------------------
 
-	// Sync AG Grid sort indicators to URL state when switching to "All Items" mode
-	// Uses skipNextSortEvent flag to prevent onSortChanged from re-updating the URL
+	// Sync AG Grid sort indicators to the URL's server sorts in "All Items" mode. The echoed
+	// sortChanged event matches those sorts, so onSortChanged leaves the URL alone.
 	$effect(() => {
 		if (!gridApi || !gridReady || mode !== 'all') return;
-		skipNextSortEvent = true;
 		gridApi.applyColumnState({
-			// Drop client-only columns (a stale URL sort): the server cannot honour them.
-			state: gridParams.sorts
-				.filter((s) => !CLIENT_ONLY_SORT_COLS.includes(s.col))
-				.map((s, i) => ({ colId: s.col, sort: s.dir, sortIndex: i })),
+			state: view.serverSorts.map((s, i) => ({ colId: s.col, sort: s.dir, sortIndex: i })),
 			defaultState: { sort: null },
 		});
 	});
@@ -700,7 +543,7 @@
 	$effect(() => {
 		const api = grid.live();
 		if (!api) return;
-		const filterModel = urlParamsToFilter(gridParams.filters);
+		const filterModel = urlParamsToFilter(view.filters);
 		api.setFilterModel(Object.keys(filterModel).length > 0 ? filterModel : null);
 	});
 
@@ -822,21 +665,9 @@
 	<FilterChips
 		{gridApi}
 		filterModel={chipFilterModel}
-		onRemove={(colId) => {
-			const next = { ...gridParams.filters };
-			delete next[colId];
-			list.resetCursors();
-			updateUrl({ filters: next, page: 1 });
-		}}
-		onClearAll={() => {
-			list.resetCursors();
-			updateUrl({ filters: {}, page: 1 });
-		}}
-		onClearAllButType={() => {
-			list.resetCursors();
-			const { type } = gridParams.filters;
-			updateUrl({ filters: type ? { type } : {}, page: 1 });
-		}}
+		onRemove={(colId) => view.removeFilter(colId)}
+		onClearAll={() => view.clearFilters()}
+		onClearAllButType={() => view.clearFiltersKeepType()}
 	/>
 
 	<!-- Mixed/unfiltered types share one column set, so many cells are blank. The card list
@@ -870,7 +701,7 @@
 	{:else if cardMode}
 		<div class="flex-1 min-h-0 overflow-y-auto">
 			<LibraryCardList
-				rowData={sortedRowData}
+				rowData={view.cardRows(rowData)}
 				{perspectiveContentIds}
 				onOpenDetails={handleOpenDetails}
 				onAddPerspective={handleAddPerspectiveFromCard}
@@ -904,7 +735,7 @@
 				{totalCount} total
 			</div>
 			<!-- Data Mode Toggle -->
-			<DataModeToggle {mode} loadedCount={loadedItemsCount} onToggle={handleModeToggle} />
+			<DataModeToggle {mode} loadedCount={loadedItemsCount} onToggle={(next) => view.setMode(next)} />
 			{#if !cardMode}
 				<button
 					type="button"
@@ -918,8 +749,8 @@
 				</button>
 			{/if}
 			<!-- Sort controls — shown on mobile too (unlike Columns): the picker doesn't
-			     depend on AG Grid, and the mobile card list has its own sort applied via
-			     sortedRowData/clientSorts, so there's no grid-readiness gate here. -->
+			     depend on AG Grid, and the mobile card list sorts through the view state
+			     (cardRows), so there's no grid-readiness gate here. -->
 			<button
 				type="button"
 				aria-label="Edit sorts"
@@ -955,7 +786,7 @@
 					<select
 						id="pageSize"
 						value={pageSize}
-						onchange={(e) => handlePageSizeChange(Number(e.currentTarget.value))}
+						onchange={(e) => view.setPageSize(Number(e.currentTarget.value))}
 						class="px-2 py-1 text-sm border border-input rounded-md bg-background"
 					>
 						<option value={10}>10</option>
@@ -969,18 +800,18 @@
 		{#if mode === 'all'}
 			<div class="flex items-center gap-2">
 				<button
-					onclick={handlePrevPage}
+					onclick={() => view.prevPage()}
 					disabled={pageNum <= 1}
 					class="px-3 py-1 text-sm border border-input rounded-md bg-background hover:bg-accent disabled:opacity-50 disabled:cursor-not-allowed"
 				>
 					<span class="hidden sm:inline">Previous</span><span class="sm:hidden">&lt;</span>
 				</button>
 				<span class="text-muted-foreground">
-					Page {pageNum} of {Math.ceil(totalCount / pageSize) || 1}
+					Page {pageNum} of {view.pageCount(totalCount) || 1}
 				</span>
 				<button
-					onclick={handleNextPage}
-					disabled={pageNum >= Math.ceil(totalCount / pageSize)}
+					onclick={() => view.nextPage(totalCount)}
+					disabled={pageNum >= view.pageCount(totalCount)}
 					class="px-3 py-1 text-sm border border-input rounded-md bg-background hover:bg-accent disabled:opacity-50 disabled:cursor-not-allowed"
 				>
 					<span class="hidden sm:inline">Next</span><span class="sm:hidden">&gt;</span>
