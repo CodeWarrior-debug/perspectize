@@ -137,6 +137,14 @@ Uses `ag-grid-svelte5` (bundles AG Grid v32.x). **Do NOT install `ag-grid-commun
 - AG Grid canvas-rendered cells (thumbnails) don't serialize into Figma captures
 - SPA hash navigation may not re-trigger auto-capture — reload or click "Send to Figma" manually
 
+## Architecture rules (enforced: `scripts/arch-check.sh`, CI step "Architecture rules")
+
+ESLint (`eslint.config.js`, architecture rules only) and dependency-cruiser (`.dependency-cruiser.cjs`) enforce: F1 components use `useX` hooks, not `createQuery`/`useQueryClient`; F2 components never call `graphqlRequest`/`graphqlClient`; F3 `isPending`, not `isLoading`; F4 no raw hex/rgb colours in UI; F5 `svelte-clerk` only in `src/lib/auth`; F6 query keys from `queryKeys`, never clear the cache; F7 no import cycles; F8 `lib` never imports `routes`, non-component `lib` never imports components.
+
+- **Known violations** are in `eslint-suppressions.json` and `.dependency-cruiser-known-violations.json`; **files over 500 lines** have a ceiling in `.size-ceilings.txt` (tests exempt). All three may only shrink. Never add to them or suppress a rule to get green; fix the code.
+- **Off-limits:** don't add lines to a file listed in `.size-ceilings.txt` (e.g. `ActivityTable.svelte`, `gridUrlState.ts`, `grid-config.ts`) or to a file with an entry in `eslint-suppressions.json`. Put new code in a new file beside it and import it.
+- After fixing a baselined violation run `scripts/arch-check.sh --update` and commit the smaller baselines.
+
 ## Self-Verification (Chrome DevTools MCP)
 
 **Mobile/tablet screenshots: use `emulate`, not `resize_page`.** AG Grid and CSS media queries respond only with `isMobile: true`, so `resize_page` alone doesn't trigger responsive column hiding. Example: `emulate({ viewport: { width: 375, height: 812, deviceScaleFactor: 3, isMobile: true, hasTouch: true } })`; reset with `emulate({ viewport: null, userAgent: null })`. Use `resize_page` for desktop breakpoints (768px+).
