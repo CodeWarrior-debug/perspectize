@@ -71,7 +71,7 @@ Errors: blank/too-long query (>100 chars after trim) or page outside 1..500 → 
 
 ## Verification (orchestrator)
 
-`go build ./...`, `gofmt -l .`, `go test ./...` in `backend/`; `pnpm run test:run`, `pnpm run check`, prettier in `frontend/`; adversarial diff review; `graphify update .`. No browser verification in cloud → PR labelled `needs-demo-video`.
+`go build ./...`, `gofmt -l .`, `go test ./...` in `backend/`; `pnpm run test:run`, `pnpm run check`, prettier in `frontend/`; adversarial diff review; `graphify update .`. No browser verification in cloud → PR labelled `needs-demo-evidence`.
 
 ## Task 3 — Trending movies (follow-up, after Tasks 1–2 land)
 
