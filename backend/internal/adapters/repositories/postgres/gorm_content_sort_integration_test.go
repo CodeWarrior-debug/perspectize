@@ -61,7 +61,7 @@ const mixedStatsRows = `(VALUES
 	(6, '{"items":[{"statistics":{}}]}'::jsonb)
 ) AS content(id, response)`
 
-func TestContentSortIntegration_ViewCountAndPercentLikedAreCastSafe(t *testing.T) {
+func TestContentSortIntegration_ViewCountIsCastSafe(t *testing.T) {
 	db := openLocalUserTodoTestDB(t)
 
 	viewExpr := contentSortRule(domain.ContentSortByViewCount, domain.SortOrderAsc).SQLRepr
@@ -72,16 +72,6 @@ func TestContentSortIntegration_ViewCountAndPercentLikedAreCastSafe(t *testing.T
 	assert.Equal(t, []sql.NullInt64{
 		{Int64: 200, Valid: true}, {}, {Int64: 100, Valid: true}, {}, {Int64: 0, Valid: true}, {},
 	}, views, "empty and non-numeric view counts are NULL, numeric ones keep their value")
-
-	percentExpr := contentSortRule(domain.ContentSortByPercentLiked, domain.SortOrderAsc).SQLRepr
-	var percents []sql.NullFloat64
-	require.NoError(t, db.Raw(fmt.Sprintf(
-		"SELECT (%s) FROM %s ORDER BY id", percentExpr, mixedStatsRows)).Scan(&percents).Error)
-	require.Len(t, percents, 6)
-	assert.Equal(t, sql.NullFloat64{Float64: 0.25, Valid: true}, percents[0], "50 likes over 200 views")
-	for i := 1; i < 6; i++ {
-		assert.False(t, percents[i].Valid, "row %d has an empty, non-numeric, zero or missing count, so no rate", i+1)
-	}
 }
 
 func TestContentSortIntegration_CountFilterIsCastSafe(t *testing.T) {

@@ -82,7 +82,6 @@ const addedBySortExpr = "LOWER((SELECT u.username FROM users u WHERE u.id = cont
 var computedSortColumns = map[string]string{
 	"ViewCount":    "view_count",
 	"LikeCount":    "like_count",
-	"PercentLiked": "percent_liked",
 	"PublishedAt":  "published_at_sort",
 	"ChannelTitle": "channel_title_sort",
 	"BoxOffice":    "box_office",
@@ -183,25 +182,6 @@ func contentSortRule(sortBy domain.ContentSortBy, order domain.SortOrder) pagina
 			Order:           paginatorOrder,
 			SQLRepr:         statCountExpr("likeCount"),
 			NULLReplacement: int64(0),
-		}
-	case domain.ContentSortByPercentLiked:
-		views, likes := statCountExpr("viewCount"), statCountExpr("likeCount")
-		return paginator.Rule{
-			Key: "PercentLiked",
-			// Computed the same way the frontend's percentLikedValueGetter does: likes as a
-			// fraction of views. NULL (and thus NULLReplacement, sorted like any other JSONB
-			// rule here) when views is missing/zero or likes is missing -- there's no
-			// meaningful rate to show.
-			Order: paginatorOrder,
-			SQLRepr: "CASE " +
-				"WHEN " + views + " IS NULL " +
-				"  OR " + likes + " IS NULL " +
-				"  OR " + views + " = 0 " +
-				"THEN NULL " +
-				"ELSE " + likes + "::FLOAT8 " +
-				"     / NULLIF(" + views + ", 0) " +
-				"END",
-			NULLReplacement: float64(-1),
 		}
 	case domain.ContentSortByBoxOffice:
 		return paginator.Rule{
