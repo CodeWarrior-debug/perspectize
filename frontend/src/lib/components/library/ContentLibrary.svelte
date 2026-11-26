@@ -39,6 +39,7 @@
 	import PrintOptionsDialog from '#lib/components/PrintOptionsDialog.svelte';
 	import { isExportDisabled } from '#lib/utils/exportGrid.js';
 	import ColumnChartPopover from '#lib/components/charts/ColumnChartPopover.svelte';
+	import { itemNounFor } from '#lib/utils/chartReadout';
 	import {
 		COLUMN_VIEW_LABEL,
 		clearLayout,
@@ -883,6 +884,7 @@
 			total={charts.data.total}
 			ranked={charts.data.ranked}
 			format={charts.format(charts.target.colId)}
+			noun={itemNounFor(columnView)}
 			open={true}
 			onClose={charts.close}
 			anchor={charts.target.anchor}
