@@ -54,7 +54,7 @@ PR3 = "No sections here."
 
 PRS = [
     {"number": 10, "title": "feat: a", "body": PR1, "mergedAt": "2026-09-20T10:00:00Z", "url": "u",
-     "labels": [{"name": "needs-demo-video"}, {"name": "ready for review"}]},
+     "labels": [{"name": "needs-demo-evidence"}, {"name": "ready for review"}]},
     {"number": 11, "title": "fix: b", "body": PR2, "mergedAt": "2026-09-21T10:00:00Z", "url": "u",
      "labels": [{"name": "migrations-unapplied"}]},
     {"number": 12, "title": "chore: c", "body": PR3, "mergedAt": "2026-09-22T10:00:00Z", "url": "u", "labels": []},
@@ -115,7 +115,7 @@ class HarvestTest(unittest.TestCase):
 
     def test_labels(self):
         self.assertEqual([i[2].split(":")[0] for i in self.items(10) if i[0] == "Leftover labels"],
-                         ["needs-demo-video"])
+                         ["needs-demo-evidence"])
         self.assertEqual([i[2].split(":")[0] for i in self.items(11) if i[0] == "Leftover labels"],
                          ["migrations-unapplied"])
         self.assertEqual(self.items(12), [])

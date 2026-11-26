@@ -15,13 +15,11 @@ import (
 // optional field populated, so an "omitted" update can prove none is touched.
 func existingPerspectiveWithOptionalsSet() *domain.Perspective {
 	cat := "original-category"
-	status := domain.ReviewStatusPending
 	primary := 11
 	return &domain.Perspective{
 		ID:                    1,
 		UserID:                1,
 		Category:              &cat,
-		ReviewStatus:          &status,
 		Parts:                 []int{1, 2},
 		Labels:                []string{"old"},
 		PrimaryPerspectiveID:  &primary,
@@ -47,8 +45,6 @@ func TestPerspectiveUpdate_OmittedOptionalFieldsAreUntouched(t *testing.T) {
 
 	require.NotNil(t, result.Category)
 	assert.Equal(t, "original-category", *result.Category)
-	require.NotNil(t, result.ReviewStatus)
-	assert.Equal(t, domain.ReviewStatusPending, *result.ReviewStatus)
 	assert.Equal(t, []int{1, 2}, result.Parts)
 	assert.Equal(t, []string{"old"}, result.Labels)
 	require.NotNil(t, result.PrimaryPerspectiveID)
@@ -68,17 +64,6 @@ func TestPerspectiveUpdate_ProvidedOptionalFieldsAreApplied(t *testing.T) {
 			assert: func(t *testing.T, p *domain.Perspective) {
 				require.NotNil(t, p.Category)
 				assert.Equal(t, "new-category", *p.Category)
-			},
-		},
-		{
-			name: "review status",
-			input: func() portservices.UpdatePerspectiveInput {
-				s := domain.ReviewStatusApproved
-				return portservices.UpdatePerspectiveInput{ReviewStatus: &s}
-			}(),
-			assert: func(t *testing.T, p *domain.Perspective) {
-				require.NotNil(t, p.ReviewStatus)
-				assert.Equal(t, domain.ReviewStatusApproved, *p.ReviewStatus)
 			},
 		},
 		{

@@ -15,7 +15,7 @@ func TestCreatePerspective_DuplicateReturnsReadableMessage(t *testing.T) {
 	// error: the message names the privacy and carries no SQL or constraint name.
 	perspectiveRepo := &mockPerspectiveRepository{
 		createFn: func(ctx context.Context, p *domain.Perspective) (*domain.Perspective, error) {
-			return nil, domain.ErrAlreadyExists
+			return nil, domain.ErrDuplicatePerspective
 		},
 	}
 

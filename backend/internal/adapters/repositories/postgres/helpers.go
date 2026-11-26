@@ -1,7 +1,6 @@
 package postgres
 
 import (
-	"database/sql"
 	"database/sql/driver"
 	"strings"
 
@@ -71,23 +70,6 @@ func visiblePerspectivePredicate(viewerID *int) (string, []any) {
 // privacyFromDBValue converts lowercase database value to domain Privacy
 func privacyFromDBValue(s string) domain.Privacy {
 	return domain.Privacy(strings.ToUpper(s))
-}
-
-// reviewStatusToDBValue converts domain ReviewStatus to lowercase for database storage
-func reviewStatusToDBValue(rs *domain.ReviewStatus) sql.NullString {
-	if rs == nil {
-		return sql.NullString{}
-	}
-	return sql.NullString{String: strings.ToLower(string(*rs)), Valid: true}
-}
-
-// reviewStatusFromDBValue converts lowercase database value to domain ReviewStatus
-func reviewStatusFromDBValue(s sql.NullString) *domain.ReviewStatus {
-	if !s.Valid {
-		return nil
-	}
-	rs := domain.ReviewStatus(strings.ToUpper(s.String))
-	return &rs
 }
 
 // intSliceToInt64Array converts []int to Int64Array for database storage

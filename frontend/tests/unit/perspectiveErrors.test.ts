@@ -127,12 +127,31 @@ describe('typed path (extensions.code present): the code decides', () => {
 	});
 
 	it('ALREADY_EXISTS is a create-only message; other operations fall through to the legacy match', () => {
-		expect(classifyPerspectiveError(gqlError('x', 'ALREADY_EXISTS'), 'create').message).toBe(
-			'You already have a perspective on this item',
-		);
+		expect(classifyPerspectiveError(gqlError('x', 'ALREADY_EXISTS'), 'create')).toEqual({
+			source: 'code',
+			message: 'You already have a perspective on this content with this privacy setting.',
+			retry: false,
+			refetchLists: false,
+		});
 		expect(classifyPerspectiveError(gqlError('boom', 'ALREADY_EXISTS'), 'update')).toMatchObject({
 			source: 'message',
 			message: 'Failed to update perspective.',
+			retry: false,
+		});
+	});
+
+	it('a typed refusal that no typed rule matches never offers Retry, even on create', () => {
+		expect(classifyPerspectiveError(gqlError('boom', 'SOMETHING_NEW'), 'create')).toMatchObject({
+			source: 'message',
+			message: 'Failed to add perspective.',
+			retry: false,
+		});
+	});
+
+	it('an uncoded, unrecognised failure on create keeps Retry', () => {
+		expect(classifyPerspectiveError(new Error('socket hang up'), 'create')).toMatchObject({
+			message: 'Failed to add perspective.',
+			retry: true,
 		});
 	});
 

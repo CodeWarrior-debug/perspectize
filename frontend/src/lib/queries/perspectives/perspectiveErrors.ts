@@ -95,7 +95,9 @@ function typedFailure(code: PerspectiveErrorCode, err: Error, op: PerspectiveOp)
 				op === 'delete' ? 'You can only delete your own perspectives' : 'You can only change your own perspectives',
 			);
 		case 'ALREADY_EXISTS':
-			return op === 'create' ? typed('You already have a perspective on this item') : null;
+			return op === 'create'
+				? typed('You already have a perspective on this content with this privacy setting.')
+				: null;
 		case 'UNAVAILABLE':
 			return op === 'delete' ? null : { ...typed(GENERIC[op]), retry: true };
 	}
@@ -109,6 +111,10 @@ export function classifyPerspectiveError(err: unknown, op: PerspectiveOp): Persp
 	if (code !== null) {
 		const typed = typedFailure(code as PerspectiveErrorCode, error, op);
 		if (typed) return typed;
+		// A typed refusal that no typed rule matched keeps its legacy wording but never offers Retry.
+		// UNAVAILABLE is the only coded error that is retryable.
+		const legacy = legacyFailure(error, op);
+		return code === 'UNAVAILABLE' ? legacy : { ...legacy, retry: false };
 	}
 	return legacyFailure(error, op);
 }

@@ -36,12 +36,6 @@ enum Privacy {
   PRIVATE
 }
 
-enum ReviewStatus {
-  PENDING
-  APPROVED
-  REJECTED
-}
-
 enum PerspectiveSortBy {
   CREATED_AT
   UPDATED_AT
@@ -75,7 +69,6 @@ type Perspective {
   privacy: Privacy!
   description: String
   category: String
-  reviewStatus: ReviewStatus
   parts: [Int!]
   labels: [String!]
   categorizedRatings: [CategorizedRating!]
@@ -631,7 +624,6 @@ input UpdatePerspectiveInput {
   privacy: Privacy
   description: String
   category: String
-  reviewStatus: ReviewStatus
   parts: [Int!]
   labels: [String!]
   categorizedRatings: [CategorizedRatingInput!]
