@@ -33,6 +33,7 @@ components:
   web:           { in: internal/adapters/web/** }
   demo:          { in: internal/demo/** }
   config:        { in: internal/config/** }
+  assembly:      { in: internal/assembly/** }
   server:        { in: internal/server/** }
   perf:          { in: internal/perf/** }
   pkg:           { in: pkg/** }
@@ -84,6 +85,9 @@ deps:
     anyVendorDeps: true
   pkg:
     mayDependOn: [pkg]
+    anyVendorDeps: true
+  assembly:
+    anyProjectDeps: true
     anyVendorDeps: true
   server:
     anyProjectDeps: true

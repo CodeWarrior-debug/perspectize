@@ -41,13 +41,14 @@ pattern_check() { # rule, regex, dirs...
 sort -o "$current" "$current"
 
 # B2: every Mutation field in schema.graphql carries @auth, and every mutation resolver calls auth.RequireAuth.
+# dispatchCreateContent calls auth.RequireAuth itself, so a resolver that delegates to it passes.
 b2() {
 	awk '/^type Mutation \{/{m=1;next} m&&/^\}/{m=0} m&&/^  [a-zA-Z]+\(/&&!/@auth/{sub(/\(.*/,"");gsub(/ /,""); print "B2 | schema.graphql | mutation " $0 " lacks @auth"}' schema.graphql
 	for f in internal/adapters/graphql/resolvers/*.resolvers.go; do
 		awk -v F="$f" '
 			/^func \(r \*mutationResolver\) /{ if (name!="" && !ok) print "B2 | " F " | resolver " name " does not derive the actor (auth.RequireAuth or auth.ForContext)"; name=$4; sub(/\(.*/,"",name); ok=0; next }
 			/^func /{ if (name!="" && !ok) print "B2 | " F " | resolver " name " does not derive the actor (auth.RequireAuth or auth.ForContext)"; name="" }
-			name!="" && /auth\.(RequireAuth|ForContext)/{ok=1}
+			name!="" && /auth\.(RequireAuth|ForContext)|r\.dispatchCreateContent\(/{ok=1}
 			END{ if (name!="" && !ok) print "B2 | " F " | resolver " name " does not derive the actor (auth.RequireAuth or auth.ForContext)" }' "$f"
 	done
 }

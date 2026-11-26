@@ -18,11 +18,9 @@ B7 | internal/core/services/messaging_service.go | updated, err := s.msgRepo.Upd
 B7 | internal/core/services/user_service.go | now := time.Now().UTC().Format(time.RFC3339)
 B7 | internal/core/services/user_todo_service.go | applyStatusStartDate(&todo, existing.Status == domain.UserTodoStatusInProgress, time.Now().UTC())
 B7 | internal/core/services/user_todo_service.go | applyStatusStartDate(todo, false, time.Now().UTC())
-B8 | internal/adapters/auth/clerk_middleware.go | if strings.Contains(createErr.Error(), "unique_email") || strings.Contains(createErr.Error(), "23505") {
-B8 | internal/core/services/content_service.go | return nil, fmt.Errorf("%w: %v", domain.ErrInvalidInput, err)
+B8 | internal/core/services/content_service.go | return "", fmt.Errorf("%w: %v", domain.ErrInvalidInput, err)
+B8 | internal/core/services/content_service.go | return "", fmt.Errorf("%w: %v", domain.ErrInvalidURL, err)
 B8 | internal/core/services/content_service.go | return nil, fmt.Errorf("%w: %v", domain.ErrInvalidURL, err)
-B8 | internal/core/services/content_service.go | return nil, fmt.Errorf("%w: %v", domain.ErrInvalidURL, err)
-auth | internal/adapters/auth/clerk_middleware.go | internal/demo
 auth | internal/adapters/auth/demo_token_verifier.go | internal/demo
 gql | internal/adapters/graphql/resolvers/helpers.go | internal/adapters/tmdb
 gql | internal/adapters/graphql/resolvers/resolver.go | internal/adapters/realtime
