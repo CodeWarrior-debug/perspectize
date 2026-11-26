@@ -706,8 +706,8 @@ func (r *queryResolver) Content(ctx context.Context, first *int, after *string, 
 
 	result, err := r.ContentService.ListContent(ctx, params)
 	if err != nil {
-		if errors.Is(err, domain.ErrInvalidInput) {
-			return nil, fmt.Errorf("invalid pagination parameters: %w", err)
+		if domain.KindOf(err) == domain.KindInvalid {
+			return nil, invalidPagingError(err)
 		}
 		slog.Error("listing content failed", "error", err)
 		return nil, fmt.Errorf("failed to list content")
@@ -720,13 +720,8 @@ func (r *queryResolver) Content(ctx context.Context, first *int, after *string, 
 	}
 
 	conn := &model.PaginatedContent{
-		Items: items,
-		PageInfo: &model.PageInfo{
-			HasNextPage:     result.HasNext,
-			HasPreviousPage: result.HasPrev,
-			StartCursor:     result.StartCursor,
-			EndCursor:       result.EndCursor,
-		},
+		Items:      items,
+		PageInfo:   pageInfoToModel(result.HasNext, result.HasPrev, result.StartCursor, result.EndCursor),
 		TotalCount: result.TotalCount,
 	}
 
@@ -869,11 +864,7 @@ func (r *queryResolver) BookTrending(ctx context.Context, window *domain.Trendin
 // record for the ISBN, so the client can show "not found" without surfacing
 // a GraphQL error.
 func (r *queryResolver) BookByIsbn(ctx context.Context, isbn string) (*model.BookSearchResult, error) {
-	// See createBook: normalize a hyphenated ISBN before it reaches
-	// ContentService's bare-digit isbnRe (Task 5 finding).
-	raw := normalizeHyphenatedISBN(isbn)
-
-	result, err := r.ContentService.ResolveBookISBN(ctx, raw)
+	result, err := r.ContentService.ResolveBookISBN(ctx, isbn)
 	if err != nil {
 		if errors.Is(err, domain.ErrNotFound) {
 			return nil, nil

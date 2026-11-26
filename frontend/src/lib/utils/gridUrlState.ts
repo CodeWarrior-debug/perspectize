@@ -6,6 +6,7 @@ import type { WebPageRole } from '#lib/queries/content/index.js';
 import {
 	COL_TO_SORT,
 	SORT_TO_COL,
+	RETIRED_COL_IDS,
 	COL_TO_FILTER_KEY,
 	NUMBER_RANGE_COLS,
 	DATE_RANGE_COLS,
@@ -119,7 +120,7 @@ function parseSorts(raw: string | null): SortSpec[] {
 		if (dotIdx === -1) continue;
 		const col = part.slice(0, dotIdx);
 		const dir = part.slice(dotIdx + 1);
-		if (!col || (dir !== 'asc' && dir !== 'desc') || seen.has(col)) continue;
+		if (!col || (dir !== 'asc' && dir !== 'desc') || seen.has(col) || RETIRED_COL_IDS.has(col)) continue;
 		seen.add(col);
 		sorts.push({ col, dir });
 		if (sorts.length >= MAX_SORT_COLUMNS) break;

@@ -94,3 +94,13 @@ export function downloadWithToast(download: () => void, toaster: Pick<typeof toa
 		toaster.error(EXPORT_FAILED_MESSAGE);
 	}
 }
+
+/**
+ * Stands in for `toast` where a host shows its own feedback (the /add page). Same call shape as the
+ * methods the add-content hooks use, so a hook picks one or the other and calls it the same way.
+ */
+export const silentToast = {
+	success: (_message: string, _opts?: ExternalToast) => {},
+	warning: (_message: string, _opts?: ExternalToast) => {},
+	error: (_message: string, _opts?: ExternalToast) => {},
+};
