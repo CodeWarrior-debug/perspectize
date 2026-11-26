@@ -20,26 +20,29 @@ func bigBibleBooks() []domain.BibleBook {
 }
 
 func TestListContent_PageSizeBoundaries(t *testing.T) {
+	cursor := "Y3Vyc29y"
 	tests := []struct {
 		name    string
 		first   *int
 		last    *int
+		before  *string
 		wantErr bool
 	}{
 		{name: "first at lower bound", first: intPtrLimits(1)},
 		{name: "first at upper bound", first: intPtrLimits(100)},
 		{name: "first below lower bound", first: intPtrLimits(0), wantErr: true},
 		{name: "first above upper bound", first: intPtrLimits(101), wantErr: true},
-		{name: "last at lower bound", last: intPtrLimits(1)},
-		{name: "last at upper bound", last: intPtrLimits(100)},
-		{name: "last below lower bound", last: intPtrLimits(0), wantErr: true},
-		{name: "last above upper bound", last: intPtrLimits(101), wantErr: true},
+		{name: "last at lower bound", last: intPtrLimits(1), before: &cursor},
+		{name: "last at upper bound", last: intPtrLimits(100), before: &cursor},
+		{name: "last below lower bound", last: intPtrLimits(0), before: &cursor, wantErr: true},
+		{name: "last above upper bound", last: intPtrLimits(101), before: &cursor, wantErr: true},
+		{name: "last without before is refused", last: intPtrLimits(5), wantErr: true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			svc := services.NewContentService(&mockContentRepository{}, &mockYouTubeClient{}, nil)
 
-			_, err := svc.ListContent(context.Background(), domain.ContentListParams{First: tt.first, Last: tt.last})
+			_, err := svc.ListContent(context.Background(), domain.ContentListParams{First: tt.first, Last: tt.last, Before: tt.before})
 
 			if tt.wantErr {
 				assert.ErrorIs(t, err, domain.ErrInvalidInput)

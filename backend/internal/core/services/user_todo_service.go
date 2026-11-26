@@ -43,11 +43,8 @@ func NewUserTodoService(
 // ListUserTodos returns one page of todos visible to the viewer: public rows
 // plus the viewer's own. Always privacy-filtered; there is no unfiltered read.
 func (s *UserTodoService) ListUserTodos(ctx context.Context, params domain.UserTodoListParams) (*domain.PaginatedUserTodos, error) {
-	if params.First != nil && (*params.First < 1 || *params.First > 100) {
-		return nil, fmt.Errorf("%w: first must be between 1 and 100", domain.ErrInvalidInput)
-	}
-	if params.Last != nil && (*params.Last < 1 || *params.Last > 100) {
-		return nil, fmt.Errorf("%w: last must be between 1 and 100", domain.ErrInvalidInput)
+	if _, err := domain.ResolvePage(params.First, params.Last, params.After, params.Before); err != nil {
+		return nil, err
 	}
 
 	// Filtering by someone else's private list answers like a missing list
