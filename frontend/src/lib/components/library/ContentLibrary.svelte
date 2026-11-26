@@ -10,50 +10,21 @@
 		CellClickedEvent,
 		CellMouseOverEvent,
 	} from '@ag-grid-community/core';
-	import { tick } from 'svelte';
-	import { createQuery, hashKey, keepPreviousData } from '@tanstack/svelte-query';
 	import { page } from '$app/state';
 	import { goto } from '$app/navigation';
-	import { graphqlRequest } from '#lib/queries/client.js';
-	import {
-		LIBRARY_LIST_STALE_TIME_MS,
-		cursorsAfterPage,
-		LIST_CONTENT,
-		libraryListRequest,
-		type ContentItem,
-		type ContentResponse,
-	} from '#lib/queries/content/index.js';
+	import type { ContentItem } from '#lib/queries/content/index.js';
 	import { useContentDetails } from '#lib/queries/content/useContentDetails.js';
 	import { OPEN_CONTENT_PARAM } from '#lib/utils/contentLinks.js';
-	import { createRowOrderMemory } from '#lib/utils/rowOrder.js';
-	import {
-		LIST_PERSPECTIVES_BY_USER,
-		MAX_PERSPECTIVES_PER_LIST,
-		type ListPerspectivesByUserResponse,
-		type PerspectiveItem,
-	} from '#lib/queries/perspectives/index.js';
-	import { queryKeys } from '#lib/queries/keys.js';
-	import {
-		parseGridParams,
-		serializeGridParams,
-		urlParamsToFilter,
-		filterToUrlParams,
-		filtersEqual,
-		nonGridFilters,
-	} from '#lib/utils/gridUrlState.js';
-	import type { DataMode, GridParams, SortSpec } from '#lib/utils/gridUrlState.js';
-	import { formatDurationMinutes, contentRowId, moviePeople, PERSON_ID_ATTR } from '#lib/utils/formatting.js';
+	import type { PerspectiveItem } from '#lib/queries/perspectives/index.js';
+	import { urlParamsToFilter, type SortSpec } from '#lib/utils/gridUrlState.js';
+	import { contentRowId, moviePeople, PERSON_ID_ATTR } from '#lib/utils/formatting.js';
 	import {
 		itemColumnHeader,
 		soloTypeFilter,
 		CLIENT_ONLY_SORT_COLS,
 		sortableColumnsFor,
-		compareContentBySorts,
-		filterContentRows,
 		togglableColIds,
 		syncItemHeader,
-		PERSON_FILTER_KEY,
-		parsePersonFilter,
 		rowMatchesPerson,
 		showColumnRelevanceCallout,
 	} from '#lib/utils/grid-config.js';
@@ -61,21 +32,12 @@
 	import { emptyCellClassRules } from '#lib/utils/grid-empty.js';
 	import { useCardMode, useResponsiveTier } from '#lib/utils/responsive.svelte.js';
 	import { useMe } from '#lib/queries/users/useMe.svelte.js';
-	import { useUsernames } from '#lib/queries/users/useUsernames.svelte.js';
 	import ColumnPickerDialog from '#lib/components/ColumnPickerDialog.svelte';
 	import ExportMenu from '#lib/components/ExportMenu.svelte';
 	import PrintListView from '#lib/components/PrintListView.svelte';
 	import PrintOptionsDialog from '#lib/components/PrintOptionsDialog.svelte';
-	import type { PrintSpacing } from '#lib/components/PrintOptionsDialog.svelte';
-	import { isExportDisabled, readExportTable, type ExportGridApi } from '#lib/utils/exportGrid.js';
-	import type { ExportTable } from '#lib/utils/exportTable.js';
-	import { copyLibraryTable, downloadLibraryCsv } from '#lib/utils/exportActions.js';
-	import { copyWithToast, downloadWithToast } from '#lib/utils/toast.js';
-	import { addLandscapePageStyle, removeLandscapePageStyle, runPrint } from '#lib/utils/printing.js';
+	import { isExportDisabled } from '#lib/utils/exportGrid.js';
 	import ColumnChartPopover from '#lib/components/charts/ColumnChartPopover.svelte';
-	import { CHART_ELIGIBLE_COLS, isChartEligible } from '#lib/utils/columnCharts.js';
-	import { isChartOn, loadChartFlags, setChartFlag } from '#lib/utils/columnChartSettings.js';
-	import { topBottom, type TopBottom } from '#lib/utils/columnStats.js';
 	import {
 		COLUMN_VIEW_LABEL,
 		clearLayout,
@@ -93,7 +55,7 @@
 	import ArrowUpDownIcon from '@lucide/svelte/icons/arrow-up-down';
 	import CellPopover, { type PopoverState } from '#lib/components/CellPopover.svelte';
 	import { buildPopoverState, createHoverController } from '#lib/utils/tooltipHover.js';
-	import { onDestroy, untrack } from 'svelte';
+	import { onDestroy } from 'svelte';
 	import ListOrderedIcon from '@lucide/svelte/icons/list-ordered';
 	import DataModeToggle from '#lib/components/DataModeToggle.svelte';
 	import FilterChips from '#lib/components/FilterChips.svelte';
@@ -102,6 +64,11 @@
 	import LibraryCardList from '#lib/components/library/LibraryCardList.svelte';
 	import { buildLibraryColumnDefs } from '#lib/components/library/columns.js';
 	import { createGridHandle } from '#lib/utils/gridHandle.svelte.js';
+	import { createLibraryExport } from '#lib/components/library/libraryExport.svelte.js';
+	import { createColumnCharts } from '#lib/components/library/columnCharts.svelte.js';
+	import { useLibraryList } from '#lib/queries/content/useLibraryList.svelte.js';
+	import { createLibraryViewState } from '#lib/components/library/libraryViewState.svelte.js';
+	import { useViewerPerspectives } from '#lib/queries/perspectives/viewerPerspectives.js';
 	import AddToPlanDialog from '#lib/components/plan/AddToPlanDialog.svelte';
 	import CategoryTypeahead from '#lib/components/CategoryTypeahead.svelte';
 	import { useSetPrimaryCategory } from '#lib/queries/categories/useSetPrimaryCategory.js';
@@ -155,7 +122,7 @@
 	function openPerspective(contentId: string, name: string) {
 		popoverContentId = parseInt(contentId, 10);
 		popoverContentName = name;
-		popoverExistingPerspective = perspectivesByContentId.get(contentId) ?? null;
+		popoverExistingPerspective = perspectivesByContentId.get(contentId)?.[0] ?? null;
 		popoverOpen = true;
 	}
 
@@ -186,9 +153,10 @@
 
 	// Mobile card-list breakpoint (< 860px) — replaces the AG Grid entirely, per design handoff.
 	const card = useCardMode();
+	const grid = createGridHandle<ContentItem>();
+	const exporter = createLibraryExport({ grid, normalDomLayout: () => normalDomLayout });
 	// Export's As-seen print keeps the grid mounted even though a Letter page matches the card query.
-	let printingAsSeen = $state(false);
-	const cardMode = $derived(card.current && !printingAsSeen);
+	const cardMode = $derived(card.current && !exporter.printingAsSeen);
 
 	// Signed-in user — drives the admin-only "Internal" group in the column picker.
 	const meCtx = useMe();
@@ -221,123 +189,6 @@
 		gridApi.setColumnsVisible([colId], next);
 		layoutVersion++;
 	}
-
-	// ---------------------------------------------------------------------------
-	// Column charts (numeric columns in the Movie view, "Loaded" mode, desktop grid)
-	// ---------------------------------------------------------------------------
-
-	/** Chart-capable in this view (movie view, "Loaded" mode, desktop grid); drives the header template. */
-	function chartEligibleHere(colId: string): boolean {
-		return mode === 'loaded' && !cardMode && isChartEligible(colId, filters.type);
-	}
-
-	// The grid's stock header template plus a chart button, placed after the label so a click on it does not sort.
-	const CHART_BUTTON_SVG =
-		'<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="6" y1="20" x2="6" y2="12"/><line x1="12" y1="20" x2="12" y2="5"/><line x1="18" y1="20" x2="18" y2="9"/></svg>';
-	/**
-	 * Lets the keyboard reach the chart button inside a header cell. Keys pressed on the button are left
-	 * to the browser (Enter/Space click it) instead of the grid (where Enter would sort); Tab from the
-	 * header cell itself goes into the button when one is showing. Everything else keeps the grid's behaviour.
-	 */
-	function suppressChartKeyboard(params: { event: KeyboardEvent }): boolean {
-		const { event } = params;
-		const target = event.target as HTMLElement | null;
-		if (!target) return false;
-		if (target.closest('[data-chart-col]')) return true;
-		if (event.key === 'Tab' && !event.shiftKey && target.classList.contains('ag-header-cell')) {
-			return target.querySelector('[data-chart-col]:not([hidden])') !== null;
-		}
-		return false;
-	}
-
-	function chartHeaderParams(colId: string, label: string): { template?: string } {
-		if (!chartEligibleHere(colId)) return {};
-		const hidden = chartIconVisible(colId) ? '' : ' hidden';
-		return {
-			template: `<div class="ag-cell-label-container" role="presentation">
-				<span data-ref="eMenu" class="ag-header-icon ag-header-cell-menu-button" aria-hidden="true"></span>
-				<span data-ref="eFilterButton" class="ag-header-icon ag-header-cell-filter-button" aria-hidden="true"></span>
-				<div data-ref="eLabel" class="ag-header-cell-label" role="presentation">
-					<span data-ref="eText" class="ag-header-cell-text"></span>
-					<span data-ref="eFilter" class="ag-header-icon ag-header-label-icon ag-filter-icon" aria-hidden="true"></span>
-					<ag-sort-indicator data-ref="eSortIndicator"></ag-sort-indicator>
-				</div>
-				<button type="button" data-chart-col="${colId}" data-testid="column-chart-button-${colId}" aria-label="Chart ${label.replace(/"/g, '&quot;')}" title="Show chart" class="text-muted-foreground hover:text-foreground ml-1 rounded-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"${hidden}>${CHART_BUTTON_SVG}</button>
-			</div>`,
-		};
-	}
-
-	/** The header chart icon shows only when every one of these holds. */
-	function chartIconVisible(colId: string): boolean {
-		return chartEligibleHere(colId) && gridApi?.getColumn(colId)?.isVisible() === true && isChartOn(colId);
-	}
-
-	/**
-	 * The numbers the grid currently shows for a column: post-filter, post-sort,
-	 * read through the column's own valueGetter. `total` counts every shown row,
-	 * including those with no value. Null when the grid isn't available.
-	 */
-	function chartRows(colId: string): { values: number[]; names: string[]; total: number; ranked: TopBottom } | null {
-		const api = gridApi;
-		if (!api || api.isDestroyed()) return null;
-		const column = api.getColumn(colId);
-		const colDef = column?.getColDef();
-		if (!column || !colDef) return null;
-		const rows: { name: string; value: number | null }[] = [];
-		api.forEachNodeAfterFilterAndSort((node) => {
-			if (!node.data) return;
-			let v: unknown = api.getCellValue({ rowNode: node, colKey: column });
-			// Duration displays as text; its numeric (seconds) form is the filter value.
-			if (colId === 'duration' && typeof v !== 'number' && typeof colDef.filterValueGetter === 'function') {
-				v = (colDef.filterValueGetter as (p: unknown) => unknown)({ data: node.data, node, colDef, column, api });
-			}
-			rows.push({ name: node.data.name, value: typeof v === 'number' && Number.isFinite(v) ? v : null });
-		});
-		const values = rows.flatMap((r) => (r.value === null ? [] : [r.value]));
-		// Parallel to `values`: the movie behind each charted number, for the chart readout.
-		const names = rows.flatMap((r) => (r.value === null ? [] : [r.name]));
-		return {
-			values,
-			names,
-			total: rows.length,
-			ranked: topBottom(
-				rows,
-				(r) => r.value,
-				(r) => r.name,
-				10,
-			),
-		};
-	}
-
-	function chartFormat(colId: string): (n: number) => string {
-		if (colId === 'duration') return (n) => formatDurationMinutes(n);
-		const fmt = gridApi?.getColumn(colId)?.getColDef().valueFormatter;
-		if (typeof fmt === 'function') return (n) => String((fmt as (p: unknown) => unknown)({ value: n }));
-		return (n) => String(Math.round(n * 100) / 100);
-	}
-
-	let chartTarget = $state<{ colId: string; label: string; anchor: HTMLElement; keyboard: boolean } | null>(null);
-	let chartTick = $state(0); // bumps when the grid's rows change (filter, sort, new data)
-	const chartData = $derived.by(() => {
-		void chartTick;
-		return chartTarget ? chartRows(chartTarget.colId) : null;
-	});
-
-	function openChart(anchor: HTMLElement, colId: string, keyboard = false) {
-		const label = gridApi?.getColumn(colId)?.getColDef().headerName ?? colId;
-		chartTarget = { colId, label, anchor, keyboard };
-	}
-
-	function handleChartChange(colId: string, on: boolean) {
-		setChartFlag(colId, on);
-		layoutVersion++;
-	}
-
-	// Columns the picker offers a chart switch for are derived below (pickerChartColumns), once `mode` exists.
-	const pickerChartFlags = $derived.by(() => {
-		void layoutVersion;
-		return loadChartFlags();
-	});
 
 	function handleColumnsReset() {
 		clearLayout(columnView);
@@ -386,61 +237,41 @@
 	// URL-derived state
 	// ---------------------------------------------------------------------------
 
-	// Derive grid params from current URL (reactive to URL changes)
-	const gridParams = $derived(parseGridParams(new URLSearchParams(page.url.search)));
+	// The Library's URL-backed view state (libraryViewState.svelte.ts). The list is created from it
+	// below; the cursor reset only runs from handlers, after both exist.
+	const view = createLibraryViewState({
+		url: {
+			search: () => page.url.search,
+			pathname: () => page.url.pathname,
+			navigate: (href, replace) => {
+				goto(href, { replace, reset: false });
+			},
+		},
+		resetCursors: () => list.resetCursors(),
+	});
 
-	// Individual derived fields from URL
-	const mode = $derived(gridParams.mode);
-	// Columns the picker offers a chart switch for (see handleChartChange).
-	const pickerChartColumns = $derived(
-		mode === 'loaded' && !cardMode ? [...CHART_ELIGIBLE_COLS].filter((c) => isChartEligible(c, filters.type)) : [],
-	);
-	const sorts = $derived(gridParams.sorts);
-	const pageNum = $derived(gridParams.page); // 1-indexed
-	const pageSize = $derived(gridParams.pageSize);
-	const searchText = $derived(gridParams.q);
-	const filters = $derived(gridParams.filters);
+	const mode = $derived(view.mode);
+	const pageNum = $derived(view.pageNum); // 1-indexed
+	const pageSize = $derived(view.pageSize);
+	const filters = $derived(view.filters);
 	/** Which saved/default column set applies (columnLayouts.ts): Movie, or the general set. */
 	const columnView = $derived(columnViewFor(filters.type));
-	// `f.person` (TMDB id, optional `:cast`/`:director`): has no grid column, so it is tracked apart from the grid filter model.
-	const personFilter = $derived(parsePersonFilter(filters[PERSON_FILTER_KEY]));
+	const personFilter = $derived(view.personFilter);
 
 	/** Filter to movies crediting this person (clicking a name in the Cast cell). */
 	function filterByPerson(personId: string) {
 		hover.close();
-		cursors = [null];
-		updateUrl({ filters: { ...gridParams.filters, [PERSON_FILTER_KEY]: personId }, page: 1 });
-	}
-
-	// ---------------------------------------------------------------------------
-	// URL update helper
-	// ---------------------------------------------------------------------------
-
-	function updateUrl(changes: Partial<GridParams>, replace = true) {
-		const updated = { ...gridParams, ...changes };
-		const search = serializeGridParams(updated);
-		const url = search ? `?${search}` : page.url.pathname;
-		goto(url, { replace, reset: false });
+		view.filterByPerson(personId);
 	}
 
 	// ---------------------------------------------------------------------------
 	// Grid state
 	// ---------------------------------------------------------------------------
 
-	const grid = createGridHandle<ContentItem>();
 	const gridApi = $derived(grid.api);
 	const gridReady = $derived(grid.ready);
 	let displayedRowCount = $state<number | null>(null);
-	let debounceTimer: ReturnType<typeof setTimeout>;
-	let skipNextSortEvent = $state(false);
-	// Mirrors gridParams.sorts's role for "All Items" mode, but for "Loaded" (client)
-	// mode — client-mode sort state lives in the grid (when there's a grid) or, on the
-	// mobile card list where there's no grid at all, nowhere but here. Kept as the
-	// source of truth the SortPickerDialog reads/writes in "Loaded" mode, and used to
-	// manually sort rows for the card list when there's no AG Grid instance to do it.
-	let clientSorts = $state<SortSpec[]>([]);
 	let sortPickerOpen = $state(false);
-	let activeFilterModel = $state<Record<string, any>>({});
 	// Responsive tier: 'xs' (<445px), 'sm' (445-639px), 'md' (640-899px), 'lg' (900px+)
 	const responsive = useResponsiveTier();
 	const responsiveTier = $derived(responsive.current);
@@ -453,97 +284,31 @@
 	// the +/glasses affordance reflects the signed-in user as soon as `me` resolves.
 	const currentUserId = $derived(meCtx.me ? parseInt(meCtx.me.id, 10) : null);
 
-	// TanStack Query for user's perspectives — used to determine +/glasses icon per row
-	const perspectivesQuery = createQuery(() => ({
-		queryKey: queryKeys.perspectives.listByUser(currentUserId ?? 0),
-		queryFn: () =>
-			graphqlRequest<ListPerspectivesByUserResponse>(LIST_PERSPECTIVES_BY_USER, {
-				userID: currentUserId,
-				first: MAX_PERSPECTIVES_PER_LIST,
-			}),
-		enabled: currentUserId !== null,
-		staleTime: 60 * 1000,
-	}));
+	// The user's perspectives — used to determine +/glasses icon per row
+	const perspectives = useViewerPerspectives(() => currentUserId);
 
-	// O(1) lookup map: contentID → PerspectiveItem
-	const perspectivesByContentId = $derived(
-		(() => {
-			const map = new Map<string, PerspectiveItem>();
-			const items = perspectivesQuery.data?.perspectives?.items ?? [];
-			for (const p of items) {
-				if (p.contentID) map.set(p.contentID, p);
-			}
-			return map;
-		})(),
-	);
+	// contentID → the viewer's perspectives on that item, latest first
+	const perspectivesByContentId = $derived(perspectives.byContent);
 
 	// Set of content ids the user has a perspective on — passed to the mobile card
 	// list so it can show the glasses (edit) vs "+" (add) affordance, matching the grid.
 	const perspectiveContentIds = $derived(new Set(perspectivesByContentId.keys()));
-
-	// Cursor stack for cursor-based pagination
-	// Index = page number (1-indexed: cursors[0] = null for page 1, cursors[1] = cursor for page 2, etc.)
-	let cursors = $state<(string | null)[]>([null]);
-	const currentCursor = $derived(cursors[pageNum - 1] ?? null); // 1-indexed page → 0-indexed cursor array
-
-	// ---------------------------------------------------------------------------
-	// Data fetching (mode-conditional)
-	// ---------------------------------------------------------------------------
-
-	// Key and LIST_CONTENT variables come from one builder (lib/queries/content/libraryList.ts),
-	// so the cache key cannot drift from the request. Captured in the options getter so queryFn
-	// sends the variables its key was built from.
-	const libraryRequest = $derived(libraryListRequest(gridParams, currentCursor));
-
-	const contentQuery = createQuery(() => {
-		const request = libraryRequest;
-		return {
-			queryKey: request.queryKey,
-			queryFn: async () => {
-				return graphqlRequest<ContentResponse>(LIST_CONTENT, request.variables);
-			},
-			placeholderData: keepPreviousData,
-			staleTime: LIBRARY_LIST_STALE_TIME_MS,
-		};
-	});
-
-	// Advance the cursor stack from the loaded page, not from inside queryFn: a cache hit (the route
-	// prefetch, or a remount inside staleTime) never runs queryFn, so Next would stall on page 1.
-	// Placeholder data (keepPreviousData: the previous page while this one loads) is skipped.
-	$effect(() => {
-		const data = contentQuery.data;
-		const placeholder = contentQuery.isPlaceholderData;
-		const isAll = mode === 'all';
-		const page = pageNum;
-		if (!data || placeholder || !isAll) return;
-		const pageInfo = data.content.pageInfo;
-		untrack(() => {
-			cursors = cursorsAfterPage(cursors, page, pageInfo);
-		});
-	});
-
-	// Derived values from query
-	// Rows get their adder's username from the cached users list (see useUsernames).
-	const usernames = useUsernames();
-	// The default server order (updatedAt desc) can put an edited row first on a refetch, so the row
-	// jumps out of view. Keep rows where they were while the list (its query key) stays the same.
-	const rowOrder = createRowOrderMemory();
-	const rowData = $derived(
-		rowOrder.apply(
-			hashKey(libraryRequest.queryKey),
-			(contentQuery.data?.content.items ?? []).map((item) => ({
-				...item,
-				addedByUsername: usernames.byId.get(item.addedByUserID) ?? null,
-			})),
-			contentQuery.isPlaceholderData,
+	// The AG Grid cell renderers read one perspective per row; the first entry is the most recently updated.
+	const gridPerspectivesByContentId = $derived(
+		new Map<string, PerspectiveItem>(
+			[...perspectivesByContentId].map(([contentId, list]) => [contentId, list[0]] as const),
 		),
 	);
+
+	// The content list for the current URL params: rows, counts, and the cursor stack for "All" mode.
+	const list = useLibraryList(() => view.params);
+	const rowData = $derived(list.rows);
 	const detailsModalRow = $derived(rowData.find((item) => String(item.id) === detailsModalContentId) ?? null);
 	// A deep-linked item (`?open=<id>`, e.g. from a "Go to" toast or a verse jump) is
 	// often not on the loaded page — fetch just that row so the modal can still open.
 	const detailsFallbackQuery = useContentDetails(
 		() => detailsModalContentId,
-		() => detailsModalRow === null && !contentQuery.isPending,
+		() => detailsModalRow === null && !list.isPending,
 	);
 	const detailsModalContent = $derived(detailsModalRow ?? detailsFallbackQuery.data?.contentByID ?? null);
 
@@ -558,7 +323,7 @@
 		const search = params.toString();
 		goto(search ? `?${search}` : page.url.pathname, { replace: true, reset: false });
 	});
-	const totalCount = $derived(contentQuery.data?.content.totalCount ?? 0);
+	const totalCount = $derived(list.totalCount);
 	// The grid reports its displayed (post-filter) row count through onModelUpdated, which also
 	// fires when row data is replaced under an active filter; the count is cleared on grid teardown.
 	$effect(() => {
@@ -566,7 +331,7 @@
 		hover.close(); // AG Grid recycles cell DOM; a stale anchor would mislead
 	});
 	const loadedItemsCount = $derived(displayedRowCount ?? rowData.length);
-	const loading = $derived(contentQuery.isLoading || contentQuery.isPlaceholderData);
+	const loading = $derived(list.loading);
 	// Chip text for the person filter: the name from any loaded row, else the bare TMDB id.
 	const personChipLabel = $derived.by(() => {
 		if (!personFilter) return '';
@@ -576,119 +341,32 @@
 		}
 		return `TMDB #${personFilter.id}`;
 	});
-	const chipFilterModel = $derived<Record<string, any>>({
-		...(gridApi ? activeFilterModel : urlParamsToFilter(filters)),
-		...(personFilter ? { [PERSON_FILTER_KEY]: { filterType: 'person', filter: personChipLabel } } : {}),
-	});
-	const hasActiveFilters = $derived(Object.keys(filters).length > 0 || searchText !== '');
+	const chipFilterModel = $derived(view.chips(personChipLabel));
+	const hasActiveFilters = $derived(view.hasActiveFilters);
 
 	// ---------------------------------------------------------------------------
 	// Mode switch handler
 	// ---------------------------------------------------------------------------
 
-	// True when sorting is anything other than the default single updatedAt/desc —
-	// i.e. multiple sorted columns, a single non-default column, or explicitly cleared.
-	const hasActiveSort = $derived(
-		mode === 'loaded'
-			? clientSorts.length > 0
-			: sorts.length !== 1 || sorts[0].col !== 'updatedAt' || sorts[0].dir !== 'desc',
-	);
+	const hasActiveSort = $derived(view.hasActiveSort);
+	/** What the SortPickerDialog shows: the Loaded-mode list, or the URL sorts the server can honour. */
+	const activeSorts = $derived(view.activeSorts);
 
-	// What the SortPickerDialog reads/writes — the URL list in "All Items" mode,
-	// the grid-mirroring state in "Loaded" mode (works with or without a live grid).
-	const activeSorts = $derived(mode === 'loaded' ? clientSorts : sorts);
-
-	// The mobile card list has no AG Grid instance to sort or filter for it. In "All
-	// Items" mode the server already returned rows in the requested (and filtered)
-	// order; in "Loaded" mode, apply clientSorts and the URL filters by hand, or the
-	// mobile card view would silently ignore every column filter. On desktop, AG Grid
-	// does both itself, so this is a no-op there.
-	const sortedRowData = $derived(
-		mode === 'loaded' && cardMode
-			? (() => {
-					const byColumns = filterContentRows(rowData, urlParamsToFilter(filters));
-					const filtered = personFilter ? byColumns.filter((r) => rowMatchesPerson(r, personFilter)) : byColumns;
-					return clientSorts.length > 0
-						? [...filtered].sort((a, b) => compareContentBySorts(a, b, clientSorts))
-						: filtered;
-				})()
-			: rowData,
-	);
-
-	/**
-	 * Clear all sorting. In "Loaded" mode, reset both our own tracking state and (when
-	 * a grid exists) AG Grid's — the mobile card list has no grid, so clientSorts alone
-	 * drives it. In "All Items" mode, sorting is server-side via the URL — push an
-	 * explicit empty sort list (distinct from the param being absent, which means
-	 * "default") so the grid/cards show unsorted server order.
-	 */
+	/** Clear all sorting. In "Loaded" mode the grid's sort state is cleared too; the view state owns the rest. */
 	function handleClearSorts() {
-		if (mode === 'loaded') {
-			clientSorts = [];
-			gridApi?.applyColumnState({ defaultState: { sort: null } });
-		} else {
-			cursors = [null];
-			updateUrl({ sorts: [], page: 1 });
-		}
+		view.clearSorts();
+		if (mode === 'loaded') gridApi?.applyColumnState({ defaultState: { sort: null } });
 	}
 
-	/**
-	 * Apply a full replacement sort list from the SortPickerDialog. In "All Items"
-	 * mode this is just another URL update (identical to what onSortChanged does for
-	 * grid-driven sorts). In "Loaded" mode, update our own tracking state and, when a
-	 * grid exists, mirror it there too — on mobile (no grid), clientSorts alone drives
-	 * the card list via sortedRowData above.
-	 */
+	/** Apply a full replacement sort list from the SortPickerDialog; in "Loaded" mode the grid mirrors it. */
 	function handleSortsApply(newSorts: SortSpec[]) {
-		if (mode === 'all') {
-			cursors = [null];
-			updateUrl({ sorts: newSorts, page: 1 });
-			return;
+		view.setSorts(newSorts);
+		if (mode === 'loaded') {
+			gridApi?.applyColumnState({
+				state: newSorts.map((s, i) => ({ colId: s.col, sort: s.dir, sortIndex: i })),
+				defaultState: { sort: null },
+			});
 		}
-		clientSorts = newSorts;
-		gridApi?.applyColumnState({
-			state: newSorts.map((s, i) => ({ colId: s.col, sort: s.dir, sortIndex: i })),
-			defaultState: { sort: null },
-		});
-	}
-
-	function handleModeToggle(newMode: DataMode) {
-		// Reset pagination when switching modes
-		cursors = [null];
-		if (newMode === 'loaded') clientSorts = [];
-
-		// When switching Loaded → All: sync AG Grid filter state to URL params
-		if (newMode === 'all' && gridApi) {
-			const filterModel = gridApi.getFilterModel();
-			const urlFilters = {
-				...filterToUrlParams(filterModel as Record<string, unknown>),
-				...nonGridFilters(gridParams.filters),
-			};
-			updateUrl({ mode: newMode, page: 1, filters: urlFilters });
-		} else {
-			updateUrl({ mode: newMode, page: 1 });
-		}
-	}
-
-	// ---------------------------------------------------------------------------
-	// Pagination handlers
-	// ---------------------------------------------------------------------------
-
-	function handleNextPage() {
-		if (pageNum < Math.ceil(totalCount / pageSize)) {
-			updateUrl({ page: pageNum + 1 });
-		}
-	}
-
-	function handlePrevPage() {
-		if (pageNum > 1) {
-			updateUrl({ page: pageNum - 1 });
-		}
-	}
-
-	function handlePageSizeChange(newSize: number) {
-		cursors = [null];
-		updateUrl({ pageSize: newSize, page: 1 });
 	}
 
 	// ---------------------------------------------------------------------------
@@ -699,7 +377,18 @@
 
 	const theme = LIBRARY_GRID_THEME;
 
-	const columnDefs = buildLibraryColumnDefs({ chartHeaderParams, suppressChartKeyboard });
+	// Column charts (numeric columns in the Movie view, "Loaded" mode, desktop grid).
+	const charts = createColumnCharts({
+		grid,
+		view: () => ({ mode, cardMode, typeFilter: filters.type, layoutVersion }),
+		container: () => gridContainer,
+		onFlagChange: () => layoutVersion++,
+	});
+
+	const columnDefs = buildLibraryColumnDefs({
+		chartHeaderParams: charts.headerParams,
+		suppressChartKeyboard: charts.suppressKeyboard,
+	});
 
 	// ---------------------------------------------------------------------------
 	// AG Grid options (mode-conditional event handlers)
@@ -729,7 +418,10 @@
 		);
 	}
 
-	onDestroy(() => hover.destroy());
+	onDestroy(() => {
+		hover.destroy();
+		view.dispose();
+	});
 
 	const gridOptions: GridOptions<ContentItem> = {
 		columnDefs,
@@ -778,41 +470,17 @@
 		...grid.options({ onDetach: () => (displayedRowCount = null) }),
 		onSortChanged: (event: SortChangedEvent) => {
 			hover.close();
-			// In "Loaded" mode, AG Grid handles client-side sort (including multi-column
-			// via shift-click) entirely on its own — mirror its sort state into
-			// clientSorts (read by "Clear sorts", the SortPickerDialog, and the mobile
-			// card list, which has no grid of its own), then skip the URL update.
-			if (mode === 'loaded') {
-				clientSorts = event.api
-					.getColumnState()
-					.filter((col) => col.sort)
-					.sort((a, b) => (a.sortIndex ?? 0) - (b.sortIndex ?? 0))
-					.map((col) => ({
-						col: col.colId ?? 'updatedAt',
-						dir: col.sort === 'asc' ? ('asc' as const) : ('desc' as const),
-					}));
-				return;
-			}
-			// Skip if we triggered this event programmatically (to avoid loop)
-			if (skipNextSortEvent) {
-				skipNextSortEvent = false;
-				return;
-			}
-
-			// Server-side: read every sorted column (multi-column sort applies shift-click
-			// or ctrl-click in AG Grid), in priority order, and push the whole list to the URL.
+			// Every sorted column in priority order (shift- or ctrl-click builds a multi-column sort).
 			const sortModel = event.api
 				.getColumnState()
 				.filter((col) => col.sort)
 				.sort((a, b) => (a.sortIndex ?? 0) - (b.sortIndex ?? 0));
-
-			const newSorts: SortSpec[] = sortModel.map((col) => ({
-				col: col.colId ?? 'updatedAt',
-				dir: col.sort === 'asc' ? 'asc' : 'desc',
-			}));
-
-			cursors = [null]; // Reset cursor stack
-			updateUrl({ sorts: newSorts.length > 0 ? newSorts : [], page: 1 });
+			view.sortsFromGrid(
+				sortModel.map((col) => ({
+					col: col.colId ?? 'updatedAt',
+					dir: col.sort === 'asc' ? 'asc' : 'desc',
+				})),
+			);
 		},
 		// The person filter has no column, so "Loaded" mode applies it here, alongside the column filters.
 		isExternalFilterPresent: () => personFilter != null,
@@ -822,28 +490,9 @@
 		},
 		onFilterChanged: (event: FilterChangedEvent) => {
 			hover.close();
-			// Immediate: update chip display
-			activeFilterModel = event.api.getFilterModel();
 			displayedRowCount = event.api.getDisplayedRowCount();
-
-			// Debounce → convert filter model → update URL. In "Loaded" mode AG Grid already
-			// filtered client-side; the URL write just keeps the URL authoritative, so a
-			// cleared default filter (f=none) isn't re-applied by the restore effect below.
-			clearTimeout(debounceTimer);
-			debounceTimer = setTimeout(() => {
-				const filterModel = event.api.getFilterModel();
-				const urlFilters = {
-					...filterToUrlParams(filterModel as Record<string, unknown>),
-					...nonGridFilters(gridParams.filters),
-				};
-				if (filtersEqual(urlFilters, gridParams.filters)) return;
-				if (mode === 'loaded') {
-					updateUrl({ filters: urlFilters });
-					return;
-				}
-				cursors = [null];
-				updateUrl({ filters: urlFilters, page: 1 });
-			}, 500);
+			// The view state shows the model at once and writes it to the URL after a short debounce.
+			view.gridFilterChanged(event.api.getFilterModel());
 		},
 		// Prevent AG Grid from client-side re-sorting data that arrives pre-sorted from server
 		postSortRows: () => {
@@ -858,16 +507,12 @@
 	// Effects
 	// ---------------------------------------------------------------------------
 
-	// Sync AG Grid sort indicators to URL state when switching to "All Items" mode
-	// Uses skipNextSortEvent flag to prevent onSortChanged from re-updating the URL
+	// Sync AG Grid sort indicators to the URL's server sorts in "All Items" mode. The echoed
+	// sortChanged event matches those sorts, so onSortChanged leaves the URL alone.
 	$effect(() => {
 		if (!gridApi || !gridReady || mode !== 'all') return;
-		skipNextSortEvent = true;
 		gridApi.applyColumnState({
-			// Drop client-only columns (a stale URL sort): the server cannot honour them.
-			state: gridParams.sorts
-				.filter((s) => !CLIENT_ONLY_SORT_COLS.includes(s.col))
-				.map((s, i) => ({ colId: s.col, sort: s.dir, sortIndex: i })),
+			state: view.serverSorts.map((s, i) => ({ colId: s.col, sort: s.dir, sortIndex: i })),
 			defaultState: { sort: null },
 		});
 	});
@@ -898,7 +543,7 @@
 	$effect(() => {
 		const api = grid.live();
 		if (!api) return;
-		const filterModel = urlParamsToFilter(gridParams.filters);
+		const filterModel = urlParamsToFilter(view.filters);
 		api.setFilterModel(Object.keys(filterModel).length > 0 ? filterModel : null);
 	});
 
@@ -941,7 +586,7 @@
 	$effect(() => {
 		if (gridApi) {
 			gridApi.setGridOption('context', {
-				perspectivesByContentId,
+				perspectivesByContentId: gridPerspectivesByContentId,
 				onOpenDetails: handleOpenDetails,
 			});
 			gridApi.refreshCells({ columns: ['perspectize', 'myQuality', 'myImportance', 'myAgreement'], force: true });
@@ -990,73 +635,9 @@
 
 	// Export: the grid is read at click time, so the output matches what the toolbar shows.
 	const exportDisabled = $derived(isExportDisabled({ gridReady, loading, displayedRows: loadedItemsCount }));
-	let printOptionsOpen = $state(false);
-	let printList = $state<{ table: ExportTable; title: string; spacing: PrintSpacing } | null>(null);
 
 	// The grid's resting layout; a print run restores this, not a fixed value.
 	const normalDomLayout = $derived(isMobile ? 'autoHeight' : 'normal');
-
-	function reportPrintFailure(err: unknown) {
-		toast.error(err instanceof Error ? `Could not print: ${err.message}` : 'Could not print');
-	}
-
-	function exportApi(): ExportGridApi | null {
-		return grid.live() as unknown as ExportGridApi | null;
-	}
-
-	function handleDownloadCsv() {
-		const api = exportApi();
-		if (api) downloadWithToast(() => downloadLibraryCsv(api));
-	}
-
-	function handleCopy() {
-		const api = exportApi();
-		if (api) void copyWithToast(() => copyLibraryTable(api));
-	}
-
-	async function handlePrintAsSeen() {
-		const api = gridApi;
-		if (!api) return;
-		try {
-			await runPrint('grid', {
-				before: async () => {
-					printingAsSeen = true;
-					addLandscapePageStyle();
-					api.setGridOption('domLayout', 'print');
-					// AG Grid lays out the rows on a later frame; printing sooner can print a half-rendered grid.
-					await new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));
-					if (api.isDestroyed()) throw new Error('The table was closed before printing');
-				},
-				after: () => {
-					printingAsSeen = false;
-					removeLandscapePageStyle();
-					if (!api.isDestroyed()) api.setGridOption('domLayout', normalDomLayout);
-				},
-			});
-		} catch (err) {
-			reportPrintFailure(err);
-		}
-	}
-
-	async function handlePrintAsList({ title, spacing }: { title: string; spacing: PrintSpacing }) {
-		const api = gridApi;
-		if (!api) return;
-		try {
-			const table = readExportTable(api as unknown as ExportGridApi, 'print');
-			await runPrint('list', {
-				before: async () => {
-					printList = { table, title, spacing };
-					await tick();
-				},
-				after: () => {
-					printList = null;
-				},
-			});
-		} catch (err) {
-			printList = null;
-			reportPrintFailure(err);
-		}
-	}
 
 	// Switch to autoHeight on mobile — eliminates empty gap below last row
 	$effect(() => {
@@ -1077,55 +658,6 @@
 		observer.observe(gridContainer);
 		return () => observer.disconnect();
 	});
-	// Re-draw the headers when something the chart icon depends on changes (the picker
-	// switch, mode, card mode, type filter); the header component re-reads chartIconVisible.
-	$effect(() => {
-		if (!gridApi || !gridReady) return;
-		void layoutVersion;
-		void mode;
-		void cardMode;
-		void filters.type;
-		grid.afterFrame((api) => {
-			api.refreshHeader();
-			// Show/hide each chart button to match its column's current state.
-			gridContainer?.querySelectorAll<HTMLElement>('[data-chart-col]').forEach((btn) => {
-				btn.hidden = !chartIconVisible(btn.dataset.chartCol ?? '');
-			});
-		});
-	});
-
-	// One delegated listener for every chart button (headers are rebuilt by the grid).
-	$effect(() => {
-		const el = gridContainer;
-		if (!el) return;
-		const onClick = (e: MouseEvent) => {
-			const btn = (e.target as HTMLElement | null)?.closest<HTMLElement>('[data-chart-col]');
-			if (!btn?.dataset.chartCol) return;
-			e.stopPropagation();
-			// A click from Enter/Space has detail 0; the popover then takes focus.
-			openChart(btn.closest<HTMLElement>('.ag-header-cell') ?? btn, btn.dataset.chartCol, e.detail === 0);
-		};
-		el.addEventListener('click', onClick);
-		return () => el.removeEventListener('click', onClick);
-	});
-
-	// An open chart closes when its icon no longer applies; it re-reads when the shown rows change.
-	$effect(() => {
-		void layoutVersion;
-		void mode;
-		void cardMode;
-		void filters.type;
-		if (chartTarget && !chartIconVisible(chartTarget.colId)) chartTarget = null;
-	});
-	$effect(() => {
-		const api = gridApi;
-		if (!api || !gridReady) return;
-		const bump = () => chartTick++;
-		api.addEventListener('modelUpdated', bump);
-		return () => {
-			if (!api.isDestroyed()) api.removeEventListener('modelUpdated', bump);
-		};
-	});
 </script>
 
 <div class="flex flex-col h-full gap-0">
@@ -1133,21 +665,9 @@
 	<FilterChips
 		{gridApi}
 		filterModel={chipFilterModel}
-		onRemove={(colId) => {
-			const next = { ...gridParams.filters };
-			delete next[colId];
-			cursors = [null];
-			updateUrl({ filters: next, page: 1 });
-		}}
-		onClearAll={() => {
-			cursors = [null];
-			updateUrl({ filters: {}, page: 1 });
-		}}
-		onClearAllButType={() => {
-			cursors = [null];
-			const { type } = gridParams.filters;
-			updateUrl({ filters: type ? { type } : {}, page: 1 });
-		}}
+		onRemove={(colId) => view.removeFilter(colId)}
+		onClearAll={() => view.clearFilters()}
+		onClearAllButType={() => view.clearFiltersKeepType()}
 	/>
 
 	<!-- Mixed/unfiltered types share one column set, so many cells are blank. The card list
@@ -1161,7 +681,7 @@
 	{/if}
 
 	<!-- Error State -->
-	{#if contentQuery.isError}
+	{#if list.isError}
 		<div class="flex-1 min-h-0 flex items-center justify-center">
 			<div class="text-center py-12 px-4">
 				<p class="text-muted-foreground mb-2">Failed to load content. Please try again.</p>
@@ -1171,7 +691,7 @@
 					</p>
 				{/if}
 				<button
-					onclick={() => contentQuery.refetch()}
+					onclick={() => list.refetch()}
 					class="px-4 py-2 text-sm font-medium border border-input rounded-md bg-background hover:bg-accent"
 				>
 					Retry
@@ -1181,7 +701,7 @@
 	{:else if cardMode}
 		<div class="flex-1 min-h-0 overflow-y-auto">
 			<LibraryCardList
-				rowData={sortedRowData}
+				rowData={view.cardRows(rowData)}
 				{perspectiveContentIds}
 				onOpenDetails={handleOpenDetails}
 				onAddPerspective={handleAddPerspectiveFromCard}
@@ -1215,7 +735,7 @@
 				{totalCount} total
 			</div>
 			<!-- Data Mode Toggle -->
-			<DataModeToggle {mode} loadedCount={loadedItemsCount} onToggle={handleModeToggle} />
+			<DataModeToggle {mode} loadedCount={loadedItemsCount} onToggle={(next) => view.setMode(next)} />
 			{#if !cardMode}
 				<button
 					type="button"
@@ -1229,8 +749,8 @@
 				</button>
 			{/if}
 			<!-- Sort controls — shown on mobile too (unlike Columns): the picker doesn't
-			     depend on AG Grid, and the mobile card list has its own sort applied via
-			     sortedRowData/clientSorts, so there's no grid-readiness gate here. -->
+			     depend on AG Grid, and the mobile card list sorts through the view state
+			     (cardRows), so there's no grid-readiness gate here. -->
 			<button
 				type="button"
 				aria-label="Edit sorts"
@@ -1254,10 +774,10 @@
 			{#if !cardMode}
 				<ExportMenu
 					disabled={exportDisabled}
-					onDownloadCsv={handleDownloadCsv}
-					onCopy={handleCopy}
-					onPrintAsSeen={handlePrintAsSeen}
-					onPrintAsList={() => (printOptionsOpen = true)}
+					onDownloadCsv={exporter.downloadCsv}
+					onCopy={exporter.copy}
+					onPrintAsSeen={exporter.printAsSeen}
+					onPrintAsList={() => (exporter.printOptionsOpen = true)}
 				/>
 			{/if}
 			{#if mode === 'all'}
@@ -1266,7 +786,7 @@
 					<select
 						id="pageSize"
 						value={pageSize}
-						onchange={(e) => handlePageSizeChange(Number(e.currentTarget.value))}
+						onchange={(e) => view.setPageSize(Number(e.currentTarget.value))}
 						class="px-2 py-1 text-sm border border-input rounded-md bg-background"
 					>
 						<option value={10}>10</option>
@@ -1280,18 +800,18 @@
 		{#if mode === 'all'}
 			<div class="flex items-center gap-2">
 				<button
-					onclick={handlePrevPage}
+					onclick={() => view.prevPage()}
 					disabled={pageNum <= 1}
 					class="px-3 py-1 text-sm border border-input rounded-md bg-background hover:bg-accent disabled:opacity-50 disabled:cursor-not-allowed"
 				>
 					<span class="hidden sm:inline">Previous</span><span class="sm:hidden">&lt;</span>
 				</button>
 				<span class="text-muted-foreground">
-					Page {pageNum} of {Math.ceil(totalCount / pageSize) || 1}
+					Page {pageNum} of {view.pageCount(totalCount) || 1}
 				</span>
 				<button
-					onclick={handleNextPage}
-					disabled={pageNum >= Math.ceil(totalCount / pageSize)}
+					onclick={() => view.nextPage(totalCount)}
+					disabled={pageNum >= view.pageCount(totalCount)}
 					class="px-3 py-1 text-sm border border-input rounded-md bg-background hover:bg-accent disabled:opacity-50 disabled:cursor-not-allowed"
 				>
 					<span class="hidden sm:inline">Next</span><span class="sm:hidden">&gt;</span>
@@ -1347,39 +867,43 @@
 		{customLayout}
 		onToggle={handleColumnToggle}
 		onReset={handleColumnsReset}
-		chartColumns={pickerChartColumns}
-		chartFlags={pickerChartFlags}
-		onChartChange={handleChartChange}
+		chartColumns={charts.pickerColumns}
+		chartFlags={charts.pickerFlags}
+		onChartChange={charts.setFlag}
 	/>
 {/if}
 
 <!-- Column chart popover — anchored to the clicked header cell -->
-{#if chartTarget && chartData}
-	{#key chartTarget.colId}
+{#if charts.target && charts.data}
+	{#key charts.target.colId}
 		<ColumnChartPopover
-			colId={chartTarget.colId}
-			label={chartTarget.label}
-			values={chartData.values}
-			names={chartData.names}
-			total={chartData.total}
-			ranked={chartData.ranked}
-			format={chartFormat(chartTarget.colId)}
+			colId={charts.target.colId}
+			label={charts.target.label}
+			values={charts.data.values}
+			names={charts.data.names}
+			total={charts.data.total}
+			ranked={charts.data.ranked}
+			format={charts.format(charts.target.colId)}
 			open={true}
-			onClose={() => (chartTarget = null)}
-			anchor={chartTarget.anchor}
-			focusOnOpen={chartTarget.keyboard}
+			onClose={charts.close}
+			anchor={charts.target.anchor}
+			focusOnOpen={charts.target.keyboard}
 		/>
 	{/key}
 {/if}
 
 <!-- Print setup for "Print as list": mounted only while open, like the pickers. -->
-{#if printOptionsOpen}
-	<PrintOptionsDialog bind:open={printOptionsOpen} onPrint={handlePrintAsList} />
+{#if exporter.printOptionsOpen}
+	<PrintOptionsDialog bind:open={exporter.printOptionsOpen} onPrint={exporter.printAsList} />
 {/if}
 
 <!-- The print-only list; it portals itself to <body> and shows only under html[data-print='list']. -->
-{#if printList}
-	<PrintListView table={printList.table} title={printList.title} spacing={printList.spacing} />
+{#if exporter.printList}
+	<PrintListView
+		table={exporter.printList.table}
+		title={exporter.printList.title}
+		spacing={exporter.printList.spacing}
+	/>
 {/if}
 
 <!-- Sort picker — works identically on mobile and desktop, and in both data modes;

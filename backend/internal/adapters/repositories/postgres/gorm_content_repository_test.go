@@ -559,8 +559,9 @@ func TestGormContentRepository_List(t *testing.T) {
 		{"max view count", &domain.ContentFilter{MaxViewCount: cInt(9000)}, `'statistics'->>'viewCount'.*<= `},
 		{"min like count", &domain.ContentFilter{MinLikeCount: cInt(10)}, `'statistics'->>'likeCount'.*>= `},
 		{"max like count", &domain.ContentFilter{MaxLikeCount: cInt(90)}, `'statistics'->>'likeCount'.*<= `},
-		{"published after", &domain.ContentFilter{PublishedAfter: cStr("2026-01-01")}, `'snippet'->>'publishedAt' >= `},
-		{"published before", &domain.ContentFilter{PublishedBefore: cStr("2026-12-31")}, `'snippet'->>'publishedAt' <= `},
+		// The filter reads the same published-date expression as the sort, so a web page filters by its own date.
+		{"published after", &domain.ContentFilter{PublishedAfter: cStr("2026-01-01")}, `THEN response->>'publishedAt' ELSE response->'items'->0->'snippet'->>'publishedAt' END >= `},
+		{"published before", &domain.ContentFilter{PublishedBefore: cStr("2026-12-31")}, `THEN response->>'publishedAt' ELSE response->'items'->0->'snippet'->>'publishedAt' END <= `},
 		{"channel title", &domain.ContentFilter{ChannelTitle: cStr("chan")}, `'snippet'->>'channelTitle' ILIKE `},
 		{"tag contains", &domain.ContentFilter{TagContains: cStr("tag")}, `'snippet'->'tags'.*ILIKE `},
 		{"description search", &domain.ContentFilter{DescriptionSearch: cStr("desc")}, `'snippet'->>'description' ILIKE `},

@@ -195,8 +195,8 @@ func (r *queryResolver) Perspectives(ctx context.Context, first *int, after *str
 
 	result, err := r.PerspectiveService.ListPerspectives(ctx, params)
 	if err != nil {
-		if errors.Is(err, domain.ErrInvalidInput) {
-			return nil, fmt.Errorf("invalid pagination parameters: %w", err)
+		if domain.KindOf(err) == domain.KindInvalid {
+			return nil, invalidPagingError(err)
 		}
 		slog.Error("listing perspectives failed", "error", err)
 		return nil, fmt.Errorf("failed to list perspectives")
@@ -209,13 +209,8 @@ func (r *queryResolver) Perspectives(ctx context.Context, first *int, after *str
 	}
 
 	conn := &model.PaginatedPerspectives{
-		Items: items,
-		PageInfo: &model.PageInfo{
-			HasNextPage:     result.HasNext,
-			HasPreviousPage: result.HasPrev,
-			StartCursor:     result.StartCursor,
-			EndCursor:       result.EndCursor,
-		},
+		Items:      items,
+		PageInfo:   pageInfoToModel(result.HasNext, result.HasPrev, result.StartCursor, result.EndCursor),
 		TotalCount: result.TotalCount,
 	}
 

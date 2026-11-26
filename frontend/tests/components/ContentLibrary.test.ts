@@ -135,23 +135,6 @@ describe('ContentLibrary', () => {
 		expect(container).toBeTruthy();
 	});
 
-	it('imports TanStack Query dependencies correctly', () => {
-		// Verify imports work (createQuery, keepPreviousData, queryKeys)
-		// This is a compile-time check - if these imports fail, the test file won't load
-		expect(true).toBe(true);
-	});
-
-	it('component code uses required TanStack Query patterns', () => {
-		// Pattern verification via code inspection (automated in execution flow):
-		// - createQuery with function wrapper pattern
-		// - keepPreviousData for placeholder data
-		// - queryKeys.content.list() with all params (sortBy, sortOrder, search, first, after)
-		// - Derived values for rowData, totalCount, loading
-		// - No manual fetchData() function
-		// - Query invalidation for cache updates (no custom events)
-		expect(true).toBe(true);
-	});
-
 	it('refetches in Loaded mode when the search text changes (and again when cleared)', async () => {
 		// Regression test for the search bar not clearing/filtering: the query cache key must
 		// track the actual search text in "Loaded" mode, or TanStack Query never refetches when
@@ -348,13 +331,16 @@ describe('ContentLibrary', () => {
 	});
 
 	// The menu stays disabled under the mocked grid, so its items can't be opened here; ExportMenu.test.ts
-	// covers the items, and this pins that ContentLibrary hands the menu its CSV and Copy handlers.
-	it('passes the CSV and Copy handlers to the Export menu', async () => {
+	// covers the items, libraryExport.test.ts covers the handlers, and this pins that ContentLibrary
+	// hands the menu the exporter's handlers.
+	it('passes the export and print handlers to the Export menu', async () => {
 		const { readFileSync } = await import('node:fs');
 		const source = readFileSync('src/lib/components/library/ContentLibrary.svelte', 'utf8');
 		const tag = source.match(/<ExportMenu[\s\S]*?\n\s*\/>/)?.[0] ?? '';
-		expect(tag).toContain('onDownloadCsv={handleDownloadCsv}');
-		expect(tag).toContain('onCopy={handleCopy}');
+		expect(tag).toContain('onDownloadCsv={exporter.downloadCsv}');
+		expect(tag).toContain('onCopy={exporter.copy}');
+		expect(tag).toContain('onPrintAsSeen={exporter.printAsSeen}');
+		expect(tag).toContain('onPrintAsList={() => (exporter.printOptionsOpen = true)}');
 	});
 
 	it('omits the Export trigger in card mode', async () => {

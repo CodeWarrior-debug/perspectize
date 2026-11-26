@@ -479,7 +479,6 @@ describe('Movie default column set', () => {
 				'publishDate',
 				'views',
 				'likes',
-				'percentLiked',
 				'tags',
 			]),
 		);

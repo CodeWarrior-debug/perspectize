@@ -350,20 +350,17 @@ func (r *queryResolver) ThreadMessages(ctx context.Context, threadID string, fir
 	}
 
 	// History pages backwards from newest; a full page implies more to load.
-	page := &model.PageInfo{
-		HasNextPage:     false,
-		HasPreviousPage: len(msgs) == limit,
-	}
+	// Cursors are seqs, not message IDs: `before` is an IntID seq, so
+	// endCursor must be feedable straight back into it. Both are numeric
+	// strings, so emitting IDs here would page from the wrong position
+	// without any visible error.
+	var start, end *string
 	if len(items) > 0 {
-		// Cursors are seqs, not message IDs: `before` is an IntID seq, so
-		// endCursor must be feedable straight back into it. Both are numeric
-		// strings, so emitting IDs here would page from the wrong position
-		// without any visible error.
-		start := strconv.Itoa(items[0].Seq)
-		end := strconv.Itoa(items[len(items)-1].Seq)
-		page.StartCursor = &start
-		page.EndCursor = &end
+		s := strconv.Itoa(items[0].Seq)
+		e := strconv.Itoa(items[len(items)-1].Seq)
+		start, end = &s, &e
 	}
+	page := pageInfoToModel(false, len(msgs) == limit, start, end)
 	return &model.MessageConnection{Items: items, PageInfo: page}, nil
 }
 

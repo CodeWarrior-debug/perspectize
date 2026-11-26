@@ -376,15 +376,8 @@ func (s *PerspectiveService) Delete(ctx context.Context, id int, actorUserID int
 
 // ListPerspectives retrieves a paginated list of perspectives
 func (s *PerspectiveService) ListPerspectives(ctx context.Context, params domain.PerspectiveListParams) (*domain.PaginatedPerspectives, error) {
-	if params.First != nil {
-		if *params.First < 1 || *params.First > 100 {
-			return nil, fmt.Errorf("%w: first must be between 1 and 100", domain.ErrInvalidInput)
-		}
-	}
-	if params.Last != nil {
-		if *params.Last < 1 || *params.Last > 100 {
-			return nil, fmt.Errorf("%w: last must be between 1 and 100", domain.ErrInvalidInput)
-		}
+	if _, err := domain.ResolvePage(params.First, params.Last, params.After, params.Before); err != nil {
+		return nil, err
 	}
 
 	// Read authorization: unless the caller is unambiguously asking only for

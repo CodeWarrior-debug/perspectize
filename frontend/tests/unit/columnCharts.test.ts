@@ -18,7 +18,7 @@ describe('chart registry', () => {
 
 	it('lists the nine numeric columns and excludes released', () => {
 		expect([...CHART_ELIGIBLE_COLS].sort()).toEqual(
-			['budget', 'boxOffice', 'duration', 'likes', 'percentLiked', 'tmdbScore', 'views', 'votes', 'vsBudget'].sort(),
+			['budget', 'boxOffice', 'duration', 'likes', 'tmdbScore', 'views', 'votes', 'vsBudget'].sort(),
 		);
 		expect(CHART_ELIGIBLE_COLS.has('released')).toBe(false);
 	});

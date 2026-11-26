@@ -32,7 +32,6 @@ export const CHART_TYPE_LABELS: Record<ChartType, string> = {
 export const CHART_ELIGIBLE_COLS: ReadonlySet<string> = new Set([
 	'views',
 	'likes',
-	'percentLiked',
 	'duration',
 	'boxOffice',
 	'vsBudget',
