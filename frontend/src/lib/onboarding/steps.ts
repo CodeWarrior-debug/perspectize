@@ -11,11 +11,6 @@ export function advanceCoachStep(step: CoachStep): CoachStep | 'complete' {
 	return 'complete';
 }
 
-/** Skip current step only (UI-local); same transition as advance. */
-export function skipCoachStep(step: CoachStep): CoachStep | 'complete' {
-	return advanceCoachStep(step);
-}
-
 export function coachStepTitle(step: CoachStep): string {
 	return step === 1 ? 'Add a video' : 'Leave a perspective';
 }
