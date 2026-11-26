@@ -10,7 +10,6 @@ import (
 	"github.com/CodeWarrior-debug/perspectize/backend/internal/core/domain"
 	"github.com/CodeWarrior-debug/perspectize/backend/internal/core/ports/repositories"
 	"github.com/jackc/pgx/v5/pgconn"
-	paginator "github.com/pilagod/gorm-cursor-paginator/v2/paginator"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 )
@@ -44,23 +43,11 @@ func NewGormUserTodoRepository(db *gorm.DB) *GormUserTodoRepository {
 // there is a viewer. The total count is a separate query, issued only when
 // IncludeTotalCount is set.
 func (r *GormUserTodoRepository) List(ctx context.Context, params domain.UserTodoListParams) (*domain.PaginatedUserTodos, error) {
-	limit := 10
-	if params.First != nil {
-		limit = *params.First
+	window, err := domain.ResolvePage(params.First, params.Last, params.After, params.Before)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list user todos: %w", err)
 	}
-
-	opts := []paginator.Option{
-		paginator.WithRules(buildUserTodoSortRules(params.SortBy, params.SortOrder)...),
-		paginator.WithLimit(limit),
-		paginator.WithAllowTupleCmp(paginator.TRUE),
-	}
-	if params.After != nil {
-		opts = append(opts, paginator.WithAfter(*params.After))
-	}
-	if params.Before != nil {
-		opts = append(opts, paginator.WithBefore(*params.Before))
-	}
-	p := paginator.New(opts...)
+	rules := buildUserTodoSortRules(params.SortBy, params.SortOrder)
 
 	query := r.db.WithContext(ctx).Model(&UserTodoModel{})
 	query = applyUserTodoFilter(query, params.Filter)
@@ -89,13 +76,9 @@ func (r *GormUserTodoRepository) List(ctx context.Context, params domain.UserTod
 	}
 
 	var models []UserTodoModel
-	pageResult, cursor, err := p.Paginate(query, &models)
+	cursor, err := listPage(query, rules, window, &models)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list user todos: %w", err)
-	}
-	// Paginate() returns the query error on pageResult, not as err.
-	if pageResult.Error != nil {
-		return nil, fmt.Errorf("failed to list user todos: %w", pageResult.Error)
 	}
 
 	items := make([]*domain.UserTodo, len(models))
@@ -105,10 +88,10 @@ func (r *GormUserTodoRepository) List(ctx context.Context, params domain.UserTod
 
 	return &domain.PaginatedUserTodos{
 		Items:       items,
-		HasNext:     cursor.After != nil,
-		HasPrev:     cursor.Before != nil,
-		StartCursor: cursor.Before,
-		EndCursor:   cursor.After,
+		HasNext:     cursor.HasNext,
+		HasPrev:     cursor.HasPrev,
+		StartCursor: cursor.StartCursor,
+		EndCursor:   cursor.EndCursor,
 		TotalCount:  totalCountInt,
 	}, nil
 }

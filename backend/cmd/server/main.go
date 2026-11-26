@@ -319,6 +319,14 @@ func main() {
 			"interval_minutes", cfg.MessageRetentionSweepMinutes)
 	}
 
+	// Identity resolution: the one place a verified Clerk identity becomes a
+	// local user. Demo mode wraps the Clerk directory so personas are never fetched.
+	var clerkDirectory portservices.ClerkDirectory = auth.NewClerkDirectory()
+	if demoCfg.Enabled {
+		clerkDirectory = demo.NewIdentityDirectory(clerkDirectory)
+	}
+	identity := services.NewIdentityResolver(userRepo, clerkDirectory)
+
 	// Shared Clerk token verifier — reused by HTTP middleware and the
 	// WebSocket InitFunc so both transports resolve identities identically.
 	var tokenVerifier portservices.TokenVerifier = auth.NewClerkTokenVerifier()
@@ -335,7 +343,7 @@ func main() {
 		UserTodoService:     userTodoService,
 		MessagingService:    messagingService,
 		ImportService:       importService,
-		UserRepo:            userRepo,
+		Identity:            identity,
 		ThreadRepo:          threadRepo,
 		Hub:                 hub,
 		Presence:            presence,
@@ -357,6 +365,7 @@ func main() {
 	if webhookSecret != "" {
 		webhookHandler := &auth.WebhookHandler{
 			WebhookSecret: webhookSecret,
+			Resolver:      identity,
 			UserRepo:      userRepo,
 		}
 		r.Post("/webhooks/clerk", webhookHandler.ServeHTTP)
