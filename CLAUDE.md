@@ -25,7 +25,7 @@
 
 **`/revise-claude-md` must not block the PR:** push and open the PR first, without asking, then run it while CI runs for the first time. A CRITICAL learning is committed on the PR branch; anything else goes in the PR body's Session Learnings for the monthly routine. What counts as CRITICAL: [PR_WORKFLOW.md → Session learnings](.docs/PR_WORKFLOW.md#session-learnings). The human's review at merge is the approval.
 
-**PRs, issues, labels, merging:** follow [.docs/PR_WORKFLOW.md](.docs/PR_WORKFLOW.md) — `gh` commands, per-type PR templates (read the template file yourself; `gh api` skips the picker), QA Acceptance Criteria, the `needs-demo-video` / `ready for review` / `needs-local-session-takeover` labels, the `new-content-type` label (specs and first implementations of a new content type), the `complexity:` / `risk:` issue labels (low/medium/high; how much owner supervision the work needs), the migration labels (synced automatically on open PRs; `migrations-applied` is set by hand after rollout), and `--squash --delete-branch --admin` merges (stacked PRs merge differently: PR_WORKFLOW.md → Stacked PRs).
+**PRs, issues, labels, merging:** follow [.docs/PR_WORKFLOW.md](.docs/PR_WORKFLOW.md) — `gh` commands, per-type PR templates (read the template file yourself; `gh api` skips the picker), QA Acceptance Criteria, the `needs-demo-evidence` / `ready for review` / `needs-local-session-takeover` labels, the `new-content-type` label (specs and first implementations of a new content type), the `complexity:` / `risk:` issue labels (low/medium/high; how much owner supervision the work needs), the migration labels (synced automatically on open PRs; `migrations-applied` is set by hand after rollout), and `--squash --delete-branch --admin` merges (stacked PRs merge differently: PR_WORKFLOW.md → Stacked PRs).
 
 **`@claude` GitHub workflow (`.github/workflows/claude.yml`):** comment-triggered runs use the file from `main`, so workflow edits take effect only once merged (ship them as their own `chore` PR). Deps are installed in workflow steps before Claude starts; `--allowed-tools` in `claude_args` is a narrow allowlist: never add `pnpm install`/`curl`/`gh api`. Claude starts at the repo root, so allowlisted commands use `pnpm --dir frontend run ...` / `go -C backend ...`. Never give it `DATABASE_URL` (DB tests skip without it).
 
@@ -66,7 +66,9 @@
 
 **Mutation testing** (`make mutate` in `backend/`, `pnpm run mutate` in `frontend/`; slow, run deliberately): a run where nothing survives is a harness bug, not a pass — hand-apply one mutant and confirm the suite fails before trusting a score. **Report what it says about the tests:** "your tests caught X of Y planted bugs (killed)", "missed Z (lived/survived)", "N places no test runs (not covered)"; "efficacy" is the tests' efficacy. Give the all-in figure (caught ÷ every planted bug) beside efficacy. Language table, baselines, pitfalls: `docs/superpowers/specs/2026-09-29-test-hardening-spike.md`.
 
-**Browser verification is local-only.** Cloud / CI / fresh-machine sessions must **not** attempt the Clerk sign-in: run only the checklist above and label a user-visible PR `needs-demo-video` ([details](.docs/PR_WORKFLOW.md#demo-requirement-ready-for-review)).
+**Demo evidence runs do no create, update or delete without the owner's explicit OK** (demo stack included), and **PR bodies carry no non-public info** (write `REDACTED`).
+
+**Browser verification is local-only.** Cloud / CI / fresh-machine sessions must **not** attempt the Clerk sign-in: run only the checklist above and label a user-visible PR `needs-demo-evidence` ([details](.docs/PR_WORKFLOW.md#demo-requirement-ready-for-review)).
 
 Unreadable `.env*` files are expected, not a broken setup. Evidence capture: [.docs/VERIFICATION.md](.docs/VERIFICATION.md).
 

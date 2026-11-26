@@ -265,7 +265,7 @@ Branch from `main` after PR 1 is merged **and** `feature/import-staging-frontend
 
 ### Task 14: Verify and open PR 3
 
-- [ ] **Step 1:** `pnpm run test:run`, `pnpm run check`. **Step 2:** Browser verification is local-only (do not sign in; ask the human). Evidence clip with `~/.claude/tools/video-capture/record-clip.mjs` once the human has staged the file. Label `new-content-type`, `needs-demo-video`.
+- [ ] **Step 1:** `pnpm run test:run`, `pnpm run check`. **Step 2:** Browser verification is local-only (do not sign in; ask the human). Evidence clip with `~/.claude/tools/video-capture/record-clip.mjs` once the human has staged the file. Label `new-content-type`, `needs-demo-evidence`.
 
 ---
 

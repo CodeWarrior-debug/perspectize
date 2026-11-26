@@ -9,7 +9,6 @@ import (
 	"github.com/CodeWarrior-debug/perspectize/backend/internal/core/domain"
 	"github.com/CodeWarrior-debug/perspectize/backend/internal/core/ports/repositories"
 	"github.com/jackc/pgx/v5/pgconn"
-	paginator "github.com/pilagod/gorm-cursor-paginator/v2/paginator"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 )
@@ -30,7 +29,7 @@ const perspectivesUserContentPrivacyUnique = "uq_perspectives_user_content_priva
 // perspectivesUserContentPrivacyUnique. The SQL detail stays out of the message.
 func perspectiveDuplicateError(privacy domain.Privacy) error {
 	return fmt.Errorf("%w: you already have a %s perspective on this content",
-		domain.ErrAlreadyExists, strings.ToLower(string(privacy)))
+		domain.ErrDuplicatePerspective, strings.ToLower(string(privacy)))
 }
 
 // GormPerspectiveRepository implements the PerspectiveRepository interface using GORM
@@ -141,24 +140,13 @@ func (r *GormPerspectiveRepository) Delete(ctx context.Context, id int, ownerUse
 
 // List retrieves a paginated list of perspectives
 func (r *GormPerspectiveRepository) List(ctx context.Context, params domain.PerspectiveListParams) (*domain.PaginatedPerspectives, error) {
-	limit := 10
-	if params.First != nil {
-		limit = *params.First
+	window, err := domain.ResolvePage(params.First, params.Last, params.After, params.Before)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list perspectives: %w", err)
 	}
 
 	// Build sort rules using helper from helpers.go
 	rules := buildPerspectiveSortRules(params.SortBy, params.SortOrder)
-
-	// Configure paginator options
-	opts := []paginator.Option{
-		paginator.WithRules(rules...),
-		paginator.WithLimit(limit),
-		paginator.WithAllowTupleCmp(paginator.TRUE),
-	}
-	if params.After != nil {
-		opts = append(opts, paginator.WithAfter(*params.After))
-	}
-	p := paginator.New(opts...)
 
 	// Start query with context and apply filters BEFORE pagination
 	query := r.db.WithContext(ctx).Model(&PerspectiveModel{})
@@ -210,12 +198,9 @@ func (r *GormPerspectiveRepository) List(ctx context.Context, params domain.Pers
 
 	// Execute pagination
 	var models []PerspectiveModel
-	pageResult, cursor, err := p.Paginate(query, &models)
+	cursor, err := listPage(query, rules, window, &models)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list perspectives: %w", err)
-	}
-	if pageResult.Error != nil {
-		return nil, fmt.Errorf("failed to list perspectives: %w", pageResult.Error)
 	}
 
 	// Map results to domain
@@ -224,18 +209,14 @@ func (r *GormPerspectiveRepository) List(ctx context.Context, params domain.Pers
 		items[i] = perspectiveModelToDomain(&models[i])
 	}
 
-	result := &domain.PaginatedPerspectives{
-		Items:      items,
-		HasNext:    cursor.After != nil,
-		HasPrev:    cursor.Before != nil,
-		TotalCount: totalCountInt,
-	}
-
-	// StartCursor = cursor.Before, EndCursor = cursor.After
-	result.StartCursor = cursor.Before
-	result.EndCursor = cursor.After
-
-	return result, nil
+	return &domain.PaginatedPerspectives{
+		Items:       items,
+		HasNext:     cursor.HasNext,
+		HasPrev:     cursor.HasPrev,
+		StartCursor: cursor.StartCursor,
+		EndCursor:   cursor.EndCursor,
+		TotalCount:  totalCountInt,
+	}, nil
 }
 
 // aggregateRow is the scan target for the grouped count/avg query below.
@@ -446,4 +427,28 @@ func (r *GormPerspectiveRepository) ReassignByUser(ctx context.Context, fromUser
 		Model(&PerspectiveModel{}).
 		Where("user_id = ?", fromUserID).
 		Update("user_id", toUserID).Error
+}
+
+// VisibleIDs returns the subset of ids viewerID may read, in one query (see
+// repositories.LinkedPerspectiveReader). The predicate is the list's read rule:
+// a public row or the viewer's own, and, when the row is attached to content,
+// that content public or owned by the viewer. The content check is written so
+// a row with no content still passes, which List's EXISTS join would not.
+func (r *GormPerspectiveRepository) VisibleIDs(ctx context.Context, ids []int, viewerID int) ([]int, error) {
+	if len(ids) == 0 {
+		return nil, nil
+	}
+	visible, args := visiblePerspectivePredicate(&viewerID)
+	var out []int
+	err := r.db.WithContext(ctx).
+		Table("perspectives").
+		Where("id = ANY(CAST(? AS bigint[]))", intsToArray(ids)).
+		Where(visible, args...).
+		Where("(content_id IS NULL OR EXISTS (SELECT 1 FROM content c WHERE c.id = perspectives.content_id AND (c.privacy = ? OR c.added_by_user_id = ?)))",
+			privacyToDBValue(domain.PrivacyPublic), viewerID).
+		Pluck("id", &out).Error
+	if err != nil {
+		return nil, fmt.Errorf("failed to check linked perspectives: %w", err)
+	}
+	return out, nil
 }

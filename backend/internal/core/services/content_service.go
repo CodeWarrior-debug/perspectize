@@ -118,66 +118,42 @@ func NewContentService(repo repositories.ContentRepository, yt portservices.YouT
 // If the URL (after normalization) already exists, returns the existing content
 // along with ErrAlreadyExists so callers can distinguish new vs existing.
 func (s *ContentService) CreateFromYouTube(ctx context.Context, url string, userID int) (*domain.Content, error) {
-	// 1. Extract video ID first (validates URL format)
-	videoID, err := s.youtubeClient.ExtractVideoID(url)
-	if err != nil {
-		return nil, fmt.Errorf("%w: %v", domain.ErrInvalidURL, err)
-	}
-
-	// 2. Normalize to canonical URL — this is the key for deduplication
-	canonicalURL := youtube.NormalizeYouTubeURL(videoID)
-
-	// 3. Check if already exists (avoids unnecessary YouTube API call)
-	existing, err := s.repo.GetByURL(ctx, canonicalURL)
-	if err == nil && existing != nil {
-		return existing, domain.ErrAlreadyExists
-	}
-	if err != nil && !errors.Is(err, domain.ErrNotFound) {
-		return nil, fmt.Errorf("failed to check existing content: %w", err)
-	}
-
-	// 4. Fetch metadata from YouTube API (only for new videos)
-	metadata, err := s.youtubeClient.GetVideoMetadata(ctx, videoID)
-	if err != nil {
-		// Log with context, but don't expose YouTube API details to GraphQL clients
-		slog.Error("failed to fetch YouTube metadata",
-			"videoID", videoID,
-			"userID", userID,
-			"error", err) // err is already sanitized by youtube client
-
-		// Generic error for GraphQL response
-		return nil, fmt.Errorf("failed to fetch video metadata")
-	}
-
-	// 5. Build content with canonical URL
-	lengthUnits := "seconds"
-	content := &domain.Content{
-		Name:          metadata.Title,
-		URL:           &canonicalURL,
-		ContentType:   domain.ContentTypeYouTubeVideo,
-		AddedByUserID: userID,
-		Length:        &metadata.Duration,
-		LengthUnits:   &lengthUnits,
-		LengthDisplay: domain.YouTubeLengthDisplay(),
-		Response:      metadata.Response,
-	}
-
-	if jobID, ok := importJobIDFrom(ctx); ok {
-		content.ImportJobID = &jobID
-	}
-
-	// 6. Atomic upsert — handles concurrent race condition
-	// refreshOnConflict=true: update response/updated_at if URL already exists (refreshes metadata)
-	created, alreadyExisted, err := s.repo.GetOrCreateByURL(ctx, content, true)
-	if err != nil {
-		return nil, fmt.Errorf("failed to save content: %w", err)
-	}
-
-	if alreadyExisted {
-		return created, domain.ErrAlreadyExists
-	}
-
-	return created, nil
+	var videoID string
+	return s.createContent(ctx, contentCreation{
+		precheck:          true,
+		refreshOnConflict: true,
+		canonical: func(ctx context.Context) (string, error) {
+			// Validates the URL format; the canonical form is the dedupe key.
+			id, err := s.youtubeClient.ExtractVideoID(url)
+			if err != nil {
+				return "", fmt.Errorf("%w: %v", domain.ErrInvalidURL, err)
+			}
+			videoID = id
+			return youtube.NormalizeYouTubeURL(id), nil
+		},
+		build: func(ctx context.Context, canonicalURL string) (*domain.Content, error) {
+			metadata, err := s.youtubeClient.GetVideoMetadata(ctx, videoID)
+			if err != nil {
+				// Log with context, but don't expose YouTube API details to GraphQL clients
+				slog.Error("failed to fetch YouTube metadata",
+					"videoID", videoID,
+					"userID", userID,
+					"error", err) // err is already sanitized by youtube client
+				return nil, domain.Unavailable("failed to fetch video metadata")
+			}
+			lengthUnits := "seconds"
+			return &domain.Content{
+				Name:          metadata.Title,
+				URL:           &canonicalURL,
+				ContentType:   domain.ContentTypeYouTubeVideo,
+				AddedByUserID: userID,
+				Length:        &metadata.Duration,
+				LengthUnits:   &lengthUnits,
+				LengthDisplay: domain.YouTubeLengthDisplay(),
+				Response:      metadata.Response,
+			}, nil
+		},
+	})
 }
 
 // GetByID retrieves content by ID
@@ -237,18 +213,22 @@ func (s *ContentService) UpdateSourceData(ctx context.Context, contentID, viewer
 		return nil, fmt.Errorf("%w: content has no source URL to refresh", domain.ErrInvalidInput)
 	}
 
-	switch existing.ContentType {
-	case domain.ContentTypeBook:
-		return s.refreshBook(ctx, existing)
-	case domain.ContentTypeMovie:
-		return s.refreshMovie(ctx, existing)
-	case "", domain.ContentTypeYouTubeVideo:
-		// YouTube rows (and rows loaded without a type, as in older tests) take the path below.
-	default:
-		// Other types have no refresh source yet.
+	// Rows loaded without a type (as in older tests) are YouTube rows.
+	typ := existing.ContentType
+	if typ == "" {
+		typ = domain.ContentTypeYouTubeVideo
+	}
+	refresh, ok := refreshers[typ]
+	if !ok {
 		return nil, fmt.Errorf("%w: content type %s cannot be refreshed", domain.ErrInvalidInput, existing.ContentType)
 	}
+	return refresh(s, ctx, existing)
+}
 
+// refreshYouTube re-reads a YouTube row's metadata from the YouTube API and
+// updates the stored row in place.
+func (s *ContentService) refreshYouTube(ctx context.Context, existing *domain.Content) (*domain.Content, error) {
+	contentID := existing.ID
 	videoID, err := s.youtubeClient.ExtractVideoID(*existing.URL)
 	if err != nil {
 		return nil, fmt.Errorf("%w: %v", domain.ErrInvalidURL, err)
@@ -260,7 +240,7 @@ func (s *ContentService) UpdateSourceData(ctx context.Context, contentID, viewer
 			"videoID", videoID,
 			"contentID", contentID,
 			"error", err)
-		return nil, fmt.Errorf("failed to fetch video metadata")
+		return nil, domain.Unavailable("failed to fetch video metadata")
 	}
 
 	updated, err := s.repo.UpdateMetadata(ctx, contentID, metadata.Title, metadata.Response, &metadata.Duration, nil, nil)
@@ -605,15 +585,8 @@ func claimHTML(text string) string {
 
 // ListContent retrieves a paginated list of content
 func (s *ContentService) ListContent(ctx context.Context, params domain.ContentListParams) (*domain.PaginatedContent, error) {
-	if params.First != nil {
-		if *params.First < 1 || *params.First > 100 {
-			return nil, fmt.Errorf("%w: first must be between 1 and 100", domain.ErrInvalidInput)
-		}
-	}
-	if params.Last != nil {
-		if *params.Last < 1 || *params.Last > 100 {
-			return nil, fmt.Errorf("%w: last must be between 1 and 100", domain.ErrInvalidInput)
-		}
+	if _, err := domain.ResolvePage(params.First, params.Last, params.After, params.Before); err != nil {
+		return nil, err
 	}
 
 	result, err := s.repo.List(ctx, params)
@@ -637,45 +610,46 @@ func (s *ContentService) CreateFromPassage(ctx context.Context, input portservic
 		(input.EndChapter == input.StartChapter && input.EndVerse < input.StartVerse) {
 		return nil, fmt.Errorf("%w: passage end is before its start", domain.ErrInvalidPassage)
 	}
-
-	books, err := s.bibleRepo.ListBooks(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("failed to load bible reference data: %w", err)
-	}
-	startID, err := domain.BibleVerseOrdinal(books, input.BookID, input.StartChapter, input.StartVerse)
-	if err != nil {
-		return nil, err
-	}
-	endID, err := domain.BibleVerseOrdinal(books, input.BookID, input.EndChapter, input.EndVerse)
-	if err != nil {
-		return nil, err
-	}
-	var bookName string
-	for _, b := range books {
-		if b.ID == input.BookID {
-			bookName = b.Name
-			break
-		}
-	}
-
-	canonicalURL := domain.CanonicalPassageURL(bookName, input.StartChapter, input.StartVerse, input.EndChapter, input.EndVerse)
-	content := &domain.Content{
-		Name:          domain.CanonicalPassageName(bookName, input.StartChapter, input.StartVerse, input.EndChapter, input.EndVerse),
-		URL:           &canonicalURL,
-		ContentType:   domain.ContentTypeBiblePassage,
-		AddedByUserID: input.UserID,
-		VerseStartID:  &startID,
-		VerseEndID:    &endID,
-	}
-
-	result, existed, err := s.repo.GetOrCreateByURL(ctx, content, false)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create passage content: %w", err)
-	}
-	if existed {
-		return result, domain.ErrAlreadyExists
-	}
-	return result, nil
+	// A passage is named from reference data alone, so there is nothing to fetch and
+	// no precheck: the upsert reports a duplicate. canonical does the reference reads
+	// and build returns the row they shaped.
+	var row *domain.Content
+	return s.createContent(ctx, contentCreation{
+		canonical: func(ctx context.Context) (string, error) {
+			books, err := s.bibleRepo.ListBooks(ctx)
+			if err != nil {
+				return "", fmt.Errorf("failed to load bible reference data: %w", err)
+			}
+			startID, err := domain.BibleVerseOrdinal(books, input.BookID, input.StartChapter, input.StartVerse)
+			if err != nil {
+				return "", err
+			}
+			endID, err := domain.BibleVerseOrdinal(books, input.BookID, input.EndChapter, input.EndVerse)
+			if err != nil {
+				return "", err
+			}
+			var bookName string
+			for _, b := range books {
+				if b.ID == input.BookID {
+					bookName = b.Name
+					break
+				}
+			}
+			canonicalURL := domain.CanonicalPassageURL(bookName, input.StartChapter, input.StartVerse, input.EndChapter, input.EndVerse)
+			row = &domain.Content{
+				Name:          domain.CanonicalPassageName(bookName, input.StartChapter, input.StartVerse, input.EndChapter, input.EndVerse),
+				URL:           &canonicalURL,
+				ContentType:   domain.ContentTypeBiblePassage,
+				AddedByUserID: input.UserID,
+				VerseStartID:  &startID,
+				VerseEndID:    &endID,
+			}
+			return canonicalURL, nil
+		},
+		build: func(ctx context.Context, _ string) (*domain.Content, error) {
+			return row, nil
+		},
+	})
 }
 
 // MaxPassageDisplayTitleLength caps a passage's optional display title (in characters).
@@ -870,86 +844,73 @@ func (s *ContentService) TrendingMovies(ctx context.Context, window domain.Trend
 
 // ErrMovieClientUnavailable is returned by CreateFromMovie when the service was
 // built without a movie client. Resolvers show clients a generic message.
-var ErrMovieClientUnavailable = errors.New("movie lookup is unavailable: no movie client configured")
+var ErrMovieClientUnavailable = domain.Unavailable("movie lookup is unavailable: no movie client configured")
 
 // CreateFromMovie creates MOVIE content from a TMDB or IMDb movie URL (or bare IMDb id),
 // attributed to the given user. If the movie already exists, returns the existing content
 // along with ErrAlreadyExists. Duplicates are detected by canonical TMDB URL before any
 // metadata fetch, so a repeat add costs no TMDB metadata call.
 func (s *ContentService) CreateFromMovie(ctx context.Context, rawURL string, userID int) (*domain.Content, error) {
-	tmdbID, imdbID, err := tmdb.ParseMovieInput(rawURL)
-	if err != nil {
-		return nil, fmt.Errorf("%w: %v", domain.ErrInvalidInput, err)
-	}
-
-	if s.movieClient == nil {
-		slog.Error("movie lookup requested but no movie client is configured", "userID", userID)
-		return nil, ErrMovieClientUnavailable
-	}
-
-	// IMDb ids must be resolved to a TMDB id so both URL forms dedupe to one row.
-	if tmdbID == 0 {
-		tmdbID, err = s.movieClient.FindMovieByIMDbID(ctx, imdbID)
-		if err != nil {
-			if errors.Is(err, domain.ErrNotFound) {
-				return nil, fmt.Errorf("%w: movie not found", domain.ErrNotFound)
+	var tmdbID int
+	return s.createContent(ctx, contentCreation{
+		precheck:          true,
+		refreshOnConflict: true,
+		canonical: func(ctx context.Context) (string, error) {
+			id, imdbID, err := tmdb.ParseMovieInput(rawURL)
+			if err != nil {
+				return "", fmt.Errorf("%w: %v", domain.ErrInvalidInput, err)
 			}
-			slog.Error("failed to resolve IMDb id", "imdbID", imdbID, "userID", userID, "error", err)
-			return nil, fmt.Errorf("failed to fetch movie metadata")
-		}
-	}
+			if s.movieClient == nil {
+				slog.Error("movie lookup requested but no movie client is configured", "userID", userID)
+				return "", ErrMovieClientUnavailable
+			}
+			// IMDb ids must be resolved to a TMDB id so both URL forms dedupe to one row.
+			if id == 0 {
+				id, err = s.movieClient.FindMovieByIMDbID(ctx, imdbID)
+				if err != nil {
+					if errors.Is(err, domain.ErrNotFound) {
+						return "", fmt.Errorf("%w: movie not found", domain.ErrNotFound)
+					}
+					slog.Error("failed to resolve IMDb id", "imdbID", imdbID, "userID", userID, "error", err)
+					return "", fmt.Errorf("failed to fetch movie metadata")
+				}
+			}
+			tmdbID = id
+			return tmdb.CanonicalMovieURL(id), nil
+		},
+		build: func(ctx context.Context, canonicalURL string) (*domain.Content, error) {
+			metadata, err := s.movieClient.GetMovie(ctx, tmdbID)
+			if err != nil {
+				if errors.Is(err, domain.ErrNotFound) {
+					return nil, fmt.Errorf("%w: movie not found", domain.ErrNotFound)
+				}
+				// Log details server-side; clients get a generic message.
+				slog.Error("failed to fetch movie metadata", "tmdbID", tmdbID, "userID", userID, "error", err)
+				return nil, fmt.Errorf("failed to fetch movie metadata")
+			}
 
-	canonicalURL := tmdb.CanonicalMovieURL(tmdbID)
+			// Policy: NC-17 and TMDB-adult movies are not enabled. Checked before any write.
+			if movieNotAllowed(metadata.Response) {
+				return nil, domain.ErrContentNotAllowed
+			}
 
-	existing, err := s.repo.GetByURL(ctx, canonicalURL)
-	if err == nil && existing != nil {
-		return existing, domain.ErrAlreadyExists
-	}
-	if err != nil && !errors.Is(err, domain.ErrNotFound) {
-		return nil, fmt.Errorf("failed to check existing content: %w", err)
-	}
-
-	metadata, err := s.movieClient.GetMovie(ctx, tmdbID)
-	if err != nil {
-		if errors.Is(err, domain.ErrNotFound) {
-			return nil, fmt.Errorf("%w: movie not found", domain.ErrNotFound)
-		}
-		// Log details server-side; clients get a generic message.
-		slog.Error("failed to fetch movie metadata", "tmdbID", tmdbID, "userID", userID, "error", err)
-		return nil, fmt.Errorf("failed to fetch movie metadata")
-	}
-
-	// Policy: NC-17 and TMDB-adult movies are not enabled. Checked before any write.
-	if movieNotAllowed(metadata.Response) {
-		return nil, domain.ErrContentNotAllowed
-	}
-
-	content := &domain.Content{
-		Name:          metadata.Title,
-		URL:           &canonicalURL,
-		ContentType:   domain.ContentTypeMovie,
-		AddedByUserID: userID,
-		Length:        metadata.RuntimeSeconds,
-		Response:      metadata.Response,
-	}
-	if metadata.RuntimeSeconds != nil {
-		lengthUnits := "seconds"
-		content.LengthUnits = &lengthUnits
-		// TMDB reports runtime in whole minutes; Length holds them as seconds.
-		content.LengthDisplay = domain.TMDBLengthDisplay()
-	}
-	if jobID, ok := importJobIDFrom(ctx); ok {
-		content.ImportJobID = &jobID
-	}
-
-	created, alreadyExisted, err := s.repo.GetOrCreateByURL(ctx, content, true)
-	if err != nil {
-		return nil, fmt.Errorf("failed to save content: %w", err)
-	}
-	if alreadyExisted {
-		return created, domain.ErrAlreadyExists
-	}
-	return created, nil
+			content := &domain.Content{
+				Name:          metadata.Title,
+				URL:           &canonicalURL,
+				ContentType:   domain.ContentTypeMovie,
+				AddedByUserID: userID,
+				Length:        metadata.RuntimeSeconds,
+				Response:      metadata.Response,
+			}
+			if metadata.RuntimeSeconds != nil {
+				lengthUnits := "seconds"
+				content.LengthUnits = &lengthUnits
+				// TMDB reports runtime in whole minutes; Length holds them as seconds.
+				content.LengthDisplay = domain.TMDBLengthDisplay()
+			}
+			return content, nil
+		},
+	})
 }
 
 // movieNotAllowed is the single content policy for movies: it rejects a shaped
@@ -1026,7 +987,7 @@ func normalizeISBN(raw string) string {
 // ErrBookClientUnavailable is returned by CreateFromBook, SearchBooks,
 // TrendingBooks and ResolveBookISBN when the service was built without the
 // relevant Open Library client. Resolvers show clients a generic message.
-var ErrBookClientUnavailable = errors.New("book lookup is unavailable: no book client configured")
+var ErrBookClientUnavailable = domain.Unavailable("book lookup is unavailable: no book client configured")
 
 // canonicalBookURL is the canonical content URL stored for an Open Library work.
 func canonicalBookURL(workKey string) string {
@@ -1169,91 +1130,90 @@ func (s *ContentService) lookupBookByWorkKey(ctx context.Context, workKey string
 // work URL before any Open Library search call, so a repeat add costs no
 // extra lookup beyond ISBN resolution (when the input was an ISBN).
 func (s *ContentService) CreateFromBook(ctx context.Context, rawURLOrISBN string, userID int) (*domain.Content, error) {
+	var (
+		workKey, isbn string
+		result        *portservices.BookSearchResult
+	)
+	return s.createContent(ctx, contentCreation{
+		precheck:          true,
+		refreshOnConflict: true,
+		canonical: func(ctx context.Context) (string, error) {
+			key, resolvedISBN, err := s.resolveBookWorkKey(ctx, rawURLOrISBN, userID)
+			if err != nil {
+				return "", err
+			}
+			workKey, isbn = key, resolvedISBN
+			return canonicalBookURL(workKey), nil
+		},
+		build: func(ctx context.Context, canonicalURL string) (*domain.Content, error) {
+			found, err := s.lookupBookByWorkKey(ctx, workKey)
+			if err != nil {
+				return nil, err
+			}
+			result = found
+			shaped := shapeBookResult(*result, s.clock())
+			if work := s.fetchBookWork(ctx, workKey); work != nil {
+				shaped.Description = work.Description
+				shaped.RelatedWorks = shapeRelatedWorks(work.RelatedWorks)
+			}
+			shaped.ResolvedFromISBN = isbn
+
+			responseJSON, err := json.Marshal(shaped)
+			if err != nil {
+				return nil, fmt.Errorf("failed to marshal book response: %w", err)
+			}
+			return &domain.Content{
+				Name:          result.Title,
+				URL:           &canonicalURL,
+				ContentType:   domain.ContentTypeBook,
+				AddedByUserID: userID,
+				Response:      responseJSON,
+			}, nil
+		},
+	})
+}
+
+// resolveBookWorkKey turns a book input (work URL, edition URL or ISBN) into an
+// Open Library work key. isbn is the ISBN the input named, or empty for a URL.
+func (s *ContentService) resolveBookWorkKey(ctx context.Context, rawURLOrISBN string, userID int) (workKey, isbn string, err error) {
 	kind, id, err := parseBookInput(rawURLOrISBN)
 	if err != nil {
-		return nil, err
+		return "", "", err
 	}
-
 	if s.bookSearch == nil {
-		return nil, ErrBookClientUnavailable
+		return "", "", ErrBookClientUnavailable
 	}
-
-	var workKey, isbn string
 	switch kind {
 	case bookInputWorkID:
-		workKey = id
+		return id, "", nil
 	case bookInputEditionID:
 		if s.bookWork == nil {
-			return nil, ErrBookClientUnavailable
+			return "", "", ErrBookClientUnavailable
 		}
 		resolved, err := s.bookWork.ResolveEdition(ctx, id)
 		if err != nil {
 			if errors.Is(err, domain.ErrNotFound) {
-				return nil, fmt.Errorf("%w: edition not found", domain.ErrNotFound)
+				return "", "", fmt.Errorf("%w: edition not found", domain.ErrNotFound)
 			}
 			slog.Error("failed to resolve edition", "editionID", id, "userID", userID, "error", err)
-			return nil, fmt.Errorf("failed to resolve edition")
+			return "", "", fmt.Errorf("failed to resolve edition")
 		}
-		workKey = resolved
+		return resolved, "", nil
 	case bookInputISBN:
 		if s.bookISBN == nil {
-			return nil, ErrBookClientUnavailable
+			return "", "", ErrBookClientUnavailable
 		}
 		resolved, err := s.bookISBN.ResolveISBN(ctx, id)
 		if err != nil {
 			if errors.Is(err, domain.ErrNotFound) {
-				return nil, fmt.Errorf("%w: isbn not found", domain.ErrNotFound)
+				return "", "", fmt.Errorf("%w: isbn not found", domain.ErrNotFound)
 			}
 			slog.Error("failed to resolve isbn", "isbn", id, "userID", userID, "error", err)
-			return nil, fmt.Errorf("failed to resolve isbn")
+			return "", "", fmt.Errorf("failed to resolve isbn")
 		}
-		workKey = resolved
-		isbn = id
+		return resolved, id, nil
 	}
-
-	canonicalURL := canonicalBookURL(workKey)
-
-	existing, err := s.repo.GetByURL(ctx, canonicalURL)
-	if err == nil && existing != nil {
-		return existing, domain.ErrAlreadyExists
-	}
-	if err != nil && !errors.Is(err, domain.ErrNotFound) {
-		return nil, fmt.Errorf("failed to check existing content: %w", err)
-	}
-
-	result, err := s.lookupBookByWorkKey(ctx, workKey)
-	if err != nil {
-		return nil, err
-	}
-
-	shaped := shapeBookResult(*result, s.clock())
-	if work := s.fetchBookWork(ctx, workKey); work != nil {
-		shaped.Description = work.Description
-		shaped.RelatedWorks = shapeRelatedWorks(work.RelatedWorks)
-	}
-	shaped.ResolvedFromISBN = isbn
-
-	responseJSON, err := json.Marshal(shaped)
-	if err != nil {
-		return nil, fmt.Errorf("failed to marshal book response: %w", err)
-	}
-
-	content := &domain.Content{
-		Name:          result.Title,
-		URL:           &canonicalURL,
-		ContentType:   domain.ContentTypeBook,
-		AddedByUserID: userID,
-		Response:      responseJSON,
-	}
-
-	created, alreadyExisted, err := s.repo.GetOrCreateByURL(ctx, content, true)
-	if err != nil {
-		return nil, fmt.Errorf("failed to save content: %w", err)
-	}
-	if alreadyExisted {
-		return created, domain.ErrAlreadyExists
-	}
-	return created, nil
+	return "", "", fmt.Errorf("%w: unsupported book input", domain.ErrInvalidInput)
 }
 
 // fetchBookWork reads the work record's description and related works. It is

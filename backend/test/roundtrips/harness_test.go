@@ -62,6 +62,14 @@ func (tokenVerifier) Verify(_ context.Context, token string) (domain.Identity, e
 	return domain.Identity{ClerkID: id}, nil
 }
 
+// noClerkDirectory answers every identity as unknown: harness users are
+// created locally, so the Clerk API must never be needed.
+type noClerkDirectory struct{}
+
+func (noClerkDirectory) Profile(context.Context, string) (domain.ClerkProfile, error) {
+	return domain.ClerkProfile{}, domain.ErrNotFound
+}
+
 // noWikidata keeps category tests off the network.
 type noWikidata struct{}
 
@@ -166,7 +174,7 @@ func newHarnessWithPool(t *testing.T, pool database.PoolConfig) *harness {
 		UserTodoService:    services.NewUserTodoService(todoRepo, todoListRepo, todoActionRepo),
 		MessagingService:   services.NewMessagingService(threadRepo, messageRepo, hub, services.NewSlidingWindowLimiter(1000, time.Second)),
 		ImportService:      importService,
-		UserRepo:           userRepo,
+		Identity:           services.NewIdentityResolver(userRepo, noClerkDirectory{}),
 		ThreadRepo:         threadRepo,
 		Hub:                hub,
 		Presence:           realtime.NewPresenceTracker(),

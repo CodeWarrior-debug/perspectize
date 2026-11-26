@@ -108,9 +108,5 @@ The per-content summary of all its perspectives, public and private alike: how m
 **Perspective count**:
 How many perspectives exist on a content item. The count a viewer is allowed to read is a separate, smaller number.
 
-**Review status**:
-Moderation state of a perspective: pending, approved or rejected. Not a draft marker.
-_Avoid_: Draft, status
-
 **Draft perspective**:
 A convention, not a state: an imported perspective kept private and labelled with where it came from.

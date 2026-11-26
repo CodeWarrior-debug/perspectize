@@ -241,7 +241,7 @@ Behaviours the spec implies but does not spell out (each is pinned by a test nam
 - [ ] **Step 2: Self-verification (report the output summary):** `go build ./...`; `gofmt -l .` (empty); `go vet -tags perf ./internal/perf/...`; `go test -race ./pkg/limiter/ -count=1`; with `DATABASE_URL` pointing at the local `testdb`, `go test -p 1 ./...` and confirm with `-v` that DB tests PASS rather than SKIP. Frontend untouched, so no frontend run.
 - [ ] **Step 3: Stale references:** grep the repo for `personEnrichWorkers`, `importWorkers` comments that say "per batch", and the old register wording.
 - [ ] **Step 4: Run the `code-reviewer` agent** on `git diff origin/main...HEAD`; fix findings.
-- [ ] **Step 5: Open PR 1** (cloud session: open it yourself, per CLAUDE.md) using the repo's PR template for its type via `mcp__github__create_pull_request`. The body states: no migration; `graphify update` skipped (CLI not installed); the Docker confirming run is still owed; the pool-warning behaviour; session learnings. No `needs-demo-video` (nothing user-visible). Then run `/revise-claude-md`.
+- [ ] **Step 5: Open PR 1** (cloud session: open it yourself, per CLAUDE.md) using the repo's PR template for its type via `mcp__github__create_pull_request`. The body states: no migration; `graphify update` skipped (CLI not installed); the Docker confirming run is still owed; the pool-warning behaviour; session learnings. No `needs-demo-evidence` (nothing user-visible). Then run `/revise-claude-md`.
 
 ---
 

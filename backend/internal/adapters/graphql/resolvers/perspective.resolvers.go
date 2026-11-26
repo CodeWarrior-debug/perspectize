@@ -15,7 +15,6 @@ import (
 	"fmt"
 	"log/slog"
 	"strconv"
-	"strings"
 
 	"github.com/CodeWarrior-debug/perspectize/backend/internal/adapters/auth"
 	"github.com/CodeWarrior-debug/perspectize/backend/internal/adapters/graphql/generated"
@@ -39,31 +38,7 @@ func (r *mutationResolver) CreatePerspective(ctx context.Context, input model.Cr
 
 	perspective, err := r.PerspectiveService.Create(ctx, modelToCreatePerspectiveInput(userID, input))
 	if err != nil {
-		if errors.Is(err, domain.ErrInvalidRating) {
-			return nil, fmt.Errorf("invalid rating: %w", err)
-		}
-		if errors.Is(err, domain.ErrInvalidInput) {
-			return nil, fmt.Errorf("invalid input: %w", err)
-		}
-		// A duplicate (same user, content and privacy) is a user error, not a
-		// server fault: no error-level log, and no SQL in the message.
-		if errors.Is(err, domain.ErrAlreadyExists) {
-			privacy := domain.PrivacyPublic // the service's default when input.privacy is omitted
-			if input.Privacy != nil {
-				privacy = *input.Privacy
-			}
-			return nil, fmt.Errorf("you already have a %s perspective on this content", strings.ToLower(string(privacy)))
-		}
-		// Checked first: content not-found is also ErrNotFound, and must not be
-		// reported as a missing user.
-		if errors.Is(err, domain.ErrContentNotFound) {
-			return nil, fmt.Errorf("content not found")
-		}
-		if errors.Is(err, domain.ErrNotFound) {
-			return nil, fmt.Errorf("user not found: %w", err)
-		}
-		slog.Error("creating perspective failed", "error", err)
-		return nil, fmt.Errorf("failed to create perspective: %v", err)
+		return nil, createPerspectiveError(err, input.Privacy)
 	}
 
 	return perspectiveDomainToModel(perspective), nil
@@ -82,31 +57,7 @@ func (r *mutationResolver) UpdatePerspective(ctx context.Context, input model.Up
 
 	perspective, err := r.PerspectiveService.Update(ctx, modelToUpdatePerspectiveInput(input), authUser.ID)
 	if err != nil {
-		if errors.Is(err, domain.ErrForbidden) {
-			return nil, fmt.Errorf("access denied: you can only modify your own perspectives")
-		}
-		if errors.Is(err, domain.ErrContentNotFound) {
-			return nil, fmt.Errorf("content not found")
-		}
-		if errors.Is(err, domain.ErrNotFound) {
-			return nil, fmt.Errorf("perspective not found")
-		}
-		if errors.Is(err, domain.ErrInvalidRating) {
-			return nil, fmt.Errorf("invalid rating: %w", err)
-		}
-		if errors.Is(err, domain.ErrInvalidInput) {
-			return nil, fmt.Errorf("invalid input: %w", err)
-		}
-		// A duplicate is a user error (no error-level log, no SQL in the message).
-		// The final privacy is only known here when the input sets it.
-		if errors.Is(err, domain.ErrAlreadyExists) {
-			if input.Privacy != nil {
-				return nil, fmt.Errorf("you already have a %s perspective on this content", strings.ToLower(string(*input.Privacy)))
-			}
-			return nil, fmt.Errorf("you already have a perspective on this content with that privacy setting")
-		}
-		slog.Error("updating perspective failed", "error", err)
-		return nil, fmt.Errorf("failed to update perspective: %v", err)
+		return nil, updatePerspectiveError(err, input.Privacy)
 	}
 
 	return perspectiveDomainToModel(perspective), nil
@@ -244,8 +195,8 @@ func (r *queryResolver) Perspectives(ctx context.Context, first *int, after *str
 
 	result, err := r.PerspectiveService.ListPerspectives(ctx, params)
 	if err != nil {
-		if errors.Is(err, domain.ErrInvalidInput) {
-			return nil, fmt.Errorf("invalid pagination parameters: %w", err)
+		if domain.KindOf(err) == domain.KindInvalid {
+			return nil, invalidPagingError(err)
 		}
 		slog.Error("listing perspectives failed", "error", err)
 		return nil, fmt.Errorf("failed to list perspectives")
@@ -258,13 +209,8 @@ func (r *queryResolver) Perspectives(ctx context.Context, first *int, after *str
 	}
 
 	conn := &model.PaginatedPerspectives{
-		Items: items,
-		PageInfo: &model.PageInfo{
-			HasNextPage:     result.HasNext,
-			HasPreviousPage: result.HasPrev,
-			StartCursor:     result.StartCursor,
-			EndCursor:       result.EndCursor,
-		},
+		Items:      items,
+		PageInfo:   pageInfoToModel(result.HasNext, result.HasPrev, result.StartCursor, result.EndCursor),
 		TotalCount: result.TotalCount,
 	}
 

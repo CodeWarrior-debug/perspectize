@@ -181,4 +181,4 @@
 
 - [ ] Backend: `go build ./...`, `gofmt -l .` (empty), `go test ./...`, `go vet -tags perf ./internal/perf/...`; integration tests against local Postgres. Frontend: `pnpm install` (cloud), `pnpm run check`, `pnpm run test:run`, `pnpm run test:browser --browser.headless=true` if grid behavior changed.
 - [ ] Stale-reference grep if anything was renamed.
-- [ ] `/revise-claude-md`; PR from `feature/user-todos` with the `feature.md` template, QA Acceptance Criteria rows (including privacy and non-owner negatives), `needs-demo-video` from a cloud session; the workflow adds `migrations-unapplied`. State that the migration needs a manual `migrate up` per environment.
+- [ ] `/revise-claude-md`; PR from `feature/user-todos` with the `feature.md` template, QA Acceptance Criteria rows (including privacy and non-owner negatives), `needs-demo-evidence` from a cloud session; the workflow adds `migrations-unapplied`. State that the migration needs a manual `migrate up` per environment.
