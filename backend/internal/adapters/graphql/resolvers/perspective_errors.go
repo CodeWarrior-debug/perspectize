@@ -34,7 +34,8 @@ func createPerspectiveError(err error, privacy *domain.Privacy) error {
 	case errors.Is(err, domain.ErrInvalidRating):
 		return kindedError(fmt.Sprintf("invalid rating: %v", err), kind)
 	case errors.Is(err, domain.ErrInvalidInput):
-		return kindedError(fmt.Sprintf("invalid input: %v", err), kind)
+		// The domain error already starts with "invalid input:".
+		return kindedError(err.Error(), kind)
 	case errors.Is(err, domain.ErrDuplicatePerspective):
 		effective := domain.PrivacyPublic // the service's default when privacy is omitted
 		if privacy != nil {
@@ -70,7 +71,8 @@ func updatePerspectiveError(err error, privacy *domain.Privacy) error {
 	case errors.Is(err, domain.ErrInvalidRating):
 		return kindedError(fmt.Sprintf("invalid rating: %v", err), kind)
 	case errors.Is(err, domain.ErrInvalidInput):
-		return kindedError(fmt.Sprintf("invalid input: %v", err), kind)
+		// The domain error already starts with "invalid input:".
+		return kindedError(err.Error(), kind)
 	case errors.Is(err, domain.ErrDuplicatePerspective):
 		if privacy != nil {
 			return kindedError(fmt.Sprintf("you already have a %s perspective on this content", lowerPrivacy(*privacy)), kind)

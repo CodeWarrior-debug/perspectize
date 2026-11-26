@@ -53,7 +53,7 @@ func TestCreatePerspectiveErrorsCarryKinds(t *testing.T) {
 		{
 			name:     "invalid input",
 			err:      fmt.Errorf("%w: at least one field must be provided", domain.ErrInvalidInput),
-			wantMsg:  "invalid input: invalid input: at least one field must be provided",
+			wantMsg:  "invalid input: at least one field must be provided",
 			wantCode: "INVALID_INPUT",
 		},
 		{
@@ -114,6 +114,12 @@ func TestUpdatePerspectiveErrorsCarryKinds(t *testing.T) {
 			err:      fmt.Errorf("failed to get perspective: %w", domain.ErrNotFound),
 			wantMsg:  "perspective not found",
 			wantCode: "NOT_FOUND",
+		},
+		{
+			name:     "invalid input says so once",
+			err:      fmt.Errorf("%w: at least one field must be provided", domain.ErrInvalidInput),
+			wantMsg:  "invalid input: at least one field must be provided",
+			wantCode: "INVALID_INPUT",
 		},
 		{
 			name:     "duplicate without a privacy in the patch",
