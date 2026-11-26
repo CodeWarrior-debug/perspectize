@@ -96,14 +96,6 @@
       "count": 1
     }
   },
-  "src/lib/components/onboarding/OnboardingShell.svelte": {
-    "no-restricted-imports": {
-      "count": 2
-    },
-    "no-restricted-syntax": {
-      "count": 1
-    }
-  },
   "src/lib/queries/content/useLibraryList.svelte.ts": {
     "no-restricted-syntax": {
       "count": 1

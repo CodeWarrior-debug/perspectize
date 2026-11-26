@@ -11,7 +11,7 @@ export interface ContentOwner {
 export function ownedContentCountQuery(owner: ContentOwner | null) {
 	const ownerID = String(owner?.id ?? 0);
 	return {
-		queryKey: [...queryKeys.content.lists(), 'owned-count', owner?.id ?? 0, owner?.username ?? ''],
+		queryKey: queryKeys.content.ownedCount(owner?.id ?? 0, owner?.username ?? ''),
 		queryFn: () =>
 			graphqlRequest<ContentResponse>(LIST_CONTENT, {
 				first: 100,
