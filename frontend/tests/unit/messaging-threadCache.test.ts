@@ -225,3 +225,47 @@ describe('threadCache — edit and delete', () => {
 		expect(applyMessageDeleted(t, { seq: 7 })).toBe(t);
 	});
 });
+
+describe('threadCache — unread follows the server row rule', () => {
+	const posted = (message: Message) => ({ __typename: 'MessagePosted' as const, message });
+
+	it('counts another user message that arrives after my own later message (out of order)', () => {
+		let t = applyThreadEventToThread(thread(), posted(msg(7, { sender: { id: 'u1', username: 'me' } })), 'u1');
+		t = applyThreadEventToThread(t, posted(msg(6)), 'u1', false);
+		expect(t.unreadCount).toBe(1);
+		expect(t.latestSeq).toBe(7);
+	});
+
+	it('does not count the same delivery twice when the caller knows the message', () => {
+		const once = applyThreadEventToThread(thread(), posted(msg(6)), 'u1', false);
+		const twice = applyThreadEventToThread(once, posted(msg(6)), 'u1', true);
+		expect(twice).toBe(once);
+		expect(twice.unreadCount).toBe(1);
+	});
+
+	it('counts rows, not seq distance, across a pruned seq gap', () => {
+		// lastRead 5; seqs 6-8 pruned; rows 9 and 10 from others
+		let t = applyThreadEventToThread(thread({ latestSeq: 5, myLastReadSeq: 5, unreadCount: 0 }), posted(msg(9)), 'u1');
+		t = applyThreadEventToThread(t, posted(msg(10)), 'u1');
+		expect(t.unreadCount).toBe(2);
+	});
+
+	it('an own read on another device lowers unread to the rows still newer than the pointer', () => {
+		const t = applyThreadEventToThread(
+			thread({ latestSeq: 10, myLastReadSeq: 5, unreadCount: 5 }),
+			{ __typename: 'ReadReceiptChanged', threadId: 't1', userId: 'u1', lastReadSeq: 9 },
+			'u1',
+		);
+		expect(t.unreadCount).toBe(1);
+	});
+
+	it('a delete changes neither latestSeq nor unread, because tombstones keep their row and seq', () => {
+		const before = thread({ latestSeq: 10, unreadCount: 2 });
+		const after = applyThreadEventToThread(
+			before,
+			{ __typename: 'MessageDeleted', threadId: 't1', messageId: 'm10', seq: 10 },
+			'u1',
+		);
+		expect(after).toBe(before);
+	});
+});

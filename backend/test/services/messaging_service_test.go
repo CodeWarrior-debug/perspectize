@@ -330,7 +330,7 @@ func TestMarkRead_MovesPointerAndPublishes(t *testing.T) {
 	assert.True(t, setLastReadCalled)
 	assert.Equal(t, int64(42), setLastReadSeq)
 	require.Len(t, pub.calls, 1)
-	assert.Equal(t, "READ_RECEIPT_CHANGED", pub.calls[0].Type)
+	assert.Equal(t, domain.KindReadReceiptChanged, pub.calls[0].Type)
 	assert.Equal(t, 1, pub.calls[0].UserID)
 	assert.Equal(t, int64(42), pub.calls[0].LastReadSeq)
 }
@@ -384,7 +384,7 @@ func TestSetTyping_PublishesEphemeralOnly(t *testing.T) {
 	require.NoError(t, err)
 	assert.False(t, setLastReadCalled, "no repo writes on SetTyping")
 	require.Len(t, pub.calls, 1)
-	assert.Equal(t, "TYPING_CHANGED", pub.calls[0].Type)
+	assert.Equal(t, domain.KindTypingChanged, pub.calls[0].Type)
 	assert.True(t, pub.calls[0].Typing)
 }
 
@@ -479,8 +479,8 @@ func TestLeaveThread_PublishesParticipantRemoved(t *testing.T) {
 	require.NoError(t, err)
 	assert.True(t, setLeftCalled)
 	require.Len(t, pub.calls, 1)
-	assert.Equal(t, "PARTICIPANT_CHANGED", pub.calls[0].Type)
-	assert.Equal(t, "REMOVED", pub.calls[0].Change)
+	assert.Equal(t, domain.KindParticipantChanged, pub.calls[0].Type)
+	assert.Equal(t, domain.ParticipantRemoved, pub.calls[0].Change)
 	assert.Equal(t, 1, pub.calls[0].UserID)
 }
 
@@ -597,7 +597,7 @@ func TestEditMessage_PublishesMessageEditedEnvelope(t *testing.T) {
 	assert.Equal(t, "edited", gotBody)
 	assert.Equal(t, "edited", got.Body)
 	require.Len(t, pub.calls, 1)
-	assert.Equal(t, "MESSAGE_EDITED", pub.calls[0].Type)
+	assert.Equal(t, domain.KindMessageEdited, pub.calls[0].Type)
 	assert.Equal(t, 7, pub.calls[0].ThreadID)
 	assert.Equal(t, int64(3), pub.calls[0].Seq)
 	assert.Equal(t, int64(100), pub.calls[0].MessageID)
@@ -641,7 +641,7 @@ func TestDeleteMessage_PublishesMessageDeletedEnvelope(t *testing.T) {
 	assert.True(t, softDeleteCalled)
 	assert.NotNil(t, got.DeletedAt)
 	require.Len(t, pub.calls, 1)
-	assert.Equal(t, "MESSAGE_DELETED", pub.calls[0].Type)
+	assert.Equal(t, domain.KindMessageDeleted, pub.calls[0].Type)
 	assert.Equal(t, 7, pub.calls[0].ThreadID)
 	assert.Equal(t, int64(5), pub.calls[0].Seq)
 	assert.Equal(t, int64(100), pub.calls[0].MessageID)
@@ -736,8 +736,8 @@ func TestAddParticipants_MergesRowsAndPublishesOneBatch(t *testing.T) {
 	assert.Equal(t, 1, pub.batches, "every ADDED event in one publish (one round trip)")
 	require.Len(t, pub.calls, 3)
 	for _, c := range pub.calls {
-		assert.Equal(t, "PARTICIPANT_CHANGED", c.Type)
-		assert.Equal(t, "ADDED", c.Change)
+		assert.Equal(t, domain.KindParticipantChanged, c.Type)
+		assert.Equal(t, domain.ParticipantAdded, c.Change)
 	}
 	require.Len(t, got.Participants, 4, "rejoined user replaced in place, new users appended")
 	for _, uid := range []int{2, 3, 4} {

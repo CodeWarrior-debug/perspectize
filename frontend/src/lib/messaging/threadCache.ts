@@ -95,19 +95,35 @@ export function applyMessageDeleted(
 	return { ...cache, items };
 }
 
-export function applyThreadEventToThread(thread: MessageThread, event: ThreadEvent, myUserId: string): MessageThread {
+/**
+ * Applies one thread event to the thread summary. Unread follows the server's
+ * row rule (rows newer than my read pointer that I did not send), so it is
+ * counted per message, never from seq distance: pruning can leave gaps.
+ *
+ * `known` says the message is already in the loaded messages list (by id), so a
+ * repeated delivery is not counted again. Without it, a message at or below
+ * latestSeq counts as seen.
+ */
+export function applyThreadEventToThread(
+	thread: MessageThread,
+	event: ThreadEvent,
+	myUserId: string,
+	known?: boolean,
+): MessageThread {
 	switch (event.__typename) {
 		case 'MessagePosted': {
 			const m = event.message;
-			if (m.seq <= thread.latestSeq) return thread;
+			const seen = known ?? m.seq <= thread.latestSeq;
+			const latestSeq = Math.max(thread.latestSeq, m.seq);
+			if (seen && latestSeq === thread.latestSeq) return thread;
 			const fromMe = m.sender.id === myUserId;
-			const myLastReadSeq = fromMe ? m.seq : thread.myLastReadSeq;
+			const myLastReadSeq = fromMe && !seen ? m.seq : thread.myLastReadSeq;
 			return {
 				...thread,
-				latestSeq: m.seq,
-				lastMessageAt: m.createdAt,
+				latestSeq,
+				lastMessageAt: latestSeq !== thread.latestSeq ? m.createdAt : thread.lastMessageAt,
 				myLastReadSeq,
-				unreadCount: Math.max(0, m.seq - myLastReadSeq),
+				unreadCount: fromMe || seen ? thread.unreadCount : thread.unreadCount + 1,
 			};
 		}
 		case 'ReadReceiptChanged': {
@@ -126,7 +142,10 @@ export function applyThreadEventToThread(thread: MessageThread, event: ThreadEve
 				...thread,
 				participants,
 				myLastReadSeq,
-				unreadCount: Math.max(0, thread.latestSeq - myLastReadSeq),
+				// Upper bound from seq distance: never above the count we hold, and
+				// exact once the read reaches the latest message. A markRead result
+				// from the server replaces it with the row count.
+				unreadCount: Math.min(thread.unreadCount, Math.max(0, thread.latestSeq - myLastReadSeq)),
 			};
 		}
 		case 'ParticipantChanged': {
@@ -135,19 +154,22 @@ export function applyThreadEventToThread(thread: MessageThread, event: ThreadEve
 			if (participants.length === thread.participants.length) return thread;
 			return { ...thread, participants };
 		}
-		case 'MessageEdited': {
-			// No thread-level summary fields change on edit; return unchanged.
+		case 'MessageEdited':
+		case 'MessageDeleted':
+			// A tombstone keeps its row and seq, and the server counts it as
+			// unread like any other row, so neither latestSeq nor unread moves.
 			return thread;
-		}
-		case 'MessageDeleted': {
-			// If the deleted message was the latest, latestSeq is now stale —
-			// a refetch will correct it. For now return unchanged; the inbox
-			// subscription will update unreadCount on the next MessagePosted.
+		case 'StreamReset':
+		case 'TypingChanged':
+		case 'PresenceChanged':
 			return thread;
-		}
 		default:
-			return thread;
+			return assertNever(event);
 	}
+}
+
+function assertNever(value: never): never {
+	throw new Error(`unhandled thread event: ${JSON.stringify(value)}`);
 }
 
 export function typingUsersReducer(

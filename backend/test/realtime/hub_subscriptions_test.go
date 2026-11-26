@@ -58,7 +58,7 @@ func TestHub_UnsubscribeOneKeepsOtherInboxSubscribers(t *testing.T) {
 	assert.False(t, open, "unsubscribed inbox channel is closed")
 
 	hub.PublishEnvelope(context.Background(), domain.EventEnvelope{
-		Type: "MESSAGE_POSTED", ThreadID: 1, Seq: 4, MessageID: 10,
+		Type: domain.KindMessagePosted, ThreadID: 1, Seq: 4, MessageID: 10,
 	})
 
 	select {
@@ -73,7 +73,7 @@ func TestHub_UnsubscribeOneKeepsOtherInboxSubscribers(t *testing.T) {
 // MESSAGE_EDITED must skip the message lookup only when there is no local
 // consumer at all (neither a thread subscriber nor any inbox subscriber).
 func TestHub_MessageEditedLookupGuard(t *testing.T) {
-	edit := domain.EventEnvelope{Type: "MESSAGE_EDITED", ThreadID: 77, MessageID: 5}
+	edit := domain.EventEnvelope{Type: domain.KindMessageEdited, ThreadID: 77, MessageID: 5}
 
 	t.Run("no subscribers skips lookup", func(t *testing.T) {
 		loads := 0
@@ -92,12 +92,12 @@ func TestHub_MessageEditedLookupGuard(t *testing.T) {
 		require.Len(t, ch, 1)
 	})
 
-	t.Run("inbox-only subscriber triggers lookup", func(t *testing.T) {
+	t.Run("inbox-only subscriber skips lookup, since an edit reaches no inbox", func(t *testing.T) {
 		loads := 0
 		hub := realtime.NewHub(countingMsgRepo{loads: &loads}, stubThreadRepo{}, nil)
 		_, unsub := hub.SubscribeInbox(9)
 		defer unsub()
 		hub.PublishEnvelope(context.Background(), edit)
-		assert.Equal(t, 1, loads)
+		assert.Equal(t, 0, loads)
 	})
 }
