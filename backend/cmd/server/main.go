@@ -17,16 +17,10 @@ import (
 	"github.com/CodeWarrior-debug/perspectize/backend/internal/adapters/realtime"
 	"github.com/CodeWarrior-debug/perspectize/backend/internal/adapters/repositories/cached"
 	"github.com/CodeWarrior-debug/perspectize/backend/internal/adapters/repositories/postgres"
-	"github.com/CodeWarrior-debug/perspectize/backend/internal/adapters/tmdb"
 	"github.com/CodeWarrior-debug/perspectize/backend/internal/adapters/web/handlers"
-	"github.com/CodeWarrior-debug/perspectize/backend/internal/adapters/webpage"
-	"github.com/CodeWarrior-debug/perspectize/backend/internal/adapters/wikidata"
-	"github.com/CodeWarrior-debug/perspectize/backend/internal/adapters/youtube"
+	"github.com/CodeWarrior-debug/perspectize/backend/internal/assembly"
 	"github.com/CodeWarrior-debug/perspectize/backend/internal/config"
-	"github.com/CodeWarrior-debug/perspectize/backend/internal/core/domain"
-	portservices "github.com/CodeWarrior-debug/perspectize/backend/internal/core/ports/services"
 	"github.com/CodeWarrior-debug/perspectize/backend/internal/core/services"
-	"github.com/CodeWarrior-debug/perspectize/backend/internal/demo"
 	"github.com/CodeWarrior-debug/perspectize/backend/internal/server"
 	"github.com/CodeWarrior-debug/perspectize/backend/pkg/database"
 	"github.com/CodeWarrior-debug/perspectize/backend/pkg/limiter"
@@ -46,8 +40,11 @@ func main() {
 	logger.Setup()
 
 	// Load .env file
-	if err := godotenv.Load(); err != nil {
-		if os.Getenv("APP_ENV") != "production" {
+	envErr := godotenv.Load()
+	// production turns off the GraphQL playground, introspection and debug routes.
+	production := os.Getenv("APP_ENV") == "production"
+	if envErr != nil {
+		if !production {
 			slog.Warn(".env file not found", "hint", "set APP_ENV=production to suppress")
 		}
 	}
@@ -147,11 +144,6 @@ func main() {
 	}
 	slog.Info("PostgreSQL version", "version", version)
 
-	// Validate YouTube API key
-	if cfg.YouTube.APIKey == "" {
-		slog.Warn("YOUTUBE_API_KEY is empty — YouTube metadata fetching will fail")
-	}
-
 	// Load security config
 	secCfg := config.LoadSecurity()
 
@@ -161,36 +153,14 @@ func main() {
 		slog.Info("Clerk SDK initialized")
 	}
 
-	// Initialize adapters
-	// Wrap the raw YouTube client with an in-memory TTL cache to avoid
-	// re-spending API quota on repeat lookups of the same video. TTL is
-	// configurable via YOUTUBE_API_CACHE_TTL_SECONDS (default 6 hours).
-	// Demo mode (DEMO_MODE=true, refused in production): seeded personas sign
-	// in with "Bearer demo.<persona>" and YouTube metadata comes from offline
-	// fixtures, so tours, recordings and E2E runs need no external accounts.
+	// Outside-world adapters: real API clients, demo fixtures (DEMO_MODE=true,
+	// refused in production) or unconfigured clients, chosen in one place.
 	demoCfg, err := config.LoadDemo()
 	if err != nil {
 		log.Fatal(err)
 	}
-	var youtubeClient portservices.YouTubeClient
-	// Discover's Trending feed; left nil in demo mode (no fixture for it), so
-	// youtubeTrending reports "not configured" there.
-	var trendingClient portservices.YouTubeTrendingClient
-	if demoCfg.Enabled {
-		slog.Warn("DEMO MODE ENABLED — unsigned demo.<persona> tokens are accepted; never expose this instance publicly with real data")
-		youtubeClient = youtube.NewFixtureClient()
-	} else {
-		// The same client also caches the Discover page's Trending chart
-		// (YOUTUBE_TRENDING_CACHE_TTL_SECONDS, default 1 hour).
-		cachingClient := youtube.NewCachingClient(
-			youtube.NewClient(cfg.YouTube.APIKey),
-			time.Duration(cfg.YouTube.CacheTTLSeconds)*time.Second,
-			youtube.WithTrendingTTL(time.Duration(cfg.YouTube.TrendingCacheTTLSeconds)*time.Second),
-		)
-		youtubeClient = cachingClient
-		trendingClient = cachingClient
-		slog.Info("YouTube API cache configured", "ttlSeconds", cfg.YouTube.CacheTTLSeconds, "trendingTTLSeconds", cfg.YouTube.TrendingCacheTTLSeconds)
-	}
+	limiterMeter := limiter.WithMeter(telemetry.Meter())
+	ext := assembly.NewExternals(assembly.SettingsFrom(cfg, demoCfg), limiterMeter)
 
 	// Global caps on import work, shared by every user's imports so their total
 	// load on the database and on TMDB stays bounded (IMPORT_ROW_CONCURRENCY,
@@ -200,41 +170,9 @@ func main() {
 	if msg, warn := config.ImportPoolWarning(importLimits, poolCfg.MaxOpenConns); warn {
 		slog.Warn(msg)
 	}
-	limiterMeter := limiter.WithMeter(telemetry.Meter())
 	importRowLimiter := limiter.New("import_rows", importLimits.RowConcurrency, limiterMeter)
 	importListingLimiter := limiter.New("import_listings", importLimits.ListingConcurrency, limiterMeter)
 
-	// Import staging listers: one per source type that has an API key. Demo
-	// mode has neither key, so it lists the sample sources in imports.json.
-	importListers := map[domain.ImportSourceType]portservices.ImportSourceLister{}
-	if demoCfg.Enabled {
-		importListers[domain.ImportSourceYouTubeChannel] = demo.NewImportLister(domain.ImportSourceYouTubeChannel)
-		importListers[domain.ImportSourceTMDBPerson] = demo.NewImportLister(domain.ImportSourceTMDBPerson)
-	} else if cfg.YouTube.APIKey != "" {
-		importListers[domain.ImportSourceYouTubeChannel] = youtube.NewChannelLister(youtube.NewClient(cfg.YouTube.APIKey))
-	}
-	// Movie lookups and Discover's Movies search share one TMDB client.
-	var movieClient portservices.MovieClient = tmdb.UnconfiguredClient{}
-	var movieSearchClient portservices.MovieSearchClient = tmdb.UnconfiguredClient{}
-	var movieTrendingClient portservices.MovieTrendingClient = tmdb.UnconfiguredClient{}
-	if cfg.TMDBReadAccessToken != "" {
-		tmdbClient := tmdb.NewClient(cfg.TMDBReadAccessToken)
-		movieClient = tmdbClient
-		movieSearchClient = tmdbClient
-		// Trending is cached (1h, per window + page); search stays uncached.
-		movieTrendingClient = tmdb.NewTrendingCache(tmdbClient, tmdb.DefaultTrendingTTL)
-		// One enrichment limiter for every person listing, so concurrent listings
-		// share TMDB's budget instead of each spending their own.
-		enrichLimiter := limiter.New("tmdb_enrich", tmdb.PersonEnrichConcurrency, limiterMeter)
-		importListers[domain.ImportSourceTMDBPerson] = tmdb.NewPersonLister(tmdbClient, tmdb.WithEnrichLimiter(enrichLimiter))
-	} else if demoCfg.Enabled {
-		// Demo mode: staged demo films resolve offline, so importing them works
-		// without a token. Discover's movie search and trending stay unconfigured.
-		movieClient = tmdb.NewDemoClient()
-	} else {
-		slog.Warn("TMDB_API_READ_ACCESS_TOKEN is empty — movie lookups will fail")
-	}
-	wikidataClient := wikidata.NewClient()
 	contentRepo := postgres.NewGormContentRepository(db)
 	// Cached: the auth middleware resolves the Clerk ID -> user on every
 	// authenticated request. All user writes go through this same instance so
@@ -254,16 +192,14 @@ func main() {
 	importRepo := postgres.NewGormImportJobRepository(db)
 
 	// Initialize services
-	// The webpage reader is SSRF-safe on every connection (adapters/webpage). It has no
-	// configuration: the address policy is fixed, not environment-driven.
-	contentOpts := []services.ContentServiceOption{services.WithBibleReference(bibleReferenceRepo), services.WithYouTubeTrending(trendingClient), services.WithMovieSearch(movieSearchClient), services.WithMovieTrending(movieTrendingClient), services.WithWebPageClient(webpage.NewClient(webpage.Options{}))}
-	contentService := services.NewContentService(contentRepo, youtubeClient, movieClient, append(contentOpts, bookServiceOptions()...)...)
+	contentService := services.NewContentService(contentRepo, ext.YouTube, ext.Movie,
+		append(ext.ContentOptions(), services.WithBibleReference(bibleReferenceRepo))...)
 	userService := services.NewUserService(userRepo, contentRepo, perspectiveRepo, todoRepo, todoListRepo, todoActionRepo,
 		services.WithImportJobRepository(importRepo))
 	perspectiveService := services.NewPerspectiveService(perspectiveRepo, userRepo,
 		services.WithContentRepository(contentRepo),
 		services.WithLinkedPerspectiveReader(perspectiveRepo))
-	categoryService := services.NewCategoryService(categoryRepo, contentRepo, wikidataClient)
+	categoryService := services.NewCategoryService(categoryRepo, contentRepo, ext.Wikidata)
 	userTodoService := services.NewUserTodoService(todoRepo, todoListRepo, todoActionRepo)
 	buildInfoService := services.NewBuildInfoService(buildInfoRepo)
 
@@ -277,7 +213,7 @@ func main() {
 		importCreator = slowImportCreator{inner: contentService, delay: d}
 		slog.Info("demo imports simulate API latency", "delayPerRow", d)
 	}
-	importService := services.NewImportService(importRepo, importListers, importCreator,
+	importService := services.NewImportService(importRepo, ext.ImportListers, importCreator,
 		services.WithImportBackground(importCtx),
 		services.WithImportRowLimiter(importRowLimiter),
 		services.WithImportListingLimiter(importListingLimiter))
@@ -322,21 +258,12 @@ func main() {
 	}
 
 	// Identity resolution: the one place a verified Clerk identity becomes a
-	// local user. Demo mode wraps the Clerk directory so personas are never fetched.
-	var clerkDirectory portservices.ClerkDirectory = auth.NewClerkDirectory()
-	if demoCfg.Enabled {
-		clerkDirectory = demo.NewIdentityDirectory(clerkDirectory)
-	}
-	identity := services.NewIdentityResolver(userRepo, clerkDirectory)
+	// local user.
+	identity := services.NewIdentityResolver(userRepo, ext.ClerkDirectory)
 
-	// Shared Clerk token verifier — reused by HTTP middleware and the
-	// WebSocket InitFunc so both transports resolve identities identically.
-	var tokenVerifier portservices.TokenVerifier = auth.NewClerkTokenVerifier()
-	if demoCfg.Enabled {
-		tokenVerifier = auth.NewDemoTokenVerifier(tokenVerifier)
-	}
-
-	// GraphQL server + API middleware stack (shared with test/roundtrips).
+	// GraphQL server + API middleware stack (shared with test/roundtrips). The
+	// token verifier is shared by HTTP middleware and the WebSocket InitFunc, so
+	// both transports resolve identities identically.
 	apiDeps := server.Deps{
 		ContentService:      contentService,
 		UserService:         userService,
@@ -349,10 +276,10 @@ func main() {
 		ThreadRepo:          threadRepo,
 		Hub:                 hub,
 		Presence:            presence,
-		TokenVerifier:       tokenVerifier,
+		TokenVerifier:       ext.TokenVerifier,
 		CORSOrigins:         secCfg.CORSOrigins,
 		RateLimitPerMin:     secCfg.RateLimitPerMin,
-		EnableIntrospection: os.Getenv("APP_ENV") != "production",
+		EnableIntrospection: !production,
 	}
 	srv := server.NewGraphQLServer(apiDeps)
 
@@ -400,7 +327,7 @@ func main() {
 	// upgrades so long-lived subscriptions are not killed by the server's
 	// Read/WriteTimeout.
 	r.Handle("/graphql", clearDeadlinesForWebsocket(srv))
-	if os.Getenv("APP_ENV") != "production" {
+	if !production {
 		r.Handle("/", playground.Handler("GraphQL Playground", "/graphql"))
 		r.Get("/debug/db-stats", database.StatsHandler(sqlDB))
 	}
@@ -429,7 +356,7 @@ func main() {
 	}()
 
 	slog.Info("server running", "addr", addr)
-	if os.Getenv("APP_ENV") != "production" {
+	if !production {
 		slog.Info("GraphQL Playground available", "url", fmt.Sprintf("http://localhost%s/", addr))
 	}
 	if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
