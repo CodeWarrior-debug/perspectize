@@ -68,14 +68,6 @@
       "count": 2
     }
   },
-  "src/lib/components/library/ContentLibrary.svelte": {
-    "no-restricted-imports": {
-      "count": 2
-    },
-    "no-restricted-syntax": {
-      "count": 1
-    }
-  },
   "src/lib/components/messaging/InboxStreamMount.svelte": {
     "no-restricted-imports": {
       "count": 1
@@ -108,6 +100,11 @@
     "no-restricted-imports": {
       "count": 2
     },
+    "no-restricted-syntax": {
+      "count": 1
+    }
+  },
+  "src/lib/queries/content/useLibraryList.svelte.ts": {
     "no-restricted-syntax": {
       "count": 1
     }
