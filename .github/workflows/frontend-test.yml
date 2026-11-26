@@ -27,6 +27,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
+        with:
+          # arch-check compares the baselines with origin/main
+          fetch-depth: 0
 
       - uses: pnpm/action-setup@v6
         with:
@@ -46,6 +49,11 @@ jobs:
       - name: svelte-check
         working-directory: frontend
         run: pnpm run check
+
+      # Layer and convention rules (F1-F8) plus the 500-line ratchet; known violations are baselined and may only shrink.
+      - name: Architecture rules
+        working-directory: frontend
+        run: scripts/arch-check.sh
 
   unit:
     name: Unit tests (coverage)

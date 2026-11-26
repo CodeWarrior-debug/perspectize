@@ -2,12 +2,14 @@ import type { GridApi, GridOptions } from '@ag-grid-community/core';
 
 /**
  * The lifecycle every AG Grid component here repeats: hold the Grid API once the grid is
- * ready, drop it before teardown, and run column-API work a frame after ready.
+ * ready, drop it before teardown, and run column-API work after ready.
  *
- * Why the frame: column APIs (`setColumnsVisible`, `applyColumnState`, `setGridOption('columnDefs')`)
+ * Why the wait: column APIs (`setColumnsVisible`, `applyColumnState`, `setGridOption('columnDefs')`)
  * called straight from `onGridReady`, or from an effect it triggers, throw
  * `Cannot read properties of undefined (reading 'setColumnMovingCss')` because the grid's body
- * controller is not up yet.
+ * controller is not up yet. AG Grid hands the controller to its column services from a timer, and
+ * `onGridReady` can arrive from a timer queued before that one. A timer queued after ready runs
+ * after both; one animation frame alone usually does, but not always.
  *
  * Why drop the API: unmounting the grid (card mode, an error state, a keyed remount) destroys it,
  * and an effect that still holds the old API would call into a destroyed grid.
@@ -22,8 +24,8 @@ export interface GridHandle<TData> {
 	/** Forget the API, e.g. when the component hides the grid without AG Grid's own teardown. */
 	detach(): void;
 	/**
-	 * Run `fn` with the API on the next animation frame, skipping it if the grid was destroyed
-	 * meanwhile. Returns a cancel function, so an `$effect` can return it as its cleanup.
+	 * Run `fn` with the API after the next animation frame and a timer queued from it, skipping it
+	 * if the grid was destroyed meanwhile. Returns a cancel function, so an `$effect` can return it as its cleanup.
 	 */
 	afterFrame(fn: (api: GridApi<TData>) => void): () => void;
 	/**
@@ -60,10 +62,16 @@ export function createGridHandle<TData>(): GridHandle<TData> {
 		afterFrame(fn) {
 			const target = api;
 			if (!target) return () => {};
+			let timer: ReturnType<typeof setTimeout> | undefined;
 			const frame = requestAnimationFrame(() => {
-				if (!target.isDestroyed()) fn(target);
+				timer = setTimeout(() => {
+					if (!target.isDestroyed()) fn(target);
+				}, 0);
 			});
-			return () => cancelAnimationFrame(frame);
+			return () => {
+				cancelAnimationFrame(frame);
+				clearTimeout(timer);
+			};
 		},
 		options(hooks = {}) {
 			return {

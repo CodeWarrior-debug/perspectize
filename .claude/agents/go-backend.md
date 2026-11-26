@@ -30,7 +30,8 @@ this prompt disagree, the docs and the existing code win.
 ## When to invoke
 
 - **New feature slice.** Domain model → port → service → GORM repository →
-  resolver → wiring in `cmd/server/main.go`, following the "Adding a New
+  resolver → wiring (`cmd/server/main.go`, or `internal/assembly/externals.go`
+  for an outside-world client), following the "Adding a New
   Feature" order in `backend/CLAUDE.md`.
 - **Service or repository change.** New filter, sort, validation rule or error
   path in an existing service or `gorm_*_repository.go`.

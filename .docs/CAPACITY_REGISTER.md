@@ -256,7 +256,7 @@ At max (32, from the ramp), then at half (16, re-run):
 
 | Setting | Where | Default | Capacity estimate | Status |
 | --- | --- | --- | --- | --- |
-| TMDB film lookups across person listings | `PersonEnrichConcurrency` (`tmdb/person_lister.go`), shared `tmdb_enrich` limiter wired in `cmd/server/main.go` | One limiter of `PersonEnrichConcurrency` slots shared by every person listing (a lister without the shared limiter caps each listing on its own) | TMDB allows about 50 requests per second (per a code comment, not re-checked). The cap now applies across listings, not per listing. It comes from TMDB's limit, not our hardware, so it was not ramped | `provider` |
+| TMDB film lookups across person listings | `PersonEnrichConcurrency` (`tmdb/person_lister.go`), shared `tmdb_enrich` limiter wired in `internal/assembly/externals.go` | One limiter of `PersonEnrichConcurrency` slots shared by every person listing (a lister without the shared limiter caps each listing on its own) | TMDB allows about 50 requests per second (per a code comment, not re-checked). The cap now applies across listings, not per listing. It comes from TMDB's limit, not our hardware, so it was not ramped | `provider` |
 | TMDB, Open Library, Wikidata HTTP timeout | `adapters/*/client.go` | 10 s | n/a | `derived` |
 | YouTube metadata cache | `DefaultYouTubeCacheTTLSeconds`, `internal/config/config.go:67` | 6 h | The API has a daily quota (units not checked); caching cuts calls | `provider` |
 | YouTube / TMDB / Open Library trending cache | config, `tmdb/cache.go:15` | 1 h | n/a | `derived` |

@@ -117,7 +117,7 @@ Uses `ag-grid-svelte5` (bundles AG Grid v32.x). **Do NOT install `ag-grid-commun
 
 **Grid remount gotcha:** the `cardMode` breakpoint (<860px) and the error state unmount `AgGridSvelte5Component`, creating a new Grid API on return. Re-apply imperative column state (`setColumnsVisible`, `applyColumnState`, the session column-picker override) from an `$effect` that reruns on `gridReady`, not only when the user changes it.
 
-**Grid column APIs can't run from `onGridReady`:** `setColumnsVisible`/`applyColumnState` called from `onGridReady` (or an effect it triggers) throws `Cannot read properties of undefined (reading 'setColumnMovingCss')` (body controller not ready). Defer one frame with `requestAnimationFrame` and check `isDestroyed()` first, as `ContentLibrary` does. The throw also kills the Plan grid's `onRowDragEnd`, so drag-reorder silently stops saving.
+**Grid column APIs can't run from `onGridReady`:** `setColumnsVisible`/`applyColumnState` called from `onGridReady` (or an effect it triggers) throws `Cannot read properties of undefined (reading 'setColumnMovingCss')` (body controller not ready). One animation frame is not always enough: use `createGridHandle().afterFrame` (`lib/utils/gridHandle.svelte.ts`), which also waits for a timer and skips a destroyed grid. The throw also kills the Plan grid's `onRowDragEnd`, so drag-reorder silently stops saving.
 
 **Grid colours come from theme tokens, not hex.** `src/lib/utils/grid-theme.ts` (`GRID_THEME_PARAMS`, unit-tested to contain no raw colours) feeds `withParams` on the base theme (`LIBRARY_GRID_THEME` = `themeBalham` plus quieter headers; Plan = `themeBalham` with the shared params), so the grid follows the theme picker. Balham is Quartz with half the padding (`spacing` 4px vs 8px); `rowHeight`/`headerHeight` are pinned by the params, so it changes width, not height. Zebra/hover use `--color-row-alt` / `--color-row-hover` / `--color-row-accent`, derived in `src/lib/theme/derive.ts` (so custom themes get them too). Adding a derived token means: `DerivedTokens` + `toCssVarMap` + `clearInlineThemeVars` in `store.svelte.ts`, the default `@theme` block in `app.css`, and the four `[data-theme]` blocks (regenerate with `npx tsx gen-preset-css.mjs`; for a new token `git diff` must show only additions). Changing how an existing token is _derived_ changes every preset block and the default block's values; `tests/unit/theme/css-agreement.test.ts` fails until `app.css` is regenerated. Row hover is a foreground wash (not primary-driven) so dimming the primary never erodes hover-vs-zebra; an authored neutral with chroma >= 0.004 keeps its own hue.
 
@@ -136,6 +136,14 @@ Uses `ag-grid-svelte5` (bundles AG Grid v32.x). **Do NOT install `ag-grid-commun
 - CSP in `app.html` blocks `mcp.figma.com` — temporarily add to `script-src` and `connect-src`, revert after capture
 - AG Grid canvas-rendered cells (thumbnails) don't serialize into Figma captures
 - SPA hash navigation may not re-trigger auto-capture — reload or click "Send to Figma" manually
+
+## Architecture rules (enforced: `scripts/arch-check.sh`, CI step "Architecture rules")
+
+ESLint (`eslint.config.js`, architecture rules only) and dependency-cruiser (`.dependency-cruiser.cjs`) enforce: F1 components use `useX` hooks, not `createQuery`/`useQueryClient`; F2 components never call `graphqlRequest`/`graphqlClient`; F3 `isPending`, not `isLoading`; F4 no raw hex/rgb colours in UI; F5 `svelte-clerk` only in `src/lib/auth`; F6 query keys from `queryKeys`, never clear the cache; F7 no import cycles; F8 `lib` never imports `routes`, non-component `lib` never imports components.
+
+- **Known violations** are in `eslint-suppressions.json` and `.dependency-cruiser-known-violations.json`; **files over 500 lines** have a ceiling in `.size-ceilings.txt` (tests exempt). All three may only shrink. Never add to them or suppress a rule to get green; fix the code.
+- **Off-limits:** don't add lines to a file listed in `.size-ceilings.txt` (e.g. `ActivityTable.svelte`, `gridUrlState.ts`, `grid-config.ts`) or to a file with an entry in `eslint-suppressions.json`. Put new code in a new file beside it and import it.
+- After fixing a baselined violation run `scripts/arch-check.sh --update` and commit the smaller baselines.
 
 ## Self-Verification (Chrome DevTools MCP)
 
