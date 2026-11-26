@@ -41,7 +41,6 @@ type UpdatePerspectiveInput struct {
 	Privacy               *domain.Privacy
 	Description           *string
 	Category              *string
-	ReviewStatus          *domain.ReviewStatus
 	Parts                 []int
 	Labels                []string
 	CategorizedRatings    []domain.CategorizedRating

@@ -234,7 +234,6 @@ func TestPerspectiveModelToDomain(t *testing.T) {
 		got := perspectiveModelToDomain(&PerspectiveModel{ID: 1, UserID: 2})
 		require.NotNil(t, got)
 		assert.Equal(t, domain.PrivacyPublic, got.Privacy)
-		assert.Nil(t, got.ReviewStatus)
 		assert.Nil(t, got.Parts)
 		assert.Nil(t, got.Labels)
 		assert.Nil(t, got.CategorizedRatings)
@@ -256,7 +255,6 @@ func TestPerspectiveModelToDomain(t *testing.T) {
 			Category:              strPtr("film"),
 			Labels:                StringArray{"a", "b"},
 			Description:           strPtr("desc"),
-			ReviewStatus:          strPtr("approved"),
 			CategorizedRatings:    JSONBArray{`{"category":"acting","rating":7}`},
 			PrimaryPerspectiveID:  intPtr(4),
 			RelatedPerspectiveIDs: Int64Array{10, 20},
@@ -267,8 +265,6 @@ func TestPerspectiveModelToDomain(t *testing.T) {
 		})
 		require.NotNil(t, got)
 		assert.Equal(t, domain.PrivacyPublic, got.Privacy)
-		require.NotNil(t, got.ReviewStatus)
-		assert.Equal(t, domain.ReviewStatusApproved, *got.ReviewStatus)
 		assert.Equal(t, []int{1, 2, 3}, got.Parts)
 		assert.Equal(t, []string{"a", "b"}, got.Labels)
 		assert.Equal(t, []domain.CategorizedRating{{Category: "acting", Rating: 7}}, got.CategorizedRatings)
@@ -312,7 +308,6 @@ func TestPerspectiveDomainToModel(t *testing.T) {
 	})
 
 	t.Run("full domain maps every field with case conversion", func(t *testing.T) {
-		rs := domain.ReviewStatusPending
 		got := perspectiveDomainToModel(&domain.Perspective{
 			ID:                    5,
 			UserID:                2,
@@ -325,7 +320,6 @@ func TestPerspectiveDomainToModel(t *testing.T) {
 			Privacy:               domain.PrivacyPublic,
 			Description:           strPtr("desc"),
 			Category:              strPtr("film"),
-			ReviewStatus:          &rs,
 			Parts:                 []int{1, 2, 3},
 			Labels:                []string{"a", "b"},
 			CategorizedRatings:    []domain.CategorizedRating{{Category: "acting", Rating: 7}},
@@ -337,8 +331,6 @@ func TestPerspectiveDomainToModel(t *testing.T) {
 			UpdatedAt:             mapperFixedTime,
 		})
 		require.NotNil(t, got)
-		require.NotNil(t, got.ReviewStatus)
-		assert.Equal(t, "pending", *got.ReviewStatus)
 		assert.Equal(t, Int64Array{1, 2, 3}, got.Parts)
 		assert.Equal(t, StringArray{"a", "b"}, got.Labels)
 		assert.Equal(t, JSONBArray{`{"category":"acting","rating":7}`}, got.CategorizedRatings)
@@ -350,13 +342,11 @@ func TestPerspectiveDomainToModel(t *testing.T) {
 }
 
 func TestPerspectiveMappers_RoundTrip(t *testing.T) {
-	rs := domain.ReviewStatusRejected
 	original := &domain.Perspective{
 		ID:                    5,
 		UserID:                2,
 		ContentID:             intPtr(11),
 		Privacy:               domain.PrivacyPublic,
-		ReviewStatus:          &rs,
 		Parts:                 []int{1, 2},
 		Labels:                []string{"x"},
 		CategorizedRatings:    []domain.CategorizedRating{{Category: "pace", Rating: 4}},
@@ -370,8 +360,6 @@ func TestPerspectiveMappers_RoundTrip(t *testing.T) {
 	assert.Equal(t, original.ID, roundTripped.ID)
 	assert.Equal(t, original.UserID, roundTripped.UserID)
 	assert.Equal(t, original.Privacy, roundTripped.Privacy)
-	require.NotNil(t, roundTripped.ReviewStatus)
-	assert.Equal(t, *original.ReviewStatus, *roundTripped.ReviewStatus)
 	assert.Equal(t, original.Parts, roundTripped.Parts)
 	assert.Equal(t, original.Labels, roundTripped.Labels)
 	assert.Equal(t, original.CategorizedRatings, roundTripped.CategorizedRatings)

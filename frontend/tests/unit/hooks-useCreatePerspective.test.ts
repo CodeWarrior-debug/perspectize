@@ -306,7 +306,7 @@ describe('useCreatePerspective hook', () => {
 		});
 
 		it('a typed refusal shows its owner message once, with no Retry action', () => {
-			const err = new Error('access denied: review status is set by moderators') as Error & { response: unknown };
+			const err = new Error('access denied: you can only modify your own perspectives') as Error & { response: unknown };
 			err.response = { errors: [{ message: err.message, extensions: { code: 'FORBIDDEN' } }] };
 			capturedMutationOptions.onError(err, { userID: 42, contentID: 10, quality: 7500 });
 			expect(mockToastError).toHaveBeenCalledWith('You can only change your own perspectives');

@@ -100,7 +100,7 @@ Order: domain model (`core/domain/`) → repository port (`core/ports/repositori
 
 **GORM tracing is in-house** (`pkg/database/tracing.go`). Don't add `gorm.io/plugin/opentelemetry` (it pulls ClickHouse + MySQL drivers into the binary). SQL spans are named `"<VERB> <table>"` (e.g. `SELECT content`).
 
-**`Perspective.ReviewStatus` is moderation state** (`PENDING`/`APPROVED`/`REJECTED`); put draft/imported markers in `labels` or `customFields`.
+**Draft or imported markers on a perspective** go in `labels` or `customFields`.
 
 ### Enum & ID Handling (REQUIRED)
 
