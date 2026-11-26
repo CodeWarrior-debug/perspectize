@@ -132,6 +132,10 @@ export default defineConfig({
 		},
 	},
 	test: {
+		// Vitest 5 takes a project's attachmentsDir from this root config, not from
+		// vitest.config.browser.ts, so the browser failure screenshots need it here.
+		// Same default as SCREENSHOT_DIR in that file.
+		attachmentsDir: process.env.SV_SCREENSHOTS_DIR ?? '/Users/jamesjordan/Downloads/screenshots',
 		// In CI, also write every result to a file (uploaded by frontend-test.yml), so
 		// when several files fail under load none of them scrolls off the log (#728).
 		// `github-actions` keeps the inline PR annotations that overriding `reporters`
