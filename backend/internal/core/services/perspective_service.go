@@ -235,11 +235,8 @@ func (s *PerspectiveService) Update(ctx context.Context, input portservices.Upda
 	if err != nil {
 		return nil, fmt.Errorf("failed to get perspective: %w", err)
 	}
-	if existing.UserID != actorUserID {
-		// Only a PUBLIC perspective is known to be visible to this user.
-		// Anything else answers as if it didn't exist rather than confirming
-		// the id -- matching perspectiveByID's null for non-owners.
-		if existing.Privacy == domain.PrivacyPublic {
+	if !(domain.Audience{Privacy: existing.Privacy, OwnerID: existing.UserID}).WritableBy(actorUserID) {
+		if err := domain.NonOwnerWriteError(existing.Privacy); errors.Is(err, domain.ErrForbidden) {
 			return nil, fmt.Errorf("%w: you can only modify your own perspectives", domain.ErrForbidden)
 		}
 		return nil, fmt.Errorf("failed to get perspective: %w", domain.ErrNotFound)
@@ -364,8 +361,10 @@ func (s *PerspectiveService) Delete(ctx context.Context, id int, actorUserID int
 	// Someone else's perspective. Only a PUBLIC one is known to be visible to
 	// this user; anything else answers as if it didn't exist rather than
 	// confirming the id -- matching perspectiveByID's null for non-owners.
-	if existing.UserID != actorUserID && existing.Privacy == domain.PrivacyPublic {
-		return fmt.Errorf("%w: you can only delete your own perspectives", domain.ErrForbidden)
+	if !(domain.Audience{Privacy: existing.Privacy, OwnerID: existing.UserID}).WritableBy(actorUserID) {
+		if err := domain.NonOwnerWriteError(existing.Privacy); errors.Is(err, domain.ErrForbidden) {
+			return fmt.Errorf("%w: you can only delete your own perspectives", domain.ErrForbidden)
+		}
 	}
 	return fmt.Errorf("failed to delete perspective: %w", domain.ErrNotFound)
 }
@@ -419,13 +418,13 @@ func (s *PerspectiveService) CountVisibleByContentIDs(ctx context.Context, conte
 
 // FeelingStats computes feeling count/average/stddev intensity — see
 // domain.FeelingStats and the repository's FeelingStats doc comment. A thin
-// passthrough with input validation; no auth restriction needed since this
-// never exposes any individual perspective's content, only an aggregate.
-func (s *PerspectiveService) FeelingStats(ctx context.Context, contentID *int, emoji string, label *string) (*domain.FeelingStats, error) {
+// passthrough with input validation. The repository scopes the count to what
+// viewerID may read, so content the viewer cannot read counts as no content.
+func (s *PerspectiveService) FeelingStats(ctx context.Context, contentID *int, emoji string, label *string, viewerID *int) (*domain.FeelingStats, error) {
 	if emoji == "" {
 		return nil, fmt.Errorf("%w: emoji is required", domain.ErrInvalidInput)
 	}
-	stats, err := s.repo.FeelingStats(ctx, contentID, emoji, label)
+	stats, err := s.repo.FeelingStats(ctx, contentID, emoji, label, viewerID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to compute feeling stats: %w", err)
 	}
@@ -435,11 +434,11 @@ func (s *PerspectiveService) FeelingStats(ctx context.Context, contentID *int, e
 // CustomFieldStats computes how many perspectives set the given
 // CustomFields key — see domain.CustomFieldStats and the repository's
 // CustomFieldStats doc comment.
-func (s *PerspectiveService) CustomFieldStats(ctx context.Context, contentID *int, key string) (*domain.CustomFieldStats, error) {
+func (s *PerspectiveService) CustomFieldStats(ctx context.Context, contentID *int, key string, viewerID *int) (*domain.CustomFieldStats, error) {
 	if key == "" {
 		return nil, fmt.Errorf("%w: key is required", domain.ErrInvalidInput)
 	}
-	stats, err := s.repo.CustomFieldStats(ctx, contentID, key)
+	stats, err := s.repo.CustomFieldStats(ctx, contentID, key, viewerID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to compute custom field stats: %w", err)
 	}

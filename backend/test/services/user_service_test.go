@@ -233,10 +233,10 @@ func (m *mockPerspectiveRepoForUser) AggregateByContentIDs(ctx context.Context, 
 func (m *mockPerspectiveRepoForUser) CountVisibleByContentIDs(ctx context.Context, contentIDs []int, viewerID *int) (map[int]int, error) {
 	return map[int]int{}, nil
 }
-func (m *mockPerspectiveRepoForUser) FeelingStats(ctx context.Context, contentID *int, emoji string, label *string) (*domain.FeelingStats, error) {
+func (m *mockPerspectiveRepoForUser) FeelingStats(ctx context.Context, contentID *int, emoji string, label *string, viewerID *int) (*domain.FeelingStats, error) {
 	return &domain.FeelingStats{Emoji: emoji, Label: label}, nil
 }
-func (m *mockPerspectiveRepoForUser) CustomFieldStats(ctx context.Context, contentID *int, key string) (*domain.CustomFieldStats, error) {
+func (m *mockPerspectiveRepoForUser) CustomFieldStats(ctx context.Context, contentID *int, key string, viewerID *int) (*domain.CustomFieldStats, error) {
 	return &domain.CustomFieldStats{Key: key}, nil
 }
 

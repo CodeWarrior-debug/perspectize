@@ -219,7 +219,7 @@ func (r *queryResolver) Perspectives(ctx context.Context, first *int, after *str
 
 // FeelingStats is the resolver for the feelingStats field.
 func (r *queryResolver) FeelingStats(ctx context.Context, contentID *int, emoji string, label *string) (*model.FeelingStats, error) {
-	stats, err := r.PerspectiveService.FeelingStats(ctx, contentID, emoji, label)
+	stats, err := r.PerspectiveService.FeelingStats(ctx, contentID, emoji, label, statsViewer(ctx))
 	if err != nil {
 		if errors.Is(err, domain.ErrInvalidInput) {
 			return nil, fmt.Errorf("invalid feelingStats arguments: %w", err)
@@ -241,7 +241,7 @@ func (r *queryResolver) FeelingStats(ctx context.Context, contentID *int, emoji 
 
 // CustomFieldStats is the resolver for the customFieldStats field.
 func (r *queryResolver) CustomFieldStats(ctx context.Context, contentID *int, key string) (*model.CustomFieldStats, error) {
-	stats, err := r.PerspectiveService.CustomFieldStats(ctx, contentID, key)
+	stats, err := r.PerspectiveService.CustomFieldStats(ctx, contentID, key, statsViewer(ctx))
 	if err != nil {
 		if errors.Is(err, domain.ErrInvalidInput) {
 			return nil, fmt.Errorf("invalid customFieldStats arguments: %w", err)

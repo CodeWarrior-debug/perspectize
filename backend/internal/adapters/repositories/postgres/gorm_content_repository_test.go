@@ -384,8 +384,8 @@ func TestGormContentRepository_UpdatePrimaryCategoryID_ViewerScope(t *testing.T)
 
 	t.Run("one scoped UPDATE ... RETURNING binding the viewer id", func(t *testing.T) {
 		db, mock := newMockDB(t)
-		mock.ExpectQuery(`UPDATE "content" SET .* WHERE id = .* AND \(privacy = 'public' OR added_by_user_id = .*\) RETURNING`).
-			WithArgs(int64(9), sqlmock.AnyArg(), int64(11), int64(7)).
+		mock.ExpectQuery(`UPDATE "content" SET .* WHERE id = .* AND \(privacy = .* OR added_by_user_id = .*\) RETURNING`).
+			WithArgs(int64(9), sqlmock.AnyArg(), int64(11), "public", int64(7)).
 			WillReturnRows(contentRows().AddRow(11, "claim", nil, "claim", 7, nil, nil, nil, 9, contentRepoTime, contentRepoTime))
 
 		c := querycount.Attach(t, db)
@@ -399,8 +399,8 @@ func TestGormContentRepository_UpdatePrimaryCategoryID_ViewerScope(t *testing.T)
 
 	t.Run("zero rows (missing or another user's private row) is ErrNotFound in one statement", func(t *testing.T) {
 		db, mock := newMockDB(t)
-		mock.ExpectQuery(`UPDATE "content" SET .* WHERE id = .* AND \(privacy = 'public' OR added_by_user_id = .*\) RETURNING`).
-			WithArgs(int64(9), sqlmock.AnyArg(), int64(11), int64(8)).
+		mock.ExpectQuery(`UPDATE "content" SET .* WHERE id = .* AND \(privacy = .* OR added_by_user_id = .*\) RETURNING`).
+			WithArgs(int64(9), sqlmock.AnyArg(), int64(11), "public", int64(8)).
 			WillReturnRows(contentRows())
 
 		c := querycount.Attach(t, db)
