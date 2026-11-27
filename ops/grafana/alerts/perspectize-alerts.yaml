@@ -2,9 +2,13 @@
 # (apiVersion 1 / groups / rules). Locally, docker-compose.observability.yml
 # mounts this file at /otel-lgtm/grafana/conf/provisioning/alerting/.
 #
-# Tracer set: ONE rule, the "Operation latency" row of the spec's alert table
-# (docs/superpowers/specs/2026-09-26-observability-design.md). The rest of
-# that table is added once this one has been proven end to end.
+# Two rules: the "Operation latency" row of the spec's alert table
+# (docs/superpowers/specs/2026-09-26-observability-design.md), and a
+# backend-silent rule, because a latency rule can't fire when nothing reports.
+# The rest of that table is not set up yet.
+#
+# Rules carry no notification settings: contact points belong to the Grafana
+# instance — see ops/grafana/README.md.
 #
 # datasourceUid "prometheus" is the uid otel-lgtm provisions
 # (docker/grafana-datasources.yaml). Provisioned alert rules can't use a
@@ -80,3 +84,56 @@ groups:
             Open the "Perspectize API" dashboard, then Explore -> Tempo with
             {resource.service.name="perspectize-backend" && duration > 1s}
             to find the slow traces.
+      - uid: perspectize-backend-silent
+        title: Perspectize backend has stopped reporting
+        condition: C
+        data:
+          # A: 1 when app_build_info has had no sample for 5m, otherwise no
+          # series. The gauge is exported on a timer, so it keeps arriving
+          # when there is no traffic.
+          - refId: A
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: prometheus
+            model:
+              refId: A
+              editorMode: code
+              expr: absent_over_time(app_build_info{job="perspectize-backend"}[5m])
+              instant: true
+              range: false
+              intervalMs: 60000
+              maxDataPoints: 43200
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              refId: B
+              type: reduce
+              expression: A
+              reducer: last
+              settings:
+                mode: dropNN
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              refId: C
+              type: threshold
+              expression: B
+              conditions:
+                - evaluator:
+                    type: gt
+                    params:
+                      - 0
+        for: 2m
+        # No series from A means the backend is reporting.
+        noDataState: OK
+        execErrState: Error
+        isPaused: false
+        labels:
+          service: perspectize-backend
+          severity: warning
+        annotations:
+          summary: "No metrics from the Perspectize backend for over 5 minutes"
+          description: >-
+            The backend may be down, or its OTLP export is broken. Check that
+            the app is running, then GET /version.

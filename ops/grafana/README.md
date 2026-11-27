@@ -62,17 +62,18 @@ and Grafana Cloud does the same. So the same PromQL works in both places. If Clo
 reports a different `job` value, the `$job` picker's regex `/perspectize-backend/`
 still matches it.
 
-### Alert rule
+### Alert rules
 
 Provisioned alert rules can't use dashboard template variables. The YAML hard-codes
 `datasourceUid: prometheus` (the local uid). Grafana Cloud has no filesystem
 provisioning, so use one of these options:
 
-- **UI (simplest, matches the plan's import-then-export flow):**
+- **UI (simplest, matches the plan's import-then-export flow), once per rule:**
   1. Alerting → Alert rules → New alert rule. Paste query A's PromQL from the YAML and
      pick the Cloud Prometheus datasource.
-  2. Add reduce B (Last, "Drop non-numeric values") and threshold C (`> 1`). Set
-     pending period 10m, no-data → OK, and folder/group `Perspectize` / `perspectize-api`.
+  2. Add reduce B (Last, "Drop non-numeric values") and threshold C (the rule's value in
+     the YAML). Set the rule's pending period, no-data → OK, and folder/group
+     `Perspectize` / `perspectize-api`.
   3. Then More → Export → YAML, and commit the export over `alerts/perspectize-alerts.yaml`.
 - **Provisioning HTTP API:** replace `datasourceUid: prometheus` with the Cloud uid.
   Find it under Connections → Data sources → the Prometheus datasource, where it's the
@@ -81,4 +82,13 @@ provisioning, so use one of these options:
   (`uid`, `title`, `condition`, `data`, `for`, `noDataState`, `execErrState`, `labels`,
   `annotations`), plus `folderUID` and `ruleGroup`.
 
-Before the rule can notify anyone, set a contact point (Manual step M6 in the plan).
+### Notifications
+
+A rule notifies nobody until it has a contact point. In Cloud, create an email contact
+point and select it **on each Perspectize rule** ("Configure notifications" → "Select
+contact point"). Leave the default notification policy alone: Grafana Cloud ships many
+built-in rules, and routing the default to email would send their alerts too.
+
+Contact points and recipient addresses stay in Grafana, not in this repo. If you export
+a rule over the YAML, remove its `notification_settings` block, because the local stack
+has no contact point of that name.
