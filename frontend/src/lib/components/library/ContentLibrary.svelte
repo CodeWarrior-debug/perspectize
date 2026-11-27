@@ -728,7 +728,6 @@
 	<div
 		class="shrink-0 flex flex-col md:flex-row items-start md:items-center justify-between gap-2 md:gap-0 px-2 md:pl-4 md:pr-20 py-1 border-t border-border text-xs md:text-sm"
 	>
-		<!-- flex-wrap: at 320px the controls don't fit one row, so they drop to a second row whole instead of squeezing a label onto two lines. -->
 		<div class="flex flex-wrap items-center gap-2 md:gap-4">
 			<div class="whitespace-nowrap text-muted-foreground">
 				{totalCount} total
