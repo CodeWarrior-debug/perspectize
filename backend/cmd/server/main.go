@@ -190,17 +190,19 @@ func main() {
 	bibleReferenceRepo := postgres.NewGormBibleReferenceRepository(db)
 	buildInfoRepo := postgres.NewGormBuildInfoRepository(db)
 	importRepo := postgres.NewGormImportJobRepository(db)
+	savedItemRepo := postgres.NewGormSavedItemRepository(db)
 
 	// Initialize services
 	contentService := services.NewContentService(contentRepo, ext.YouTube, ext.Movie,
 		append(ext.ContentOptions(), services.WithBibleReference(bibleReferenceRepo))...)
 	userService := services.NewUserService(userRepo, contentRepo, perspectiveRepo, todoRepo, todoListRepo, todoActionRepo,
-		services.WithImportJobRepository(importRepo))
+		services.WithImportJobRepository(importRepo), services.WithSavedItemRepository(savedItemRepo))
 	perspectiveService := services.NewPerspectiveService(perspectiveRepo, userRepo,
 		services.WithContentRepository(contentRepo),
 		services.WithLinkedPerspectiveReader(perspectiveRepo))
 	categoryService := services.NewCategoryService(categoryRepo, contentRepo, ext.Wikidata)
 	userTodoService := services.NewUserTodoService(todoRepo, todoListRepo, todoActionRepo)
+	savedItemService := services.NewSavedItemService(savedItemRepo)
 	buildInfoService := services.NewBuildInfoService(buildInfoRepo)
 
 	// Import staging runs listing and imports in background goroutines tied to
@@ -270,6 +272,7 @@ func main() {
 		PerspectiveService:  perspectiveService,
 		CategoryService:     categoryService,
 		UserTodoService:     userTodoService,
+		SavedItemService:    savedItemService,
 		MessagingService:    messagingService,
 		ImportService:       importService,
 		Identity:            identity,

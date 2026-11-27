@@ -24,6 +24,7 @@ type Resolver struct {
 	PerspectiveService portservices.PerspectiveService
 	CategoryService    portservices.CategoryService
 	UserTodoService    portservices.UserTodoService
+	SavedItemService   portservices.SavedItemService
 	// ImportService is set after NewResolver by cmd/server (nil in tests that
 	// don't exercise imports; the import resolvers then report "not configured").
 	ImportService portservices.ImportService
@@ -41,6 +42,7 @@ func NewResolver(
 	perspectiveService portservices.PerspectiveService,
 	categoryService portservices.CategoryService,
 	userTodoService portservices.UserTodoService,
+	savedItemService portservices.SavedItemService,
 	messagingService portservices.MessagingService,
 	hub *realtime.Hub,
 	presence *realtime.PresenceTracker,
@@ -51,6 +53,7 @@ func NewResolver(
 		PerspectiveService: perspectiveService,
 		CategoryService:    categoryService,
 		UserTodoService:    userTodoService,
+		SavedItemService:   savedItemService,
 		Messaging:          messagingService,
 		Hub:                hub,
 		Presence:           presence,

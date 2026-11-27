@@ -18,7 +18,7 @@ The first worked example is **Bang for Buck**: TMDB score per $1M of budget. It 
 
 One table, `user_saved_items`, holds everything a person saves: formulas now, and later themes, views (column set, filters, sort) and settings. A `type` column limits what a row may be. Privacy is built in, matching ADR 0002.
 
-### Schema (migration 000039, written and reviewed only; never applied during dev)
+### Schema (migration 000042, written and reviewed only; never applied during dev)
 
 ```sql
 CREATE TABLE IF NOT EXISTS public.user_saved_items (

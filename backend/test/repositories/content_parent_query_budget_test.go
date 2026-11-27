@@ -48,7 +48,7 @@ func listRequestStatements(t *testing.T, selection string, pages int) int {
 		AddRow(9, "example.com", "https://example.com/", "website", 1, "public", nil, now, now))
 
 	contentService := services.NewContentService(postgres.NewGormContentRepository(db), nil, nil)
-	resolver := resolvers.NewResolver(contentService, nil, nil, nil, nil, nil, nil, nil)
+	resolver := resolvers.NewResolver(contentService, nil, nil, nil, nil, nil, nil, nil, nil)
 	srv := handler.NewDefaultServer(generated.NewExecutableSchema(generated.Config{Resolvers: resolver}))
 	h := dataloader.Middleware(dataloader.Services{Content: contentService})(srv)
 

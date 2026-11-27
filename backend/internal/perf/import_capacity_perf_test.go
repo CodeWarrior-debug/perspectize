@@ -760,7 +760,7 @@ func newProbeHandler(db *gorm.DB, contentRepo *postgres.GormContentRepository, c
 	categoryService := services.NewCategoryService(postgres.NewGormCategoryRepository(db), contentRepo, nil)
 	perspectiveService := services.NewPerspectiveService(perspectiveRepo, userRepo)
 	userService := services.NewUserService(userRepo, contentRepo, perspectiveRepo, nil, nil, nil)
-	resolver := resolvers.NewResolver(contentService, userService, perspectiveService, categoryService, nil, nil, nil, nil)
+	resolver := resolvers.NewResolver(contentService, userService, perspectiveService, categoryService, nil, nil, nil, nil, nil)
 	srv := handler.New(generated.NewExecutableSchema(generated.Config{
 		Resolvers: resolver,
 		Directives: generated.DirectiveRoot{

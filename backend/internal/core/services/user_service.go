@@ -22,6 +22,7 @@ type UserService struct {
 	listRepo        repositories.UserTodoListRepository
 	actionRepo      repositories.TodoActionRepository
 	importRepo      repositories.ImportJobRepository
+	savedItemRepo   repositories.SavedItemRepository
 }
 
 // UserServiceOption configures optional UserService dependencies.
@@ -30,6 +31,11 @@ type UserServiceOption func(*UserService)
 // WithImportJobRepository lets Delete reassign the imports a user created.
 func WithImportJobRepository(repo repositories.ImportJobRepository) UserServiceOption {
 	return func(s *UserService) { s.importRepo = repo }
+}
+
+// WithSavedItemRepository lets Delete reassign the saved items a user owns.
+func WithSavedItemRepository(repo repositories.SavedItemRepository) UserServiceOption {
+	return func(s *UserService) { s.savedItemRepo = repo }
 }
 
 // NewUserService creates a new user service
@@ -233,9 +239,9 @@ func (s *UserService) Update(ctx context.Context, actor *domain.AuthenticatedUse
 	return updated, nil
 }
 
-// Delete reassigns the user's content, perspectives, todos, todo lists and
-// custom todo actions to the sentinel "[deleted]" user, then removes the user
-// row.
+// Delete reassigns the user's content, perspectives, todos, todo lists, custom
+// todo actions, imports and saved items to the sentinel "[deleted]" user, then
+// removes the user row.
 func (s *UserService) Delete(ctx context.Context, actor *domain.AuthenticatedUser, id int) error {
 	if id <= 0 {
 		return fmt.Errorf("%w: user id must be a positive integer", domain.ErrInvalidInput)
@@ -280,6 +286,11 @@ func (s *UserService) Delete(ctx context.Context, actor *domain.AuthenticatedUse
 	if s.importRepo != nil {
 		if err := s.importRepo.ReassignByUser(ctx, id, sentinel.ID); err != nil {
 			return fmt.Errorf("failed to reassign imports: %w", err)
+		}
+	}
+	if s.savedItemRepo != nil {
+		if err := s.savedItemRepo.ReassignByUser(ctx, id, sentinel.ID); err != nil {
+			return fmt.Errorf("failed to reassign saved items: %w", err)
 		}
 	}
 

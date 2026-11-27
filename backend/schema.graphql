@@ -1003,6 +1003,22 @@ type Mutation {
   # Rewrites the list's positions to 1..N in the order of todoIds.
   reorderUserTodoList(listId: IntID!, todoIds: [IntID!]!): [UserTodo!]! @auth
 
+  # Saved items. Ownership is enforced in SavedItemService and the owner-scoped
+  # SQL under it; the actor is the session user, never a client id.
+  createSavedFormula(input: CreateSavedFormulaInput!): SavedFormula! @auth
+  updateSavedFormula(input: UpdateSavedFormulaInput!): SavedFormula! @auth
+  deleteSavedItem(id: ID!): Boolean! @auth
+  # Undoes a delete. Fails with "not found" when the name is in use again.
+  restoreSavedItem(id: ID!): SavedItem! @auth
+  # A link can be made PUBLIC only while its source is public.
+  setSavedItemPrivacy(id: ID!, privacy: Privacy!): SavedItem! @auth
+  # Copies a public item into a new PRIVATE item the caller owns.
+  copySavedItem(id: ID!): SavedItem! @auth
+  # Links to a public item. The new item stores no payload and reads its source's.
+  linkSavedItem(id: ID!): SavedItem! @auth
+  # Turns a link the caller owns into a copy, while its source is still readable.
+  convertLinkToCopy(id: ID!): SavedItem! @auth
+
   # Import staging. Anyone signed in may create an import. An admin's is approved
   # at once and starts listing in the background (its sources come back LISTING);
   # anyone else's is a request awaiting review, with its sources WAITING.
@@ -1141,6 +1157,14 @@ type Query {
 
   # Presets plus the caller's own actions, in picker order.
   todoActions: [TodoAction!]! @auth
+
+  # Saved formulas the caller owns, live rows only. Needs a signed-in caller.
+  mySavedFormulas(first: Int = 10, after: String, includeTotalCount: Boolean = false): PaginatedSavedFormulas!
+  # Public saved formulas plus the caller's own, live rows only. Anonymous callers
+  # see public rows.
+  sharedFormulas(first: Int = 10, after: String, includeTotalCount: Boolean = false): PaginatedSavedFormulas!
+  # Null for an item that doesn't exist, is deleted, or is someone else's PRIVATE item.
+  savedItem(id: ID!): SavedItem
 
   # Import staging (preliminary pages; not linked from the main nav).
   # Closed imports are included only for an admin passing includeClosed.
@@ -1322,4 +1346,82 @@ input UpdateUserTodoListInput {
   "Omit = unchanged; null = clear."
   description: String
   privacy: Privacy
+}
+
+# Saved items: one store for what a person saves (formulas now; themes, views and
+# settings later). Spec: docs/superpowers/specs/2026-11-20-custom-columns-and-saved-items-design.md.
+enum SavedItemType {
+  FORMULA
+  THEME
+  VIEW
+  SETTING
+}
+
+enum SavedItemOrigin {
+  OWN
+  COPY
+  LINK
+}
+
+# Shared shape of every saved item. Only SavedFormula implements it for now.
+interface SavedItem {
+  id: ID!
+  type: SavedItemType!
+  name: String!
+  privacy: Privacy!
+  origin: SavedItemOrigin!
+  "Source item of a copy or link. Null when the source is no longer readable."
+  sourceId: ID
+  "False when a copy or link's source is private or deleted."
+  sourceAvailable: Boolean!
+  payloadVersion: Int!
+  user: User!
+  "ISO timestamp."
+  createdAt: String!
+  "ISO timestamp."
+  updatedAt: String!
+}
+
+type SavedFormula implements SavedItem {
+  id: ID!
+  type: SavedItemType!
+  name: String!
+  privacy: Privacy!
+  origin: SavedItemOrigin!
+  "Source item of a copy or link. Null when the source is no longer readable."
+  sourceId: ID
+  "False when a copy or link's source is private or deleted."
+  sourceAvailable: Boolean!
+  payloadVersion: Int!
+  user: User!
+  "ISO timestamp."
+  createdAt: String!
+  "ISO timestamp."
+  updatedAt: String!
+  "Expression tree plus display options. Null for a link whose source is unreadable."
+  payload: JSON
+}
+
+type PaginatedSavedFormulas {
+  items: [SavedFormula!]!
+  pageInfo: PageInfo!
+  totalCount: Int
+}
+
+input CreateSavedFormulaInput {
+  name: String!
+  "Formula expression tree, validated by the backend."
+  payload: JSON!
+  "Defaults to PRIVATE."
+  privacy: Privacy
+}
+
+"""
+Partial update: omit a field to leave it unchanged. The payload cannot be
+cleared, and a link has no payload to change.
+"""
+input UpdateSavedFormulaInput {
+  id: IntID!
+  name: String
+  payload: JSON
 }

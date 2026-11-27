@@ -254,7 +254,7 @@ func utServer(t *testing.T, fx utFixture, viewer int) *httptest.Server {
 	categoryService := services.NewCategoryService(&mockCategoryRepository{}, contentRepo, &mockWikidataClient{})
 	todoService := services.NewUserTodoService(fx.todos, fx.lists, fx.actions)
 
-	resolver := resolvers.NewResolver(contentService, userService, perspectiveService, categoryService, todoService, nil, nil, nil)
+	resolver := resolvers.NewResolver(contentService, userService, perspectiveService, categoryService, todoService, nil, nil, nil, nil)
 	directiveRoot := directives.NewDirectiveRoot(contentService, perspectiveService)
 	gqlConfig := generated.Config{
 		Resolvers: resolver,

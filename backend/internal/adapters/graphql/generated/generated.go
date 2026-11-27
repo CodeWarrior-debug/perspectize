@@ -37,6 +37,7 @@ type ResolverRoot interface {
 	Mutation() MutationResolver
 	Perspective() PerspectiveResolver
 	Query() QueryResolver
+	SavedFormula() SavedFormulaResolver
 	Subscription() SubscriptionResolver
 	ThreadParticipant() ThreadParticipantResolver
 	User() UserResolver
@@ -366,6 +367,8 @@ type ComplexityRoot struct {
 		AddThreadParticipants           func(childComplexity int, threadID string, userIds []string) int
 		ClearPassageDisplayTitle        func(childComplexity int, contentID int) int
 		CloseImportJob                  func(childComplexity int, input model.CloseImportJobInput) int
+		ConvertLinkToCopy               func(childComplexity int, id string) int
+		CopySavedItem                   func(childComplexity int, id string) int
 		CreateClaim                     func(childComplexity int, input model.CreateClaimInput) int
 		CreateContent                   func(childComplexity int, input model.CreateContentInput) int
 		CreateContentFromBook           func(childComplexity int, input model.CreateContentFromBookInput) int
@@ -377,6 +380,7 @@ type ComplexityRoot struct {
 		CreateImportJob                 func(childComplexity int, input model.CreateImportJobInput) int
 		CreateMessageThread             func(childComplexity int, input model.CreateMessageThreadInput) int
 		CreatePerspective               func(childComplexity int, input model.CreatePerspectiveInput) int
+		CreateSavedFormula              func(childComplexity int, input model.CreateSavedFormulaInput) int
 		CreateTodoAction                func(childComplexity int, input model.CreateTodoActionInput) int
 		CreateUser                      func(childComplexity int, input model.CreateUserInput) int
 		CreateUserTodo                  func(childComplexity int, input model.CreateUserTodoInput) int
@@ -384,29 +388,34 @@ type ComplexityRoot struct {
 		DeleteClaim                     func(childComplexity int, id string, keepAnonymous *bool) int
 		DeleteMessage                   func(childComplexity int, messageID string) int
 		DeletePerspective               func(childComplexity int, id string) int
+		DeleteSavedItem                 func(childComplexity int, id string) int
 		DeleteUser                      func(childComplexity int, id string) int
 		DeleteUserTodo                  func(childComplexity int, id string) int
 		DeleteUserTodoList              func(childComplexity int, id string) int
 		EditMessage                     func(childComplexity int, messageID string, body string) int
 		ImportItems                     func(childComplexity int, input model.ImportItemsInput) int
 		LeaveThread                     func(childComplexity int, threadID string) int
+		LinkSavedItem                   func(childComplexity int, id string) int
 		MarkOnboardingSeen              func(childComplexity int, version int) int
 		MarkThreadRead                  func(childComplexity int, threadID string, seq int) int
 		MuteThread                      func(childComplexity int, threadID string, muted bool) int
 		RemovePrimaryCategory           func(childComplexity int, contentID int) int
 		ReorderUserTodoList             func(childComplexity int, listID int, todoIds []int) int
+		RestoreSavedItem                func(childComplexity int, id string) int
 		ReviewImportJob                 func(childComplexity int, input model.ReviewImportJobInput) int
 		SendMessage                     func(childComplexity int, input model.SendMessageInput) int
 		SetImportItemsExcluded          func(childComplexity int, input model.SetImportItemsExcludedInput) int
 		SetOnboardingDisplayNextSession func(childComplexity int, displayNextSession bool) int
 		SetPassageDisplayTitle          func(childComplexity int, input model.SetPassageDisplayTitleInput) int
 		SetPrimaryCategory              func(childComplexity int, input model.SetPrimaryCategoryInput) int
+		SetSavedItemPrivacy             func(childComplexity int, id string, privacy domain.Privacy) int
 		SetTyping                       func(childComplexity int, threadID string, typing bool) int
 		StageImportFromFile             func(childComplexity int, input model.StageImportFromFileInput) int
 		UpdateClaim                     func(childComplexity int, id string, input model.UpdateClaimInput) int
 		UpdateContentSourceData         func(childComplexity int, contentID int) int
 		UpdateImportJobDescription      func(childComplexity int, input model.UpdateImportJobDescriptionInput) int
 		UpdatePerspective               func(childComplexity int, input model.UpdatePerspectiveInput) int
+		UpdateSavedFormula              func(childComplexity int, input model.UpdateSavedFormulaInput) int
 		UpdateUser                      func(childComplexity int, input model.UpdateUserInput) int
 		UpdateUserTodo                  func(childComplexity int, input model.UpdateUserTodoInput) int
 		UpdateUserTodoList              func(childComplexity int, input model.UpdateUserTodoListInput) int
@@ -426,6 +435,12 @@ type ComplexityRoot struct {
 	}
 
 	PaginatedPerspectives struct {
+		Items      func(childComplexity int) int
+		PageInfo   func(childComplexity int) int
+		TotalCount func(childComplexity int) int
+	}
+
+	PaginatedSavedFormulas struct {
 		Items      func(childComplexity int) int
 		PageInfo   func(childComplexity int) int
 		TotalCount func(childComplexity int) int
@@ -508,11 +523,14 @@ type ComplexityRoot struct {
 		MessageThreads     func(childComplexity int, first *int, before *string) int
 		MovieSearch        func(childComplexity int, query string, page *int) int
 		MovieTrending      func(childComplexity int, window *domain.TrendingWindow, page *int) int
+		MySavedFormulas    func(childComplexity int, first *int, after *string, includeTotalCount *bool) int
 		PassageInterlinear func(childComplexity int, startVerseID int, endVerseID int) int
 		PassageText        func(childComplexity int, startVerseID int, endVerseID int) int
 		PerspectiveByID    func(childComplexity int, id string) int
 		Perspectives       func(childComplexity int, first *int, after *string, last *int, before *string, sortBy *domain.PerspectiveSortBy, sortOrder *domain.SortOrder, includeTotalCount *bool, filter *model.PerspectiveFilter) int
 		PreviewWebPage     func(childComplexity int, url string) int
+		SavedItem          func(childComplexity int, id string) int
+		SharedFormulas     func(childComplexity int, first *int, after *string, includeTotalCount *bool) int
 		ThreadMessages     func(childComplexity int, threadID string, first *int, before *int) int
 		TodoActions        func(childComplexity int) int
 		UserByID           func(childComplexity int, id string) int
@@ -529,6 +547,21 @@ type ComplexityRoot struct {
 		LastReadSeq func(childComplexity int) int
 		ThreadID    func(childComplexity int) int
 		UserID      func(childComplexity int) int
+	}
+
+	SavedFormula struct {
+		CreatedAt       func(childComplexity int) int
+		ID              func(childComplexity int) int
+		Name            func(childComplexity int) int
+		Origin          func(childComplexity int) int
+		Payload         func(childComplexity int) int
+		PayloadVersion  func(childComplexity int) int
+		Privacy         func(childComplexity int) int
+		SourceAvailable func(childComplexity int) int
+		SourceID        func(childComplexity int) int
+		Type            func(childComplexity int) int
+		UpdatedAt       func(childComplexity int) int
+		User            func(childComplexity int) int
 	}
 
 	StreamReset struct {
@@ -722,6 +755,14 @@ type MutationResolver interface {
 	UpdateUserTodoList(ctx context.Context, input model.UpdateUserTodoListInput) (*model.UserTodoList, error)
 	DeleteUserTodoList(ctx context.Context, id string) (bool, error)
 	ReorderUserTodoList(ctx context.Context, listID int, todoIds []int) ([]*model.UserTodo, error)
+	CreateSavedFormula(ctx context.Context, input model.CreateSavedFormulaInput) (*model.SavedFormula, error)
+	UpdateSavedFormula(ctx context.Context, input model.UpdateSavedFormulaInput) (*model.SavedFormula, error)
+	DeleteSavedItem(ctx context.Context, id string) (bool, error)
+	RestoreSavedItem(ctx context.Context, id string) (model.SavedItem, error)
+	SetSavedItemPrivacy(ctx context.Context, id string, privacy domain.Privacy) (model.SavedItem, error)
+	CopySavedItem(ctx context.Context, id string) (model.SavedItem, error)
+	LinkSavedItem(ctx context.Context, id string) (model.SavedItem, error)
+	ConvertLinkToCopy(ctx context.Context, id string) (model.SavedItem, error)
 	CreateImportJob(ctx context.Context, input model.CreateImportJobInput) (*model.ImportJob, error)
 	UpdateImportJobDescription(ctx context.Context, input model.UpdateImportJobDescriptionInput) (*model.ImportJob, error)
 	AddImportJobSources(ctx context.Context, input model.AddImportJobSourcesInput) (*model.ImportJob, error)
@@ -770,12 +811,18 @@ type QueryResolver interface {
 	UserTodoByID(ctx context.Context, id string) (*model.UserTodo, error)
 	UserTodoLists(ctx context.Context, userID int) ([]*model.UserTodoList, error)
 	TodoActions(ctx context.Context) ([]*model.TodoAction, error)
+	MySavedFormulas(ctx context.Context, first *int, after *string, includeTotalCount *bool) (*model.PaginatedSavedFormulas, error)
+	SharedFormulas(ctx context.Context, first *int, after *string, includeTotalCount *bool) (*model.PaginatedSavedFormulas, error)
+	SavedItem(ctx context.Context, id string) (model.SavedItem, error)
 	ImportJobs(ctx context.Context, includeClosed *bool) ([]*model.ImportJob, error)
 	ImportJob(ctx context.Context, id string) (*model.ImportJob, error)
 	ImportItemDetails(ctx context.Context, id string) (*model.ImportItemDetails, error)
 	MessageThreads(ctx context.Context, first *int, before *string) ([]*model.MessageThread, error)
 	MessageThread(ctx context.Context, id string) (*model.MessageThread, error)
 	ThreadMessages(ctx context.Context, threadID string, first *int, before *int) (*model.MessageConnection, error)
+}
+type SavedFormulaResolver interface {
+	User(ctx context.Context, obj *model.SavedFormula) (*model.User, error)
 }
 type SubscriptionResolver interface {
 	ThreadEvents(ctx context.Context, threadID string, sinceSeq *int) (<-chan model.ThreadEvent, error)
@@ -2168,6 +2215,28 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.Mutation.CloseImportJob(childComplexity, args["input"].(model.CloseImportJobInput)), true
+	case "Mutation.convertLinkToCopy":
+		if e.ComplexityRoot.Mutation.ConvertLinkToCopy == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_convertLinkToCopy_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.ComplexityRoot.Mutation.ConvertLinkToCopy(childComplexity, args["id"].(string)), true
+	case "Mutation.copySavedItem":
+		if e.ComplexityRoot.Mutation.CopySavedItem == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_copySavedItem_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.ComplexityRoot.Mutation.CopySavedItem(childComplexity, args["id"].(string)), true
 	case "Mutation.createClaim":
 		if e.ComplexityRoot.Mutation.CreateClaim == nil {
 			break
@@ -2289,6 +2358,17 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.Mutation.CreatePerspective(childComplexity, args["input"].(model.CreatePerspectiveInput)), true
+	case "Mutation.createSavedFormula":
+		if e.ComplexityRoot.Mutation.CreateSavedFormula == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_createSavedFormula_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.ComplexityRoot.Mutation.CreateSavedFormula(childComplexity, args["input"].(model.CreateSavedFormulaInput)), true
 	case "Mutation.createTodoAction":
 		if e.ComplexityRoot.Mutation.CreateTodoAction == nil {
 			break
@@ -2366,6 +2446,17 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.Mutation.DeletePerspective(childComplexity, args["id"].(string)), true
+	case "Mutation.deleteSavedItem":
+		if e.ComplexityRoot.Mutation.DeleteSavedItem == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_deleteSavedItem_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.ComplexityRoot.Mutation.DeleteSavedItem(childComplexity, args["id"].(string)), true
 	case "Mutation.deleteUser":
 		if e.ComplexityRoot.Mutation.DeleteUser == nil {
 			break
@@ -2432,6 +2523,17 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.Mutation.LeaveThread(childComplexity, args["threadId"].(string)), true
+	case "Mutation.linkSavedItem":
+		if e.ComplexityRoot.Mutation.LinkSavedItem == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_linkSavedItem_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.ComplexityRoot.Mutation.LinkSavedItem(childComplexity, args["id"].(string)), true
 	case "Mutation.markOnboardingSeen":
 		if e.ComplexityRoot.Mutation.MarkOnboardingSeen == nil {
 			break
@@ -2487,6 +2589,17 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.Mutation.ReorderUserTodoList(childComplexity, args["listId"].(int), args["todoIds"].([]int)), true
+	case "Mutation.restoreSavedItem":
+		if e.ComplexityRoot.Mutation.RestoreSavedItem == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_restoreSavedItem_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.ComplexityRoot.Mutation.RestoreSavedItem(childComplexity, args["id"].(string)), true
 	case "Mutation.reviewImportJob":
 		if e.ComplexityRoot.Mutation.ReviewImportJob == nil {
 			break
@@ -2553,6 +2666,17 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.Mutation.SetPrimaryCategory(childComplexity, args["input"].(model.SetPrimaryCategoryInput)), true
+	case "Mutation.setSavedItemPrivacy":
+		if e.ComplexityRoot.Mutation.SetSavedItemPrivacy == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_setSavedItemPrivacy_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.ComplexityRoot.Mutation.SetSavedItemPrivacy(childComplexity, args["id"].(string), args["privacy"].(domain.Privacy)), true
 	case "Mutation.setTyping":
 		if e.ComplexityRoot.Mutation.SetTyping == nil {
 			break
@@ -2619,6 +2743,17 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.Mutation.UpdatePerspective(childComplexity, args["input"].(model.UpdatePerspectiveInput)), true
+	case "Mutation.updateSavedFormula":
+		if e.ComplexityRoot.Mutation.UpdateSavedFormula == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_updateSavedFormula_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.ComplexityRoot.Mutation.UpdateSavedFormula(childComplexity, args["input"].(model.UpdateSavedFormulaInput)), true
 	case "Mutation.updateUser":
 		if e.ComplexityRoot.Mutation.UpdateUser == nil {
 			break
@@ -2715,6 +2850,25 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.PaginatedPerspectives.TotalCount(childComplexity), true
+
+	case "PaginatedSavedFormulas.items":
+		if e.ComplexityRoot.PaginatedSavedFormulas.Items == nil {
+			break
+		}
+
+		return e.ComplexityRoot.PaginatedSavedFormulas.Items(childComplexity), true
+	case "PaginatedSavedFormulas.pageInfo":
+		if e.ComplexityRoot.PaginatedSavedFormulas.PageInfo == nil {
+			break
+		}
+
+		return e.ComplexityRoot.PaginatedSavedFormulas.PageInfo(childComplexity), true
+	case "PaginatedSavedFormulas.totalCount":
+		if e.ComplexityRoot.PaginatedSavedFormulas.TotalCount == nil {
+			break
+		}
+
+		return e.ComplexityRoot.PaginatedSavedFormulas.TotalCount(childComplexity), true
 
 	case "PaginatedUserTodos.items":
 		if e.ComplexityRoot.PaginatedUserTodos.Items == nil {
@@ -3124,6 +3278,17 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.Query.MovieTrending(childComplexity, args["window"].(*domain.TrendingWindow), args["page"].(*int)), true
+	case "Query.mySavedFormulas":
+		if e.ComplexityRoot.Query.MySavedFormulas == nil {
+			break
+		}
+
+		args, err := ec.field_Query_mySavedFormulas_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.ComplexityRoot.Query.MySavedFormulas(childComplexity, args["first"].(*int), args["after"].(*string), args["includeTotalCount"].(*bool)), true
 	case "Query.passageInterlinear":
 		if e.ComplexityRoot.Query.PassageInterlinear == nil {
 			break
@@ -3179,6 +3344,28 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.Query.PreviewWebPage(childComplexity, args["url"].(string)), true
+	case "Query.savedItem":
+		if e.ComplexityRoot.Query.SavedItem == nil {
+			break
+		}
+
+		args, err := ec.field_Query_savedItem_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.ComplexityRoot.Query.SavedItem(childComplexity, args["id"].(string)), true
+	case "Query.sharedFormulas":
+		if e.ComplexityRoot.Query.SharedFormulas == nil {
+			break
+		}
+
+		args, err := ec.field_Query_sharedFormulas_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.ComplexityRoot.Query.SharedFormulas(childComplexity, args["first"].(*int), args["after"].(*string), args["includeTotalCount"].(*bool)), true
 	case "Query.threadMessages":
 		if e.ComplexityRoot.Query.ThreadMessages == nil {
 			break
@@ -3298,6 +3485,79 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.ReadReceiptChanged.UserID(childComplexity), true
+
+	case "SavedFormula.createdAt":
+		if e.ComplexityRoot.SavedFormula.CreatedAt == nil {
+			break
+		}
+
+		return e.ComplexityRoot.SavedFormula.CreatedAt(childComplexity), true
+	case "SavedFormula.id":
+		if e.ComplexityRoot.SavedFormula.ID == nil {
+			break
+		}
+
+		return e.ComplexityRoot.SavedFormula.ID(childComplexity), true
+	case "SavedFormula.name":
+		if e.ComplexityRoot.SavedFormula.Name == nil {
+			break
+		}
+
+		return e.ComplexityRoot.SavedFormula.Name(childComplexity), true
+	case "SavedFormula.origin":
+		if e.ComplexityRoot.SavedFormula.Origin == nil {
+			break
+		}
+
+		return e.ComplexityRoot.SavedFormula.Origin(childComplexity), true
+	case "SavedFormula.payload":
+		if e.ComplexityRoot.SavedFormula.Payload == nil {
+			break
+		}
+
+		return e.ComplexityRoot.SavedFormula.Payload(childComplexity), true
+	case "SavedFormula.payloadVersion":
+		if e.ComplexityRoot.SavedFormula.PayloadVersion == nil {
+			break
+		}
+
+		return e.ComplexityRoot.SavedFormula.PayloadVersion(childComplexity), true
+	case "SavedFormula.privacy":
+		if e.ComplexityRoot.SavedFormula.Privacy == nil {
+			break
+		}
+
+		return e.ComplexityRoot.SavedFormula.Privacy(childComplexity), true
+	case "SavedFormula.sourceAvailable":
+		if e.ComplexityRoot.SavedFormula.SourceAvailable == nil {
+			break
+		}
+
+		return e.ComplexityRoot.SavedFormula.SourceAvailable(childComplexity), true
+	case "SavedFormula.sourceId":
+		if e.ComplexityRoot.SavedFormula.SourceID == nil {
+			break
+		}
+
+		return e.ComplexityRoot.SavedFormula.SourceID(childComplexity), true
+	case "SavedFormula.type":
+		if e.ComplexityRoot.SavedFormula.Type == nil {
+			break
+		}
+
+		return e.ComplexityRoot.SavedFormula.Type(childComplexity), true
+	case "SavedFormula.updatedAt":
+		if e.ComplexityRoot.SavedFormula.UpdatedAt == nil {
+			break
+		}
+
+		return e.ComplexityRoot.SavedFormula.UpdatedAt(childComplexity), true
+	case "SavedFormula.user":
+		if e.ComplexityRoot.SavedFormula.User == nil {
+			break
+		}
+
+		return e.ComplexityRoot.SavedFormula.User(childComplexity), true
 
 	case "StreamReset.threadId":
 		if e.ComplexityRoot.StreamReset.ThreadID == nil {
@@ -3840,6 +4100,7 @@ func (e *executableSchema) Exec(ctx context.Context) graphql.ResponseHandler {
 			graphql.NewInputUnmarshaler("CreateImportSourceInput", ec.unmarshalInputCreateImportSourceInput),
 			graphql.NewInputUnmarshaler("CreateMessageThreadInput", ec.unmarshalInputCreateMessageThreadInput),
 			graphql.NewInputUnmarshaler("CreatePerspectiveInput", ec.unmarshalInputCreatePerspectiveInput),
+			graphql.NewInputUnmarshaler("CreateSavedFormulaInput", ec.unmarshalInputCreateSavedFormulaInput),
 			graphql.NewInputUnmarshaler("CreateTodoActionInput", ec.unmarshalInputCreateTodoActionInput),
 			graphql.NewInputUnmarshaler("CreateUserInput", ec.unmarshalInputCreateUserInput),
 			graphql.NewInputUnmarshaler("CreateUserTodoInput", ec.unmarshalInputCreateUserTodoInput),
@@ -3857,6 +4118,7 @@ func (e *executableSchema) Exec(ctx context.Context) graphql.ResponseHandler {
 			graphql.NewInputUnmarshaler("UpdateClaimInput", ec.unmarshalInputUpdateClaimInput),
 			graphql.NewInputUnmarshaler("UpdateImportJobDescriptionInput", ec.unmarshalInputUpdateImportJobDescriptionInput),
 			graphql.NewInputUnmarshaler("UpdatePerspectiveInput", ec.unmarshalInputUpdatePerspectiveInput),
+			graphql.NewInputUnmarshaler("UpdateSavedFormulaInput", ec.unmarshalInputUpdateSavedFormulaInput),
 			graphql.NewInputUnmarshaler("UpdateUserInput", ec.unmarshalInputUpdateUserInput),
 			graphql.NewInputUnmarshaler("UpdateUserTodoInput", ec.unmarshalInputUpdateUserTodoInput),
 			graphql.NewInputUnmarshaler("UpdateUserTodoListInput", ec.unmarshalInputUpdateUserTodoListInput),
@@ -4959,6 +5221,22 @@ type Mutation {
   # Rewrites the list's positions to 1..N in the order of todoIds.
   reorderUserTodoList(listId: IntID!, todoIds: [IntID!]!): [UserTodo!]! @auth
 
+  # Saved items. Ownership is enforced in SavedItemService and the owner-scoped
+  # SQL under it; the actor is the session user, never a client id.
+  createSavedFormula(input: CreateSavedFormulaInput!): SavedFormula! @auth
+  updateSavedFormula(input: UpdateSavedFormulaInput!): SavedFormula! @auth
+  deleteSavedItem(id: ID!): Boolean! @auth
+  # Undoes a delete. Fails with "not found" when the name is in use again.
+  restoreSavedItem(id: ID!): SavedItem! @auth
+  # A link can be made PUBLIC only while its source is public.
+  setSavedItemPrivacy(id: ID!, privacy: Privacy!): SavedItem! @auth
+  # Copies a public item into a new PRIVATE item the caller owns.
+  copySavedItem(id: ID!): SavedItem! @auth
+  # Links to a public item. The new item stores no payload and reads its source's.
+  linkSavedItem(id: ID!): SavedItem! @auth
+  # Turns a link the caller owns into a copy, while its source is still readable.
+  convertLinkToCopy(id: ID!): SavedItem! @auth
+
   # Import staging. Anyone signed in may create an import. An admin's is approved
   # at once and starts listing in the background (its sources come back LISTING);
   # anyone else's is a request awaiting review, with its sources WAITING.
@@ -5097,6 +5375,14 @@ type Query {
 
   # Presets plus the caller's own actions, in picker order.
   todoActions: [TodoAction!]! @auth
+
+  # Saved formulas the caller owns, live rows only. Needs a signed-in caller.
+  mySavedFormulas(first: Int = 10, after: String, includeTotalCount: Boolean = false): PaginatedSavedFormulas!
+  # Public saved formulas plus the caller's own, live rows only. Anonymous callers
+  # see public rows.
+  sharedFormulas(first: Int = 10, after: String, includeTotalCount: Boolean = false): PaginatedSavedFormulas!
+  # Null for an item that doesn't exist, is deleted, or is someone else's PRIVATE item.
+  savedItem(id: ID!): SavedItem
 
   # Import staging (preliminary pages; not linked from the main nav).
   # Closed imports are included only for an admin passing includeClosed.
@@ -5278,6 +5564,84 @@ input UpdateUserTodoListInput {
   "Omit = unchanged; null = clear."
   description: String
   privacy: Privacy
+}
+
+# Saved items: one store for what a person saves (formulas now; themes, views and
+# settings later). Spec: docs/superpowers/specs/2026-11-20-custom-columns-and-saved-items-design.md.
+enum SavedItemType {
+  FORMULA
+  THEME
+  VIEW
+  SETTING
+}
+
+enum SavedItemOrigin {
+  OWN
+  COPY
+  LINK
+}
+
+# Shared shape of every saved item. Only SavedFormula implements it for now.
+interface SavedItem {
+  id: ID!
+  type: SavedItemType!
+  name: String!
+  privacy: Privacy!
+  origin: SavedItemOrigin!
+  "Source item of a copy or link. Null when the source is no longer readable."
+  sourceId: ID
+  "False when a copy or link's source is private or deleted."
+  sourceAvailable: Boolean!
+  payloadVersion: Int!
+  user: User!
+  "ISO timestamp."
+  createdAt: String!
+  "ISO timestamp."
+  updatedAt: String!
+}
+
+type SavedFormula implements SavedItem {
+  id: ID!
+  type: SavedItemType!
+  name: String!
+  privacy: Privacy!
+  origin: SavedItemOrigin!
+  "Source item of a copy or link. Null when the source is no longer readable."
+  sourceId: ID
+  "False when a copy or link's source is private or deleted."
+  sourceAvailable: Boolean!
+  payloadVersion: Int!
+  user: User!
+  "ISO timestamp."
+  createdAt: String!
+  "ISO timestamp."
+  updatedAt: String!
+  "Expression tree plus display options. Null for a link whose source is unreadable."
+  payload: JSON
+}
+
+type PaginatedSavedFormulas {
+  items: [SavedFormula!]!
+  pageInfo: PageInfo!
+  totalCount: Int
+}
+
+input CreateSavedFormulaInput {
+  name: String!
+  "Formula expression tree, validated by the backend."
+  payload: JSON!
+  "Defaults to PRIVATE."
+  privacy: Privacy
+}
+
+"""
+Partial update: omit a field to leave it unchanged. The payload cannot be
+cleared, and a link has no payload to change.
+"""
+input UpdateSavedFormulaInput {
+  id: IntID!
+  name: String
+  payload: JSON
 }
 `, BuiltIn: false},
 	{Name: "../../../../messaging.graphql", Input: `# ---- Messaging ----
@@ -6019,6 +6383,18 @@ func (ec *executionContext) childFields_PaginatedPerspectives(ctx context.Contex
 	return nil, fmt.Errorf("no field named %q was found under type PaginatedPerspectives", field.Name)
 }
 
+func (ec *executionContext) childFields_PaginatedSavedFormulas(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+	switch field.Name {
+	case "items":
+		return ec.fieldContext_PaginatedSavedFormulas_items(ctx, field)
+	case "pageInfo":
+		return ec.fieldContext_PaginatedSavedFormulas_pageInfo(ctx, field)
+	case "totalCount":
+		return ec.fieldContext_PaginatedSavedFormulas_totalCount(ctx, field)
+	}
+	return nil, fmt.Errorf("no field named %q was found under type PaginatedSavedFormulas", field.Name)
+}
+
 func (ec *executionContext) childFields_PaginatedUserTodos(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 	switch field.Name {
 	case "items":
@@ -6115,6 +6491,36 @@ func (ec *executionContext) childFields_Perspective(ctx context.Context, field g
 		return ec.fieldContext_Perspective_updatedAt(ctx, field)
 	}
 	return nil, fmt.Errorf("no field named %q was found under type Perspective", field.Name)
+}
+
+func (ec *executionContext) childFields_SavedFormula(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+	switch field.Name {
+	case "id":
+		return ec.fieldContext_SavedFormula_id(ctx, field)
+	case "type":
+		return ec.fieldContext_SavedFormula_type(ctx, field)
+	case "name":
+		return ec.fieldContext_SavedFormula_name(ctx, field)
+	case "privacy":
+		return ec.fieldContext_SavedFormula_privacy(ctx, field)
+	case "origin":
+		return ec.fieldContext_SavedFormula_origin(ctx, field)
+	case "sourceId":
+		return ec.fieldContext_SavedFormula_sourceId(ctx, field)
+	case "sourceAvailable":
+		return ec.fieldContext_SavedFormula_sourceAvailable(ctx, field)
+	case "payloadVersion":
+		return ec.fieldContext_SavedFormula_payloadVersion(ctx, field)
+	case "user":
+		return ec.fieldContext_SavedFormula_user(ctx, field)
+	case "createdAt":
+		return ec.fieldContext_SavedFormula_createdAt(ctx, field)
+	case "updatedAt":
+		return ec.fieldContext_SavedFormula_updatedAt(ctx, field)
+	case "payload":
+		return ec.fieldContext_SavedFormula_payload(ctx, field)
+	}
+	return nil, fmt.Errorf("no field named %q was found under type SavedFormula", field.Name)
 }
 
 func (ec *executionContext) childFields_ThreadParticipant(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
@@ -6523,6 +6929,34 @@ func (ec *executionContext) field_Mutation_closeImportJob_args(ctx context.Conte
 	return args, nil
 }
 
+func (ec *executionContext) field_Mutation_convertLinkToCopy_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "id",
+		func(ctx context.Context, v any) (string, error) {
+			return ec.unmarshalNID2string(ctx, v)
+		})
+	if err != nil {
+		return nil, err
+	}
+	args["id"] = arg0
+	return args, nil
+}
+
+func (ec *executionContext) field_Mutation_copySavedItem_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "id",
+		func(ctx context.Context, v any) (string, error) {
+			return ec.unmarshalNID2string(ctx, v)
+		})
+	if err != nil {
+		return nil, err
+	}
+	args["id"] = arg0
+	return args, nil
+}
+
 func (ec *executionContext) field_Mutation_createClaim_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
 	var err error
 	args := map[string]any{}
@@ -6677,6 +7111,20 @@ func (ec *executionContext) field_Mutation_createPerspective_args(ctx context.Co
 	return args, nil
 }
 
+func (ec *executionContext) field_Mutation_createSavedFormula_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "input",
+		func(ctx context.Context, v any) (model.CreateSavedFormulaInput, error) {
+			return ec.unmarshalNCreateSavedFormulaInput2githubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋadaptersᚋgraphqlᚋmodelᚐCreateSavedFormulaInput(ctx, v)
+		})
+	if err != nil {
+		return nil, err
+	}
+	args["input"] = arg0
+	return args, nil
+}
+
 func (ec *executionContext) field_Mutation_createTodoAction_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
 	var err error
 	args := map[string]any{}
@@ -6783,6 +7231,20 @@ func (ec *executionContext) field_Mutation_deletePerspective_args(ctx context.Co
 	return args, nil
 }
 
+func (ec *executionContext) field_Mutation_deleteSavedItem_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "id",
+		func(ctx context.Context, v any) (string, error) {
+			return ec.unmarshalNID2string(ctx, v)
+		})
+	if err != nil {
+		return nil, err
+	}
+	args["id"] = arg0
+	return args, nil
+}
+
 func (ec *executionContext) field_Mutation_deleteUserTodoList_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
 	var err error
 	args := map[string]any{}
@@ -6872,6 +7334,20 @@ func (ec *executionContext) field_Mutation_leaveThread_args(ctx context.Context,
 		return nil, err
 	}
 	args["threadId"] = arg0
+	return args, nil
+}
+
+func (ec *executionContext) field_Mutation_linkSavedItem_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "id",
+		func(ctx context.Context, v any) (string, error) {
+			return ec.unmarshalNID2string(ctx, v)
+		})
+	if err != nil {
+		return nil, err
+	}
+	args["id"] = arg0
 	return args, nil
 }
 
@@ -6969,6 +7445,20 @@ func (ec *executionContext) field_Mutation_reorderUserTodoList_args(ctx context.
 	return args, nil
 }
 
+func (ec *executionContext) field_Mutation_restoreSavedItem_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "id",
+		func(ctx context.Context, v any) (string, error) {
+			return ec.unmarshalNID2string(ctx, v)
+		})
+	if err != nil {
+		return nil, err
+	}
+	args["id"] = arg0
+	return args, nil
+}
+
 func (ec *executionContext) field_Mutation_reviewImportJob_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
 	var err error
 	args := map[string]any{}
@@ -7050,6 +7540,28 @@ func (ec *executionContext) field_Mutation_setPrimaryCategory_args(ctx context.C
 		return nil, err
 	}
 	args["input"] = arg0
+	return args, nil
+}
+
+func (ec *executionContext) field_Mutation_setSavedItemPrivacy_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "id",
+		func(ctx context.Context, v any) (string, error) {
+			return ec.unmarshalNID2string(ctx, v)
+		})
+	if err != nil {
+		return nil, err
+	}
+	args["id"] = arg0
+	arg1, err := graphql.ProcessArgField(ctx, rawArgs, "privacy",
+		func(ctx context.Context, v any) (domain.Privacy, error) {
+			return ec.unmarshalNPrivacy2githubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋcoreᚋdomainᚐPrivacy(ctx, v)
+		})
+	if err != nil {
+		return nil, err
+	}
+	args["privacy"] = arg1
 	return args, nil
 }
 
@@ -7145,6 +7657,20 @@ func (ec *executionContext) field_Mutation_updatePerspective_args(ctx context.Co
 	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "input",
 		func(ctx context.Context, v any) (model.UpdatePerspectiveInput, error) {
 			return ec.unmarshalNUpdatePerspectiveInput2githubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋadaptersᚋgraphqlᚋmodelᚐUpdatePerspectiveInput(ctx, v)
+		})
+	if err != nil {
+		return nil, err
+	}
+	args["input"] = arg0
+	return args, nil
+}
+
+func (ec *executionContext) field_Mutation_updateSavedFormula_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "input",
+		func(ctx context.Context, v any) (model.UpdateSavedFormulaInput, error) {
+			return ec.unmarshalNUpdateSavedFormulaInput2githubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋadaptersᚋgraphqlᚋmodelᚐUpdateSavedFormulaInput(ctx, v)
 		})
 	if err != nil {
 		return nil, err
@@ -7533,6 +8059,36 @@ func (ec *executionContext) field_Query_movieTrending_args(ctx context.Context, 
 	return args, nil
 }
 
+func (ec *executionContext) field_Query_mySavedFormulas_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "first",
+		func(ctx context.Context, v any) (*int, error) {
+			return ec.unmarshalOInt2ᚖint(ctx, v)
+		})
+	if err != nil {
+		return nil, err
+	}
+	args["first"] = arg0
+	arg1, err := graphql.ProcessArgField(ctx, rawArgs, "after",
+		func(ctx context.Context, v any) (*string, error) {
+			return ec.unmarshalOString2ᚖstring(ctx, v)
+		})
+	if err != nil {
+		return nil, err
+	}
+	args["after"] = arg1
+	arg2, err := graphql.ProcessArgField(ctx, rawArgs, "includeTotalCount",
+		func(ctx context.Context, v any) (*bool, error) {
+			return ec.unmarshalOBoolean2ᚖbool(ctx, v)
+		})
+	if err != nil {
+		return nil, err
+	}
+	args["includeTotalCount"] = arg2
+	return args, nil
+}
+
 func (ec *executionContext) field_Query_passageInterlinear_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
 	var err error
 	args := map[string]any{}
@@ -7672,6 +8228,50 @@ func (ec *executionContext) field_Query_previewWebPage_args(ctx context.Context,
 		return nil, err
 	}
 	args["url"] = arg0
+	return args, nil
+}
+
+func (ec *executionContext) field_Query_savedItem_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "id",
+		func(ctx context.Context, v any) (string, error) {
+			return ec.unmarshalNID2string(ctx, v)
+		})
+	if err != nil {
+		return nil, err
+	}
+	args["id"] = arg0
+	return args, nil
+}
+
+func (ec *executionContext) field_Query_sharedFormulas_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "first",
+		func(ctx context.Context, v any) (*int, error) {
+			return ec.unmarshalOInt2ᚖint(ctx, v)
+		})
+	if err != nil {
+		return nil, err
+	}
+	args["first"] = arg0
+	arg1, err := graphql.ProcessArgField(ctx, rawArgs, "after",
+		func(ctx context.Context, v any) (*string, error) {
+			return ec.unmarshalOString2ᚖstring(ctx, v)
+		})
+	if err != nil {
+		return nil, err
+	}
+	args["after"] = arg1
+	arg2, err := graphql.ProcessArgField(ctx, rawArgs, "includeTotalCount",
+		func(ctx context.Context, v any) (*bool, error) {
+			return ec.unmarshalOBoolean2ᚖbool(ctx, v)
+		})
+	if err != nil {
+		return nil, err
+	}
+	args["includeTotalCount"] = arg2
 	return args, nil
 }
 
@@ -14857,6 +15457,462 @@ func (ec *executionContext) fieldContext_Mutation_reorderUserTodoList(ctx contex
 	return fc, nil
 }
 
+func (ec *executionContext) _Mutation_createSavedFormula(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_Mutation_createSavedFormula(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.Resolvers.Mutation().CreateSavedFormula(ctx, fc.Args["input"].(model.CreateSavedFormulaInput))
+		},
+		func(ctx context.Context, next graphql.Resolver) graphql.Resolver {
+			directive0 := next
+
+			directive1 := func(ctx context.Context) (any, error) {
+				if ec.Directives.Auth == nil {
+					var zeroVal *model.SavedFormula
+					return zeroVal, errors.New("directive auth is not implemented")
+				}
+				return ec.Directives.Auth(ctx, nil, directive0)
+			}
+
+			next = directive1
+			return next
+		},
+		func(ctx context.Context, selections ast.SelectionSet, v *model.SavedFormula) graphql.Marshaler {
+			return ec.marshalNSavedFormula2ᚖgithubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋadaptersᚋgraphqlᚋmodelᚐSavedFormula(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_Mutation_createSavedFormula(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.childFields_SavedFormula(ctx, field)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Mutation_createSavedFormula_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Mutation_updateSavedFormula(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_Mutation_updateSavedFormula(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.Resolvers.Mutation().UpdateSavedFormula(ctx, fc.Args["input"].(model.UpdateSavedFormulaInput))
+		},
+		func(ctx context.Context, next graphql.Resolver) graphql.Resolver {
+			directive0 := next
+
+			directive1 := func(ctx context.Context) (any, error) {
+				if ec.Directives.Auth == nil {
+					var zeroVal *model.SavedFormula
+					return zeroVal, errors.New("directive auth is not implemented")
+				}
+				return ec.Directives.Auth(ctx, nil, directive0)
+			}
+
+			next = directive1
+			return next
+		},
+		func(ctx context.Context, selections ast.SelectionSet, v *model.SavedFormula) graphql.Marshaler {
+			return ec.marshalNSavedFormula2ᚖgithubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋadaptersᚋgraphqlᚋmodelᚐSavedFormula(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_Mutation_updateSavedFormula(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.childFields_SavedFormula(ctx, field)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Mutation_updateSavedFormula_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Mutation_deleteSavedItem(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_Mutation_deleteSavedItem(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.Resolvers.Mutation().DeleteSavedItem(ctx, fc.Args["id"].(string))
+		},
+		func(ctx context.Context, next graphql.Resolver) graphql.Resolver {
+			directive0 := next
+
+			directive1 := func(ctx context.Context) (any, error) {
+				if ec.Directives.Auth == nil {
+					var zeroVal bool
+					return zeroVal, errors.New("directive auth is not implemented")
+				}
+				return ec.Directives.Auth(ctx, nil, directive0)
+			}
+
+			next = directive1
+			return next
+		},
+		func(ctx context.Context, selections ast.SelectionSet, v bool) graphql.Marshaler {
+			return ec.marshalNBoolean2bool(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_Mutation_deleteSavedItem(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Boolean does not have child fields")
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Mutation_deleteSavedItem_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Mutation_restoreSavedItem(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_Mutation_restoreSavedItem(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.Resolvers.Mutation().RestoreSavedItem(ctx, fc.Args["id"].(string))
+		},
+		func(ctx context.Context, next graphql.Resolver) graphql.Resolver {
+			directive0 := next
+
+			directive1 := func(ctx context.Context) (any, error) {
+				if ec.Directives.Auth == nil {
+					var zeroVal model.SavedItem
+					return zeroVal, errors.New("directive auth is not implemented")
+				}
+				return ec.Directives.Auth(ctx, nil, directive0)
+			}
+
+			next = directive1
+			return next
+		},
+		func(ctx context.Context, selections ast.SelectionSet, v model.SavedItem) graphql.Marshaler {
+			return ec.marshalNSavedItem2githubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋadaptersᚋgraphqlᚋmodelᚐSavedItem(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_Mutation_restoreSavedItem(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("FieldContext.Child cannot be called on type INTERFACE")
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Mutation_restoreSavedItem_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Mutation_setSavedItemPrivacy(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_Mutation_setSavedItemPrivacy(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.Resolvers.Mutation().SetSavedItemPrivacy(ctx, fc.Args["id"].(string), fc.Args["privacy"].(domain.Privacy))
+		},
+		func(ctx context.Context, next graphql.Resolver) graphql.Resolver {
+			directive0 := next
+
+			directive1 := func(ctx context.Context) (any, error) {
+				if ec.Directives.Auth == nil {
+					var zeroVal model.SavedItem
+					return zeroVal, errors.New("directive auth is not implemented")
+				}
+				return ec.Directives.Auth(ctx, nil, directive0)
+			}
+
+			next = directive1
+			return next
+		},
+		func(ctx context.Context, selections ast.SelectionSet, v model.SavedItem) graphql.Marshaler {
+			return ec.marshalNSavedItem2githubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋadaptersᚋgraphqlᚋmodelᚐSavedItem(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_Mutation_setSavedItemPrivacy(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("FieldContext.Child cannot be called on type INTERFACE")
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Mutation_setSavedItemPrivacy_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Mutation_copySavedItem(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_Mutation_copySavedItem(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.Resolvers.Mutation().CopySavedItem(ctx, fc.Args["id"].(string))
+		},
+		func(ctx context.Context, next graphql.Resolver) graphql.Resolver {
+			directive0 := next
+
+			directive1 := func(ctx context.Context) (any, error) {
+				if ec.Directives.Auth == nil {
+					var zeroVal model.SavedItem
+					return zeroVal, errors.New("directive auth is not implemented")
+				}
+				return ec.Directives.Auth(ctx, nil, directive0)
+			}
+
+			next = directive1
+			return next
+		},
+		func(ctx context.Context, selections ast.SelectionSet, v model.SavedItem) graphql.Marshaler {
+			return ec.marshalNSavedItem2githubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋadaptersᚋgraphqlᚋmodelᚐSavedItem(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_Mutation_copySavedItem(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("FieldContext.Child cannot be called on type INTERFACE")
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Mutation_copySavedItem_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Mutation_linkSavedItem(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_Mutation_linkSavedItem(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.Resolvers.Mutation().LinkSavedItem(ctx, fc.Args["id"].(string))
+		},
+		func(ctx context.Context, next graphql.Resolver) graphql.Resolver {
+			directive0 := next
+
+			directive1 := func(ctx context.Context) (any, error) {
+				if ec.Directives.Auth == nil {
+					var zeroVal model.SavedItem
+					return zeroVal, errors.New("directive auth is not implemented")
+				}
+				return ec.Directives.Auth(ctx, nil, directive0)
+			}
+
+			next = directive1
+			return next
+		},
+		func(ctx context.Context, selections ast.SelectionSet, v model.SavedItem) graphql.Marshaler {
+			return ec.marshalNSavedItem2githubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋadaptersᚋgraphqlᚋmodelᚐSavedItem(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_Mutation_linkSavedItem(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("FieldContext.Child cannot be called on type INTERFACE")
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Mutation_linkSavedItem_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Mutation_convertLinkToCopy(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_Mutation_convertLinkToCopy(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.Resolvers.Mutation().ConvertLinkToCopy(ctx, fc.Args["id"].(string))
+		},
+		func(ctx context.Context, next graphql.Resolver) graphql.Resolver {
+			directive0 := next
+
+			directive1 := func(ctx context.Context) (any, error) {
+				if ec.Directives.Auth == nil {
+					var zeroVal model.SavedItem
+					return zeroVal, errors.New("directive auth is not implemented")
+				}
+				return ec.Directives.Auth(ctx, nil, directive0)
+			}
+
+			next = directive1
+			return next
+		},
+		func(ctx context.Context, selections ast.SelectionSet, v model.SavedItem) graphql.Marshaler {
+			return ec.marshalNSavedItem2githubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋadaptersᚋgraphqlᚋmodelᚐSavedItem(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_Mutation_convertLinkToCopy(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("FieldContext.Child cannot be called on type INTERFACE")
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Mutation_convertLinkToCopy_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _Mutation_createImportJob(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
@@ -16090,6 +17146,93 @@ func (ec *executionContext) _PaginatedPerspectives_totalCount(ctx context.Contex
 }
 func (ec *executionContext) fieldContext_PaginatedPerspectives_totalCount(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	return graphql.NewScalarFieldContext("PaginatedPerspectives", field, false, false, "Int")
+}
+
+func (ec *executionContext) _PaginatedSavedFormulas_items(ctx context.Context, field graphql.CollectedField, obj *model.PaginatedSavedFormulas) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_PaginatedSavedFormulas_items(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Items, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v []*model.SavedFormula) graphql.Marshaler {
+			return ec.marshalNSavedFormula2ᚕᚖgithubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋadaptersᚋgraphqlᚋmodelᚐSavedFormulaᚄ(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_PaginatedSavedFormulas_items(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "PaginatedSavedFormulas",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.childFields_SavedFormula(ctx, field)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _PaginatedSavedFormulas_pageInfo(ctx context.Context, field graphql.CollectedField, obj *model.PaginatedSavedFormulas) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_PaginatedSavedFormulas_pageInfo(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.PageInfo, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v *model.PageInfo) graphql.Marshaler {
+			return ec.marshalNPageInfo2ᚖgithubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋadaptersᚋgraphqlᚋmodelᚐPageInfo(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_PaginatedSavedFormulas_pageInfo(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "PaginatedSavedFormulas",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.childFields_PageInfo(ctx, field)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _PaginatedSavedFormulas_totalCount(ctx context.Context, field graphql.CollectedField, obj *model.PaginatedSavedFormulas) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_PaginatedSavedFormulas_totalCount(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.TotalCount, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v *int) graphql.Marshaler {
+			return ec.marshalOInt2ᚖint(ctx, selections, v)
+		},
+		true,
+		false,
+	)
+}
+func (ec *executionContext) fieldContext_PaginatedSavedFormulas_totalCount(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("PaginatedSavedFormulas", field, false, false, "Int")
 }
 
 func (ec *executionContext) _PaginatedUserTodos_items(ctx context.Context, field graphql.CollectedField, obj *model.PaginatedUserTodos) (ret graphql.Marshaler) {
@@ -18143,6 +19286,138 @@ func (ec *executionContext) fieldContext_Query_todoActions(_ context.Context, fi
 	return fc, nil
 }
 
+func (ec *executionContext) _Query_mySavedFormulas(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_Query_mySavedFormulas(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.Resolvers.Query().MySavedFormulas(ctx, fc.Args["first"].(*int), fc.Args["after"].(*string), fc.Args["includeTotalCount"].(*bool))
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v *model.PaginatedSavedFormulas) graphql.Marshaler {
+			return ec.marshalNPaginatedSavedFormulas2ᚖgithubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋadaptersᚋgraphqlᚋmodelᚐPaginatedSavedFormulas(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_Query_mySavedFormulas(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Query",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.childFields_PaginatedSavedFormulas(ctx, field)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Query_mySavedFormulas_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Query_sharedFormulas(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_Query_sharedFormulas(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.Resolvers.Query().SharedFormulas(ctx, fc.Args["first"].(*int), fc.Args["after"].(*string), fc.Args["includeTotalCount"].(*bool))
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v *model.PaginatedSavedFormulas) graphql.Marshaler {
+			return ec.marshalNPaginatedSavedFormulas2ᚖgithubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋadaptersᚋgraphqlᚋmodelᚐPaginatedSavedFormulas(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_Query_sharedFormulas(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Query",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.childFields_PaginatedSavedFormulas(ctx, field)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Query_sharedFormulas_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Query_savedItem(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_Query_savedItem(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.Resolvers.Query().SavedItem(ctx, fc.Args["id"].(string))
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v model.SavedItem) graphql.Marshaler {
+			return ec.marshalOSavedItem2githubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋadaptersᚋgraphqlᚋmodelᚐSavedItem(ctx, selections, v)
+		},
+		true,
+		false,
+	)
+}
+func (ec *executionContext) fieldContext_Query_savedItem(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Query",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("FieldContext.Child cannot be called on type INTERFACE")
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Query_savedItem_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _Query_importJobs(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
@@ -18628,6 +19903,291 @@ func (ec *executionContext) _ReadReceiptChanged_lastReadSeq(ctx context.Context,
 }
 func (ec *executionContext) fieldContext_ReadReceiptChanged_lastReadSeq(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	return graphql.NewScalarFieldContext("ReadReceiptChanged", field, false, false, "IntID")
+}
+
+func (ec *executionContext) _SavedFormula_id(ctx context.Context, field graphql.CollectedField, obj *model.SavedFormula) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_SavedFormula_id(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.ID, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v string) graphql.Marshaler {
+			return ec.marshalNID2string(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_SavedFormula_id(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("SavedFormula", field, false, false, "ID")
+}
+
+func (ec *executionContext) _SavedFormula_type(ctx context.Context, field graphql.CollectedField, obj *model.SavedFormula) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_SavedFormula_type(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Type, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v domain.SavedItemType) graphql.Marshaler {
+			return ec.marshalNSavedItemType2githubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋcoreᚋdomainᚐSavedItemType(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_SavedFormula_type(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("SavedFormula", field, false, false, "SavedItemType")
+}
+
+func (ec *executionContext) _SavedFormula_name(ctx context.Context, field graphql.CollectedField, obj *model.SavedFormula) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_SavedFormula_name(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Name, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v string) graphql.Marshaler {
+			return ec.marshalNString2string(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_SavedFormula_name(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("SavedFormula", field, false, false, "String")
+}
+
+func (ec *executionContext) _SavedFormula_privacy(ctx context.Context, field graphql.CollectedField, obj *model.SavedFormula) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_SavedFormula_privacy(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Privacy, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v domain.Privacy) graphql.Marshaler {
+			return ec.marshalNPrivacy2githubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋcoreᚋdomainᚐPrivacy(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_SavedFormula_privacy(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("SavedFormula", field, false, false, "Privacy")
+}
+
+func (ec *executionContext) _SavedFormula_origin(ctx context.Context, field graphql.CollectedField, obj *model.SavedFormula) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_SavedFormula_origin(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Origin, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v domain.SavedItemOrigin) graphql.Marshaler {
+			return ec.marshalNSavedItemOrigin2githubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋcoreᚋdomainᚐSavedItemOrigin(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_SavedFormula_origin(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("SavedFormula", field, false, false, "SavedItemOrigin")
+}
+
+func (ec *executionContext) _SavedFormula_sourceId(ctx context.Context, field graphql.CollectedField, obj *model.SavedFormula) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_SavedFormula_sourceId(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.SourceID, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v *string) graphql.Marshaler {
+			return ec.marshalOID2ᚖstring(ctx, selections, v)
+		},
+		true,
+		false,
+	)
+}
+func (ec *executionContext) fieldContext_SavedFormula_sourceId(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("SavedFormula", field, false, false, "ID")
+}
+
+func (ec *executionContext) _SavedFormula_sourceAvailable(ctx context.Context, field graphql.CollectedField, obj *model.SavedFormula) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_SavedFormula_sourceAvailable(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.SourceAvailable, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v bool) graphql.Marshaler {
+			return ec.marshalNBoolean2bool(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_SavedFormula_sourceAvailable(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("SavedFormula", field, false, false, "Boolean")
+}
+
+func (ec *executionContext) _SavedFormula_payloadVersion(ctx context.Context, field graphql.CollectedField, obj *model.SavedFormula) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_SavedFormula_payloadVersion(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.PayloadVersion, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v int) graphql.Marshaler {
+			return ec.marshalNInt2int(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_SavedFormula_payloadVersion(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("SavedFormula", field, false, false, "Int")
+}
+
+func (ec *executionContext) _SavedFormula_user(ctx context.Context, field graphql.CollectedField, obj *model.SavedFormula) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_SavedFormula_user(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return ec.Resolvers.SavedFormula().User(ctx, obj)
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v *model.User) graphql.Marshaler {
+			return ec.marshalNUser2ᚖgithubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋadaptersᚋgraphqlᚋmodelᚐUser(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_SavedFormula_user(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "SavedFormula",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.childFields_User(ctx, field)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _SavedFormula_createdAt(ctx context.Context, field graphql.CollectedField, obj *model.SavedFormula) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_SavedFormula_createdAt(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.CreatedAt, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v string) graphql.Marshaler {
+			return ec.marshalNString2string(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_SavedFormula_createdAt(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("SavedFormula", field, false, false, "String")
+}
+
+func (ec *executionContext) _SavedFormula_updatedAt(ctx context.Context, field graphql.CollectedField, obj *model.SavedFormula) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_SavedFormula_updatedAt(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.UpdatedAt, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v string) graphql.Marshaler {
+			return ec.marshalNString2string(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_SavedFormula_updatedAt(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("SavedFormula", field, false, false, "String")
+}
+
+func (ec *executionContext) _SavedFormula_payload(ctx context.Context, field graphql.CollectedField, obj *model.SavedFormula) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_SavedFormula_payload(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Payload, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v map[string]any) graphql.Marshaler {
+			return ec.marshalOJSON2map(ctx, selections, v)
+		},
+		true,
+		false,
+	)
+}
+func (ec *executionContext) fieldContext_SavedFormula_payload(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("SavedFormula", field, false, false, "JSON")
 }
 
 func (ec *executionContext) _StreamReset_threadId(ctx context.Context, field graphql.CollectedField, obj *model.StreamReset) (ret graphql.Marshaler) {
@@ -23087,6 +24647,62 @@ func UnmarshalCreatePerspectiveInput(ctx context.Context, raw any) (model.Create
 	return out, err
 }
 
+func (ec *executionContext) unmarshalInputCreateSavedFormulaInput(ctx context.Context, obj any) (model.CreateSavedFormulaInput, error) {
+	var it model.CreateSavedFormulaInput
+	if obj == nil {
+		return it, nil
+	}
+
+	asMap := map[string]any{}
+	for k, v := range obj.(map[string]any) {
+		asMap[k] = v
+	}
+
+	fieldsInOrder := [...]string{"name", "payload", "privacy"}
+	for _, k := range fieldsInOrder {
+		v, ok := asMap[k]
+		if !ok {
+			continue
+		}
+		switch k {
+		case "name":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("name"))
+			data, err := ec.unmarshalNString2string(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Name = data
+		case "payload":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("payload"))
+			data, err := ec.unmarshalNJSON2map(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Payload = data
+		case "privacy":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("privacy"))
+			data, err := ec.unmarshalOPrivacy2ᚖgithubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋcoreᚋdomainᚐPrivacy(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Privacy = data
+		}
+	}
+	return it, nil
+}
+
+// UnmarshalCreateSavedFormulaInput unmarshals raw into the CreateSavedFormulaInput input type, using the
+// unmarshaler bound to ctx's request. Call it from a resolver to decode an input
+// object that was not passed as a field argument.
+//
+// ctx must come from a gqlgen request; outside one there is no unmarshaler to use
+// and the returned error says so.
+func UnmarshalCreateSavedFormulaInput(ctx context.Context, raw any) (model.CreateSavedFormulaInput, error) {
+	var out model.CreateSavedFormulaInput
+	err := graphql.UnmarshalNamedInputFromContext(ctx, "CreateSavedFormulaInput", raw, &out)
+	return out, err
+}
+
 func (ec *executionContext) unmarshalInputCreateTodoActionInput(ctx context.Context, obj any) (model.CreateTodoActionInput, error) {
 	var it model.CreateTodoActionInput
 	if obj == nil {
@@ -24228,6 +25844,62 @@ func UnmarshalUpdatePerspectiveInput(ctx context.Context, raw any) (model.Update
 	return out, err
 }
 
+func (ec *executionContext) unmarshalInputUpdateSavedFormulaInput(ctx context.Context, obj any) (model.UpdateSavedFormulaInput, error) {
+	var it model.UpdateSavedFormulaInput
+	if obj == nil {
+		return it, nil
+	}
+
+	asMap := map[string]any{}
+	for k, v := range obj.(map[string]any) {
+		asMap[k] = v
+	}
+
+	fieldsInOrder := [...]string{"id", "name", "payload"}
+	for _, k := range fieldsInOrder {
+		v, ok := asMap[k]
+		if !ok {
+			continue
+		}
+		switch k {
+		case "id":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("id"))
+			data, err := ec.unmarshalNIntID2int(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.ID = data
+		case "name":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("name"))
+			data, err := ec.unmarshalOString2ᚖstring(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Name = data
+		case "payload":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("payload"))
+			data, err := ec.unmarshalOJSON2map(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Payload = data
+		}
+	}
+	return it, nil
+}
+
+// UnmarshalUpdateSavedFormulaInput unmarshals raw into the UpdateSavedFormulaInput input type, using the
+// unmarshaler bound to ctx's request. Call it from a resolver to decode an input
+// object that was not passed as a field argument.
+//
+// ctx must come from a gqlgen request; outside one there is no unmarshaler to use
+// and the returned error says so.
+func UnmarshalUpdateSavedFormulaInput(ctx context.Context, raw any) (model.UpdateSavedFormulaInput, error) {
+	var out model.UpdateSavedFormulaInput
+	err := graphql.UnmarshalNamedInputFromContext(ctx, "UpdateSavedFormulaInput", raw, &out)
+	return out, err
+}
+
 func (ec *executionContext) unmarshalInputUpdateUserInput(ctx context.Context, obj any) (model.UpdateUserInput, error) {
 	var it model.UpdateUserInput
 	if obj == nil {
@@ -24553,6 +26225,26 @@ func UnmarshalUserTodoFilter(ctx context.Context, raw any) (model.UserTodoFilter
 // endregion **************************** input.gotpl *****************************
 
 // region    ************************** interface.gotpl ***************************
+
+func (ec *executionContext) _SavedItem(ctx context.Context, sel ast.SelectionSet, obj model.SavedItem) graphql.Marshaler {
+	switch obj := (obj).(type) {
+	case nil:
+		return graphql.Null
+	case model.SavedFormula:
+		return ec._SavedFormula(ctx, sel, &obj)
+	case *model.SavedFormula:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._SavedFormula(ctx, sel, obj)
+	default:
+		if typedObj, ok := obj.(graphql.Marshaler); ok {
+			return typedObj
+		} else {
+			panic(fmt.Errorf("unexpected type %T; non-generated variants of SavedItem must implement graphql.Marshaler", obj))
+		}
+	}
+}
 
 func (ec *executionContext) _ThreadEvent(ctx context.Context, sel ast.SelectionSet, obj model.ThreadEvent) graphql.Marshaler {
 	switch obj := (obj).(type) {
@@ -26865,6 +28557,62 @@ func (ec *executionContext) _Mutation(ctx context.Context, sel ast.SelectionSet)
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
 			}
+		case "createSavedFormula":
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_createSavedFormula(ctx, field)
+			})
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "updateSavedFormula":
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_updateSavedFormula(ctx, field)
+			})
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "deleteSavedItem":
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_deleteSavedItem(ctx, field)
+			})
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "restoreSavedItem":
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_restoreSavedItem(ctx, field)
+			})
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "setSavedItemPrivacy":
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_setSavedItemPrivacy(ctx, field)
+			})
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "copySavedItem":
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_copySavedItem(ctx, field)
+			})
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "linkSavedItem":
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_linkSavedItem(ctx, field)
+			})
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "convertLinkToCopy":
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_convertLinkToCopy(ctx, field)
+			})
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
 		case "createImportJob":
 			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
 				return ec._Mutation_createImportJob(ctx, field)
@@ -27115,6 +28863,49 @@ func (ec *executionContext) _PaginatedPerspectives(ctx context.Context, sel ast.
 			}
 		case "totalCount":
 			out.Values[i] = ec._PaginatedPerspectives_totalCount(ctx, field, obj)
+			if out.Values[i] == graphql.RequiredNull {
+				out.Invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	if n := len(deferred.Defers); n > 0 {
+		atomic.AddInt32(&ec.Deferred, int32(min(n, math.MaxInt32)))
+		ec.ProcessDeferredGroup(deferred)
+	}
+
+	return out
+}
+
+var paginatedSavedFormulasImplementors = []string{"PaginatedSavedFormulas"}
+
+func (ec *executionContext) _PaginatedSavedFormulas(ctx context.Context, sel ast.SelectionSet, obj *model.PaginatedSavedFormulas) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, paginatedSavedFormulasImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferred := graphql.NewDeferredGroup(ctx)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("PaginatedSavedFormulas")
+		case "items":
+			out.Values[i] = ec._PaginatedSavedFormulas_items(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "pageInfo":
+			out.Values[i] = ec._PaginatedSavedFormulas_pageInfo(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "totalCount":
+			out.Values[i] = ec._PaginatedSavedFormulas_totalCount(ctx, field, obj)
 			if out.Values[i] == graphql.RequiredNull {
 				out.Invalids++
 			}
@@ -27696,6 +29487,24 @@ func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) gr
 				func(ctx context.Context) graphql.Marshaler {
 					return ec._Query_todoActions(ctx, field)
 				})
+		case "mySavedFormulas":
+			out.ResolveRootConcurrently(innerCtx, ec.OperationContext, i,
+				true, true,
+				func(ctx context.Context) graphql.Marshaler {
+					return ec._Query_mySavedFormulas(ctx, field)
+				})
+		case "sharedFormulas":
+			out.ResolveRootConcurrently(innerCtx, ec.OperationContext, i,
+				true, true,
+				func(ctx context.Context) graphql.Marshaler {
+					return ec._Query_sharedFormulas(ctx, field)
+				})
+		case "savedItem":
+			out.ResolveRootConcurrently(innerCtx, ec.OperationContext, i,
+				true, false,
+				func(ctx context.Context) graphql.Marshaler {
+					return ec._Query_savedItem(ctx, field)
+				})
 		case "importJobs":
 			out.ResolveRootConcurrently(innerCtx, ec.OperationContext, i,
 				true, true,
@@ -27788,6 +29597,95 @@ func (ec *executionContext) _ReadReceiptChanged(ctx context.Context, sel ast.Sel
 			out.Values[i] = ec._ReadReceiptChanged_lastReadSeq(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	if n := len(deferred.Defers); n > 0 {
+		atomic.AddInt32(&ec.Deferred, int32(min(n, math.MaxInt32)))
+		ec.ProcessDeferredGroup(deferred)
+	}
+
+	return out
+}
+
+var savedFormulaImplementors = []string{"SavedFormula", "SavedItem"}
+
+func (ec *executionContext) _SavedFormula(ctx context.Context, sel ast.SelectionSet, obj *model.SavedFormula) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, savedFormulaImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferred := graphql.NewDeferredGroup(ctx)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("SavedFormula")
+		case "id":
+			out.Values[i] = ec._SavedFormula_id(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				atomic.AddUint32(&out.Invalids, 1)
+			}
+		case "type":
+			out.Values[i] = ec._SavedFormula_type(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				atomic.AddUint32(&out.Invalids, 1)
+			}
+		case "name":
+			out.Values[i] = ec._SavedFormula_name(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				atomic.AddUint32(&out.Invalids, 1)
+			}
+		case "privacy":
+			out.Values[i] = ec._SavedFormula_privacy(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				atomic.AddUint32(&out.Invalids, 1)
+			}
+		case "origin":
+			out.Values[i] = ec._SavedFormula_origin(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				atomic.AddUint32(&out.Invalids, 1)
+			}
+		case "sourceId":
+			out.Values[i] = ec._SavedFormula_sourceId(ctx, field, obj)
+			if out.Values[i] == graphql.RequiredNull {
+				atomic.AddUint32(&out.Invalids, 1)
+			}
+		case "sourceAvailable":
+			out.Values[i] = ec._SavedFormula_sourceAvailable(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				atomic.AddUint32(&out.Invalids, 1)
+			}
+		case "payloadVersion":
+			out.Values[i] = ec._SavedFormula_payloadVersion(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				atomic.AddUint32(&out.Invalids, 1)
+			}
+		case "user":
+			out.ResolveConcurrently(ec.OperationContext, &deferred, i,
+				true, true,
+				func(ctx context.Context) graphql.Marshaler {
+					return ec._SavedFormula_user(ctx, field, obj)
+				})
+		case "createdAt":
+			out.Values[i] = ec._SavedFormula_createdAt(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				atomic.AddUint32(&out.Invalids, 1)
+			}
+		case "updatedAt":
+			out.Values[i] = ec._SavedFormula_updatedAt(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				atomic.AddUint32(&out.Invalids, 1)
+			}
+		case "payload":
+			out.Values[i] = ec._SavedFormula_payload(ctx, field, obj)
+			if out.Values[i] == graphql.RequiredNull {
+				atomic.AddUint32(&out.Invalids, 1)
 			}
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
@@ -29175,6 +31073,11 @@ func (ec *executionContext) unmarshalNCreatePerspectiveInput2githubᚗcomᚋCode
 	return res, graphql.ErrorOnPath(ctx, err)
 }
 
+func (ec *executionContext) unmarshalNCreateSavedFormulaInput2githubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋadaptersᚋgraphqlᚋmodelᚐCreateSavedFormulaInput(ctx context.Context, v any) (model.CreateSavedFormulaInput, error) {
+	res, err := ec.unmarshalInputCreateSavedFormulaInput(ctx, v)
+	return res, graphql.ErrorOnPath(ctx, err)
+}
+
 func (ec *executionContext) unmarshalNCreateTodoActionInput2githubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋadaptersᚋgraphqlᚋmodelᚐCreateTodoActionInput(ctx context.Context, v any) (model.CreateTodoActionInput, error) {
 	res, err := ec.unmarshalInputCreateTodoActionInput(ctx, v)
 	return res, graphql.ErrorOnPath(ctx, err)
@@ -29767,6 +31670,14 @@ func (ec *executionContext) marshalNPaginatedPerspectives2ᚖgithubᚗcomᚋCode
 	return ec._PaginatedPerspectives(ctx, sel, v)
 }
 
+func (ec *executionContext) marshalNPaginatedSavedFormulas2ᚖgithubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋadaptersᚋgraphqlᚋmodelᚐPaginatedSavedFormulas(ctx context.Context, sel ast.SelectionSet, v *model.PaginatedSavedFormulas) graphql.Marshaler {
+	if v == nil {
+		graphql.AddInvalidNullError(ctx, "PaginatedSavedFormulas!")
+		return graphql.Null
+	}
+	return ec._PaginatedSavedFormulas(ctx, sel, v)
+}
+
 func (ec *executionContext) marshalNPaginatedUserTodos2ᚖgithubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋadaptersᚋgraphqlᚋmodelᚐPaginatedUserTodos(ctx context.Context, sel ast.SelectionSet, v *model.PaginatedUserTodos) graphql.Marshaler {
 	if v == nil {
 		graphql.AddInvalidNullError(ctx, "PaginatedUserTodos!")
@@ -29882,6 +31793,68 @@ func (ec *executionContext) marshalNPrivacy2githubᚗcomᚋCodeWarriorᚑdebug�
 func (ec *executionContext) unmarshalNReviewImportJobInput2githubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋadaptersᚋgraphqlᚋmodelᚐReviewImportJobInput(ctx context.Context, v any) (model.ReviewImportJobInput, error) {
 	res, err := ec.unmarshalInputReviewImportJobInput(ctx, v)
 	return res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) marshalNSavedFormula2ᚕᚖgithubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋadaptersᚋgraphqlᚋmodelᚐSavedFormulaᚄ(ctx context.Context, sel ast.SelectionSet, v []*model.SavedFormula) graphql.Marshaler {
+	ret := graphql.MarshalSliceConcurrently(ctx, len(v), 0, false, func(ctx context.Context, i int) graphql.Marshaler {
+		fc := graphql.GetFieldContext(ctx)
+		fc.Result = &v[i]
+		return ec.marshalNSavedFormula2ᚖgithubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋadaptersᚋgraphqlᚋmodelᚐSavedFormula(ctx, sel, v[i])
+	})
+
+	for _, e := range ret {
+		if e == graphql.Null {
+			return graphql.Null
+		}
+	}
+
+	return ret
+}
+
+func (ec *executionContext) marshalNSavedFormula2ᚖgithubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋadaptersᚋgraphqlᚋmodelᚐSavedFormula(ctx context.Context, sel ast.SelectionSet, v *model.SavedFormula) graphql.Marshaler {
+	if v == nil {
+		graphql.AddInvalidNullError(ctx, "SavedFormula!")
+		return graphql.Null
+	}
+	return ec._SavedFormula(ctx, sel, v)
+}
+
+func (ec *executionContext) marshalNSavedItem2githubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋadaptersᚋgraphqlᚋmodelᚐSavedItem(ctx context.Context, sel ast.SelectionSet, v model.SavedItem) graphql.Marshaler {
+	if v == nil {
+		graphql.AddInvalidNullError(ctx, "SavedItem!")
+		return graphql.Null
+	}
+	return ec._SavedItem(ctx, sel, v)
+}
+
+func (ec *executionContext) unmarshalNSavedItemOrigin2githubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋcoreᚋdomainᚐSavedItemOrigin(ctx context.Context, v any) (domain.SavedItemOrigin, error) {
+	tmp, err := graphql.UnmarshalString(v)
+	res := domain.SavedItemOrigin(tmp)
+	return res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) marshalNSavedItemOrigin2githubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋcoreᚋdomainᚐSavedItemOrigin(ctx context.Context, sel ast.SelectionSet, v domain.SavedItemOrigin) graphql.Marshaler {
+	_ = sel
+	res := graphql.MarshalString(string(v))
+	if res == graphql.Null {
+		graphql.AddInvalidNullFromMarshaler(ctx, "SavedItemOrigin!")
+	}
+	return res
+}
+
+func (ec *executionContext) unmarshalNSavedItemType2githubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋcoreᚋdomainᚐSavedItemType(ctx context.Context, v any) (domain.SavedItemType, error) {
+	tmp, err := graphql.UnmarshalString(v)
+	res := domain.SavedItemType(tmp)
+	return res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) marshalNSavedItemType2githubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋcoreᚋdomainᚐSavedItemType(ctx context.Context, sel ast.SelectionSet, v domain.SavedItemType) graphql.Marshaler {
+	_ = sel
+	res := graphql.MarshalString(string(v))
+	if res == graphql.Null {
+		graphql.AddInvalidNullFromMarshaler(ctx, "SavedItemType!")
+	}
+	return res
 }
 
 func (ec *executionContext) unmarshalNSendMessageInput2githubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋadaptersᚋgraphqlᚋmodelᚐSendMessageInput(ctx context.Context, v any) (model.SendMessageInput, error) {
@@ -30069,6 +32042,11 @@ func (ec *executionContext) unmarshalNUpdateImportJobDescriptionInput2githubᚗc
 
 func (ec *executionContext) unmarshalNUpdatePerspectiveInput2githubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋadaptersᚋgraphqlᚋmodelᚐUpdatePerspectiveInput(ctx context.Context, v any) (model.UpdatePerspectiveInput, error) {
 	res, err := ec.unmarshalInputUpdatePerspectiveInput(ctx, v)
+	return res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) unmarshalNUpdateSavedFormulaInput2githubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋadaptersᚋgraphqlᚋmodelᚐUpdateSavedFormulaInput(ctx context.Context, v any) (model.UpdateSavedFormulaInput, error) {
+	res, err := ec.unmarshalInputUpdateSavedFormulaInput(ctx, v)
 	return res, graphql.ErrorOnPath(ctx, err)
 }
 
@@ -31006,6 +32984,13 @@ func (ec *executionContext) marshalOPrivacy2ᚖgithubᚗcomᚋCodeWarriorᚑdebu
 	_ = ctx
 	res := graphql.MarshalString(string(*v))
 	return res
+}
+
+func (ec *executionContext) marshalOSavedItem2githubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋadaptersᚋgraphqlᚋmodelᚐSavedItem(ctx context.Context, sel ast.SelectionSet, v model.SavedItem) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	return ec._SavedItem(ctx, sel, v)
 }
 
 func (ec *executionContext) unmarshalOSortOrder2ᚖgithubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋcoreᚋdomainᚐSortOrder(ctx context.Context, v any) (*domain.SortOrder, error) {

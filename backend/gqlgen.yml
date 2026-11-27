@@ -114,6 +114,23 @@ models:
     model:
       - github.com/CodeWarrior-debug/perspectize/backend/internal/core/domain.UserTodoSortBy
 
+  # Saved item enums - bind directly to domain types
+  SavedItemType:
+    model:
+      - github.com/CodeWarrior-debug/perspectize/backend/internal/core/domain.SavedItemType
+  SavedItemOrigin:
+    model:
+      - github.com/CodeWarrior-debug/perspectize/backend/internal/core/domain.SavedItemOrigin
+  # The owner's user id rides on the generated model (extraFields) so the user
+  # field can batch through the per-request user loader.
+  SavedFormula:
+    fields:
+      user:
+        resolver: true
+    extraFields:
+      UserID:
+        type: "int"
+
   # Discover enums - bind directly to domain types
   TrendingWindow:
     model:

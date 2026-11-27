@@ -42,6 +42,7 @@ type Deps struct {
 	PerspectiveService portservices.PerspectiveService
 	CategoryService    portservices.CategoryService
 	UserTodoService    portservices.UserTodoService
+	SavedItemService   portservices.SavedItemService
 	MessagingService   portservices.MessagingService
 	// ImportService is optional; nil leaves the import queries reporting "not configured".
 	ImportService portservices.ImportService
@@ -66,7 +67,7 @@ type Deps struct {
 func NewGraphQLServer(d Deps) *handler.Server {
 	resolver := resolvers.NewResolver(
 		d.ContentService, d.UserService, d.PerspectiveService, d.CategoryService,
-		d.UserTodoService, d.MessagingService, d.Hub, d.Presence,
+		d.UserTodoService, d.SavedItemService, d.MessagingService, d.Hub, d.Presence,
 	)
 	resolver.ImportService = d.ImportService
 	directiveRoot := directives.NewDirectiveRoot(d.ContentService, d.PerspectiveService)
