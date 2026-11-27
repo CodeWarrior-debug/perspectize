@@ -56,7 +56,7 @@
 	import CellPopover, { type PopoverState } from '#lib/components/CellPopover.svelte';
 	import { buildPopoverState, createHoverController } from '#lib/utils/tooltipHover.js';
 	import { onDestroy } from 'svelte';
-	import ListOrderedIcon from '@lucide/svelte/icons/list-ordered';
+	import ListXIcon from '@lucide/svelte/icons/list-x';
 	import DataModeToggle from '#lib/components/DataModeToggle.svelte';
 	import FilterChips from '#lib/components/FilterChips.svelte';
 	import ColumnRelevanceCallout from '#lib/components/ColumnRelevanceCallout.svelte';
@@ -728,8 +728,8 @@
 	<div
 		class="shrink-0 flex flex-col md:flex-row items-start md:items-center justify-between gap-2 md:gap-0 px-2 md:pl-4 md:pr-20 py-1 border-t border-border text-xs md:text-sm"
 	>
-		<div class="flex items-center gap-2 md:gap-4">
-			<div class="text-muted-foreground">
+		<div class="flex flex-wrap items-center gap-2 md:gap-4">
+			<div class="whitespace-nowrap text-muted-foreground">
 				{totalCount} total
 			</div>
 			<!-- Data Mode Toggle -->
@@ -756,7 +756,7 @@
 				onclick={() => (sortPickerOpen = true)}
 				class="inline-flex items-center gap-1.5 px-2 py-1 text-sm border border-input rounded-md bg-background hover:bg-accent"
 			>
-				<ListOrderedIcon class="size-4" />
+				<ArrowUpDownIcon class="size-4" />
 				<span class="hidden md:inline">Edit sorts</span>
 			</button>
 			<button
@@ -766,7 +766,7 @@
 				disabled={!hasActiveSort}
 				class="inline-flex items-center gap-1.5 px-2 py-1 text-sm border border-input rounded-md bg-background hover:bg-accent disabled:opacity-50 disabled:cursor-not-allowed"
 			>
-				<ArrowUpDownIcon class="size-4" />
+				<ListXIcon class="size-4" />
 				<span class="hidden md:inline">Clear sorts</span>
 			</button>
 			{#if !cardMode}
