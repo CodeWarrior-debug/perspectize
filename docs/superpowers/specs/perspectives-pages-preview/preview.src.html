@@ -1,0 +1,811 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Perspectives pages preview</title>
+<!--
+  THROWAWAY DESIGN PREVIEW, not product code. Fake data; nothing here is wired to the app.
+  Source of truth is this file. perspectives-pages.html is built from it by build.mjs,
+  which only inlines the app's fonts. The README says which design questions it answers.
+-->
+<style>
+/*@FONTS@*/
+
+/* Tokens copied from frontend/src/app.css (Reading Room default, Archive, Midnight).
+   --soft, --mark and --hover are derived here so secondary text and chart marks stay legible in every theme. */
+:root,[data-theme="reading-room"]{
+  --background:#ffffff;--foreground:#171717;--primary:#1a365d;--muted:#f5f5f5;--border:#d4d4d4;
+  --positive:#16a34a;--negative:#dc2626;--undecided:#64748b;
+  --mark:#1a365d;--ring-vis:#1a365d;
+  --sans:'Geist',system-ui,-apple-system,'Segoe UI',sans-serif;
+  --serif:'Charter','Georgia','Times New Roman',serif;
+}
+[data-theme="archive"]{
+  --background:#fbf6ec;--foreground:#3a2f22;--primary:#7c5a2e;--muted:#f3ece0;--border:#dcc9a8;
+  --positive:#3ba13a;--negative:#dc2912;--undecided:#6a728b;--mark:#7c5a2e;--ring-vis:#7c5a2e;
+}
+[data-theme="midnight"]{
+  --background:#10141f;--foreground:#e8e6df;--primary:#0d1b33;--muted:#1c2436;--border:#2c3448;
+  --positive:#00a55f;--negative:#db2149;--undecided:#64748b;--mark:#aab8d6;--ring-vis:#e8e6df;
+}
+*{box-sizing:border-box}
+html{color-scheme:light}
+body[data-theme="midnight"]{color-scheme:dark}
+/* Derived on body, not :root: a var() reference resolves where it is declared, so these must sit under the theme attribute. */
+body{
+  --soft:color-mix(in oklab,var(--foreground) 66%,var(--background));
+  --hover:color-mix(in oklab,var(--foreground) 5%,var(--background));
+  --stage:color-mix(in oklab,var(--foreground) 6%,var(--background));
+}
+body{margin:0;background:var(--background);color:var(--foreground);font:14px/1.5 var(--sans);-webkit-font-smoothing:antialiased}
+button{font:inherit;color:inherit;background:none;border:0;padding:0;cursor:pointer;text-align:inherit}
+button:disabled{cursor:not-allowed}
+select{font:inherit;color:inherit;background:var(--background);border:1px solid var(--border);border-radius:8px;padding:5px 8px}
+:focus-visible{outline:2px solid var(--ring-vis);outline-offset:2px;border-radius:3px}
+svg.i{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round;flex:none}
+svg.i.sm{width:12px;height:12px}
+.serif{font-family:var(--serif)}
+.soft{color:var(--soft)}
+.num{font-variant-numeric:tabular-nums lining-nums;font-feature-settings:'tnum','lnum'}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+
+/* ---- Preview chrome (outside the app) ---- */
+.bar{display:flex;flex-wrap:wrap;align-items:center;gap:10px 20px;padding:12px 20px;border-bottom:1px solid var(--border)}
+.bar h1{font:600 14px var(--sans);margin:0}
+.bar .tag{font-size:12px;color:var(--soft)}
+.seg{display:inline-flex;border:1px solid var(--border);border-radius:8px;overflow:hidden}
+.seg button{padding:5px 12px;font-size:13px}
+.seg button[aria-pressed="true"]{background:var(--foreground);color:var(--background)}
+.bar .sp{flex:1}
+.stage{background:var(--stage);padding:24px 16px 64px;min-height:calc(100vh - 56px)}
+.frame{margin:0 auto}
+.device{position:relative;background:var(--background);border:1px solid var(--border);transform-origin:top left}
+.device.desktop{width:1280px;border-radius:8px}
+.device.phone{width:390px;height:820px;border-radius:34px;overflow:hidden}
+.notes{position:fixed;top:0;right:0;bottom:0;width:min(420px,100%);z-index:60;background:var(--background);border-left:1px solid var(--border);padding:20px 22px 40px;overflow-y:auto;font-size:13.5px}
+.notes[hidden]{display:none}
+.notes h2{font:400 22px/1.2 var(--serif);margin:0 0 4px}
+.notes h3{font:600 13.5px var(--sans);margin:20px 0 4px}
+.notes p,.notes li{margin:0 0 6px;color:var(--soft)}
+.notes ul{padding-left:18px;margin:0 0 6px}
+.notes .x{position:absolute;top:14px;right:16px}
+.notes code{font-size:12px}
+
+/* ---- App header ---- */
+.app{position:relative;background:var(--background);color:var(--foreground)}
+.device.phone .app{height:100%;overflow-y:auto;overflow-x:hidden}
+.hd{display:flex;align-items:center;gap:30px;height:56px;padding:0 32px;border-bottom:1px solid var(--border);background:var(--background)}
+.brand{display:flex;align-items:center;gap:8px;font-weight:600;font-size:16px;color:var(--mark)}
+.nav{display:flex;gap:22px;font-size:14px;color:var(--soft);align-self:stretch}
+.nav span{display:flex;align-items:center;border-bottom:2px solid transparent;margin-bottom:-1px}
+.nav .on{color:var(--foreground);border-bottom-color:var(--mark)}
+.hd .right{margin-left:auto;display:flex;align-items:center;gap:14px}
+.add{border:1px solid var(--border);border-radius:8px;padding:5px 12px;font-size:13px}
+.avatar{width:28px;height:28px;border-radius:50%;background:var(--muted);display:grid;place-items:center;font-size:12px;color:var(--soft)}
+.phone-hd{height:52px;padding:0 16px;gap:12px;position:sticky;top:0;z-index:10}
+
+/* ---- Page head ---- */
+.ph{padding:36px 32px 0}
+.ph h1{font:400 36px/1.1 var(--serif);margin:0}
+.ph .lede{margin:12px 0 0;color:var(--soft);max-width:62ch}
+.tabs{display:flex;gap:26px;margin-top:22px;border-bottom:1px solid var(--border)}
+.tabs button{padding:8px 0 10px;margin-bottom:-1px;border-bottom:2px solid transparent;color:var(--soft)}
+.tabs button[aria-selected="true"]{color:var(--foreground);border-bottom-color:var(--mark);font-weight:500}
+.tb{display:flex;align-items:center;gap:10px;padding:16px 32px}
+.tb .grow{flex:1}
+.field{border:1px solid var(--border);border-radius:8px;padding:6px 12px;width:260px;background:var(--background);color:var(--foreground);font:inherit}
+.field::placeholder{color:var(--soft)}
+.pill{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--border);border-radius:999px;padding:3px 10px;font-size:12.5px}
+.btn{border:1px solid var(--border);border-radius:8px;padding:6px 12px;font-size:13px;display:inline-flex;align-items:center;gap:6px}
+.btn.ghost{border-style:dashed;color:var(--soft)}
+.seg.sm button{padding:4px 11px;font-size:12.5px}
+
+/* ---- Grid ---- */
+.gridwrap{padding:0 32px 8px}
+table{width:100%;border-collapse:collapse;table-layout:fixed}
+th{font-weight:500;font-size:13px;text-align:left;vertical-align:bottom;padding:8px 14px 10px 0;border-bottom:1px solid var(--foreground)}
+th.r,td.r{text-align:right;padding-right:0}
+td{padding:14px 14px 14px 0;border-bottom:1px solid var(--border);vertical-align:middle}
+tbody tr:hover td{background:var(--hover)}
+.th-btn{display:inline-flex;align-items:center;gap:5px}
+.th-btn[data-sorted="true"]{font-weight:600}
+.chipwrap{position:relative;display:block;margin-top:3px}
+.agg-chip{display:inline-flex;align-items:center;gap:3px;font-size:12px;color:var(--soft);border-bottom:1px dotted var(--soft);line-height:1.3}
+.agg-chip:hover,.agg-chip[aria-expanded="true"]{color:var(--foreground);border-bottom-color:var(--foreground)}
+.menu{position:absolute;z-index:25;top:100%;left:-8px;margin-top:8px;width:236px;background:var(--background);border:1px solid var(--border);border-radius:10px;padding:6px;box-shadow:0 12px 30px color-mix(in oklab,var(--foreground) 16%,transparent);font-weight:400}
+.menu button{display:flex;align-items:center;gap:8px;width:100%;padding:7px 8px;border-radius:6px;font-size:13px}
+.menu button:hover:not(:disabled){background:var(--hover)}
+.menu button:disabled{color:var(--soft)}
+.menu .chk{width:14px;flex:none;display:grid;place-items:center}
+.menu .why{margin-left:auto;font-size:11.5px;color:var(--soft)}
+.menu .sep{height:1px;background:var(--border);margin:5px 0}
+.rowlink{display:flex;align-items:center;gap:14px;width:100%}
+.tile{flex:none;width:64px;height:36px;border-radius:4px;background:var(--muted);color:var(--soft);display:grid;place-items:center}
+.ct .title{display:block;font:400 16px/1.25 var(--serif)}
+.ct .sub{display:block;font-size:12.5px;color:var(--soft);margin-top:2px}
+.rowlink:hover .title{text-decoration:underline;text-underline-offset:3px}
+span.mc{display:block}
+.mc .top{display:flex;align-items:baseline;gap:8px;min-height:26px}
+.mc .num{font-size:18px;font-weight:500;letter-spacing:-.01em}
+.mc .n{font-size:12px;color:var(--soft)}
+.mc .split{font:italic 13px var(--serif);color:var(--soft)}
+.mc .gap{display:block;height:14px}
+.mc.dim .num{color:var(--soft);font-weight:400}
+.ruler{display:block;margin-top:4px}
+.r-base,.r-tick{stroke:var(--border);stroke-width:1}
+.r-dot{fill:var(--mark);opacity:.45}
+.r-mark{stroke:var(--foreground);stroke-width:2;stroke-linecap:round}
+.r-band{fill:var(--mark);opacity:.15}
+.r-one{fill:var(--mark);opacity:1}
+.foot{padding:12px 32px 40px;font-size:12.5px;color:var(--soft);max-width:92ch}
+.lock{display:inline-flex;align-items:center;gap:4px;font-size:12px;color:var(--soft);white-space:nowrap}
+.rate{display:flex;flex-direction:column;gap:2px}
+.rate .num{font-size:15px}
+.feel{font-size:16px;letter-spacing:2px;white-space:nowrap}
+.like{color:var(--soft)}
+.like.up{color:var(--positive)}.like.down{color:var(--negative)}
+.empty{padding:48px 0;color:var(--soft)}
+
+/* ---- Reading page ---- */
+.rd{display:grid;grid-template-columns:180px minmax(0,640px) 270px;gap:48px;padding:36px 32px 96px}
+.rail{font-size:13px;color:var(--soft)}
+.rail .link{display:inline-flex;align-items:center;gap:6px;color:var(--foreground)}
+.rail .link:hover,.link2:hover{text-decoration:underline;text-underline-offset:3px}
+.rail .item{margin-top:28px;display:block}
+.rail .item .tile{width:100%;height:auto;aspect-ratio:16/9;margin-bottom:8px}
+.rail .item b{display:block;font:400 15px/1.3 var(--serif);color:var(--foreground)}
+.rail .more{margin-top:22px;display:block}
+.link2{color:var(--foreground);text-align:left}
+.slots{display:flex;gap:22px;border-bottom:1px solid var(--border);margin-bottom:22px}
+.slots button{padding:4px 0 9px;margin-bottom:-1px;border-bottom:2px solid transparent;color:var(--soft);display:inline-flex;gap:6px;align-items:center}
+.slots button[aria-selected="true"]{color:var(--foreground);border-bottom-color:var(--mark);font-weight:500}
+.rd h2.t{font:400 38px/1.12 var(--serif);margin:0 0 16px;letter-spacing:-.005em}
+.meta{color:var(--soft);font-size:13.5px;display:flex;gap:6px 14px;flex-wrap:wrap;align-items:center}
+.body{font:400 18px/1.7 var(--serif);margin-top:28px}
+.body p{margin:0 0 1.1em}
+.body h3{font:700 20px/1.3 var(--serif);margin:1.6em 0 .5em}
+.body ul{padding-left:1.2em;margin:0 0 1.1em}
+.body li{margin-bottom:.3em}
+.body a{color:var(--mark);text-underline-offset:3px}
+.edit{margin-top:24px}
+.ledger .row{padding:13px 0;border-bottom:1px solid var(--border)}
+.ledger .row:first-child{padding-top:0}
+.ledger .lab{display:flex;justify-content:space-between;font-size:13px;color:var(--soft)}
+.ledger .big{font-size:28px;font-weight:500;letter-spacing:-.015em;line-height:1.15;display:block;margin:2px 0 2px}
+.ledger .small{font-size:13.5px}
+.ledger .line{display:flex;align-items:baseline;justify-content:space-between;gap:10px}
+.ledger .fe{font-size:13.5px;margin-top:4px}
+
+/* ---- Phone ---- */
+.device.phone .ph{padding:20px 16px 0}
+.device.phone .ph h1{font-size:28px}
+.device.phone .ph .lede{font-size:13.5px}
+.device.phone .tabs{gap:22px}
+.ptb{padding:14px 16px 0;display:flex;flex-direction:column;gap:10px}
+.ptb .field{width:100%}
+.ptb .row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.cards{padding:6px 16px 40px}
+.card{display:block;width:100%;padding:16px 0;border-bottom:1px solid var(--border)}
+.card .title{display:block;font:400 18px/1.25 var(--serif)}
+.card .sub{display:block;font-size:12.5px;color:var(--soft);margin-top:2px}
+.mgrid{display:grid;grid-template-columns:1fr 1fr;gap:14px 20px;margin-top:14px}
+.mgrid .lab{font-size:12px;color:var(--soft)}
+.mgrid .mc .top{min-height:24px}
+.q4{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-top:10px}
+.q4 .lab{font-size:11.5px;color:var(--soft);display:block}
+.q4 .num{font-size:15px}
+.cardfoot{display:flex;gap:12px;align-items:center;margin-top:10px;font-size:12.5px;color:var(--soft)}
+.device.phone .rd{display:block;padding:18px 16px 48px}
+.device.phone .rd h2.t{font-size:28px}
+.device.phone .body{font-size:17px;line-height:1.65;margin-top:22px}
+.p4{display:grid;grid-template-columns:1fr 1fr;gap:12px 20px;margin-top:22px}
+.p4 .lab{font-size:12.5px;color:var(--soft)}
+.p4 .big{font-size:22px;font-weight:500;display:block;line-height:1.2}
+.ptop{display:flex;align-items:center;justify-content:space-between;margin-bottom:18px}
+.scrim{position:absolute;inset:0;z-index:30;background:color-mix(in oklab,var(--foreground) 38%,transparent)}
+.sheet{position:absolute;left:0;right:0;bottom:0;z-index:31;background:var(--background);border-top:1px solid var(--border);border-radius:18px 18px 0 0;padding:16px 16px 28px}
+.sheet h2{font:400 20px/1.2 var(--serif);margin:0 0 4px}
+.sheet p{margin:0 0 8px;color:var(--soft);font-size:13px}
+.sheet button.opt{display:flex;align-items:center;gap:10px;width:100%;padding:11px 0;border-bottom:1px solid var(--border);font-size:15px}
+.sheet button.opt:disabled{color:var(--soft)}
+.sheet .why{margin-left:auto;font-size:12px;color:var(--soft)}
+.sheet .chk{width:16px;display:grid;place-items:center}
+</style>
+</head>
+<body data-theme="reading-room">
+<div class="bar" role="toolbar" aria-label="Preview controls">
+  <h1>Perspectives pages</h1>
+  <span class="tag">Throwaway preview · fake data · issues #751 and #752</span>
+  <div class="seg" role="group" aria-label="Viewport">
+    <button data-act="vp" data-vp="desktop" aria-pressed="true">Desktop</button>
+    <button data-act="vp" data-vp="phone" aria-pressed="false">Phone</button>
+  </div>
+  <label class="tag">Theme
+    <select id="theme" aria-label="Theme">
+      <option value="reading-room">Reading Room</option>
+      <option value="archive">Archive</option>
+      <option value="midnight">Midnight</option>
+    </select>
+  </label>
+  <span class="sp"></span>
+  <button class="btn" data-act="notes" aria-expanded="false" aria-controls="notes">Design notes</button>
+</div>
+
+<div class="stage" id="stage">
+  <div class="frame" id="frame">
+    <div class="device desktop" id="device">
+      <div class="app" id="app"></div>
+      <div id="overlay"></div>
+    </div>
+  </div>
+</div>
+
+<aside class="notes" id="notes" hidden aria-label="Design notes">
+  <button class="btn x" data-act="notes" aria-label="Close notes">Close</button>
+  <h2>What this proposes</h2>
+  <p>Answers to the open questions in #751 and #752, drawn so they can be argued with. None of it is decided.</p>
+
+  <h3>Two views, one nav entry</h3>
+  <p>"By content" (#751) and "By perspective" (#752) are two routes under one nav item. They share the metric names, the ruler mark and the privacy rules, but keep their own filters, sorts and default columns, as #752 asks. A content row drills down into the second view, filtered to that item. Opening a row there reads the perspective.</p>
+
+  <h3>Aggregators</h3>
+  <ul>
+    <li>Average, spread (standard deviation), lowest, highest and count are on offer. A chip in each header switches that column; "use for all columns" sets the rest.</li>
+    <li>Sum is listed but disabled for the four rating dimensions: adding up 0–10 ratings means nothing. It stays for count-like and custom numeric fields later.</li>
+    <li>On a phone the aggregator is page-wide, set from a sheet, because per-column chips do not fit a card.</li>
+    <li>Median and percentiles are left for later.</li>
+  </ul>
+
+  <h3>No minimum sample</h3>
+  <p>Decided for now: there is no minimum number of people. Every value shows from the first rating, with its own "n" beside it so a reader can see how few people it rests on. Spread is the one exception, because a single rating has no spread: one person shows a dash and "n 1". The cost of having no floor is that when one other person has rated an item, their rating can be read from the average, lowest and highest. A floor can be added later without changing the layout.</p>
+
+  <h3>Whose perspectives</h3>
+  <p>"Everyone" counts the public perspectives plus your own private ones: what you can read, not what exists. "Just mine" is your own. Friends and share lists wait for the sharing model (ADR 0002). Defaults: Everyone on "By content", Just mine on "By perspective" (as #752 says).</p>
+
+  <h3>People, not perspectives</h3>
+  <p>One person with a public and a private perspective on the same item counts once, public first. Cells say "n" for people who rated that metric, and the People column counts people, not rows. "Forty Years of One Tree" shows it: five perspectives, four people.</p>
+
+  <h3>Missing is not zero</h3>
+  <p>An item nobody has rated on a metric shows a dash and "n 0", never 0.000. Each cell carries its own n, because a perspective can leave a dimension blank ("What the Tides Do to a Harbour").</p>
+
+  <h3>Spread and "split"</h3>
+  <p>Each cell draws the ratings people gave as dots on a 0–10 line. Average and highest/lowest add a tick; spread shades one standard deviation either side of the mean. A wide spread adds the word "split" beside the number. Marks stay one colour: the rating colours (green and red) are only used for thumbs.</p>
+
+  <h3>Private marks</h3>
+  <p>Private perspectives carry a lock and the word "Private", as Compare does. On a perspective you hold both slots of, the page offers "Public take" and "Private notes" (names from the multiple-perspectives spec, still to be confirmed).</p>
+
+  <h3>Name and nav</h3>
+  <p>"Perspectives" is the working label (the other candidate in #751 was "Insights"). It sits beside Library here. Where it lives belongs to the flow-based navigation work (#722), and the phone header ignores the overflow problem in #840 on purpose.</p>
+
+  <h3>Not drawn</h3>
+  <ul>
+    <li>The Sort, Columns and Export controls (dashed). They reuse the Library's pickers; Export is #800.</li>
+    <li>The perspective editor. Edit opens the existing one.</li>
+    <li>Loading, error and signed-out states.</li>
+  </ul>
+  <p>Ratings are stored 0–10000 and shown 0–10 to three places, as in the app.</p>
+</aside>
+
+<script>
+'use strict';
+const $ = (s, r = document) => r.querySelector(s);
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+
+/* ---------- Icons ---------- */
+const I = {
+  caret: '<path d="M3 4.5 6 7.5 9 4.5"/>',
+  check: '<path d="M3 8.5 6.5 12 13 4.5"/>',
+  lock: '<rect x="3" y="7" width="10" height="7" rx="1.5"/><path d="M5 7V5a3 3 0 0 1 6 0v2"/>',
+  play: '<path d="M6 4.5v7l6-3.5z"/>',
+  back: '<path d="M13 8H3M7.5 3.5 3 8l4.5 4.5"/>',
+  menu: '<path d="M2.5 4.5h11M2.5 8h11M2.5 11.5h11"/>',
+  up: '<path d="M9.5 6.5 10.5 3a1.6 1.6 0 0 0-2-1.9L6.5 6.2H3v7h8.4a1.5 1.5 0 0 0 1.5-1.2l.9-4a1.4 1.4 0 0 0-1.4-1.7z"/>',
+  down: '<path d="M6.5 9.5 5.5 13a1.6 1.6 0 0 0 2 1.9l2-5.1H13v-7H4.6a1.5 1.5 0 0 0-1.5 1.2l-.9 4a1.4 1.4 0 0 0 1.4 1.7z"/>',
+  glasses: '<circle cx="4.5" cy="10.5" r="2.7"/><circle cx="11.5" cy="10.5" r="2.7"/><path d="M7.2 10a1.3 1.3 0 0 1 1.6 0M1.8 10.5 3 5M14.2 10.5 13 5"/>',
+  arrowUp: '<path d="M6 10V2.5M3 5.5l3-3 3 3"/>',
+  arrowDown: '<path d="M6 2v7.5M3 6.5l3 3 3-3"/>',
+  plus: '<path d="M8 3v10M3 8h10"/>',
+};
+const SMALL_ICONS = new Set(['caret', 'arrowUp', 'arrowDown']); // drawn on a 12-unit grid; the rest on 16
+const ico = (n, cls = '') => `<svg class="i ${cls}" viewBox="${SMALL_ICONS.has(n) ? '0 0 12 12' : '0 0 16 16'}" aria-hidden="true">${I[n]}</svg>`;
+
+/* ---------- Fake data. Ratings stored 0-10000, shown 0-10 to three places, as in the app. ---------- */
+const R = x => (x == null ? null : Math.round(x * 1000));
+const ME = 'you';
+const USERS = { you: 'You', ada: 'Ada Okafor', ben: 'Ben Larsen', chidi: 'Chidi Mensah', dara: 'Dara Whitlock', eli: 'Eli Navarro', fenna: 'Fenna de Wit' };
+const METRICS = [
+  { key: 'q', label: 'Quality', tip: 'How good the content is.' },
+  { key: 'a', label: 'Agreement', tip: 'How far the author agrees with it.' },
+  { key: 'i', label: 'Importance', tip: 'How much it matters.' },
+  { key: 'f', label: 'Confidence', tip: 'How sure the author is of their own view.' },
+];
+const CONTENT = [
+  { id: 1, title: 'How Sleep Actually Works', channel: 'Lumen Lab', len: '18:42' },
+  { id: 2, title: 'The Case Against Meetings', channel: 'Workshop Notes', len: '24:05' },
+  { id: 3, title: 'A Brief History of Zero', channel: 'Numberline', len: '12:31' },
+  { id: 4, title: 'Why Cities Are Shaped Like That', channel: 'Plan View', len: '31:17' },
+  { id: 5, title: 'Sourdough Hydration, Measured', channel: 'Crumb Study', len: '9:48' },
+  { id: 6, title: 'The Quiet Collapse of Local News', channel: 'Ledger', len: '42:10' },
+  { id: 7, title: 'Learning to Read Music in 30 Days', channel: 'Staff Lines', len: '15:20' },
+  { id: 8, title: 'What the Tides Do to a Harbour', channel: 'Low Water', len: '21:03' },
+  { id: 9, title: 'Forty Years of One Tree', channel: 'Slow Field', len: '27:36' },
+];
+const byId = id => CONTENT.find(c => c.id === id);
+const P = (id, c, u, privacy, r, like, o = {}) => ({
+  id, c, u, privacy, q: R(r[0]), a: R(r[1]), i: R(r[2]), f: R(r[3]), like,
+  feelings: o.feel || [], title: o.title || null, body: o.body || '', labels: o.labels || [],
+  updated: o.updated || '2026-11-10', extra: o.extra || null, related: o.related || null,
+});
+const SLEEP_LONG = `<p>The first twelve minutes are the best popular account of sleep architecture I have watched. There is no hand-waving about "deep sleep" being the only useful kind, and a refreshingly honest handling of how little anyone knows about why we dream.</p>
+<h3>Where it overreaches</h3>
+<p>The nap segment states as settled fact that a nap past thirty minutes always costs you that night. The studies cited are small, and the one with the strongest effect recruited only shift workers. I would file it under "plausible, unproven".</p>
+<ul><li>Chronotype section: sound, and worth watching twice.</li><li>Caffeine half-life: correct, but the "ninety minutes after waking" advice has no source on screen.</li><li>Sleep debt: stated more confidently than the evidence allows.</li></ul>
+<p>I would send this to anyone who thinks eight hours is a law. I would not send it to someone looking for rules about napping. <a href="#">The meta-analysis behind the nap claim</a> is open access.</p>`;
+const PERSP = [
+  P('p1', 1, 'you', 'PUBLIC', [8.25, 6, 7.5, 5.25], 'up', { title: 'Mostly right, and quietly wrong about naps', body: SLEEP_LONG, labels: ['sleep', 'health'], updated: '2026-11-12', related: 'p3', feel: [['🙂', 'Curious', 7000], ['🤔', 'Unconvinced', 4500]], extra: { label: 'Originality', v: 7000 } }),
+  P('p2', 1, 'you', 'PRIVATE', [7, 5, 7, 6], null, { title: 'Notes to self', body: '<p>Re-watch from 11:40. Check the nap citation before arguing about it with Ben.</p><p>Sleep debt: ask Dara which paper she meant.</p>', labels: ['sleep'], updated: '2026-11-14', feel: [['😬', 'Wary', 3500]] }),
+  P('p3', 1, 'ada', 'PUBLIC', [9, 8.5, 9, 7.5], 'up', { body: '<p>The chronotype section alone is worth the eighteen minutes.</p>', labels: ['sleep'], updated: '2026-11-08', feel: [['🤩', 'Delighted', 8000]] }),
+  P('p4', 1, 'ben', 'PUBLIC', [8.75, 3.5, 8, 6.5], 'up', { body: '<p>Great production. The claim about sleep debt is stated far more confidently than the studies allow.</p>', updated: '2026-11-09', feel: [['🧐', 'Skeptical', 6500]] }),
+  P('p5', 1, 'chidi', 'PUBLIC', [7.5, 8, 6, 4], null, { body: '<p>Sound, a little slow in the middle.</p>', updated: '2026-11-05' }),
+  P('p6', 1, 'dara', 'PUBLIC', [8, 2, 7, 8], 'up', { body: '<p>I disagree on caffeine timing, and it is still the best explainer I have seen.</p>', updated: '2026-11-11', feel: [['😤', 'Contrary', 5500]] }),
+  P('p7', 1, 'eli', 'PRIVATE', [4, 1, 5, 9], 'down', { body: '<p>Not for anyone else.</p>', updated: '2026-11-02' }),
+
+  P('p8', 2, 'you', 'PUBLIC', [6.5, 9, 8, 7], 'up', { body: '<p>Half of mine could have been a message, and I say that as someone who called them.</p>', labels: ['work'], updated: '2026-11-17', feel: [['😅', 'Sheepish', 5000]] }),
+  P('p9', 2, 'ada', 'PUBLIC', [6, 2.5, 7, 6], 'down', { body: '<p>Standing meetings are where decisions get made. The video never meets that.</p>', updated: '2026-11-13' }),
+  P('p10', 2, 'ben', 'PUBLIC', [7, 9.5, 8.5, 8], 'up', { body: '<p>Correct and overdue.</p>', updated: '2026-11-06' }),
+  P('p11', 2, 'fenna', 'PUBLIC', [5.5, 3, 6.5, 5], null, { body: '<p>Fine for software teams. Not how a hospital works.</p>', updated: '2026-10-30' }),
+  P('p12', 2, 'dara', 'PUBLIC', [7.5, 8, 7.5, 6], 'up', { body: '<p>The cost-per-hour table is the whole argument in one slide.</p>', updated: '2026-11-15' }),
+
+  P('p13', 3, 'ada', 'PUBLIC', [9.5, 9, 8, 9], 'up', { body: '<p>Delightful. The Brahmagupta section is a gift.</p>', updated: '2026-10-29' }),
+  P('p14', 3, 'chidi', 'PUBLIC', [9, 9, 7, 8.5], 'up', { body: '<p>Short and exact.</p>', updated: '2026-11-01' }),
+  P('p15', 3, 'fenna', 'PUBLIC', [9.25, 8.5, 6.5, 9], 'up', { body: '<p>I watched it twice.</p>', updated: '2026-11-04' }),
+  P('p16', 3, 'you', 'PUBLIC', [9, 9, 7.5, 8], 'up', { body: '<p>I now have opinions about placeholders.</p>', updated: '2026-11-18' }),
+
+  P('p17', 4, 'ben', 'PUBLIC', [7, 6, 9, 5], null, { body: '<p>Zoning is the whole story, and the video says so late.</p>', updated: '2026-11-03' }),
+  P('p18', 4, 'dara', 'PUBLIC', [7.5, 7, 8.5, 6], 'up', { body: '<p>The street-width comparison is the best minute in it.</p>', updated: '2026-11-07' }),
+  P('p19', 4, 'you', 'PRIVATE', [6.5, null, 8, null], null, { body: '<p>Come back to the parking section.</p>', updated: '2026-11-16' }),
+
+  P('p20', 5, 'eli', 'PUBLIC', [8, null, 4, 7], 'up', { body: '<p>Finally, someone weighs the flour.</p>', updated: '2026-11-12' }),
+  P('p21', 5, 'fenna', 'PUBLIC', [7, 6, 5, 6], null, { body: '<p>Useful, if you own a scale.</p>', updated: '2026-11-14' }),
+
+  P('p22', 6, 'you', 'PRIVATE', [7.5, 8, 9.5, 6], 'up', { body: '<p>Still thinking about the county-by-county map.</p>', updated: '2026-11-19' }),
+  P('p23', 6, 'fenna', 'PRIVATE', [6, 7, 9, 5], null, { body: '<p>Private.</p>', updated: '2026-11-10' }),
+
+  P('p24', 8, 'ada', 'PUBLIC', [8, null, null, 6], null, { body: '<p>Quietly lovely.</p>', updated: '2026-11-02' }),
+  P('p25', 8, 'chidi', 'PUBLIC', [7.5, 7, null, 5], 'up', { body: '<p>Learned a word: seiche.</p>', updated: '2026-11-04' }),
+  P('p26', 8, 'ben', 'PUBLIC', [8.5, null, null, null], null, { body: '<p>Pretty.</p>', updated: '2026-11-06' }),
+  P('p27', 8, 'you', 'PUBLIC', [8, 6.5, 6, 7], 'up', { body: '<p>The harbour-master interview makes it.</p>', updated: '2026-11-20' }),
+
+  P('p28', 9, 'you', 'PUBLIC', [9, 7, 6, 8], 'up', { body: '<p>Forty years in forty minutes, and I did not check the time.</p>', updated: '2026-11-18', labels: ['nature'], feel: [['😌', 'Calm', 8000]] }),
+  P('p29', 9, 'you', 'PRIVATE', [8, 5, 5, 6], null, { body: '<p>Honestly a bit long. Do not tell Slow Field.</p>', updated: '2026-11-18' }),
+  P('p30', 9, 'ada', 'PUBLIC', [8.5, 8, 5.5, 7], 'up', { body: '<p>Patient and lovely.</p>', updated: '2026-11-09' }),
+  P('p31', 9, 'dara', 'PUBLIC', [9.5, 8.5, 6.5, 9], 'up', { body: '<p>The time-lapse of the third winter.</p>', updated: '2026-11-12' }),
+  P('p32', 9, 'fenna', 'PUBLIC', [9, 7.5, 7, 8], 'up', { body: '<p>I cried at a tree.</p>', updated: '2026-11-15' }),
+];
+const pById = id => PERSP.find(p => p.id === id);
+
+/* ---------- Aggregation ---------- */
+const AGGS = [
+  { key: 'avg', label: 'Average', short: 'avg' },
+  { key: 'sd', label: 'Spread (std deviation)', short: 'spread' },
+  { key: 'min', label: 'Lowest', short: 'lowest' },
+  { key: 'max', label: 'Highest', short: 'highest' },
+  { key: 'count', label: 'Count', short: 'count' },
+  { key: 'sum', label: 'Sum', short: 'sum', disabled: true },
+];
+const aggOf = k => AGGS.find(a => a.key === k);
+
+/** One vote per person: public wins over private when someone holds both. */
+function votes(cid, scope) {
+  const rows = PERSP.filter(p => p.c === cid && (scope === 'mine' ? p.u === ME : p.privacy === 'PUBLIC' || p.u === ME));
+  const by = new Map();
+  for (const p of rows) {
+    const cur = by.get(p.u);
+    if (!cur || (cur.privacy === 'PRIVATE' && p.privacy === 'PUBLIC')) by.set(p.u, p);
+  }
+  return [...by.values()];
+}
+function cell(cid, m, agg, scope) {
+  const vs = votes(cid, scope).map(p => p[m]).filter(v => v != null).map(v => v / 1000);
+  const n = vs.length;
+  if (n === 0 && agg !== 'count') return { state: 'empty', n, value: null };
+  // No minimum sample: every value shows from the first rating. Spread alone needs two, since one rating has none.
+  if (agg === 'sd' && n < 2) return { state: 'alone', n, vs, value: null };
+  const mean = n ? vs.reduce((s, v) => s + v, 0) / n : null;
+  const sd = n ? Math.sqrt(vs.reduce((s, v) => s + (v - mean) ** 2, 0) / n) : null;
+  const value = { avg: mean, sd, min: n ? Math.min(...vs) : null, max: n ? Math.max(...vs) : null, count: n }[agg];
+  return { state: 'ok', n, vs, mean, sd, value, split: sd != null && sd >= 2.25 };
+}
+const fmt3 = v => (v == null ? '—' : v.toFixed(3));
+const fmtVal = (cl, agg) => (agg === 'count' ? String(cl.value) : fmt3(cl.value));
+
+function ruler(vals, { mark = null, band = null, w = 132, h = 14, solid = false } = {}) {
+  const x = v => 4 + (Math.max(0, Math.min(10, v)) / 10) * (w - 8);
+  const y = h / 2;
+  let s = `<svg class="ruler" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}" aria-hidden="true">`;
+  s += `<line class="r-base" x1="4" x2="${w - 4}" y1="${y}" y2="${y}"/>`;
+  [0, 5, 10].forEach(t => (s += `<line class="r-tick" x1="${x(t)}" x2="${x(t)}" y1="${y - 3}" y2="${y + 3}"/>`));
+  if (band) s += `<rect class="r-band" x="${x(band[0])}" y="${y - 4}" width="${x(band[1]) - x(band[0])}" height="8" rx="2"/>`;
+  vals.forEach(v => (s += `<circle class="r-dot${solid ? ' r-one' : ''}" cx="${x(v)}" cy="${y}" r="3"/>`));
+  if (mark != null) s += `<line class="r-mark" x1="${x(mark)}" x2="${x(mark)}" y1="${y - 6}" y2="${y + 6}"/>`;
+  return s + '</svg>';
+}
+function aggRuler(cl, agg, w) {
+  if (agg === 'count' || agg === 'sum') return '<span class="gap"></span>';
+  const o = { w };
+  if (agg === 'avg') o.mark = cl.mean;
+  if (agg === 'min') o.mark = cl.value;
+  if (agg === 'max') o.mark = cl.value;
+  if (agg === 'sd') { o.mark = cl.mean; o.band = [Math.max(0, cl.mean - cl.sd), Math.min(10, cl.mean + cl.sd)]; }
+  return ruler(cl.vs, o);
+}
+function metricCell(cid, m, w = 132, tag = 'td') {
+  const agg = state.aggs[m.key];
+  const scope = state.scope.content;
+  const cl = cell(cid, m.key, agg, scope);
+  if (cl.state === 'empty') return `<${tag} class="mc dim"><span class="top"><span class="num">—</span><span class="n">n 0</span></span><span class="gap"></span></${tag}>`;
+  if (cl.state === 'alone') return `<${tag} class="mc dim" title="Spread needs at least two people."><span class="top"><span class="num">—</span><span class="n">n ${cl.n}</span></span>${ruler(cl.vs, { w })}</${tag}>`;
+  const split = cl.split ? `<span class="split" title="Standard deviation ${fmt3(cl.sd)}">split</span>` : '';
+  return `<${tag} class="mc"><span class="top"><span class="num">${fmtVal(cl, agg)}</span><span class="n">n ${cl.n}</span>${split}</span>${aggRuler(cl, agg, w)}</${tag}>`;
+}
+
+/* ---------- State ---------- */
+const state = {
+  vp: 'desktop', theme: 'reading-room', page: 'content',
+  scope: { content: 'everyone', persp: 'mine' },
+  aggs: { q: 'avg', a: 'avg', i: 'avg', f: 'avg' },
+  sort: { content: { key: 'q', dir: 'desc' }, persp: { key: 'updated', dir: 'desc' } },
+  menu: null, sheet: null, filter: null, openId: null, slot: null, back: 'content', q: '', notes: false,
+};
+function readHash() {
+  const h = new URLSearchParams(location.hash.slice(1));
+  if (['desktop', 'phone'].includes(h.get('vp'))) state.vp = h.get('vp');
+  if (['reading-room', 'archive', 'midnight'].includes(h.get('theme'))) state.theme = h.get('theme');
+  if (['content', 'persp', 'read'].includes(h.get('page'))) state.page = h.get('page');
+  if (h.get('open') && pById(h.get('open'))) { state.openId = h.get('open'); state.page = 'read'; state.slot = pById(state.openId).privacy; }
+  if (state.page === 'read' && !state.openId) { state.openId = 'p1'; state.slot = 'PUBLIC'; }
+  if (h.get('filter') && byId(+h.get('filter'))) state.filter = +h.get('filter');
+  if (h.get('notes') === '1') state.notes = true;
+}
+function writeHash() {
+  const h = new URLSearchParams({ vp: state.vp, theme: state.theme, page: state.page });
+  if (state.page === 'read') h.set('open', state.openId);
+  if (state.filter) h.set('filter', state.filter);
+  history.replaceState(null, '', '#' + h.toString());
+}
+
+/* ---------- Shared bits ---------- */
+const dateShort = d => { const [y, m, day] = d.split('-').map(Number); return new Date(y, m - 1, day).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }); };
+const dateLong = d => { const [y, m, day] = d.split('-').map(Number); return new Date(y, m - 1, day).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }); };
+const plain = html => html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+/** Shortens at a word boundary so an excerpt never ends mid-word. */
+const clip = (s, n) => (s.length <= n ? s : s.slice(0, s.lastIndexOf(' ', n)).replace(/[,.;:]$/, '') + '…');
+const privTag = () => `<span class="lock">${ico('lock', 'sm')}Private</span>`;
+const likeIcon = l => (l ? `<span class="like ${l}" title="${l === 'up' ? 'Thumbs up' : 'Thumbs down'}">${ico(l)}</span>` : '<span class="soft">—</span>');
+const tile = () => `<span class="tile">${ico('play')}</span>`;
+const sortArrow = (s, key) => (s.key === key ? ico(s.dir === 'asc' ? 'arrowUp' : 'arrowDown', 'sm') : '');
+const aggAllLabel = () => { const set = new Set(Object.values(state.aggs)); return set.size === 1 ? aggOf([...set][0]).label : 'Mixed'; };
+
+function header() {
+  if (state.vp === 'phone') {
+    return `<header class="hd phone-hd"><div class="brand">${ico('glasses')}Perspectize</div><div class="right"><button class="add" aria-label="Menu" title="Navigation is decided in #722 and #840">${ico('menu')}</button></div></header>`;
+  }
+  const nav = ['Library', 'Perspectives', 'Discover', 'Compare', 'Plan', 'Declare', 'Import'];
+  return `<header class="hd"><div class="brand">${ico('glasses')}Perspectize</div>
+    <nav class="nav" aria-label="Primary">${nav.map(n => `<span ${n === 'Perspectives' ? 'class="on" aria-current="page"' : ''}>${n}</span>`).join('')}</nav>
+    <div class="right"><span class="add">+ Add</span><span class="avatar" aria-hidden="true">Y</span></div></header>`;
+}
+function pageHead() {
+  const lede = state.page === 'content'
+    ? 'Every item in the Library, with what people made of it. Counted by person, so nobody votes twice.'
+    : 'One line per perspective, as written.';
+  return `<div class="ph"><h1>Perspectives</h1><p class="lede">${lede}</p>
+    <div class="tabs" role="tablist" aria-label="View">
+      <button role="tab" data-act="page" data-page="content" aria-selected="${state.page === 'content'}">By content</button>
+      <button role="tab" data-act="page" data-page="persp" aria-selected="${state.page === 'persp'}">By perspective</button>
+    </div></div>`;
+}
+function scopeSeg(page) {
+  const s = state.scope[page];
+  const second = page === 'persp' ? 'Public and yours' : 'Everyone';
+  return `<div class="seg sm" role="group" aria-label="Whose perspectives">
+    <button data-act="scope" data-page="${page}" data-scope="mine" aria-pressed="${s === 'mine'}">Just mine</button>
+    <button data-act="scope" data-page="${page}" data-scope="everyone" aria-pressed="${s === 'everyone'}">${second}</button></div>`;
+}
+const searchBox = ph => `<input class="field" id="q" type="search" placeholder="${ph}" value="${esc(state.q)}" aria-label="Search">`;
+
+/* ---------- Page 1: by content ---------- */
+function contentList() {
+  const sc = state.scope.content;
+  const s = state.sort.content;
+  const q = state.q.trim().toLowerCase();
+  const rows = CONTENT.filter(c => !q || (c.title + ' ' + c.channel).toLowerCase().includes(q)).map(c => ({
+    c, people: votes(c.id, sc).length,
+    val: s.key === 'title' ? c.title : (() => { const cl = cell(c.id, s.key, state.aggs[s.key], sc); return cl.state === 'ok' ? cl.value : null; })(),
+  }));
+  rows.sort((x, y) => {
+    if (s.key === 'title') return s.dir === 'asc' ? x.val.localeCompare(y.val) : y.val.localeCompare(x.val);
+    if (x.val == null && y.val == null) return x.c.id - y.c.id;
+    if (x.val == null) return 1;
+    if (y.val == null) return -1;
+    return s.dir === 'asc' ? x.val - y.val : y.val - x.val;
+  });
+  return rows;
+}
+function menuHTML(mk) {
+  const cur = state.aggs[mk];
+  const label = METRICS.find(m => m.key === mk).label;
+  return `<div class="menu" role="menu" aria-label="How to combine ${label}">
+    ${AGGS.map(a => `<button role="menuitemradio" aria-checked="${a.key === cur}" data-act="agg" data-key="${mk}" data-agg="${a.key}" ${a.disabled ? 'disabled' : ''}>
+      <span class="chk">${a.key === cur ? ico('check', '') : ''}</span><span>${a.label}</span>${a.disabled ? '<span class="why">not for ratings</span>' : ''}</button>`).join('')}
+    <div class="sep"></div>
+    <button role="menuitem" data-act="aggAll" data-agg="${cur}"><span class="chk"></span><span>Use ${aggOf(cur).label.toLowerCase().replace(' (std deviation)', '')} for all columns</span></button></div>`;
+}
+function pageContentDesktop() {
+  const sc = state.scope.content;
+  const s = state.sort.content;
+  const rows = contentList();
+  const head = METRICS.map(m => {
+    const open = state.menu === m.key;
+    return `<th aria-sort="${s.key === m.key ? (s.dir === 'asc' ? 'ascending' : 'descending') : 'none'}" title="${m.tip}">
+      <button class="th-btn" data-act="sort" data-key="${m.key}" data-sorted="${s.key === m.key}">${m.label}${sortArrow(s, m.key)}</button>
+      <span class="chipwrap"><button class="agg-chip" data-act="menu" data-key="${m.key}" aria-haspopup="menu" aria-expanded="${open}" aria-label="${m.label}: ${aggOf(state.aggs[m.key]).label}. Change.">${aggOf(state.aggs[m.key]).short}${ico('caret', 'sm')}</button>${open ? menuHTML(m.key) : ''}</span></th>`;
+  }).join('');
+  const body = rows.map(({ c, people }) => `<tr>
+    <td><button class="rowlink" data-act="drill" data-id="${c.id}">${tile()}<span class="ct"><span class="title">${esc(c.title)}</span><span class="sub">${esc(c.channel)} · ${c.len}</span></span></button></td>
+    ${METRICS.map(m => metricCell(c.id, m)).join('')}
+    <td class="r num ${people ? '' : 'soft'}">${people || '—'}</td></tr>`).join('');
+  const foot = sc === 'everyone'
+    ? `Counting people, not perspectives: someone with a public and a private perspective counts once, public first. You are counting what you can read, which is every public perspective plus your own private ones. Each value shows how many people it rests on (n); dashes are not zeros. Dashed buttons are the Library's pickers and are not drawn here.`
+    : 'Just your own perspectives. Dashes mean you left that rating blank.';
+  return `${header()}${pageHead()}
+    <div class="tb">${searchBox('Search content')}<span class="pill">YouTube video</span><span class="grow"></span>${scopeSeg('content')}
+      <span class="btn ghost" title="Same sort dialog as the Library">Sort</span><span class="btn ghost" title="Same column picker as the Library">Columns</span><span class="btn ghost" title="Print, CSV, copy. See #800">Export</span></div>
+    <div class="gridwrap"><table><colgroup><col style="width:330px"><col span="4" style="width:186px"><col style="width:90px"></colgroup>
+      <thead><tr><th aria-sort="${s.key === 'title' ? (s.dir === 'asc' ? 'ascending' : 'descending') : 'none'}"><button class="th-btn" data-act="sort" data-key="title" data-sorted="${s.key === 'title'}">Content${sortArrow(s, 'title')}</button></th>${head}<th class="r" title="People with at least one perspective you can see">People</th></tr></thead>
+      <tbody>${body || ''}</tbody></table>${rows.length ? '' : '<p class="empty">Nothing in the Library matches that. Try fewer letters.</p>'}</div>
+    <p class="foot">${foot}</p>`;
+}
+function pageContentPhone() {
+  const rows = contentList();
+  const cards = rows.map(({ c, people }) => `<button class="card" data-act="drill" data-id="${c.id}">
+    <span class="title">${esc(c.title)}</span><span class="sub">${esc(c.channel)} · ${c.len} · ${people ? people + (people === 1 ? ' person' : ' people') : 'no perspectives yet'}</span>
+    <span class="mgrid">${METRICS.map(m => `<span><span class="lab">${m.label}</span>${metricCell(c.id, m, 150, 'span')}</span>`).join('')}</span></button>`).join('');
+  return `${header()}${pageHead()}
+    <div class="ptb">${searchBox('Search content')}
+      <div class="row">${scopeSeg('content')}</div>
+      <div class="row"><button class="btn" data-act="sheet" data-sheet="agg">Showing ${aggAllLabel().toLowerCase().replace(' (std deviation)', '')}${ico('caret', 'sm')}</button>
+        <button class="btn" data-act="sheet" data-sheet="sort">Sort${ico('caret', 'sm')}</button><span class="btn ghost">Columns</span></div></div>
+    <div class="cards">${cards || '<p class="empty">Nothing in the Library matches that.</p>'}
+      <p class="foot" style="padding:14px 0 0">${state.scope.content === 'everyone' ? 'Counted by person. n is how many people each value rests on.' : 'Just your own perspectives.'}</p></div>`;
+}
+
+/* ---------- Page 2: by perspective ---------- */
+function perspList() {
+  const sc = state.scope.persp;
+  const s = state.sort.persp;
+  const q = state.q.trim().toLowerCase();
+  let rows = PERSP.filter(p => (sc === 'mine' ? p.u === ME : p.privacy === 'PUBLIC' || p.u === ME));
+  if (state.filter) rows = rows.filter(p => p.c === state.filter);
+  if (q) rows = rows.filter(p => ((p.title || '') + ' ' + byId(p.c).title + ' ' + plain(p.body) + ' ' + USERS[p.u]).toLowerCase().includes(q));
+  const val = p => ({ title: (p.title || byId(p.c).title).toLowerCase(), by: USERS[p.u], updated: p.updated, q: p.q, a: p.a, i: p.i, f: p.f }[s.key]);
+  rows.sort((x, y) => {
+    const a = val(x), b = val(y);
+    if (a == null && b == null) return 0;
+    if (a == null) return 1;
+    if (b == null) return -1;
+    const r = typeof a === 'string' ? a.localeCompare(b) : a - b;
+    return s.dir === 'asc' ? r : -r;
+  });
+  return rows;
+}
+/** Headline and second line for a perspective row. Untitled ones default to the content's name, as in the app; once the list is filtered to one item that name repeats, so the words themselves lead. */
+function rowText(p) {
+  const c = byId(p.c);
+  const excerpt = esc(clip(plain(p.body), 100));
+  if (state.filter) return p.title ? [esc(p.title), excerpt] : [excerpt, ''];
+  return p.title ? [esc(p.title), `On ${esc(c.title)}`] : [esc(c.title), excerpt];
+}
+function ratingCell(p, k, w = 84) {
+  const v = p[k];
+  if (v == null) return '<td class="r-none"><span class="soft">—</span></td>';
+  return `<td><span class="rate"><span class="num">${fmt3(v / 1000)}</span>${ruler([v / 1000], { w, h: 12, solid: true })}</span></td>`;
+}
+function filterChip() {
+  if (!state.filter) return '';
+  return `<span class="pill">On ${esc(byId(state.filter).title)}<button data-act="clearFilter" aria-label="Show all content">✕</button></span>`;
+}
+function feelCell(p) { return p.feelings.length ? `<span class="feel" title="${p.feelings.map(f => f[1]).join(', ')}">${p.feelings.slice(0, 3).map(f => f[0]).join('')}</span>` : '<span class="soft">—</span>'; }
+function pagePerspDesktop() {
+  const sc = state.scope.persp;
+  const s = state.sort.persp;
+  const rows = perspList();
+  const showBy = sc !== 'mine';
+  const th = (key, label, cls = '', tip = '') => `<th class="${cls}" ${tip ? `title="${tip}"` : ''} aria-sort="${s.key === key ? (s.dir === 'asc' ? 'ascending' : 'descending') : 'none'}"><button class="th-btn" data-act="sort" data-key="${key}" data-sorted="${s.key === key}">${label}${sortArrow(s, key)}</button></th>`;
+  const body = rows.map(p => {
+    const [head, sub] = rowText(p);
+    return `<tr><td><button class="rowlink" data-act="open" data-id="${p.id}"><span class="ct"><span class="title">${head}${p.privacy === 'PRIVATE' ? ' ' + privTag() : ''}</span>${sub ? `<span class="sub">${sub}</span>` : ''}</span></button></td>
+      ${showBy ? `<td>${esc(USERS[p.u])}</td>` : ''}${['q', 'a', 'i', 'f'].map(k => ratingCell(p, k)).join('')}
+      <td>${likeIcon(p.like)}</td><td>${feelCell(p)}</td><td class="soft">${dateShort(p.updated)}</td></tr>`;
+  }).join('');
+  const foot = sc === 'mine'
+    ? 'Your perspectives, public and private, each as written. A rating left blank shows a dash.'
+    : 'Every public perspective plus your own private ones. Other people\'s private perspectives are never listed.';
+  return `${header()}${pageHead()}
+    <div class="tb">${searchBox('Search perspectives')}${filterChip()}<span class="grow"></span>${scopeSeg('persp')}
+      <span class="btn ghost">Sort</span><span class="btn ghost">Columns</span><span class="btn ghost" title="Print, CSV, copy. See #800">Export</span></div>
+    <div class="gridwrap"><table><colgroup><col style="width:${showBy ? 360 : 470}px">${showBy ? '<col style="width:120px">' : ''}<col span="4" style="width:${showBy ? 104 : 112}px"><col style="width:64px"><col style="width:100px"><col style="width:86px"></colgroup>
+      <thead><tr>${th('title', 'Perspective')}${showBy ? th('by', 'By') : ''}${METRICS.map(m => th(m.key, m.label, '', m.tip)).join('')}<th>Like</th><th>Feelings</th>${th('updated', 'Updated')}</tr></thead>
+      <tbody>${body}</tbody></table>${rows.length ? '' : '<p class="empty">No perspectives here yet. Open an item in the Library and add the first.</p>'}</div>
+    <p class="foot">${foot}</p>`;
+}
+function pagePerspPhone() {
+  const sc = state.scope.persp;
+  const rows = perspList();
+  const cards = rows.map(p => {
+    const c = byId(p.c);
+    const [head, sub] = rowText(p);
+    return `<button class="card" data-act="open" data-id="${p.id}"><span class="title">${head}</span>
+      <span class="sub">${state.filter ? '' : sub ? sub + ' · ' : ''}${esc(USERS[p.u])} · ${dateShort(p.updated)}</span>
+      <span class="q4">${METRICS.map(m => `<span><span class="lab">${m.label}</span><span class="num">${p[m.key] == null ? '—' : fmt3(p[m.key] / 1000)}</span></span>`).join('')}</span>
+      <span class="cardfoot">${p.privacy === 'PRIVATE' ? privTag() : ''}${likeIcon(p.like)}${feelCell(p)}</span></button>`;
+  }).join('');
+  return `${header()}${pageHead()}
+    <div class="ptb">${searchBox('Search perspectives')}<div class="row">${scopeSeg('persp')}${filterChip()}</div>
+      <div class="row"><button class="btn" data-act="sheet" data-sheet="sort">Sort${ico('caret', 'sm')}</button><span class="btn ghost">Columns</span></div></div>
+    <div class="cards">${cards || '<p class="empty">No perspectives here yet.</p>'}
+      <p class="foot" style="padding:14px 0 0">${sc === 'mine' ? 'Your perspectives, public and private.' : 'Public perspectives and your own private ones.'}</p></div>`;
+}
+
+/* ---------- Page 3: one perspective ---------- */
+function readData() {
+  let p = pById(state.openId);
+  const sib = p.u === ME ? PERSP.find(x => x.c === p.c && x.u === ME && x.id !== p.id) : null;
+  if (sib && state.slot && p.privacy !== state.slot) p = sib;
+  return { p, sib: sib || null, hasBoth: !!sib };
+}
+function slots(p, hasBoth) {
+  if (!hasBoth) return '';
+  return `<div class="slots" role="tablist" aria-label="Your perspectives on this">
+    <button role="tab" data-act="slot" data-slot="PUBLIC" aria-selected="${p.privacy === 'PUBLIC'}">Public take</button>
+    <button role="tab" data-act="slot" data-slot="PRIVATE" aria-selected="${p.privacy === 'PRIVATE'}">${ico('lock', 'sm')}Private notes</button></div>`;
+}
+function ledgerRows(p, w) {
+  const rows = [...METRICS.map(m => ({ label: m.label, v: p[m.key] })), ...(p.extra ? [{ label: p.extra.label, v: p.extra.v }] : [])];
+  return rows.map(r => `<div class="row"><div class="lab"><span>${r.label}</span></div><span class="big num ${r.v == null ? 'soft' : ''}">${r.v == null ? '—' : fmt3(r.v / 1000)}</span>${r.v == null ? '' : ruler([r.v / 1000], { w, h: 14, solid: true })}</div>`).join('');
+}
+function extras(p) {
+  const out = [];
+  out.push(`<div class="row"><div class="line"><span class="lab soft">Reaction</span><span>${p.like ? `<span class="like ${p.like}">${ico(p.like)}</span> ${p.like === 'up' ? 'Thumbs up' : 'Thumbs down'}` : '<span class="soft">None given</span>'}</span></div></div>`);
+  if (p.feelings.length) out.push(`<div class="row"><div class="lab"><span>Feelings</span></div>${p.feelings.map(f => `<div class="fe">${f[0]} ${f[1]} <span class="num soft">${fmt3(f[2] / 1000)}</span></div>`).join('')}</div>`);
+  if (p.labels.length) out.push(`<div class="row"><div class="line"><span class="lab soft">Labels</span><span class="small">${p.labels.map(esc).join(', ')}</span></div></div>`);
+  if (p.related) { const r = pById(p.related); out.push(`<div class="row"><div class="lab"><span>Builds on</span></div><button class="link2 small" data-act="open" data-id="${r.id}">${esc(USERS[r.u])}'s perspective</button></div>`); }
+  return out.join('');
+}
+function pageRead() {
+  const { p, hasBoth } = readData();
+  const c = byId(p.c);
+  const n = votes(p.c, 'everyone').length;
+  const mine = p.u === ME;
+  const meta = `<div class="meta"><span>${esc(USERS[p.u])}</span><span>${dateLong(p.updated)}</span>${p.privacy === 'PRIVATE' ? `<span class="lock">${ico('lock', 'sm')}Private. Only you can see this.</span>` : '<span>Public</span>'}</div>`;
+  const title = esc(p.title || c.title);
+  if (state.vp === 'phone') {
+    return `${header()}<div class="rd">
+      <div class="ptop"><button class="link2" data-act="back">${ico('back')} Back</button>${mine ? '<span class="btn">Edit</span>' : ''}</div>
+      ${slots(p, hasBoth)}<h2 class="t">${title}</h2>${meta}
+      <p class="soft" style="margin:10px 0 0;font-size:13.5px">On <button class="link2 serif" data-act="drill" data-id="${c.id}">${esc(c.title)}</button></p>
+      <div class="p4">${[...METRICS.map(m => ({ label: m.label, v: p[m.key] })), ...(p.extra ? [{ label: p.extra.label, v: p.extra.v }] : [])].map(r => `<div><span class="lab">${r.label}</span><span class="big num ${r.v == null ? 'soft' : ''}">${r.v == null ? '—' : fmt3(r.v / 1000)}</span>${r.v == null ? '' : ruler([r.v / 1000], { w: 150, h: 12, solid: true })}</div>`).join('')}</div>
+      <div class="body">${p.body}</div>
+      <div class="ledger" style="margin-top:28px">${extras(p)}</div>
+      <p class="soft" style="margin-top:22px"><button class="link2" data-act="drill" data-id="${c.id}">${n} ${n === 1 ? 'person has' : 'people have'} a perspective on this</button></p></div>`;
+  }
+  return `${header()}<div class="rd">
+    <aside class="rail"><button class="link" data-act="back">${ico('back')} All perspectives</button>
+      <span class="item">${tile()}<b>${esc(c.title)}</b><span>${esc(c.channel)} · ${c.len}</span></span>
+      <button class="link2 more" data-act="drill" data-id="${c.id}">${n} ${n === 1 ? 'person has' : 'people have'} a perspective on this</button>
+      <span class="more" title="Opens the existing Compare page">Compare with someone</span></aside>
+    <article>${slots(p, hasBoth)}<h2 class="t">${title}</h2>${meta}<div class="body">${p.body}</div>${mine ? '<button class="btn edit">Edit</button>' : ''}</article>
+    <aside class="ledger" aria-label="Ratings">${ledgerRows(p, 270)}${extras(p)}</aside></div>`;
+}
+
+/* ---------- Overlay (phone sheets) ---------- */
+function overlayHTML() {
+  if (state.vp !== 'phone' || !state.sheet) return '';
+  let inner = '';
+  if (state.sheet === 'agg') {
+    const cur = aggAllLabel();
+    inner = `<h2>How to combine each rating</h2><p>Applies to all four columns.</p>${AGGS.map(a => {
+      const on = cur === a.label;
+      return `<button class="opt" data-act="aggAllSheet" data-agg="${a.key}" ${a.disabled ? 'disabled' : ''}><span class="chk">${on ? ico('check') : ''}</span>${a.label}${a.disabled ? '<span class="why">not for ratings</span>' : ''}</button>`;
+    }).join('')}`;
+  } else {
+    const page = state.page === 'persp' ? 'persp' : 'content';
+    const s = state.sort[page];
+    const keys = page === 'content' ? [['title', 'Title'], ...METRICS.map(m => [m.key, m.label])] : [['updated', 'Updated'], ['title', 'Title'], ['by', 'Author'], ...METRICS.map(m => [m.key, m.label])];
+    inner = `<h2>Sort by</h2><p>${s.dir === 'desc' ? 'Highest first' : 'Lowest first'}. Tap the current one again to flip it.</p>${keys.map(([k, l]) => `<button class="opt" data-act="sortSheet" data-key="${k}"><span class="chk">${s.key === k ? ico(s.dir === 'asc' ? 'arrowUp' : 'arrowDown', 'sm') : ''}</span>${l}</button>`).join('')}`;
+  }
+  return `<div class="scrim" data-act="sheetClose"></div><div class="sheet" role="dialog" aria-modal="true">${inner}</div>`;
+}
+
+/* ---------- Render + fit ---------- */
+let pendingScrollTop = false;
+let refocus = null;
+function render() {
+  document.body.dataset.theme = state.theme;
+  $('#theme').value = state.theme;
+  document.querySelectorAll('[data-act="vp"]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.vp === state.vp)));
+  const dev = $('#device');
+  dev.className = 'device ' + state.vp;
+  const app = $('#app');
+  const keep = app.scrollTop;
+  const page = state.page === 'content' ? (state.vp === 'phone' ? pageContentPhone() : pageContentDesktop())
+    : state.page === 'persp' ? (state.vp === 'phone' ? pagePerspPhone() : pagePerspDesktop()) : pageRead();
+  app.innerHTML = page;
+  app.scrollTop = pendingScrollTop ? 0 : keep;
+  if (pendingScrollTop) window.scrollTo(0, 0);
+  pendingScrollTop = false;
+  $('#overlay').innerHTML = overlayHTML();
+  $('#notes').hidden = !state.notes;
+  document.querySelector('.bar [data-act="notes"]').setAttribute('aria-expanded', String(state.notes));
+  if (refocus) { const el = $(refocus); if (el) { el.focus(); if (el.setSelectionRange && el.type === 'search') { const l = el.value.length; try { el.setSelectionRange(l, l); } catch (e) {} } } refocus = null; }
+  writeHash();
+  fit();
+}
+function fit() {
+  const frame = $('#frame'), dev = $('#device'), stage = $('#stage');
+  const base = state.vp === 'phone' ? 390 : 1280;
+  const avail = stage.clientWidth - 32;
+  const s = Math.min(1, avail / base);
+  dev.style.transform = s < 1 ? `scale(${s})` : 'none';
+  frame.style.width = base * s + 'px';
+  frame.style.height = dev.offsetHeight * s + 'px';
+}
+function go(page, o = {}) {
+  state.page = page; state.menu = null; state.sheet = null;
+  if ('filter' in o) state.filter = o.filter;
+  pendingScrollTop = true;
+  render();
+}
+
+/* ---------- Events ---------- */
+document.addEventListener('click', e => {
+  if (state.menu && !e.target.closest('.chipwrap')) { state.menu = null; render(); }
+  const t = e.target.closest('[data-act]');
+  if (e.target.closest('a[href="#"]')) e.preventDefault();
+  if (!t) return;
+  const d = t.dataset;
+  switch (d.act) {
+    case 'vp': state.vp = d.vp; state.menu = null; state.sheet = null; render(); break;
+    case 'notes': state.notes = !state.notes; render(); break;
+    case 'page': state.back = d.page; go(d.page, { filter: null }); break;
+    case 'scope': state.scope[d.page] = d.scope; render(); break;
+    case 'sort': { const page = state.page === 'persp' ? 'persp' : 'content'; const s = state.sort[page]; if (s.key === d.key) s.dir = s.dir === 'desc' ? 'asc' : 'desc'; else { s.key = d.key; s.dir = ['title', 'by'].includes(d.key) ? 'asc' : 'desc'; } render(); break; }
+    case 'sortSheet': { const page = state.page === 'persp' ? 'persp' : 'content'; const s = state.sort[page]; if (s.key === d.key) s.dir = s.dir === 'desc' ? 'asc' : 'desc'; else { s.key = d.key; s.dir = ['title', 'by'].includes(d.key) ? 'asc' : 'desc'; } render(); break; }
+    case 'menu': state.menu = state.menu === d.key ? null : d.key; refocus = `.agg-chip[data-key="${d.key}"]`; render(); break;
+    case 'agg': state.aggs[d.key] = d.agg; if (state.sort.content.key === d.key) { /* sort follows the new aggregate */ } state.menu = null; refocus = `.agg-chip[data-key="${d.key}"]`; render(); break;
+    case 'aggAll': METRICS.forEach(m => (state.aggs[m.key] = d.agg)); state.menu = null; render(); break;
+    case 'aggAllSheet': METRICS.forEach(m => (state.aggs[m.key] = d.agg)); state.sheet = null; render(); break;
+    case 'sheet': state.sheet = d.sheet; render(); break;
+    case 'sheetClose': state.sheet = null; render(); break;
+    case 'drill': state.back = state.page === 'read' ? 'persp' : 'content'; state.scope.persp = state.page === 'content' ? state.scope.content : 'everyone'; go('persp', { filter: +d.id }); break;
+    case 'open': { const p = pById(d.id); if (state.page !== 'read') state.back = state.page; state.openId = p.id; state.slot = p.privacy; go('read'); break; }
+    case 'slot': state.slot = d.slot; render(); break;
+    case 'back': go(state.back === 'persp' ? 'persp' : 'content'); break;
+    case 'clearFilter': state.filter = null; render(); break;
+  }
+});
+document.addEventListener('input', e => { if (e.target.id === 'q') { state.q = e.target.value; refocus = '#q'; render(); } });
+$('#theme').addEventListener('change', e => { state.theme = e.target.value; render(); });
+document.addEventListener('keydown', e => {
+  if (e.key !== 'Escape') return;
+  if (state.menu || state.sheet || state.notes) { const k = state.menu; state.menu = null; state.sheet = null; state.notes = false; if (k) refocus = `.agg-chip[data-key="${k}"]`; render(); }
+});
+window.addEventListener('resize', fit);
+if ('ResizeObserver' in window) new ResizeObserver(fit).observe($('#app'));
+
+readHash();
+render();
+</script>
+</body>
+</html>
