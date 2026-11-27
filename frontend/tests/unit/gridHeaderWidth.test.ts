@@ -5,9 +5,9 @@ import { themeQuartz } from '@ag-grid-community/theming';
 import { headerMinWidth, headerTextWidth } from '#lib/utils/grid-header-width.js';
 import { GEIST_SEMIBOLD_ADVANCE_EM, GEIST_SEMIBOLD_WIDEST_EM } from '#lib/utils/grid-header-metrics.js';
 import {
-	ACTIVITY_GRID_THEME,
-	ACTIVITY_HEADER_CHROME,
-	ACTIVITY_HEADER_TEXT_CASE,
+	LIBRARY_GRID_THEME,
+	LIBRARY_HEADER_CHROME,
+	LIBRARY_HEADER_TEXT_CASE,
 	GRID_THEME_PARAMS,
 	headerChrome,
 } from '#lib/utils/grid-theme.js';
@@ -19,7 +19,7 @@ const WIDEST_DIGIT_EM = Math.max(...[...'0123456789'].map((d) => GEIST_SEMIBOLD_
 
 describe('headerChrome', () => {
 	it('reads the Activity theme: 4px Balham spacing, 16px icons, 11px uppercase letter-spaced headers', () => {
-		expect(ACTIVITY_HEADER_CHROME).toEqual({
+		expect(LIBRARY_HEADER_CHROME).toEqual({
 			fontSize: 11,
 			padding: 8,
 			sort: 20,
@@ -44,7 +44,7 @@ describe('headerChrome', () => {
 	});
 
 	it('header text is the weight and font that the metrics table was generated for', () => {
-		const params = ACTIVITY_GRID_THEME.getParams() as Record<string, unknown>;
+		const params = LIBRARY_GRID_THEME.getParams() as Record<string, unknown>;
 		expect(params.headerFontWeight).toBe(600);
 		expect(String(params.fontFamily)).toMatch(/^'Geist'/);
 	});
@@ -55,11 +55,11 @@ describe('headerChrome', () => {
 		expect(appCss).toMatch(/\.ag-header-cell \.ag-sort-indicator-icon \{\s*padding-left: 0;\s*padding-right: 0;/);
 	});
 
-	it('app.css sets the Activity header label the way ACTIVITY_HEADER_TEXT_CASE says', () => {
+	it('app.css sets the Activity header label the way LIBRARY_HEADER_TEXT_CASE says', () => {
 		const rule = appCss.match(/\.activity-grid \.ag-header-cell-text \{([^}]*)\}/)?.[1] ?? '';
-		expect(/text-transform:\s*uppercase/.test(rule)).toBe(ACTIVITY_HEADER_TEXT_CASE.uppercase);
+		expect(/text-transform:\s*uppercase/.test(rule)).toBe(LIBRARY_HEADER_TEXT_CASE.uppercase);
 		const spacing = rule.match(/letter-spacing:\s*([\d.]+)em/)?.[1];
-		expect(Number(spacing ?? 0)).toBe(ACTIVITY_HEADER_TEXT_CASE.letterSpacingEm);
+		expect(Number(spacing ?? 0)).toBe(LIBRARY_HEADER_TEXT_CASE.letterSpacingEm);
 	});
 });
 
@@ -108,7 +108,7 @@ describe('headerTextWidth', () => {
 });
 
 describe('headerMinWidth', () => {
-	const { padding, sort, sortOrder, filter } = ACTIVITY_HEADER_CHROME;
+	const { padding, sort, sortOrder, filter } = LIBRARY_HEADER_CHROME;
 
 	it('is padding + measured label + sort arrow + order number + funnel, rounded up', () => {
 		const exact = padding * 2 + headerTextWidth('Released') + sort + sortOrder + filter;
@@ -133,7 +133,7 @@ describe('headerMinWidth', () => {
 	});
 
 	it('reserves a whole digit for the order number, which the picker caps at five sorts', () => {
-		expect(sortOrder).toBeGreaterThanOrEqual(ACTIVITY_HEADER_CHROME.fontSize * WIDEST_DIGIT_EM);
+		expect(sortOrder).toBeGreaterThanOrEqual(LIBRARY_HEADER_CHROME.fontSize * WIDEST_DIGIT_EM);
 	});
 
 	it('reserves the funnel only for filterable columns', () => {

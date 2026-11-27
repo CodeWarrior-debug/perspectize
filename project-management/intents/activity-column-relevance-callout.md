@@ -25,7 +25,7 @@ When the type filter is empty or has two or more types selected, a callout sits 
 
 - **Users:** anyone on the Activity page with no type filter or a multi-type filter (the default landing state).
 - **Frontend:**
-  - `ActivityTable.svelte` (renders the callout above the grid/card list; owns `columnPickerOpen` and the filter state);
+  - `ContentLibrary.svelte` (renders the callout above the grid/card list; owns `columnPickerOpen` and the filter state);
   - `grid-config.ts` (`CONTENT_TYPE_OPTIONS`, `isMovieOnlyTypeFilter`; likely a sibling helper that counts selected types);
   - the type column's `ContentTypeFilter` (`contentTypeFilter.ts`) and `gridUrlState.ts` (`f.type=` URL key), whichever the link drives;
   - `ColumnPickerDialog.svelte`.

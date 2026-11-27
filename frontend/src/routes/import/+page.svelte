@@ -3,6 +3,7 @@
 	import SignInTrigger from '#lib/components/auth/SignInTrigger.svelte';
 	import ImportJobActions from '#lib/components/imports/ImportJobActions.svelte';
 	import ImportDescription from '#lib/components/imports/ImportDescription.svelte';
+	import ImportFromFileButton from '#lib/components/imports/ImportFromFileButton.svelte';
 	import ImportJobStatus from '#lib/components/imports/ImportJobStatus.svelte';
 	import ImportListingProgress from '#lib/components/imports/ImportListingProgress.svelte';
 	import ImportRequestForm from '#lib/components/imports/ImportRequestForm.svelte';
@@ -78,6 +79,7 @@
 			<ImportRequestForm isAdmin={me.isAdmin} onCreated={() => (tab = 'imports')} />
 		{:else}
 			{#if me.isAdmin}
+				<ImportFromFileButton isAdmin={me.isAdmin} />
 				<label class="text-muted-foreground mb-3 flex items-center gap-2 text-sm">
 					<input type="checkbox" bind:checked={showClosed} />
 					Show closed imports

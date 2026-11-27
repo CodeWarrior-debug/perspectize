@@ -370,6 +370,7 @@ type ComplexityRoot struct {
 		ConvertLinkToCopy               func(childComplexity int, id string) int
 		CopySavedItem                   func(childComplexity int, id string) int
 		CreateClaim                     func(childComplexity int, input model.CreateClaimInput) int
+		CreateContent                   func(childComplexity int, input model.CreateContentInput) int
 		CreateContentFromBook           func(childComplexity int, input model.CreateContentFromBookInput) int
 		CreateContentFromMovie          func(childComplexity int, input model.CreateContentFromMovieInput) int
 		CreateContentFromPassage        func(childComplexity int, input model.CreateContentFromPassageInput) int
@@ -495,7 +496,6 @@ type ComplexityRoot struct {
 		Quality               func(childComplexity int) int
 		RelatedPerspectiveIDs func(childComplexity int) int
 		Review                func(childComplexity int) int
-		ReviewStatus          func(childComplexity int) int
 		UpdatedAt             func(childComplexity int) int
 		User                  func(childComplexity int) int
 		UserID                func(childComplexity int) int
@@ -724,6 +724,7 @@ type MessageThreadResolver interface {
 	Muted(ctx context.Context, obj *model.MessageThread) (bool, error)
 }
 type MutationResolver interface {
+	CreateContent(ctx context.Context, input model.CreateContentInput) (*model.CreateContentResult, error)
 	CreateContentFromYouTube(ctx context.Context, input model.CreateContentFromYouTubeInput) (*model.CreateContentResult, error)
 	UpdateContentSourceData(ctx context.Context, contentID int) (*model.Content, error)
 	CreateContentFromMovie(ctx context.Context, input model.CreateContentFromMovieInput) (*model.Content, error)
@@ -2247,6 +2248,17 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.Mutation.CreateClaim(childComplexity, args["input"].(model.CreateClaimInput)), true
+	case "Mutation.createContent":
+		if e.ComplexityRoot.Mutation.CreateContent == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_createContent_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.ComplexityRoot.Mutation.CreateContent(childComplexity, args["input"].(model.CreateContentInput)), true
 	case "Mutation.createContentFromBook":
 		if e.ComplexityRoot.Mutation.CreateContentFromBook == nil {
 			break
@@ -3067,12 +3079,6 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.Perspective.Review(childComplexity), true
-	case "Perspective.reviewStatus":
-		if e.ComplexityRoot.Perspective.ReviewStatus == nil {
-			break
-		}
-
-		return e.ComplexityRoot.Perspective.ReviewStatus(childComplexity), true
 	case "Perspective.updatedAt":
 		if e.ComplexityRoot.Perspective.UpdatedAt == nil {
 			break
@@ -4089,6 +4095,7 @@ func (e *executableSchema) Exec(ctx context.Context) graphql.ResponseHandler {
 			graphql.NewInputUnmarshaler("CreateContentFromWebPageInput", ec.unmarshalInputCreateContentFromWebPageInput),
 			graphql.NewInputUnmarshaler("CreateContentFromWebsiteInput", ec.unmarshalInputCreateContentFromWebsiteInput),
 			graphql.NewInputUnmarshaler("CreateContentFromYouTubeInput", ec.unmarshalInputCreateContentFromYouTubeInput),
+			graphql.NewInputUnmarshaler("CreateContentInput", ec.unmarshalInputCreateContentInput),
 			graphql.NewInputUnmarshaler("CreateImportJobInput", ec.unmarshalInputCreateImportJobInput),
 			graphql.NewInputUnmarshaler("CreateImportSourceInput", ec.unmarshalInputCreateImportSourceInput),
 			graphql.NewInputUnmarshaler("CreateMessageThreadInput", ec.unmarshalInputCreateMessageThreadInput),
@@ -4247,12 +4254,6 @@ enum Privacy {
   PRIVATE
 }
 
-enum ReviewStatus {
-  PENDING
-  APPROVED
-  REJECTED
-}
-
 enum PerspectiveSortBy {
   CREATED_AT
   UPDATED_AT
@@ -4286,7 +4287,6 @@ type Perspective {
   privacy: Privacy!
   description: String
   category: String
-  reviewStatus: ReviewStatus
   parts: [Int!]
   labels: [String!]
   categorizedRatings: [CategorizedRating!]
@@ -4349,7 +4349,7 @@ type MovieSearchResult {
   posterPath: String
   # TMDB vote average 0-10; null when there are no votes
   voteAverage: Float
-  # Canonical content URL (https://www.themoviedb.org/movie/<id>) — pass to createContentFromMovie
+  # Canonical content URL (https://www.themoviedb.org/movie/<id>) — pass to createContent (movie field)
   url: String!
 }
 
@@ -4380,7 +4380,7 @@ type BookSearchResult {
   alreadyReadCount: Int
   # Open Library's own total across the shelves
   readingLogCount: Int
-  # Canonical content URL (https://openlibrary.org/works/<id>) — pass to createContentFromBook
+  # Canonical content URL (https://openlibrary.org/works/<id>) — pass to createContent (book field)
   url: String!
 }
 
@@ -4509,7 +4509,6 @@ enum ContentSortBy {
   NAME
   VIEW_COUNT
   LIKE_COUNT
-  PERCENT_LIKED
   PUBLISHED_AT
   CHANNEL_TITLE
   LENGTH
@@ -4643,6 +4642,17 @@ input CreateContentFromPassageInput {
   userID: IntID!
 }
 
+# One content create. Set exactly one field; the field picks the content type and
+# carries that type's input. Zero or two fields are refused with INVALID_INPUT.
+input CreateContentInput @oneOf {
+  youtube: CreateContentFromYouTubeInput
+  webPage: CreateContentFromWebPageInput
+  website: CreateContentFromWebsiteInput
+  movie: CreateContentFromMovieInput
+  book: CreateContentFromBookInput
+  passage: CreateContentFromPassageInput
+}
+
 input SetPassageDisplayTitleInput {
   contentID: IntID!
   title: String!
@@ -4740,9 +4750,12 @@ input ContentFilter {
   maxViewCount: Int
   minLikeCount: Int
   maxLikeCount: Int
-  # Published date filters (ISO 8601 date string)
+  # Published date filters (ISO 8601 date string). Cover YouTube videos and web pages.
   publishedAfter: String
   publishedBefore: String
+  # Web page filters (web page rows only; other rows never match). Case-insensitive contains.
+  webPageSiteContains: String
+  webPageAuthorContains: String
   # Channel/tag/description filters
   channelTitle: String       # ILIKE search
   tagContains: String        # Tag text contains
@@ -4828,7 +4841,6 @@ input UpdatePerspectiveInput {
   privacy: Privacy
   description: String
   category: String
-  reviewStatus: ReviewStatus
   parts: [Int!]
   labels: [String!]
   categorizedRatings: [CategorizedRatingInput!]
@@ -5141,21 +5153,26 @@ input StageImportFromFileInput {
 }
 
 type Mutation {
-  createContentFromYouTube(input: CreateContentFromYouTubeInput!): CreateContentResult! @auth
+  # Creates or finds one content row. Send exactly one field of CreateContentInput.
+  createContent(input: CreateContentInput!): CreateContentResult! @auth
+  createContentFromYouTube(input: CreateContentFromYouTubeInput!): CreateContentResult! @auth @deprecated(reason: "Use createContent")
   updateContentSourceData(contentId: IntID!): Content! @auth
 
   # Movie mutations
-  createContentFromMovie(input: CreateContentFromMovieInput!): Content! @auth
+  # Returns the row without saying whether it already existed.
+  createContentFromMovie(input: CreateContentFromMovieInput!): Content! @auth @deprecated(reason: "Use createContent")
 
   # Book mutations
-  createContentFromBook(input: CreateContentFromBookInput!): Content! @auth
+  # Returns the row without saying whether it already existed.
+  createContentFromBook(input: CreateContentFromBookInput!): Content! @auth @deprecated(reason: "Use createContent")
 
   # Webpage mutations
-  createContentFromWebPage(input: CreateContentFromWebPageInput!): CreateContentResult! @auth
-  createContentFromWebsite(input: CreateContentFromWebsiteInput!): CreateContentResult! @auth
+  createContentFromWebPage(input: CreateContentFromWebPageInput!): CreateContentResult! @auth @deprecated(reason: "Use createContent")
+  createContentFromWebsite(input: CreateContentFromWebsiteInput!): CreateContentResult! @auth @deprecated(reason: "Use createContent")
 
   # Bible passage mutations
-  createContentFromPassage(input: CreateContentFromPassageInput!): Content! @auth
+  # Returns the row without saying whether it already existed.
+  createContentFromPassage(input: CreateContentFromPassageInput!): Content! @auth @deprecated(reason: "Use createContent")
   # First-write-wins: if a title already exists, returns the content with the existing title.
   setPassageDisplayTitle(input: SetPassageDisplayTitleInput!): Content! @auth
   # Admin only: resets the title so it can be set again.
@@ -6452,8 +6469,6 @@ func (ec *executionContext) childFields_Perspective(ctx context.Context, field g
 		return ec.fieldContext_Perspective_description(ctx, field)
 	case "category":
 		return ec.fieldContext_Perspective_category(ctx, field)
-	case "reviewStatus":
-		return ec.fieldContext_Perspective_reviewStatus(ctx, field)
 	case "parts":
 		return ec.fieldContext_Perspective_parts(ctx, field)
 	case "labels":
@@ -7032,6 +7047,20 @@ func (ec *executionContext) field_Mutation_createContentFromYouTube_args(ctx con
 	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "input",
 		func(ctx context.Context, v any) (model.CreateContentFromYouTubeInput, error) {
 			return ec.unmarshalNCreateContentFromYouTubeInput2githubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋadaptersᚋgraphqlᚋmodelᚐCreateContentFromYouTubeInput(ctx, v)
+		})
+	if err != nil {
+		return nil, err
+	}
+	args["input"] = arg0
+	return args, nil
+}
+
+func (ec *executionContext) field_Mutation_createContent_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "input",
+		func(ctx context.Context, v any) (model.CreateContentInput, error) {
+			return ec.unmarshalNCreateContentInput2githubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋadaptersᚋgraphqlᚋmodelᚐCreateContentInput(ctx, v)
 		})
 	if err != nil {
 		return nil, err
@@ -13661,6 +13690,63 @@ func (ec *executionContext) fieldContext_MovieSearchResult_url(_ context.Context
 	return graphql.NewScalarFieldContext("MovieSearchResult", field, false, false, "String")
 }
 
+func (ec *executionContext) _Mutation_createContent(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_Mutation_createContent(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.Resolvers.Mutation().CreateContent(ctx, fc.Args["input"].(model.CreateContentInput))
+		},
+		func(ctx context.Context, next graphql.Resolver) graphql.Resolver {
+			directive0 := next
+
+			directive1 := func(ctx context.Context) (any, error) {
+				if ec.Directives.Auth == nil {
+					var zeroVal *model.CreateContentResult
+					return zeroVal, errors.New("directive auth is not implemented")
+				}
+				return ec.Directives.Auth(ctx, nil, directive0)
+			}
+
+			next = directive1
+			return next
+		},
+		func(ctx context.Context, selections ast.SelectionSet, v *model.CreateContentResult) graphql.Marshaler {
+			return ec.marshalNCreateContentResult2ᚖgithubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋadaptersᚋgraphqlᚋmodelᚐCreateContentResult(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_Mutation_createContent(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.childFields_CreateContentResult(ctx, field)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Mutation_createContent_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _Mutation_createContentFromYouTube(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
@@ -17822,29 +17908,6 @@ func (ec *executionContext) _Perspective_category(ctx context.Context, field gra
 }
 func (ec *executionContext) fieldContext_Perspective_category(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	return graphql.NewScalarFieldContext("Perspective", field, false, false, "String")
-}
-
-func (ec *executionContext) _Perspective_reviewStatus(ctx context.Context, field graphql.CollectedField, obj *model.Perspective) (ret graphql.Marshaler) {
-	return graphql.ResolveField(
-		ctx,
-		ec.OperationContext,
-		field,
-		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			return ec.fieldContext_Perspective_reviewStatus(ctx, field)
-		},
-		func(ctx context.Context) (any, error) {
-			return obj.ReviewStatus, nil
-		},
-		nil,
-		func(ctx context.Context, selections ast.SelectionSet, v *domain.ReviewStatus) graphql.Marshaler {
-			return ec.marshalOReviewStatus2ᚖgithubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋcoreᚋdomainᚐReviewStatus(ctx, selections, v)
-		},
-		true,
-		false,
-	)
-}
-func (ec *executionContext) fieldContext_Perspective_reviewStatus(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
-	return graphql.NewScalarFieldContext("Perspective", field, false, false, "ReviewStatus")
 }
 
 func (ec *executionContext) _Perspective_parts(ctx context.Context, field graphql.CollectedField, obj *model.Perspective) (ret graphql.Marshaler) {
@@ -23426,7 +23489,7 @@ func (ec *executionContext) unmarshalInputContentFilter(ctx context.Context, obj
 		asMap[k] = v
 	}
 
-	fieldsInOrder := [...]string{"contentType", "contentTypes", "minLengthSeconds", "maxLengthSeconds", "search", "searchFields", "personId", "personRole", "genreContains", "castContains", "ageRating", "releasedAfter", "releasedBefore", "minBoxOffice", "maxBoxOffice", "minTmdbScore", "maxTmdbScore", "authorContains", "minPublishYear", "maxPublishYear", "minPages", "maxPages", "minBookRating", "maxBookRating", "webPageRoles", "parentContentID", "minViewCount", "maxViewCount", "minLikeCount", "maxLikeCount", "publishedAfter", "publishedBefore", "channelTitle", "tagContains", "descriptionSearch", "addedByUsername", "minPerspectiveCount", "createdAfter", "createdBefore", "updatedAfter", "updatedBefore"}
+	fieldsInOrder := [...]string{"contentType", "contentTypes", "minLengthSeconds", "maxLengthSeconds", "search", "searchFields", "personId", "personRole", "genreContains", "castContains", "ageRating", "releasedAfter", "releasedBefore", "minBoxOffice", "maxBoxOffice", "minTmdbScore", "maxTmdbScore", "authorContains", "minPublishYear", "maxPublishYear", "minPages", "maxPages", "minBookRating", "maxBookRating", "webPageRoles", "parentContentID", "minViewCount", "maxViewCount", "minLikeCount", "maxLikeCount", "publishedAfter", "publishedBefore", "webPageSiteContains", "webPageAuthorContains", "channelTitle", "tagContains", "descriptionSearch", "addedByUsername", "minPerspectiveCount", "createdAfter", "createdBefore", "updatedAfter", "updatedBefore"}
 	for _, k := range fieldsInOrder {
 		v, ok := asMap[k]
 		if !ok {
@@ -23657,6 +23720,20 @@ func (ec *executionContext) unmarshalInputContentFilter(ctx context.Context, obj
 				return it, err
 			}
 			it.PublishedBefore = data
+		case "webPageSiteContains":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("webPageSiteContains"))
+			data, err := ec.unmarshalOString2ᚖstring(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.WebPageSiteContains = data
+		case "webPageAuthorContains":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("webPageAuthorContains"))
+			data, err := ec.unmarshalOString2ᚖstring(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.WebPageAuthorContains = data
 		case "channelTitle":
 			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("channelTitle"))
 			data, err := ec.unmarshalOString2ᚖstring(ctx, v)
@@ -24168,6 +24245,83 @@ func (ec *executionContext) unmarshalInputCreateContentFromYouTubeInput(ctx cont
 func UnmarshalCreateContentFromYouTubeInput(ctx context.Context, raw any) (model.CreateContentFromYouTubeInput, error) {
 	var out model.CreateContentFromYouTubeInput
 	err := graphql.UnmarshalNamedInputFromContext(ctx, "CreateContentFromYouTubeInput", raw, &out)
+	return out, err
+}
+
+func (ec *executionContext) unmarshalInputCreateContentInput(ctx context.Context, obj any) (model.CreateContentInput, error) {
+	var it model.CreateContentInput
+	if obj == nil {
+		return it, nil
+	}
+
+	asMap := map[string]any{}
+	for k, v := range obj.(map[string]any) {
+		asMap[k] = v
+	}
+
+	fieldsInOrder := [...]string{"youtube", "webPage", "website", "movie", "book", "passage"}
+	for _, k := range fieldsInOrder {
+		v, ok := asMap[k]
+		if !ok {
+			continue
+		}
+		switch k {
+		case "youtube":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("youtube"))
+			data, err := ec.unmarshalOCreateContentFromYouTubeInput2ᚖgithubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋadaptersᚋgraphqlᚋmodelᚐCreateContentFromYouTubeInput(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Youtube = data
+		case "webPage":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("webPage"))
+			data, err := ec.unmarshalOCreateContentFromWebPageInput2ᚖgithubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋadaptersᚋgraphqlᚋmodelᚐCreateContentFromWebPageInput(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.WebPage = data
+		case "website":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("website"))
+			data, err := ec.unmarshalOCreateContentFromWebsiteInput2ᚖgithubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋadaptersᚋgraphqlᚋmodelᚐCreateContentFromWebsiteInput(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Website = data
+		case "movie":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("movie"))
+			data, err := ec.unmarshalOCreateContentFromMovieInput2ᚖgithubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋadaptersᚋgraphqlᚋmodelᚐCreateContentFromMovieInput(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Movie = data
+		case "book":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("book"))
+			data, err := ec.unmarshalOCreateContentFromBookInput2ᚖgithubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋadaptersᚋgraphqlᚋmodelᚐCreateContentFromBookInput(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Book = data
+		case "passage":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("passage"))
+			data, err := ec.unmarshalOCreateContentFromPassageInput2ᚖgithubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋadaptersᚋgraphqlᚋmodelᚐCreateContentFromPassageInput(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Passage = data
+		}
+	}
+	return it, nil
+}
+
+// UnmarshalCreateContentInput unmarshals raw into the CreateContentInput input type, using the
+// unmarshaler bound to ctx's request. Call it from a resolver to decode an input
+// object that was not passed as a field argument.
+//
+// ctx must come from a gqlgen request; outside one there is no unmarshaler to use
+// and the returned error says so.
+func UnmarshalCreateContentInput(ctx context.Context, raw any) (model.CreateContentInput, error) {
+	var out model.CreateContentInput
+	err := graphql.UnmarshalNamedInputFromContext(ctx, "CreateContentInput", raw, &out)
 	return out, err
 }
 
@@ -25540,7 +25694,7 @@ func (ec *executionContext) unmarshalInputUpdatePerspectiveInput(ctx context.Con
 		asMap[k] = v
 	}
 
-	fieldsInOrder := [...]string{"id", "contentID", "quality", "agreement", "importance", "confidence", "like", "privacy", "description", "category", "reviewStatus", "parts", "labels", "categorizedRatings", "feelings", "primaryPerspectiveID", "relatedPerspectiveIDs", "customFields", "review"}
+	fieldsInOrder := [...]string{"id", "contentID", "quality", "agreement", "importance", "confidence", "like", "privacy", "description", "category", "parts", "labels", "categorizedRatings", "feelings", "primaryPerspectiveID", "relatedPerspectiveIDs", "customFields", "review"}
 	for _, k := range fieldsInOrder {
 		v, ok := asMap[k]
 		if !ok {
@@ -25617,13 +25771,6 @@ func (ec *executionContext) unmarshalInputUpdatePerspectiveInput(ctx context.Con
 				return it, err
 			}
 			it.Category = data
-		case "reviewStatus":
-			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("reviewStatus"))
-			data, err := ec.unmarshalOReviewStatus2ᚖgithubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋcoreᚋdomainᚐReviewStatus(ctx, v)
-			if err != nil {
-				return it, err
-			}
-			it.ReviewStatus = data
 		case "parts":
 			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("parts"))
 			data, err := ec.unmarshalOInt2ᚕintᚄ(ctx, v)
@@ -28193,6 +28340,13 @@ func (ec *executionContext) _Mutation(ctx context.Context, sel ast.SelectionSet)
 		switch field.Name {
 		case "__typename":
 			out.Values[i] = graphql.MarshalString("Mutation")
+		case "createContent":
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_createContent(ctx, field)
+			})
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
 		case "createContentFromYouTube":
 			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
 				return ec._Mutation_createContentFromYouTube(ctx, field)
@@ -29057,11 +29211,6 @@ func (ec *executionContext) _Perspective(ctx context.Context, sel ast.SelectionS
 			}
 		case "category":
 			out.Values[i] = ec._Perspective_category(ctx, field, obj)
-			if out.Values[i] == graphql.RequiredNull {
-				atomic.AddUint32(&out.Invalids, 1)
-			}
-		case "reviewStatus":
-			out.Values[i] = ec._Perspective_reviewStatus(ctx, field, obj)
 			if out.Values[i] == graphql.RequiredNull {
 				atomic.AddUint32(&out.Invalids, 1)
 			}
@@ -30877,6 +31026,11 @@ func (ec *executionContext) unmarshalNCreateContentFromYouTubeInput2githubᚗcom
 	return res, graphql.ErrorOnPath(ctx, err)
 }
 
+func (ec *executionContext) unmarshalNCreateContentInput2githubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋadaptersᚋgraphqlᚋmodelᚐCreateContentInput(ctx context.Context, v any) (model.CreateContentInput, error) {
+	res, err := ec.unmarshalInputCreateContentInput(ctx, v)
+	return res, graphql.ErrorOnPath(ctx, err)
+}
+
 func (ec *executionContext) marshalNCreateContentResult2ᚖgithubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋadaptersᚋgraphqlᚋmodelᚐCreateContentResult(ctx context.Context, sel ast.SelectionSet, v *model.CreateContentResult) graphql.Marshaler {
 	if v == nil {
 		graphql.AddInvalidNullError(ctx, "CreateContentResult!")
@@ -32479,6 +32633,54 @@ func (ec *executionContext) marshalOContentType2ᚖgithubᚗcomᚋCodeWarriorᚑ
 	return res
 }
 
+func (ec *executionContext) unmarshalOCreateContentFromBookInput2ᚖgithubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋadaptersᚋgraphqlᚋmodelᚐCreateContentFromBookInput(ctx context.Context, v any) (*model.CreateContentFromBookInput, error) {
+	if v == nil {
+		return nil, nil
+	}
+	res, err := ec.unmarshalInputCreateContentFromBookInput(ctx, v)
+	return &res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) unmarshalOCreateContentFromMovieInput2ᚖgithubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋadaptersᚋgraphqlᚋmodelᚐCreateContentFromMovieInput(ctx context.Context, v any) (*model.CreateContentFromMovieInput, error) {
+	if v == nil {
+		return nil, nil
+	}
+	res, err := ec.unmarshalInputCreateContentFromMovieInput(ctx, v)
+	return &res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) unmarshalOCreateContentFromPassageInput2ᚖgithubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋadaptersᚋgraphqlᚋmodelᚐCreateContentFromPassageInput(ctx context.Context, v any) (*model.CreateContentFromPassageInput, error) {
+	if v == nil {
+		return nil, nil
+	}
+	res, err := ec.unmarshalInputCreateContentFromPassageInput(ctx, v)
+	return &res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) unmarshalOCreateContentFromWebPageInput2ᚖgithubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋadaptersᚋgraphqlᚋmodelᚐCreateContentFromWebPageInput(ctx context.Context, v any) (*model.CreateContentFromWebPageInput, error) {
+	if v == nil {
+		return nil, nil
+	}
+	res, err := ec.unmarshalInputCreateContentFromWebPageInput(ctx, v)
+	return &res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) unmarshalOCreateContentFromWebsiteInput2ᚖgithubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋadaptersᚋgraphqlᚋmodelᚐCreateContentFromWebsiteInput(ctx context.Context, v any) (*model.CreateContentFromWebsiteInput, error) {
+	if v == nil {
+		return nil, nil
+	}
+	res, err := ec.unmarshalInputCreateContentFromWebsiteInput(ctx, v)
+	return &res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) unmarshalOCreateContentFromYouTubeInput2ᚖgithubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋadaptersᚋgraphqlᚋmodelᚐCreateContentFromYouTubeInput(ctx context.Context, v any) (*model.CreateContentFromYouTubeInput, error) {
+	if v == nil {
+		return nil, nil
+	}
+	res, err := ec.unmarshalInputCreateContentFromYouTubeInput(ctx, v)
+	return &res, graphql.ErrorOnPath(ctx, err)
+}
+
 func (ec *executionContext) marshalOFeelingEntry2ᚕᚖgithubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋadaptersᚋgraphqlᚋmodelᚐFeelingEntryᚄ(ctx context.Context, sel ast.SelectionSet, v []*model.FeelingEntry) graphql.Marshaler {
 	if v == nil {
 		return graphql.Null
@@ -32775,25 +32977,6 @@ func (ec *executionContext) unmarshalOPrivacy2ᚖgithubᚗcomᚋCodeWarriorᚑde
 }
 
 func (ec *executionContext) marshalOPrivacy2ᚖgithubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋcoreᚋdomainᚐPrivacy(ctx context.Context, sel ast.SelectionSet, v *domain.Privacy) graphql.Marshaler {
-	if v == nil {
-		return graphql.Null
-	}
-	_ = sel
-	_ = ctx
-	res := graphql.MarshalString(string(*v))
-	return res
-}
-
-func (ec *executionContext) unmarshalOReviewStatus2ᚖgithubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋcoreᚋdomainᚐReviewStatus(ctx context.Context, v any) (*domain.ReviewStatus, error) {
-	if v == nil {
-		return nil, nil
-	}
-	tmp, err := graphql.UnmarshalString(v)
-	res := domain.ReviewStatus(tmp)
-	return &res, graphql.ErrorOnPath(ctx, err)
-}
-
-func (ec *executionContext) marshalOReviewStatus2ᚖgithubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋcoreᚋdomainᚐReviewStatus(ctx context.Context, sel ast.SelectionSet, v *domain.ReviewStatus) graphql.Marshaler {
 	if v == nil {
 		return graphql.Null
 	}

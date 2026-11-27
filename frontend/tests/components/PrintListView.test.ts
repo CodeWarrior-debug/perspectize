@@ -83,16 +83,7 @@ describe('PrintListView', () => {
 		const rule = appCss.match(/((?:\s*\.print-root td\[data-col='\w+'\],?)+)\s*\{\s*white-space: nowrap;/);
 		expect(rule).not.toBeNull();
 		const ids = [...rule![1].matchAll(/data-col='(\w+)'/g)].map((m) => m[1]);
-		for (const id of [
-			'duration',
-			'views',
-			'likes',
-			'percentLiked',
-			'effectiveDate',
-			'publishDate',
-			'updatedAt',
-			'createdAt',
-		]) {
+		for (const id of ['duration', 'views', 'likes', 'effectiveDate', 'publishDate', 'updatedAt', 'createdAt']) {
 			expect(ids).toContain(id);
 		}
 		for (const id of ['item', 'category', 'channel', 'tags', 'cast', 'author', 'description']) {

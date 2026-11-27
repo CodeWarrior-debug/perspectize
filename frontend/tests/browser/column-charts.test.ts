@@ -11,7 +11,7 @@ import { render } from 'vitest-browser-svelte';
 import { afterEach, beforeEach, describe, expect, it, onTestFinished, vi } from 'vitest';
 import { page as browserPage, userEvent } from 'vitest/browser';
 
-import ActivityTableHarness from './fixtures/ActivityTableHarness.svelte';
+import ContentLibraryHarness from './fixtures/ContentLibraryHarness.svelte';
 import { page as routerPage } from '$app/state';
 import { CHART_SETTINGS_KEY } from '#lib/utils/columnChartSettings';
 
@@ -81,7 +81,7 @@ beforeEach(() => {
 });
 
 afterEach(async () => {
-	// Known pre-existing bug: debounce timer not cleared on destroy (ActivityTable filter-to-URL timer).
+	// Known pre-existing bug: debounce timer not cleared on destroy (ContentLibrary filter-to-URL timer).
 	// It fires 500ms after a filter change and throws if the grid is already gone, so wait it out here.
 	await new Promise((r) => setTimeout(r, 600));
 	localStorage.clear();
@@ -90,7 +90,7 @@ afterEach(async () => {
 
 describe('column charts on the activity grid', () => {
 	it('shows no chart icon until the column picker turns it on, then charts the loaded rows', async () => {
-		render(ActivityTableHarness);
+		render(ContentLibraryHarness);
 
 		await expect.poll(rowCount).toBe(ITEMS.length);
 		await expect.poll(() => takeHeader()).not.toBeNull();
@@ -114,7 +114,7 @@ describe('column charts on the activity grid', () => {
 
 	it('shows the icon straight away when the flag was saved earlier, and turns it off again from the picker', async () => {
 		localStorage.setItem(CHART_SETTINGS_KEY, JSON.stringify({ version: 1, flags: { boxOffice: true } }));
-		render(ActivityTableHarness);
+		render(ContentLibraryHarness);
 
 		await expect.poll(() => chartButton()).not.toBeNull();
 
@@ -129,7 +129,7 @@ describe('column charts on the activity grid', () => {
 	it('shows no chart icon outside the movie view', async () => {
 		localStorage.setItem(CHART_SETTINGS_KEY, JSON.stringify({ version: 1, flags: { boxOffice: true } }));
 		setUrl(new URL('http://localhost/activity?mode=loaded&f.type=movie,youtube_video'));
-		render(ActivityTableHarness);
+		render(ContentLibraryHarness);
 
 		await expect.poll(rowCount).toBe(ITEMS.length);
 		expect(document.querySelector('[data-chart-col]')).toBeNull();
@@ -137,7 +137,7 @@ describe('column charts on the activity grid', () => {
 
 	it('keeps the header sortable once it carries the chart icon', async () => {
 		localStorage.setItem(CHART_SETTINGS_KEY, JSON.stringify({ version: 1, flags: { boxOffice: true } }));
-		render(ActivityTableHarness);
+		render(ContentLibraryHarness);
 		await expect.poll(() => chartButton()).not.toBeNull();
 
 		// The Item column is pinned left, so a row's text spans the pinned and the centre container.
@@ -164,7 +164,7 @@ describe('column charts on the activity grid', () => {
 			flagsOn('boxOffice');
 			setUrl(new URL('http://localhost/activity?mode=all&f.type=movie'));
 			// Pre-existing: applyColumnState from the sort-sync effect throws before the grid's body controller
-			// is ready, ActivityTable ~line 1331 (fresh mount in "All Items" mode). Suppressed here for now.
+			// is ready, ContentLibrary ~line 1331 (fresh mount in "All Items" mode). Suppressed here for now.
 			const swallow = (e: ErrorEvent) => {
 				if (String(e.message).includes('setColumnMovingCss')) {
 					e.preventDefault();
@@ -173,7 +173,7 @@ describe('column charts on the activity grid', () => {
 			};
 			window.addEventListener('error', swallow, true);
 			onTestFinished(() => window.removeEventListener('error', swallow, true));
-			render(ActivityTableHarness);
+			render(ContentLibraryHarness);
 
 			await expect.poll(() => takeHeader()).not.toBeNull();
 			await expect.poll(rowCount).toBe(ITEMS.length);
@@ -193,7 +193,7 @@ describe('column charts on the activity grid', () => {
 					movie: null,
 				},
 			];
-			render(ActivityTableHarness);
+			render(ContentLibraryHarness);
 
 			await expect.poll(() => header('views')).not.toBeNull();
 			await expect.poll(rowCount).toBe(1);
@@ -208,7 +208,7 @@ describe('column charts on the activity grid', () => {
 
 		it('opens the filter popup from the filter button on a chart column', async () => {
 			flagsOn('boxOffice');
-			render(ActivityTableHarness);
+			render(ContentLibraryHarness);
 			await expect.poll(() => chartButton()).not.toBeNull();
 
 			(takeHeader()?.querySelector('.ag-header-cell-filter-button') as HTMLElement).click();
@@ -217,7 +217,7 @@ describe('column charts on the activity grid', () => {
 
 		it('sorts a chart column and shows the sort order when two columns are sorted', async () => {
 			flagsOn('boxOffice', 'duration');
-			render(ActivityTableHarness);
+			render(ContentLibraryHarness);
 			await expect.poll(() => chartButton()).not.toBeNull();
 			await expect.poll(() => header('duration')).not.toBeNull();
 
@@ -233,7 +233,7 @@ describe('column charts on the activity grid', () => {
 		it('marks a filtered chart column with the active-filter state', async () => {
 			flagsOn('boxOffice');
 			setUrl(new URL('http://localhost/activity?mode=loaded&f.type=movie&f.boxoffice=20000000..'));
-			render(ActivityTableHarness);
+			render(ContentLibraryHarness);
 
 			await expect.poll(() => chartButton()).not.toBeNull();
 			await expect
@@ -243,12 +243,12 @@ describe('column charts on the activity grid', () => {
 				.toBe(true);
 			// The chart follows the filtered rows: 25M, 40M, 90M of the 5.
 			(chartButton() as HTMLElement).click();
-			await expect.element(browserPage.getByText('based on 3 loaded movies')).toBeVisible();
+			await expect.element(browserPage.getByText('based on 3 loaded movies · 0 empty')).toBeVisible();
 		});
 
 		it('names each chart button after its column header', async () => {
 			flagsOn('boxOffice', 'duration');
-			render(ActivityTableHarness);
+			render(ContentLibraryHarness);
 			await expect.poll(() => chartButton()).not.toBeNull();
 
 			await expect.element(browserPage.getByRole('button', { name: 'Chart Take' })).toBeInTheDocument();
@@ -257,7 +257,7 @@ describe('column charts on the activity grid', () => {
 
 		it('labels duration charts as h:mm', async () => {
 			flagsOn('duration');
-			render(ActivityTableHarness);
+			render(ContentLibraryHarness);
 			await expect.poll(() => header('duration')?.querySelector('[data-chart-col]:not([hidden])')).not.toBeNull();
 
 			(document.querySelector('[data-testid="column-chart-button-duration"]') as HTMLElement).click();
@@ -274,13 +274,13 @@ describe('column charts on the activity grid', () => {
 
 		it('closes an open chart when its switch is turned off in the picker', async () => {
 			flagsOn('boxOffice');
-			render(ActivityTableHarness);
+			render(ContentLibraryHarness);
 			await expect.poll(() => chartButton()).not.toBeNull();
 			(chartButton() as HTMLElement).click();
 			await expect.poll(() => document.querySelector('[data-testid="column-chart-popover"]')).not.toBeNull();
 
 			// Programmatic clicks (no pointerdown) so the popover's outside-click dismissal is not what closes it;
-			// only ActivityTable's "icon no longer applies" effect can.
+			// only ContentLibrary's "icon no longer applies" effect can.
 			(document.querySelector('[aria-label="Choose columns"]') as HTMLElement).click();
 			await expect.poll(() => document.querySelector('[role="switch"][aria-label="Take chart"]')).not.toBeNull();
 			expect(document.querySelector('[data-testid="column-chart-popover"]')).not.toBeNull();
@@ -291,7 +291,7 @@ describe('column charts on the activity grid', () => {
 
 		it('opens the chart from the keyboard: Tab to the chart button, Enter, and focus lands in the popover', async () => {
 			flagsOn('boxOffice');
-			render(ActivityTableHarness);
+			render(ContentLibraryHarness);
 			await expect.poll(() => chartButton()).not.toBeNull();
 
 			(takeHeader() as HTMLElement).focus();
@@ -308,7 +308,7 @@ describe('column charts on the activity grid', () => {
 
 		it('shows no chart icon for a hidden column', async () => {
 			flagsOn('boxOffice');
-			render(ActivityTableHarness);
+			render(ContentLibraryHarness);
 			await expect.poll(() => chartButton()).not.toBeNull();
 
 			await browserPage.getByRole('button', { name: 'Choose columns' }).click();

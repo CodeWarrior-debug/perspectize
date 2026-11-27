@@ -1,27 +1,28 @@
+import { LIBRARY_COLUMNS } from '#lib/utils/libraryColumns/index.js';
 import { describe, it, expect, vi } from 'vitest';
 import {
 	syncItemHeader,
 	capitalizeContentType,
 	durationComparator,
-	DATA_COLUMNS,
-	INTERNAL_COLUMNS,
-	togglableColIds,
-	SORTABLE_COLUMNS,
-	compareContentBySorts,
-	filterContentRows,
-	CLIENT_ONLY_SORT_COLS,
-	COL_TO_SORT,
-	sortableColumnsFor,
 	releasedComparator,
 	labelComparator,
 	itemColumnHeader,
 	soloTypeFilter,
-	defaultColumnVisibility,
-	COLUMNS,
-	NUMERIC_COL_IDS,
 	CONTENT_TYPE_OPTIONS,
 	liveGridApi,
 } from '#lib/utils/grid-config.js';
+import {
+	DATA_COLUMNS,
+	INTERNAL_COLUMNS,
+	togglableColIds,
+	SORTABLE_COLUMNS,
+	CLIENT_ONLY_SORT_COLS,
+	COL_TO_SORT,
+	sortableColumnsFor,
+	defaultColumnVisibility,
+	NUMERIC_COL_IDS,
+} from '#lib/utils/libraryColumns/index.js';
+import { compareContentBySorts, filterContentRows } from '#lib/utils/libraryColumns/clientRows.js';
 import type { ContentItem } from '#lib/queries/content/index.js';
 
 describe('CONTENT_TYPE_OPTIONS (Book)', () => {
@@ -83,17 +84,7 @@ describe('NUMERIC_COL_IDS (right-aligned columns)', () => {
 	});
 
 	it('covers every count, money, score and duration column', () => {
-		for (const id of [
-			'duration',
-			'views',
-			'likes',
-			'percentLiked',
-			'boxOffice',
-			'vsBudget',
-			'tmdbScore',
-			'budget',
-			'votes',
-		]) {
+		for (const id of ['duration', 'views', 'likes', 'boxOffice', 'vsBudget', 'tmdbScore', 'budget', 'votes']) {
 			expect(NUMERIC_COL_IDS.has(id), id).toBe(true);
 		}
 	});
@@ -203,7 +194,6 @@ describe('column-picker registry', () => {
 			'duration',
 			'views',
 			'likes',
-			'percentLiked',
 			'released',
 			'boxOffice',
 			'vsBudget',
@@ -287,10 +277,6 @@ describe('SORTABLE_COLUMNS', () => {
 		expect(ids).toContain('released');
 		expect(ids).toContain('tmdbScore');
 	});
-
-	it('includes percentLiked — sortable in the grid, must stay sortable in the mobile/Loaded-mode picker too', () => {
-		expect(SORTABLE_COLUMNS.map((c) => c.colId)).toContain('percentLiked');
-	});
 });
 
 // ---------------------------------------------------------------------------
@@ -340,16 +326,6 @@ describe('compareContentBySorts', () => {
 		const rows = [row({ id: '1', name: 'banana' }), row({ id: '2', name: 'Apple' })];
 		const sorted = [...rows].sort((a, b) => compareContentBySorts(a, b, [{ col: 'item', dir: 'asc' }]));
 		expect(sorted.map((r) => r.id)).toEqual(['2', '1']);
-	});
-
-	it('sorts by percentLiked (likes / views), the same computation the grid column uses', () => {
-		const rows = [
-			row({ id: '1', viewCount: 100, likeCount: 10 }), // 10%
-			row({ id: '2', viewCount: 100, likeCount: 90 }), // 90%
-			row({ id: '3', viewCount: 0, likeCount: 0 }), // null — no meaningful rate
-		];
-		const sorted = [...rows].sort((a, b) => compareContentBySorts(a, b, [{ col: 'percentLiked', dir: 'desc' }]));
-		expect(sorted.map((r) => r.id)).toEqual(['2', '1', '3']);
 	});
 
 	it('skips a colId with no known value getter', () => {
@@ -569,7 +545,8 @@ describe('Category column (client-only sort)', () => {
 	});
 
 	it('the value extractor yields the lowercased label, or null when there is no category', () => {
-		const sortValue = COLUMNS.find((c) => c.colId === 'category')?.sortValue;
+		const sort = LIBRARY_COLUMNS.find((c) => c.colId === 'category')?.sort;
+		const sortValue = sort ? sort.client : undefined;
 		expect(sortValue?.(withCategory('x', 'Art'))).toBe('art');
 		expect(sortValue?.(withCategory('x', null))).toBeNull();
 	});
@@ -648,7 +625,6 @@ describe('Claim column set', () => {
 			'publishDate',
 			'views',
 			'likes',
-			'percentLiked',
 			'tags',
 			'user',
 			'description',
@@ -688,12 +664,12 @@ describe('Claim column set', () => {
 
 	it('registers the claim date columns as picker data columns sorted client-side only', () => {
 		for (const id of ['effectiveDate', 'evaluateBy']) {
-			const meta = COLUMNS.find((c) => c.colId === id);
+			const meta = LIBRARY_COLUMNS.find((c) => c.colId === id);
 			expect(meta, id).toBeDefined();
 			expect(meta?.picker).toBe('data');
-			expect(meta?.sortable).toBe(true);
-			expect(meta?.serverSort, id).toBeUndefined();
-			expect(meta?.filterKey, id).toBeUndefined();
+			expect(meta?.sort, id).toBeTruthy();
+			expect(meta && meta.sort !== false ? meta.sort.server : undefined, id).toBeUndefined();
+			expect(meta?.filter?.key, id).toBeUndefined();
 		}
 	});
 });

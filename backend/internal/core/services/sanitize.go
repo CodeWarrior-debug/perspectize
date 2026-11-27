@@ -11,6 +11,7 @@ func newReviewPolicy() *bluemonday.Policy {
 	p := bluemonday.NewPolicy()
 	p.AllowElements("p", "br", "strong", "b", "em", "i", "u", "span", "ul", "ol", "li")
 	p.AllowElements("h2", "h3")
+	p.AllowElements("blockquote")
 	p.AllowElements("table", "thead", "tbody", "tr", "th", "td")
 
 	p.AllowAttrs("href").OnElements("a")

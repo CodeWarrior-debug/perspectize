@@ -8,13 +8,13 @@ The grid can only sort and filter by a fixed set of fields. Today that set is th
 
 A user who wants to rank content by something that matters to *them* has no way to say so. This applies to **every content type**, not one: YouTube videos, movies, Bible passages, claims, and any type added later. Some examples:
 
-- **YouTube:** "popularity" as a weighted blend of views and likes, or "sleeper hits" as a high like ratio on low views.
+- **Plan:** "urgency" as priority weighted by days until due.
 - **Movies:** "return on budget" blended with TMDB score.
 - **Any type:** "contested" as many perspectives with widely spread quality ratings.
 
 Today users end up eyeballing several columns at once.
 
-Every derived metric we *do* have, `PERCENT_LIKED` and `VS_BUDGET`, was hand-written in five places:
+A derived metric we *do* have, `VS_BUDGET`, was hand-written in five places:
 
 1. The GraphQL enum.
 2. `contentSortRule` (a fixed SQL expression) in `backend/internal/adapters/repositories/postgres/helpers.go`.
@@ -22,7 +22,7 @@ Every derived metric we *do* have, `PERCENT_LIKED` and `VS_BUDGET`, was hand-wri
 4. A read-only GORM field in `gorm_models.go`.
 5. A mirrored client value getter in `frontend/src/lib/utils/formatting.ts`.
 
-That means a new metric costs a backend and a frontend change plus a deploy. The two implementations can also drift apart, and users can never define one themselves. Filtering on derived values is worse still: % Liked has no server filter at all (`grid-config.ts` notes the gap).
+That means a new metric costs a backend and a frontend change plus a deploy. The two implementations can also drift apart, and users can never define one themselves. Filtering on derived values needs more backend work again.
 
 ## Proposed outcome
 
@@ -30,11 +30,12 @@ A signed-in user can define a named **calculated column** from a formula over a 
 
 - **Works for every content type.** Calculated columns are a general grid capability, not a YouTube feature. The operand catalogue has two kinds of entry:
   - **Shared operands** that exist for every type: length, age since added, and perspective aggregates (count, average quality, spread).
-  - **Type-specific operands** that each content type registers: YouTube views/likes/comments and publish age; movie revenue, budget and TMDB score; and whatever later types bring.
+  - **Type-specific operands** that each content type registers: movie revenue, budget and TMDB score; and whatever later types bring.
+  - **No YouTube statistics.** Views, likes and comments are not operands: YouTube's API policy forbids deriving metrics from them.
   - Adding a new content type includes registering its numeric operands in one place, so its fields become usable in formulas without touching the compiler or evaluator. That step belongs in the [Adding a Content Type](../../.claude/docs/ADDING_CONTENT_TYPE.md) guide.
   - A formula can mix operands from different types. An operand that doesn't apply to a row evaluates to NULL unless the formula wraps it in `coalesce`.
 - **Definable without code.** A formula is built from catalogue operands, numeric weights and constants, and a small set of safe functions: `+ - * /`, `log10`, `sqrt`, `min`, `max`, `coalesce`, safe division. Examples:
-  - YouTube popularity: `0.7 * log10(viewCount + 1) + 0.3 * log10(likeCount + 1)`
+  - Plan urgency: `priority / max(1, daysUntilDue)`
   - Movie value: `0.5 * (revenue / budget) + 0.5 * tmdbScore`
   - Any type, contested: `perspectiveCount * qualitySpread`
 - **Runs on either side, same answer.**
@@ -47,7 +48,7 @@ A signed-in user can define a named **calculated column** from a formula over a 
   - It takes a min/max range filter.
   - Sort and filter state still round-trip through the URL.
 - **Very dynamic at the database, but no runtime DDL.** New formulas never need a migration or a deploy. The database does the math, so sort and filter stay correct across all rows, not just the loaded page. Schema changes are limited to a one-time foundation: typed operand columns or a view, plus the definitions table. Those go through the normal migration review.
-- **Built-ins and custom metrics share one path.** Once this ships, `PERCENT_LIKED` and `VS_BUDGET` can be re-expressed as system-owned definitions. That removes the five-place pattern.
+- **Built-ins and custom metrics share one path.** Once this ships, `VS_BUDGET` can be re-expressed as a system-owned definition. That removes the five-place pattern.
 - **One engine, more than one grid.** Each definition names the grid it targets (`plan` or `content`). Each grid registers its own operand catalogue with the same compiler and evaluator. A future grid joins by registering its operands.
 
 ## Phasing
@@ -83,13 +84,13 @@ The end goal above covers every content type in the Activity grid. Delivery is s
 **Phase 2 — Activity grid, every content type.**
 - The same engine targets `content`, with shared and type-specific operands, both data modes, and keyset pagination at scale.
 - This phase is where open questions 2, 6 and 8 get answered.
-- `PERCENT_LIKED` and `VS_BUDGET` move onto the engine here.
+- `VS_BUDGET` moves onto the engine here.
 
 ## Affected users and systems
 
 - **Users:**
   - Phase 1: signed-in users on their own Plan view.
-  - Phase 2: anyone browsing the Activity grid, across all content types (YouTube videos, movies, Bible passages, claims, and future types). YouTube is only the motivating example.
+  - Phase 2: anyone browsing the Activity grid, across all content types (YouTube videos, movies, Bible passages, claims, and future types). YouTube statistics are excluded (see the operand catalogue).
 - **Plan view (phases 0–1):**
   - `PlanBoard.svelte` (query variables, sort state, page size);
   - `PlanTable.svelte` (colDefs, `onSortChanged` → `serverSortFor`, a client/server sort mode);
@@ -97,7 +98,7 @@ The end goal above covers every content type in the Activity grid. Delivery is s
   - backend `UserTodoSortBy` / `UserTodoFilter` in `schema.graphql`, plus the user-todo repository, which need a way to name a metric.
 - **Content-type plumbing:** each type's numeric fields are registered as operands, in one catalogue shared by backend and frontend. The [Adding a Content Type](../../.claude/docs/ADDING_CONTENT_TYPE.md) guide gains a step for this.
 - **Frontend:**
-  - `ActivityTable.svelte` (colDefs, both data modes);
+  - `library/columns.ts` (colDefs) and `ContentLibrary.svelte` (both data modes);
   - `grid-config.ts` (`COLUMNS` / `ColumnMeta`; dynamic entries join the static list);
   - `ColumnPickerDialog.svelte`;
   - `columnLayouts.ts` (localStorage layouts must reference metric ids);
@@ -141,7 +142,7 @@ The end goal above covers every content type in the Activity grid. Delivery is s
     - Phase 1: migration, compiler + tests, GraphQL, client evaluator, editor UI — all on Plan.
     - Phase 2: content operands and the Activity grid.
   - The integration branch is rebased on `origin/main` regularly so the final merge stays small.
-  - When it merges to `main` is decided as the phases land (open question 9). Built-in metrics such as % Liked keep working unchanged until then.
+  - When it merges to `main` is decided as the phases land (open question 9). Built-in metrics such as vs Budget keep working unchanged until then.
 - **Split backend and frontend PRs and deploys, so work can be tested without users seeing it.**
   - **Backend slices ship first, and dark.** Each one is purely additive:
     - the `metric_definitions` table;
@@ -166,21 +167,21 @@ The end goal above covers every content type in the Activity grid. Delivery is s
    - b) **One generic SQL function shipped by migration**, e.g. `metric_eval(content_row, expr JSONB)`, which interprets the tree in PL/pgSQL. The logic stays fully in the database, but it is slower per row, hard to optimise, and a second interpreter to keep in parity.
    - c) **Materialised metric cache.** A `content_metric_values (metric_id, content_id, value)` table, refreshed on definition change and nightly stats sync. It is indexable and fast to sort, but it adds staleness and refresh jobs. Possibly a later optimisation on top of (a), not instead of it.
    - d) **Per-metric views or generated columns.** Ruled out under Constraints; listed only to record the rejection.
-2. **How do operands become clean numbers?** Type-specific fields live in the `content.response` JSONB (YouTube stats are strings cast with `::BIGINT`). The answer has to scale to every current and future content type.
-   - a) `STORED` generated columns on `content` (e.g. `view_count BIGINT GENERATED ALWAYS AS (...)`). Indexable, with no write-path changes. But with every type registering operands, the shared `content` table grows a mostly-NULL column per operand, and each new operand needs a migration.
-   - b) Plain columns populated on ingest and on each type's stats refresh (YouTube, TMDB, …). Same column growth as (a).
+2. **How do operands become clean numbers?** Type-specific fields live in the `content.response` JSONB (some are strings that need casting). The answer has to scale to every current and future content type.
+   - a) `STORED` generated columns on `content` (e.g. `revenue BIGINT GENERATED ALWAYS AS (...)`). Indexable, with no write-path changes. But with every type registering operands, the shared `content` table grows a mostly-NULL column per operand, and each new operand needs a migration.
+   - b) Plain columns populated on ingest and on each type's data refresh (TMDB, …). Same column growth as (a).
    - c) A `content_metrics` SQL view over `content`. Nothing is stored, so it can't be indexed.
    - d) Each registered operand carries its own SQL template (a JSONB path plus cast) used by the compiler. New types add operands with no migration. Promote individual hot operands to (a) later, behind the same operand key, when one needs an index.
    - e) A narrow `content_operand_values (content_id, operand_key, value NUMERIC)` table filled on ingest and refresh. Adding a type's operands needs no migration, but every operand in a formula becomes a join or pivot.
 3. **Who can see a definition?**
    - a) Private to its owner only.
    - b) Private by default, optionally shared publicly. Others can add it as a column; it is read-only to them.
-   - c) Also system-owned definitions that ship as built-ins, replacing `PERCENT_LIKED` and `VS_BUDGET`.
+   - c) Also system-owned definitions that ship as built-ins, replacing `VS_BUDGET`.
 4. **Formula authoring UX.**
-   - a) A weighted-sum builder: pick operands, set weights, choose a transform (none / log / sqrt / rank). It covers "popularity" with no parsing.
+   - a) A weighted-sum builder: pick operands, set weights, choose a transform (none / log / sqrt / rank). It covers weighted blends with no parsing.
    - b) A free-text formula with a parser and live preview.
    - c) Ship (a) first. The stored tree is general enough to add (b) later.
-5. **Normalisation across rows.** "Popularity" usually wants views and likes on comparable scales.
+5. **Normalisation across rows.** A weighted blend usually wants its inputs on comparable scales.
    - a) Per-row transforms only (log, sqrt). Simple and the same on client and server.
    - b) Population-relative transforms (percentile, z-score over the current filtered set). These need window functions server-side and differ between a 100-row loaded page and all rows, so the spec must say whose population counts.
 6. **Operands that don't apply to a row.** Formulas span all content types, so a YouTube-only operand meets movie rows. Should a missing operand:

@@ -272,7 +272,7 @@ Per the testing rules: every stateful surface has each state named and tested; t
 - Empty state: claim view signed in vs signed out copy.
 - Parity tests unchanged and green.
 
-**Browser (local only, demo evidence for `needs-demo-video`):** add a claim, filter to Claim (four columns, header "Claim", no Type), open details, switch back to all types (toast), mobile card at 375px.
+**Browser (local only, demo evidence for `needs-demo-evidence`):** add a claim, filter to Claim (four columns, header "Claim", no Type), open details, switch back to all types (toast), mobile card at 375px.
 
 ## Query budget
 
@@ -309,7 +309,7 @@ Frontend (`tests/helpers/queryBudget.ts`): creating a claim costs one mutation a
 | **4 - Declare view** | Own spec (below). | none expected | after 3 |
 | **5 - public gate** | Own spec, contract in section 5. | none | after 3 has real `duplicates` data |
 
-PR 1 is user-visible (Add Content) and PR 2 is user-visible (grid, modal): both need `needs-demo-video` from a cloud session or a local demo before `ready for review`.
+PR 1 is user-visible (Add Content) and PR 2 is user-visible (grid, modal): both need `needs-demo-evidence` from a cloud session or a local demo before `ready for review`.
 
 ## The Declare view (separate phase, separate spec)
 

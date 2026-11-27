@@ -1,11 +1,7 @@
 import type { QueryClient } from '@tanstack/svelte-query';
 import { subscribeGraphql } from '#lib/messaging/ws-client.svelte.js';
-import {
-	INBOX_EVENTS_SUBSCRIPTION,
-	type InboxEvent,
-	type ListMessageThreadsResponse,
-} from '#lib/queries/messaging/index.js';
-import { applyInboxEvent } from '#lib/messaging/inboxCache.js';
+import { INBOX_EVENTS_SUBSCRIPTION, type InboxEvent } from '#lib/queries/messaging/index.js';
+import { applyInboxEvent } from '#lib/messaging/messagingCache.js';
 import { queryKeys } from '#lib/queries/keys.js';
 
 export function createInboxStream(queryClient: QueryClient) {
@@ -17,16 +13,8 @@ export function createInboxStream(queryClient: QueryClient) {
 			{ query: INBOX_EVENTS_SUBSCRIPTION },
 			{
 				next: ({ inboxEvents }) => {
-					let unknownThread = false;
-					queryClient.setQueryData<ListMessageThreadsResponse>(queryKeys.messaging.threads.list(), (old) => {
-						if (!old) return old;
-						const next = applyInboxEvent(old.messageThreads, inboxEvents);
-						if (next === old.messageThreads && !old.messageThreads.some((t) => t.id === inboxEvents.threadId)) {
-							unknownThread = true;
-						}
-						return next === old.messageThreads ? old : { messageThreads: next };
-					});
-					if (unknownThread) {
+					// A thread missing from a loaded list is refetched, not guessed.
+					if (applyInboxEvent(queryClient, inboxEvents)) {
 						queryClient.invalidateQueries({ queryKey: queryKeys.messaging.threads.lists() });
 					}
 				},

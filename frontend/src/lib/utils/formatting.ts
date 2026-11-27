@@ -1,4 +1,4 @@
-import { BIBLE_PASSAGE_ICON_SVG } from './icons';
+import { descriptorFor } from '#lib/contentTypes/registry.js';
 import { bookSubjects } from './bookFormatting';
 import type { LengthDisplay } from '#lib/queries/content/index.js';
 
@@ -302,43 +302,6 @@ export function formatCountExact(count: number | null): string {
 }
 
 /**
- * AG Grid value getter for % Liked — likes as a percentage of views.
- * Computed client-side; both fields are already loaded on ContentItem, so no
- * backend field is needed (see .claude/docs/ADDING_AG_GRID_COLUMN.md
- * Decision 1). Returns null when views is 0/null/missing or likes is
- * missing — there's no meaningful rate to show.
- */
-export function percentLikedValueGetter(params: {
-	data?: { viewCount: number | null; likeCount: number | null };
-}): number | null {
-	const views = params.data?.viewCount;
-	const likes = params.data?.likeCount;
-	if (!views || likes === null || likes === undefined) return null;
-	return (likes / views) * 100;
-}
-
-/**
- * Format a % Liked value to 1 decimal place, or "—" when unavailable.
- */
-export function formatPercentLiked(value: number | null): string {
-	if (value === null) return EMPTY_VALUE;
-	return `${value.toFixed(1)}%`;
-}
-
-/**
- * AG Grid tooltip value getter for % Liked — shows the exact calculation
- * (likes ÷ views × 100) with the result to 3 decimal places, so a rounded
- * 1-decimal cell value never hides the precision behind it.
- */
-export function percentLikedTooltip(params: { data?: { viewCount: number | null; likeCount: number | null } }): string {
-	const views = params.data?.viewCount;
-	const likes = params.data?.likeCount;
-	if (!views || likes === null || likes === undefined) return 'No views recorded';
-	const pct = (likes / views) * 100;
-	return `${formatCountExact(likes)} ÷ ${formatCountExact(views)} × 100 = ${pct.toFixed(3)}%`;
-}
-
-/**
  * Format date in compact form: "MMM 'YY" (e.g., "Jul '10") for tight columns.
  */
 export function formatDateCompact(isoString: string | null): string {
@@ -462,142 +425,62 @@ export function itemCellRenderer(params: { data?: { name: string; url: string | 
 }
 
 /**
- * AG Grid cell renderer for type column with YouTube icon.
+ * AG Grid cell renderer for the Type column: the type's glyph, labelled for screen readers. Glyph and
+ * label come from the content-type registry; a type with no descriptor gets the neutral glyph.
  */
-/** YouTube play-button icon path (the circle-with-triangle glyph), for typeCellRenderer. */
-const YOUTUBE_ICON_PATH =
-	'M10 16.5l6-4.5-6-4.5v9zM12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8z';
-
-/** A plain speech-bubble glyph for CLAIM rows, distinct from the YouTube play button. */
-const CLAIM_ICON_PATH =
-	'M4 4h16a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H9l-4.29 3.71A1 1 0 0 1 3 19V5a1 1 0 0 1 1-1zm2 4h12M6 10.5h8';
-
-/** Film-frame glyph for MOVIE rows (outline, themed stroke). */
-const MOVIE_ICON_PATH =
-	'M4 2h16a2 2 0 0 1 2 2v16a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2zM7 2v20M17 2v20M2 12h20M2 7h5M2 17h5M17 17h5M17 7h5';
-
-/**
- * Closed-book glyph (Lucide "book") for BOOK rows (outline, themed stroke). Deliberately not an
- * open book: BIBLE_PASSAGE already uses Lucide's "book-open", and the two must read apart in the Type column.
- */
-const BOOK_ICON_PATH = 'M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H19a1 1 0 0 1 1 1v18a1 1 0 0 1-1 1H6.5a1 1 0 0 1 0-5H20';
-
 export function typeCellRenderer(params: { data?: { contentType: string } }): HTMLElement | string {
 	if (!params.data) return '';
 
+	const type = descriptorFor(params.data.contentType);
 	const container = document.createElement('div');
 	container.className = 'flex items-center justify-center h-full w-full';
 
-	if (params.data.contentType === 'BIBLE_PASSAGE') {
+	if (type.icon.kind === 'markup') {
 		container.classList.add('text-primary');
-		container.innerHTML = BIBLE_PASSAGE_ICON_SVG;
-		const label = document.createElement('span');
-		label.className = 'sr-only';
-		label.textContent = 'Bible Passage';
-		container.appendChild(label);
+		container.innerHTML = type.icon.svg;
+		container.appendChild(srOnlyText(type.label));
 		return container;
 	}
 
-	if (params.data.contentType === 'MOVIE') {
-		container.title = 'Movie';
-		const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-		svg.setAttribute('width', '20');
-		svg.setAttribute('height', '20');
-		svg.setAttribute('viewBox', '0 0 24 24');
-		svg.setAttribute('fill', 'none');
-		svg.setAttribute('stroke', 'var(--color-muted-foreground)');
-		svg.setAttribute('stroke-width', '2');
-		svg.setAttribute('stroke-linecap', 'round');
-		svg.setAttribute('stroke-linejoin', 'round');
-		const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-		path.setAttribute('d', MOVIE_ICON_PATH);
-		svg.appendChild(path);
-		const label = document.createElement('span');
-		label.className = 'sr-only';
-		label.textContent = 'Movie';
-		container.appendChild(svg);
-		container.appendChild(label);
-		return container;
-	}
-
-	if (params.data.contentType === 'WEB_PAGE') {
-		// Lucide "globe" (outline, themed stroke): a web page is not a video, so no YouTube red.
-		container.title = 'Webpage';
-		const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-		svg.setAttribute('width', '20');
-		svg.setAttribute('height', '20');
-		svg.setAttribute('viewBox', '0 0 24 24');
-		svg.setAttribute('fill', 'none');
-		svg.setAttribute('stroke', 'var(--color-muted-foreground)');
-		svg.setAttribute('stroke-width', '2');
-		svg.setAttribute('stroke-linecap', 'round');
-		svg.setAttribute('stroke-linejoin', 'round');
-		const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-		path.setAttribute(
-			'd',
-			'M12 2a10 10 0 1 0 0 20 10 10 0 1 0 0-20M2 12h20M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20',
-		);
-		svg.appendChild(path);
-		const label = document.createElement('span');
-		label.className = 'sr-only';
-		label.textContent = 'Webpage';
-		container.appendChild(svg);
-		container.appendChild(label);
-		return container;
-	}
-
-	if (params.data.contentType === 'BOOK') {
-		container.title = 'Book';
-		const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-		svg.setAttribute('width', '20');
-		svg.setAttribute('height', '20');
-		svg.setAttribute('viewBox', '0 0 24 24');
-		svg.setAttribute('fill', 'none');
-		svg.setAttribute('stroke', 'var(--color-muted-foreground)');
-		svg.setAttribute('stroke-width', '2');
-		svg.setAttribute('stroke-linecap', 'round');
-		svg.setAttribute('stroke-linejoin', 'round');
-		const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-		path.setAttribute('d', BOOK_ICON_PATH);
-		svg.appendChild(path);
-		const label = document.createElement('span');
-		label.className = 'sr-only';
-		label.textContent = 'Book';
-		container.appendChild(svg);
-		container.appendChild(label);
-		return container;
-	}
-
-	// Hidden text for filter matching
-	const hidden = document.createElement('span');
-	hidden.className = 'sr-only';
-	hidden.textContent = params.data.contentType ?? '';
-	container.appendChild(hidden);
-
-	const isClaim = params.data.contentType === 'CLAIM';
-
-	const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+	const svg = document.createElementNS(SVG_NS, 'svg');
 	svg.setAttribute('width', '20');
 	svg.setAttribute('height', '20');
 	svg.setAttribute('viewBox', '0 0 24 24');
-	if (isClaim) {
-		// Not a brand colour (unlike YouTube red below) — use the theme token.
+	if (type.icon.kind === 'brand') {
+		svg.setAttribute('fill', type.icon.fill);
+	} else {
+		// Outlined in the theme's muted colour, not a brand colour.
 		svg.setAttribute('fill', 'none');
 		svg.setAttribute('stroke', 'var(--color-muted-foreground)');
 		svg.setAttribute('stroke-width', '2');
 		svg.setAttribute('stroke-linecap', 'round');
 		svg.setAttribute('stroke-linejoin', 'round');
+	}
+	const path = document.createElementNS(SVG_NS, 'path');
+	path.setAttribute('d', type.icon.d);
+	svg.appendChild(path);
+
+	// A video and a claim carry the raw type as hidden text (the grid's text matching reads it) and no title:
+	// their glyph already says what they are. Other types get a title with the label.
+	if (type.isVideo || type.type === 'CLAIM') {
+		container.appendChild(srOnlyText(params.data.contentType ?? ''));
+		container.appendChild(svg);
 	} else {
-		svg.setAttribute('fill', '#FF0000'); // YouTube brand red (hex-ok: fixed brand colour, not themeable)
+		container.title = type.label;
+		container.appendChild(svg);
+		container.appendChild(srOnlyText(type.label));
 	}
 
-	const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-	path.setAttribute('d', isClaim ? CLAIM_ICON_PATH : YOUTUBE_ICON_PATH);
-
-	svg.appendChild(path);
-	container.appendChild(svg);
-
 	return container;
+}
+
+const SVG_NS = 'http://www.w3.org/2000/svg';
+
+function srOnlyText(text: string): HTMLSpanElement {
+	const span = document.createElement('span');
+	span.className = 'sr-only';
+	span.textContent = text;
+	return span;
 }
 
 /**
@@ -688,7 +571,7 @@ export function categoryCellRenderer(params: {
 	const category = params.data?.primaryCategory;
 	if (category) {
 		// Label links out to Wikipedia when available; clicking elsewhere in the
-		// cell still opens the category-edit popover (see ActivityTable's grid
+		// cell still opens the category-edit popover (see ContentLibrary's grid
 		// cell click handler).
 		const label: HTMLElement = category.wikipediaUrl ? document.createElement('a') : document.createElement('span');
 		label.textContent = category.label;
@@ -821,7 +704,7 @@ export function moviePeople(row: MovieRow | null | undefined): MoviePerson[] {
 export const CAST_CELL_MAX_DIRECTORS = 2;
 export const CAST_CELL_MAX_CAST = 3;
 
-/** Attribute on a clickable cast/director name; its value is the TMDB person id (read by ActivityTable's cell click). */
+/** Attribute on a clickable cast/director name; its value is the TMDB person id (read by ContentLibrary's cell click). */
 export const PERSON_ID_ATTR = 'data-person-id';
 
 /** The names, comma separated, each wrapped in a span carrying its person id so a click can filter by that person. */

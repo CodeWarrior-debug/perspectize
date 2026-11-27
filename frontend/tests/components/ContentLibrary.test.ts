@@ -1,0 +1,450 @@
+/**
+ * ContentLibrary Tests
+ *
+ * LIMITATION: AG Grid + TanStack Query rendering in JSDOM has known limitations.
+ * AG Grid's mocked component doesn't trigger lifecycle hooks (onGridReady), and
+ * TanStack Query queries don't execute in this test environment.
+ *
+ * These tests verify component instantiation. Full integration testing requires
+ * browser environment (manual verification or Playwright E2E tests).
+ */
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { render, screen, waitFor } from '@testing-library/svelte';
+import { QueryClient } from '@tanstack/svelte-query';
+import TestWrapper from '../helpers/TestWrapper.svelte';
+import { mockPageState } from '../setup';
+
+const { mockRequest, clerkState } = vi.hoisted(() => ({
+	mockRequest: vi.fn(),
+	// Mutable so individual tests can simulate a signed-in Clerk session.
+	// Reset in beforeEach.
+	clerkState: { isLoaded: false, auth: { userId: null as string | null } },
+}));
+
+// Mock AG Grid component
+vi.mock('ag-grid-svelte5', () => ({
+	default: vi.fn(() => ({
+		$$: {},
+		$set: vi.fn(),
+		$on: vi.fn(),
+		$destroy: vi.fn(),
+	})),
+}));
+
+// Mock graphqlRequest
+vi.mock('#lib/queries/client.js', () => ({
+	graphqlRequest: mockRequest,
+}));
+
+// Mock Clerk context — useMe() calls useClerkContext(); no ClerkProvider in tests.
+// Defaults to signed-out (clerkState reset in beforeEach), which keeps the `me`
+// query disabled so isAdmin resolves to false.
+vi.mock('svelte-clerk', () => ({
+	useClerkContext: () => clerkState,
+}));
+
+// queryKeys is used directly, no need to mock since it's a simple object
+
+import ContentLibrary from '#lib/components/library/ContentLibrary.svelte';
+import { preloadLazy, warmUp } from '../helpers/warmUp';
+
+const mockEmptyResponse = {
+	content: {
+		items: [],
+		pageInfo: {
+			hasNextPage: false,
+			hasPreviousPage: false,
+			startCursor: null,
+			endCursor: null,
+		},
+		totalCount: 0,
+	},
+};
+
+const mockDataResponse = {
+	content: {
+		items: [
+			{
+				id: '1',
+				name: 'Test Video',
+				url: 'https://youtube.com/watch?v=abc',
+				contentType: 'YOUTUBE_VIDEO',
+				length: 300,
+				lengthUnits: 'seconds',
+				viewCount: 1500,
+				likeCount: 100,
+				channelTitle: 'Test Channel',
+				publishedAt: '2024-01-15T00:00:00Z',
+				tags: ['test'],
+				description: 'A test video',
+				createdAt: '2024-01-20',
+				updatedAt: '2024-01-25',
+			},
+		],
+		pageInfo: {
+			hasNextPage: true,
+			hasPreviousPage: false,
+			startCursor: 'cursor1',
+			endCursor: 'cursor2',
+		},
+		totalCount: 25,
+	},
+};
+
+function renderWithQuery(queryClient?: QueryClient) {
+	const client =
+		queryClient ??
+		new QueryClient({
+			defaultOptions: {
+				queries: {
+					retry: false,
+					gcTime: 0,
+					staleTime: 0,
+				},
+				mutations: { retry: false },
+			},
+		});
+	return render(TestWrapper, {
+		props: {
+			queryClient: client,
+			component: ContentLibrary,
+			props: {},
+		},
+	});
+}
+
+// The component renders this through {#await import(...)}: load it up front so a
+// findBy* waits on the UI, not on Vite's first transform of the module (#728).
+preloadLazy(() => import('#lib/components/PerspectivePopover.svelte'));
+
+// Pay the component's first-render cost before any test, not inside the first
+// one: under full-suite load it alone can pass the 5 s testTimeout (#728).
+warmUp(() => renderWithQuery());
+
+describe('ContentLibrary', () => {
+	beforeEach(() => {
+		vi.clearAllMocks();
+		clerkState.isLoaded = false;
+		clerkState.auth.userId = null;
+		mockRequest.mockResolvedValue(mockEmptyResponse);
+		mockPageState.url = new URL('http://localhost/');
+	});
+
+	it('renders without errors', () => {
+		const { container } = renderWithQuery();
+		expect(container).toBeTruthy();
+	});
+
+	// The footer is the same on a phone and a desktop; these pin the parts that go wrong at 320-390px.
+	describe('footer controls', () => {
+		it('Edit sorts shows the up/down arrows, the universal sort glyph', () => {
+			renderWithQuery();
+			const icon = screen.getByRole('button', { name: 'Edit sorts' }).querySelector('svg');
+			expect(icon?.getAttribute('class')).toContain('lucide-arrow-up-down');
+		});
+
+		it('Clear sorts shows the same "clear" glyph as the filter bar, not a sort glyph', () => {
+			renderWithQuery();
+			const icon = screen.getByRole('button', { name: 'Clear sorts' }).querySelector('svg');
+			expect(icon?.getAttribute('class')).toContain('lucide-list-x');
+			expect(icon?.getAttribute('class')).not.toContain('lucide-arrow-up-down');
+		});
+
+		it('keeps "N total" on one line', () => {
+			renderWithQuery();
+			expect(screen.getByText(/\d+ total/).className).toContain('whitespace-nowrap');
+		});
+
+		it('lets the controls wrap onto a second row instead of squeezing their labels', () => {
+			renderWithQuery();
+			const controls = screen.getByRole('button', { name: 'Edit sorts' }).parentElement;
+			expect(controls?.className).toContain('flex-wrap');
+		});
+	});
+
+	it('refetches in Loaded mode when the search text changes (and again when cleared)', async () => {
+		// Regression test for the search bar not clearing/filtering: the query cache key must
+		// track the actual search text in "Loaded" mode, or TanStack Query never refetches when
+		// the box is typed into or cleared and the grid keeps showing stale results.
+		const queryClient = new QueryClient({
+			defaultOptions: {
+				queries: { retry: false, gcTime: 0, staleTime: 0 },
+				mutations: { retry: false },
+			},
+		});
+
+		mockPageState.url = new URL('http://localhost/?q=sowell');
+		const { unmount } = renderWithQuery(queryClient);
+		await waitFor(() => {
+			expect(mockRequest).toHaveBeenCalledWith(
+				expect.anything(),
+				expect.objectContaining({
+					filter: {
+						search: 'sowell',
+						searchFields: ['TITLE', 'DESCRIPTION', 'CHANNEL_TITLE', 'TAGS'],
+						contentTypes: ['YOUTUBE_VIDEO'], // default Type filter is also server-side in Loaded mode
+					},
+				}),
+			);
+		});
+		unmount();
+
+		mockRequest.mockClear();
+		mockPageState.url = new URL('http://localhost/?f=none');
+		renderWithQuery(queryClient);
+		await waitFor(() => {
+			expect(mockRequest).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ filter: undefined }));
+		});
+	});
+
+	it('sends the Type filter to the server in Loaded mode (first 50 rows are already that type)', async () => {
+		mockPageState.url = new URL('http://localhost/?f.type=movie');
+		renderWithQuery();
+		await waitFor(() => {
+			expect(mockRequest).toHaveBeenCalledWith(
+				expect.anything(),
+				expect.objectContaining({ first: 50, filter: { contentTypes: ['MOVIE'] } }),
+			);
+		});
+	});
+
+	it('sends the Type filter together with search, but not other column filters, in Loaded mode', async () => {
+		mockPageState.url = new URL('http://localhost/?f.type=movie&q=heat&f.views=100..');
+		renderWithQuery();
+		await waitFor(() => {
+			expect(mockRequest).toHaveBeenCalledWith(
+				expect.anything(),
+				expect.objectContaining({
+					filter: expect.objectContaining({ contentTypes: ['MOVIE'], search: 'heat' }),
+				}),
+			);
+		});
+		const filter = mockRequest.mock.calls[0][1].filter;
+		expect(filter).not.toHaveProperty('minViewCount');
+	});
+
+	it('refetches in Loaded mode when the Type filter changes (query key mirrors the request)', async () => {
+		const queryClient = new QueryClient({
+			defaultOptions: { queries: { retry: false, gcTime: 0, staleTime: 0 }, mutations: { retry: false } },
+		});
+		mockPageState.url = new URL('http://localhost/?f.type=movie');
+		const { unmount } = renderWithQuery(queryClient);
+		await waitFor(() => expect(mockRequest).toHaveBeenCalled());
+		unmount();
+		mockRequest.mockClear();
+		mockPageState.url = new URL('http://localhost/?f=none');
+		renderWithQuery(queryClient);
+		await waitFor(() => {
+			expect(mockRequest).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ filter: undefined }));
+		});
+	});
+
+	it("?open=<id> opens that item's details (fetched by ID when not loaded) and strips the param", async () => {
+		const { goto } = await import('$app/navigation');
+		const deepLinked = { ...mockDataResponse.content.items[0], id: '99', name: 'Deep Linked Video' };
+		mockRequest.mockImplementation(async (query: string) =>
+			String(query).includes('GetContentDetails') ? { contentByID: deepLinked } : mockEmptyResponse,
+		);
+		mockPageState.url = new URL('http://localhost/?q=sowell&open=99');
+		renderWithQuery();
+
+		await waitFor(() => {
+			expect(mockRequest).toHaveBeenCalledWith(expect.stringContaining('GetContentDetails'), { id: '99' });
+		});
+		expect(goto).toHaveBeenCalledWith('?q=sowell', expect.objectContaining({ replace: true }));
+		expect(await screen.findByText('Deep Linked Video')).toBeInTheDocument();
+	});
+
+	it('hides pagination controls in loaded mode (default)', async () => {
+		mockRequest.mockResolvedValue(mockDataResponse);
+		const { container } = renderWithQuery();
+
+		await waitFor(() => {
+			// Pagination buttons should not be present in loaded mode
+			const buttons = Array.from(container.querySelectorAll('button'));
+			const paginationButtons = buttons.filter(
+				(b) => b.textContent?.includes('Previous') || b.textContent?.includes('Next'),
+			);
+			expect(paginationButtons).toHaveLength(0);
+		});
+	});
+
+	it('shows the mobile card list below the 860px breakpoint', async () => {
+		mockRequest.mockResolvedValue(mockDataResponse);
+		// Plain reassignment (not vi.spyOn/mockRestore) — the setup.ts matchMedia mock is
+		// defined via Object.defineProperty without `configurable: true`, which breaks
+		// vi.spyOn's restore. Capture and put back the original function reference instead.
+		const originalMatchMedia = window.matchMedia;
+		window.matchMedia = vi.fn(
+			(query: string) =>
+				({
+					matches: query.includes('max-width: 859px'),
+					media: query,
+					onchange: null,
+					addListener: vi.fn(),
+					removeListener: vi.fn(),
+					addEventListener: vi.fn(),
+					removeEventListener: vi.fn(),
+					dispatchEvent: vi.fn(),
+				}) as unknown as MediaQueryList,
+		);
+
+		const { container } = renderWithQuery();
+
+		await waitFor(() => {
+			expect(container.querySelector('[data-testid="activity-card-list"]')).toBeTruthy();
+			expect(container.querySelector('[data-testid="ag-grid-container"]')).toBeFalsy();
+		});
+
+		window.matchMedia = originalMatchMedia;
+	});
+
+	it('wires an add-perspective trigger into each mobile card (no grid column exists there)', async () => {
+		mockRequest.mockResolvedValue(mockDataResponse);
+		const originalMatchMedia = window.matchMedia;
+		window.matchMedia = vi.fn(
+			(query: string) =>
+				({
+					matches: query.includes('max-width: 859px'),
+					media: query,
+					onchange: null,
+					addListener: vi.fn(),
+					removeListener: vi.fn(),
+					addEventListener: vi.fn(),
+					removeEventListener: vi.fn(),
+					dispatchEvent: vi.fn(),
+				}) as unknown as MediaQueryList,
+		);
+
+		const { container } = renderWithQuery();
+
+		await waitFor(() => {
+			expect(container.querySelector('[data-testid="card-perspective-1"]')).toBeTruthy();
+		});
+
+		window.matchMedia = originalMatchMedia;
+	});
+
+	it('shows the AG Grid table at/above the 860px breakpoint', async () => {
+		mockRequest.mockResolvedValue(mockDataResponse);
+		// Default window.matchMedia mock from tests/setup.ts always returns matches: false.
+		const { container } = renderWithQuery();
+
+		await waitFor(() => {
+			expect(container.querySelector('[data-testid="ag-grid-container"]')).toBeTruthy();
+			expect(container.querySelector('[data-testid="activity-card-list"]')).toBeFalsy();
+		});
+	});
+
+	it('renders the column-picker trigger in grid mode', async () => {
+		mockRequest.mockResolvedValue(mockDataResponse);
+		const { container } = renderWithQuery();
+
+		await waitFor(() => {
+			expect(container.querySelector('button[aria-label="Choose columns"]')).toBeTruthy();
+		});
+	});
+
+	it('renders the Export trigger disabled while the grid is not ready', async () => {
+		mockRequest.mockResolvedValue(mockDataResponse);
+		const { container } = renderWithQuery();
+
+		await waitFor(() => {
+			const exportButton = container.querySelector<HTMLButtonElement>('button[aria-label="Export"]');
+			expect(exportButton).toBeTruthy();
+			// The mocked AG Grid never fires onGridReady, so gridReady stays false.
+			expect(exportButton?.disabled).toBe(true);
+		});
+	});
+
+	// The menu stays disabled under the mocked grid, so its items can't be opened here; ExportMenu.test.ts
+	// covers the items, libraryExport.test.ts covers the handlers, and this pins that ContentLibrary
+	// hands the menu the exporter's handlers.
+	it('passes the export and print handlers to the Export menu', async () => {
+		const { readFileSync } = await import('node:fs');
+		const source = readFileSync('src/lib/components/library/ContentLibrary.svelte', 'utf8');
+		const tag = source.match(/<ExportMenu[\s\S]*?\n\s*\/>/)?.[0] ?? '';
+		expect(tag).toContain('onDownloadCsv={exporter.downloadCsv}');
+		expect(tag).toContain('onCopy={exporter.copy}');
+		expect(tag).toContain('onPrintAsSeen={exporter.printAsSeen}');
+		expect(tag).toContain('onPrintAsList={() => (exporter.printOptionsOpen = true)}');
+	});
+
+	it('omits the Export trigger in card mode', async () => {
+		mockRequest.mockResolvedValue(mockDataResponse);
+		const originalMatchMedia = window.matchMedia;
+		window.matchMedia = vi.fn(
+			(query: string) =>
+				({
+					matches: query.includes('max-width: 859px'),
+					media: query,
+					onchange: null,
+					addListener: vi.fn(),
+					removeListener: vi.fn(),
+					addEventListener: vi.fn(),
+					removeEventListener: vi.fn(),
+					dispatchEvent: vi.fn(),
+				}) as unknown as MediaQueryList,
+		);
+
+		try {
+			const { container } = renderWithQuery();
+
+			await waitFor(() => {
+				expect(container.querySelector('[data-testid="activity-card-list"]')).toBeTruthy();
+			});
+			expect(container.querySelector('button[aria-label="Export"]')).toBeFalsy();
+		} finally {
+			window.matchMedia = originalMatchMedia;
+		}
+	});
+
+	// Regression: the +/glasses affordance is driven by a per-user perspectives
+	// query. It must key off the Clerk-derived `me` id, not the legacy
+	// `userSelection` store (which lags and left the query permanently disabled,
+	// so the glasses icon never appeared even after a perspective was saved).
+	it('queries the current user’s perspectives using the Clerk-derived me id', async () => {
+		clerkState.isLoaded = true;
+		clerkState.auth.userId = 'user_clerk_abc';
+
+		mockRequest.mockImplementation((query: string) => {
+			if (query.includes('me {')) {
+				return Promise.resolve({
+					me: {
+						id: '7',
+						username: 'tester',
+						role: 'DEFAULT',
+						onboarding: { version: 1, displayNextSession: false, completedAt: null },
+					},
+				});
+			}
+			if (query.includes('ListPerspectivesByUser')) {
+				return Promise.resolve({ perspectives: { items: [] } });
+			}
+			return Promise.resolve(mockDataResponse);
+		});
+
+		renderWithQuery();
+
+		await waitFor(() => {
+			const perspectiveCall = mockRequest.mock.calls.find(
+				([q]) => typeof q === 'string' && q.includes('ListPerspectivesByUser'),
+			);
+			expect(perspectiveCall).toBeTruthy();
+			expect(perspectiveCall?.[1]).toEqual({ userID: 7, first: 100 });
+		});
+	});
+
+	it('does not query perspectives while the Clerk session is still loading', async () => {
+		// clerkState stays signed-out (beforeEach default)
+		mockRequest.mockResolvedValue(mockDataResponse);
+		renderWithQuery();
+
+		await waitFor(() => {
+			expect(mockRequest).toHaveBeenCalled();
+		});
+		expect(mockRequest.mock.calls.some(([q]) => typeof q === 'string' && q.includes('ListPerspectivesByUser'))).toBe(
+			false,
+		);
+	});
+});

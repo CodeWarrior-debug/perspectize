@@ -10,7 +10,7 @@ Spec: [2026-11-20-custom-columns-and-saved-items-design.md](../specs/2026-11-20-
 |---|---|---|---|
 | 1 | `feature/custom-columns-design` (#828) | spec, this plan, intent update, Decision 8 fix | docs only |
 | 2 | `feature/saved-items-backend` | migration + domain + port + service + GORM repo + GraphQL + `UserService.Delete` reassign | dark: deploys unused; migration applied by hand per environment |
-| 3 | `feature/custom-columns-frontend` | evaluator, builder, grid integration, hooks | merge-gated; user-visible, needs `needs-demo-video` |
+| 3 | `feature/custom-columns-frontend` | evaluator, builder, grid integration, hooks | merge-gated; user-visible, needs `needs-demo-evidence` |
 
 The migration is numbered 000042, the next free number on `main`. Open PR #810 also claims 000042 and renumbers itself when it merges.
 

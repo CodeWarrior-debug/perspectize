@@ -27,7 +27,7 @@
 			onNewThread={() => (dialogOpen = true)}
 		/>
 	</div>
-	<div class="min-w-0 flex-1">
+	<div class="min-w-0 flex-1 {mobileThreadOpen ? '' : 'hidden md:block'}">
 		{@render children()}
 	</div>
 </div>

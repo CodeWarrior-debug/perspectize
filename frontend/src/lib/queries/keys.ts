@@ -30,6 +30,8 @@ export const queryKeys = {
 		// Full ContentItem row (GET_CONTENT_DETAILS) for a details modal opened on an
 		// item that isn't in the loaded Activity rows (e.g. via `?open=<id>`).
 		row: (id: string) => [...queryKeys.content.details(), 'row', id] as const,
+		// The pages filed under one WEBSITE (LIST_WEBSITE_PAGES), for its details view.
+		websitePages: (websiteId: string) => [...queryKeys.content.details(), 'website-pages', websiteId] as const,
 		// Viewer-scoped aggregates for one content (GET_CONTENT_AGGREGATES). A child of
 		// `detail(id)`, so mutations that invalidate `detail(id)` still evict it. Keyed per
 		// viewer: perspective counts and the import a row came from both resolve per viewer.
@@ -49,6 +51,10 @@ export const queryKeys = {
 		// The viewer's own claims (Declare page). Under lists() so any content-list
 		// invalidation (create/update of a claim) also marks it stale.
 		claimList: () => [...queryKeys.content.lists(), 'claims'] as const,
+		// How many rows one user added (useOwnedContentCount). Under lists() so adding
+		// content marks it stale.
+		ownedCount: (userId: number, username: string) =>
+			[...queryKeys.content.lists(), 'owned-count', userId, username] as const,
 	},
 
 	bible: {

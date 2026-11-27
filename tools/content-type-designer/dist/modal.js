@@ -1,5 +1,5 @@
 /**
- * A mock of ActivityDetailsModal driven by a DetailsLayout and one sample row,
+ * A mock of ContentDetailsModal driven by a DetailsLayout and one sample row,
  * so a type's details view can be judged before any Svelte is written. Tiles
  * and sections carry the same popovers as grid cells; "Show field sources"
  * annotates every value with where it would come from.

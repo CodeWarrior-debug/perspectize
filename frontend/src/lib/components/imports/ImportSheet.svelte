@@ -5,6 +5,7 @@
 	import { ClientSideRowModelModule } from '@ag-grid-community/client-side-row-model';
 	import { themeQuartz } from '@ag-grid-community/theming';
 	import type { CellClickedEvent, GridApi, GridOptions, IRowNode } from '@ag-grid-community/core';
+	import { createGridHandle } from '#lib/utils/gridHandle.svelte.js';
 	import { toast } from 'svelte-sonner';
 	import { Button } from '#lib/components/shadcn/index.js';
 	import XIcon from '@lucide/svelte/icons/x';
@@ -51,8 +52,7 @@
 	const importItems = useImportItems();
 	const setExcluded = useSetImportItemsExcluded();
 
-	let gridApi = $state<GridApi<ImportRow> | null>(null);
-	let gridReady = $state(false);
+	const grid = createGridHandle<ImportRow>();
 	let sourceId = $state('');
 	let library = $state<LibraryFilter>('all');
 	let search = $state('');
@@ -98,10 +98,7 @@
 		animateRows: false,
 		overlayNoRowsTemplate:
 			'<div class="py-12 text-center text-muted-foreground">No rows match. Clear a filter or pick another source.</div>',
-		onGridReady: (p) => {
-			gridApi = p.api;
-			gridReady = true;
-		},
+		...grid.options(),
 		onSelectionChanged: (e) => {
 			selected = e.api.getSelectedRows();
 		},
@@ -116,30 +113,24 @@
 	$effect(() => {
 		filter.sourceId = sourceId;
 		filter.library = library;
-		const api = gridApi;
-		if (api && gridReady && !api.isDestroyed()) api.onFilterChanged();
+		grid.live()?.onFilterChanged();
 	});
 
 	$effect(() => {
 		const text = search;
-		const api = gridApi;
-		if (api && gridReady && !api.isDestroyed()) api.setGridOption('quickFilterText', text);
+		grid.live()?.setGridOption('quickFilterText', text);
 	});
 
 	// Rebuild the columns when a listing brings a new facts key (or a second
-	// source), a frame after grid ready (column APIs throw straight from onGridReady).
+	// source), a frame after grid ready (see gridHandle).
 	$effect(() => {
 		void columnsKey;
 		const defs = buildImportColumnDefs(
 			untrack(() => rows),
 			job.sources.length,
 		);
-		const api = gridApi;
-		if (!api || !gridReady) return;
-		const frame = requestAnimationFrame(() => {
-			if (!api.isDestroyed()) api.setGridOption('columnDefs', defs);
-		});
-		return () => cancelAnimationFrame(frame);
+		if (!grid.ready) return;
+		return grid.afterFrame((api) => api.setGridOption('columnDefs', defs));
 	});
 
 	// The details drawer opens on a row click and closes with X, the backdrop or Escape.
@@ -155,11 +146,11 @@
 		sourceId = '';
 		library = 'all';
 		search = '';
-		gridApi?.setFilterModel(null);
+		grid.live()?.setFilterModel(null);
 	}
 
 	function clearSelection() {
-		gridApi?.deselectAll();
+		grid.live()?.deselectAll();
 		confirming = false;
 	}
 

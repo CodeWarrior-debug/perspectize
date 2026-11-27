@@ -142,7 +142,7 @@ Sortable JSONB fields need a SQL extraction rule in `backend/internal/adapters/r
 | --- | --- | --- |
 | Length | YouTube video: Length; Movie: Runtime; Book: Pages | n/a for Painting — cells render "em-dash" when this type appears alongside types that do bind it. |
 | Audience | YouTube video: Views; Podcast episode: Plays; Music track: Plays | n/a for Painting — cells render "em-dash" when this type appears alongside types that do bind it. |
-| Approval | YouTube video: % Liked; Movie: Score; Book: Score | n/a for Painting — cells render "em-dash" when this type appears alongside types that do bind it. |
+| Approval | Movie: Score; Book: Score | n/a for Painting — cells render "em-dash" when this type appears alongside types that do bind it. |
 | Amount | Purchase: Price; Place visit: Spend; Book: Price paid | n/a for Painting — cells render "em-dash" when this type appears alongside types that do bind it. |
 | Stance | Propositional truth claim: Stance; Another person's perspective: Stance | n/a for Painting — cells render "hide-column" when this type appears alongside types that do bind it. |
 | Confidence | Propositional truth claim: Confidence; Another person's perspective: Confidence | n/a for Painting — cells render "hide-column" when this type appears alongside types that do bind it. |
@@ -263,7 +263,7 @@ Dimensions (e.g. "28 13/16 × 36 3/4 in. (73.2 × 93.4 cm)") and creditLine are 
 | Length | — | Length ● | Runtime ● | Pages ● | Read time ● | Length ● | Length ● | — | Words ○ | — | — | Visit length ○ | Pages ○ | Words - BSB ● | — |
 | Date | Painted ● | Published ● | Released ● | Published ● | Published ● | Aired ● | Released ● | Asserted ● | First told ○ | Purchased ● | Stated ● | Visited ● | Published ● | — | Painted ● |
 | Audience | — | Views ● | Votes ○ | — | — | Plays ○ | Plays ○ | — | — | — | — | — | Citations ● | — | — |
-| Approval | — | % Liked ● | Score ● | Score ○ | — | — | — | — | — | — | — | — | — | — | — |
+| Approval | — | — | Score ● | Score ○ | — | — | — | — | — | — | — | — | — | — | — |
 | Rating | Rating ● | Rating ● | Rating ● | Rating ● | Rating ● | Rating ● | Rating ● | — | Rating ● | Rating ● | — | Rating ● | Rating ● | — | Rating ● |
 | Amount | — | — | Ticket ○ | Price paid ○ | — | — | — | — | — | Price ● | — | Spend ● | — | — | — |
 | Stance | — | — | — | — | — | — | — | Stance ● | — | — | Stance ● | — | — | — | — |

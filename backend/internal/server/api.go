@@ -5,7 +5,6 @@ package server
 
 import (
 	"context"
-	"fmt"
 	"net/http"
 	"strings"
 	"time"
@@ -28,7 +27,6 @@ import (
 	"github.com/CodeWarrior-debug/perspectize/backend/internal/adapters/graphql/resolvers"
 	"github.com/CodeWarrior-debug/perspectize/backend/internal/adapters/realtime"
 	apimw "github.com/CodeWarrior-debug/perspectize/backend/internal/adapters/web/middleware"
-	"github.com/CodeWarrior-debug/perspectize/backend/internal/core/domain"
 	"github.com/CodeWarrior-debug/perspectize/backend/internal/core/ports/repositories"
 	portservices "github.com/CodeWarrior-debug/perspectize/backend/internal/core/ports/services"
 	gqltiming "github.com/CodeWarrior-debug/perspectize/backend/pkg/graphql"
@@ -49,7 +47,7 @@ type Deps struct {
 	// ImportService is optional; nil leaves the import queries reporting "not configured".
 	ImportService portservices.ImportService
 
-	UserRepo   repositories.UserRepository
+	Identity   portservices.IdentityResolver
 	ThreadRepo repositories.MessageThreadRepository
 
 	Hub      *realtime.Hub
@@ -112,25 +110,11 @@ func NewGraphQLServer(d Deps) *handler.Server {
 				}
 			}
 			token = strings.TrimPrefix(token, "Bearer ")
-			if token == "" {
-				return ctx, nil, fmt.Errorf("unauthenticated websocket: missing token")
+			authUser, err := AuthenticateWebSocket(ctx, token, d.TokenVerifier, d.Identity)
+			if err != nil {
+				return ctx, nil, err
 			}
-			identity, err := d.TokenVerifier.Verify(ctx, token)
-			if err != nil || identity.ClerkID == "" {
-				return ctx, nil, fmt.Errorf("unauthenticated websocket: invalid token")
-			}
-			user, err := d.UserRepo.GetByClerkID(ctx, identity.ClerkID)
-			if err != nil || user == nil {
-				return ctx, nil, fmt.Errorf("unauthenticated websocket: unknown user")
-			}
-			authUser := &domain.AuthenticatedUser{
-				ID:       user.ID,
-				ClerkID:  identity.ClerkID,
-				Username: user.Username,
-				Email:    user.Email,
-				Role:     user.Role,
-			}
-			go realtime.RunPresenceSession(ctx, d.Presence, d.Hub, d.ThreadRepo, user.ID, realtime.DefaultPresenceConfig())
+			go realtime.RunPresenceSession(ctx, d.Presence, d.Hub, d.ThreadRepo, authUser.ID, realtime.DefaultPresenceConfig())
 			return auth.WithAuthenticatedUser(ctx, authUser), &initPayload, nil
 		},
 	})
@@ -167,7 +151,7 @@ func Middleware(d Deps) []func(http.Handler) http.Handler {
 		apimw.GlobalRateLimit(d.RateLimitPerMin), // H-11: rate limiting before auth
 		apimw.SecureHeaders(),                    // M-14: security headers (HSTS, X-Content-Type-Options, X-Frame-Options)
 		apimw.ContentTypeValidation,              // M-15: CSRF protection via Content-Type
-		auth.Middleware(d.UserRepo, d.TokenVerifier),
+		auth.Middleware(d.Identity, d.TokenVerifier),
 		// per-request GraphQL dataloaders (batches Content.primaryCategory,
 		// Content.perspectiveCount/averageRating, users, thread stats)
 		graphqldl.Middleware(graphqldl.Services{

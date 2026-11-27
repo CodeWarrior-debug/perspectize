@@ -1,0 +1,8 @@
+src/lib/components/CommentsEditor.svelte 934
+src/lib/components/ContentDetailsModal.svelte 586
+src/lib/components/PerspectivePopover.svelte 612
+src/lib/components/charts/ColumnChart.svelte 514
+src/lib/components/library/ContentLibrary.svelte 942
+src/lib/queries/content/index.ts 603
+src/lib/utils/formatting.ts 941
+src/lib/utils/import-sheet.ts 560

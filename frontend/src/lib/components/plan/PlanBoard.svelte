@@ -9,7 +9,7 @@
 	import { useUserTodos } from '#lib/queries/userTodos/useUserTodos.js';
 	import { useUserTodoLists } from '#lib/queries/userTodos/useUserTodoLists.js';
 	import { useReorderUserTodoList } from '#lib/queries/userTodos/useReorderUserTodoList.js';
-	import { useMyPerspectives } from '#lib/queries/perspectives/useMyPerspectives.js';
+	import { useViewerPerspectives } from '#lib/queries/perspectives/viewerPerspectives.js';
 	import type { PerspectiveItem } from '#lib/queries/perspectives/index.js';
 	import type { UserTodoItem, UserTodoSortBy } from '#lib/queries/userTodos/index.js';
 	import { filterForSelection, type ListSelection, type TodoFocusField } from '#lib/utils/plan-todo-helpers.js';
@@ -40,15 +40,8 @@
 	const listsQuery = useUserTodoLists(() => userId);
 	const lists = $derived(listsQuery.data?.userTodoLists ?? []);
 	const reorder = useReorderUserTodoList();
-	const myPerspectives = useMyPerspectives(() => userId);
-
-	const perspectivesByContentId = $derived.by(() => {
-		const map = new Map<string, PerspectiveItem>();
-		for (const p of myPerspectives.data?.perspectives?.items ?? []) {
-			if (p.contentID) map.set(p.contentID, p);
-		}
-		return map;
-	});
+	const myPerspectives = useViewerPerspectives(() => userId);
+	const perspectivesByContentId = $derived(myPerspectives.byContent);
 
 	// The server already applied the selection's filter, so the page is the rows.
 	const rows = $derived(todosQuery.data?.userTodos.items ?? []);
@@ -154,8 +147,8 @@
 
 <!-- The same details view as Activity, loaded only when "View content" is used. -->
 {#if detailsContentId !== null}
-	{#await import('#lib/components/ActivityDetailsModal.svelte') then { default: ActivityDetailsModal }}
-		<ActivityDetailsModal
+	{#await import('#lib/components/ContentDetailsModal.svelte') then { default: ContentDetailsModal }}
+		<ContentDetailsModal
 			content={detailsQuery.data?.contentByID ?? null}
 			open
 			onClose={() => (detailsContentId = null)}
@@ -165,13 +158,13 @@
 	{/await}
 {/if}
 
-<!-- Lazy, like ActivityTable: the Tiptap-based editor only loads when a perspective is opened. -->
+<!-- Lazy, like ContentLibrary: the Tiptap-based editor only loads when a perspective is opened. -->
 {#if popoverOpen && popoverContent !== null}
 	{#await import('#lib/components/PerspectivePopover.svelte') then { default: PerspectivePopover }}
 		<PerspectivePopover
 			contentId={popoverContent.id}
 			contentName={popoverContent.name}
-			existingPerspective={perspectivesByContentId.get(String(popoverContent.id)) ?? null}
+			existingPerspective={perspectivesByContentId.get(String(popoverContent.id))?.[0] ?? null}
 			{userId}
 			bind:open={popoverOpen}
 			onClose={() => {

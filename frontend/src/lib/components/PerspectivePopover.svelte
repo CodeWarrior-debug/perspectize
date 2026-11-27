@@ -1,6 +1,5 @@
 <script lang="ts">
 	import { onDestroy } from 'svelte';
-	import { toast } from 'svelte-sonner';
 	import ExternalLinkIcon from '@lucide/svelte/icons/external-link';
 	import InfoIcon from '@lucide/svelte/icons/info';
 	import Trash2Icon from '@lucide/svelte/icons/trash-2';
@@ -22,18 +21,10 @@
 	import Thumbs from '#lib/components/Thumbs.svelte';
 	import CommentsEditor from '#lib/components/CommentsEditor.svelte';
 	import AddFieldSearch from '#lib/components/AddFieldSearch.svelte';
-	import { sanitizeHtml } from '#lib/utils/sanitize.js';
 	import { hasReviewContent, reviewPreviewText } from '#lib/utils/reviewContent.js';
-	import { draftKey, saveDraft, loadDraft, clearDraft } from '#lib/utils/perspectiveDraft.js';
 	import type { FieldDef } from '#lib/components/AddFieldSearch.svelte';
-	import { useCreatePerspective } from '#lib/queries/perspectives/useCreatePerspective.js';
-	import { useUpdatePerspective } from '#lib/queries/perspectives/useUpdatePerspective.js';
-	import { useDeletePerspective } from '#lib/queries/perspectives/useDeletePerspective.js';
-	import { useFetchUserTodos } from '#lib/queries/userTodos/useFetchUserTodos.js';
-	import { useUpdateUserTodo } from '#lib/queries/userTodos/useUpdateUserTodo.js';
-	import { completedTodoInput, openConsumeOrReviewTodos } from '#lib/utils/plan-todo-helpers.js';
-	import { toastWithAction } from '#lib/utils/toast.js';
-	import { isOptimisticId, type PerspectiveItem } from '#lib/queries/perspectives/index.js';
+	import { usePerspectiveSave, type PerspectiveFormValues } from '#lib/queries/perspectives/usePerspectiveSave.js';
+	import type { PerspectiveItem } from '#lib/queries/perspectives/index.js';
 	import FeelWheel, { type Feeling } from '#lib/components/FeelWheel.svelte';
 
 	/**
@@ -65,6 +56,8 @@
 	} = $props();
 
 	const isEditMode = $derived(existingPerspective !== null);
+	// The dialog's title is a plain <h2> inside the body, so give the dialog itself a name.
+	const dialogName = $derived(isEditMode ? 'Edit perspective' : 'Add perspective');
 
 	// Delete is offered only when the perspective provably belongs to the signed-in
 	// user (userId is the session user from every caller) — whatever its privacy
@@ -97,10 +90,6 @@
 	// Comment (rich text HTML)
 	let comment = $state('');
 	let commentExpanded = $state(false);
-	let restoredFromDraft = $state(false);
-	let draftSaveTimer: ReturnType<typeof setTimeout> | undefined;
-	// Latest HTML awaiting the debounced draft save (null when nothing is pending).
-	let pendingDraft: string | null = null;
 
 	// Dynamic fields — tracks which rating fields are shown
 	// Single source of truth: STANDARD_DIMENSIONS in comparePerspectives.ts (also used
@@ -196,18 +185,8 @@
 		confidence = existingPerspective?.confidence ?? null;
 		const l = existingPerspective?.like;
 		likeValue = l === 'THUMBS_UP' ? 'THUMBS_UP' : l === 'THUMBS_DOWN' ? 'THUMBS_DOWN' : null;
-		cancelPendingDraft();
-		const baseline = existingPerspective?.review ?? '';
-		// Only restore a draft that was started from this same server review;
-		// a draft based on an older copy would overwrite newer saved content.
-		const draft = loadDraft(draftKey(contentId, userId), baseline);
-		if (draft && draft !== baseline) {
-			comment = draft;
-			restoredFromDraft = true;
-		} else {
-			comment = baseline;
-			restoredFromDraft = false;
-		}
+		// Only a draft started from this same server review is restored; see reviewDraft.
+		comment = reviewDraftRestore(existingPerspective?.review ?? '') ?? existingPerspective?.review ?? '';
 		commentExpanded = false;
 		confirmingDelete = false;
 		isPrivate = String(existingPerspective?.privacy ?? '').toUpperCase() === 'PRIVATE';
@@ -227,198 +206,76 @@
 
 	const isMobile = new MediaQuery('(max-width: 639px)');
 
-	const createMutation = useCreatePerspective();
-	const updateMutation = useUpdatePerspective();
-	const deleteMutation = useDeletePerspective();
-	const fetchTodos = useFetchUserTodos();
-	const updateTodo = useUpdateUserTodo();
+	// Save, delete, the review draft and the Plan follow-up all live in the module.
+	const saver = usePerspectiveSave(() => ({ userId, contentId }));
+	const draft = saver.draft;
+	const reviewDraftRestore = (serverReview: string) => draft.restore(serverReview);
+	const draftStatus = $derived(draft.status);
+	const restoredFromDraft = $derived(draft.restored);
+	const isPending = $derived(saver.status.busy);
 
-	/**
-	 * After a save succeeds: if the user has an open consume or review todo for this
-	 * content, offer to mark it done. Looked up here, on save, so opening the
-	 * popover costs no request. A failed lookup just skips the prompt.
-	 */
-	async function offerMarkTodosDone(saved: number) {
-		const items = await fetchTodos({
-			first: 50,
-			filter: { userId, contentId: saved, status: ['NOT_STARTED', 'IN_PROGRESS'] },
-		}).catch(() => null);
-		if (items === null) return;
-		const open = openConsumeOrReviewTodos(items);
-		if (open.length === 0) return;
-		const complete = (fullPercent: boolean) => {
-			for (const todo of open) {
-				updateTodo.mutateAsync(completedTodoInput(todo, fullPercent)).catch((err: unknown) => {
-					toast.error(err instanceof Error ? err.message : 'Could not update the Todo');
-				});
-			}
-		};
-		toastWithAction(
-			'Mark this Todo done?',
-			{ label: 'Done + 100%', onClick: () => complete(true) },
-			{ secondary: { label: 'Done, keep %', onClick: () => complete(false) } },
-		);
-	}
-	const isPending = $derived(createMutation.isPending || updateMutation.isPending || deleteMutation.isPending);
+	// Closing the popover within the debounce window must not lose the last edits.
+	onDestroy(() => draft.flush());
 
 	const hasComment = $derived(hasReviewContent(comment));
 
-	function cancelPendingDraft() {
-		if (draftSaveTimer) clearTimeout(draftSaveTimer);
-		draftSaveTimer = undefined;
-		pendingDraft = null;
-	}
-
-	// Write the pending draft now (debounce fired, or the popover is closing).
-	function flushPendingDraft() {
-		const html = pendingDraft;
-		cancelPendingDraft();
-		if (html !== null) {
-			saveDraft(draftKey(contentId, userId), html, existingPerspective?.review ?? '');
-		}
-	}
-
-	// Closing the popover within the debounce window must not lose the last edits.
-	onDestroy(flushPendingDraft);
+	// Write the pending draft now (page hidden, or the popover is closing).
+	const flushPendingDraft = () => draft.flush();
 
 	function handleCommentChange(html: string) {
 		comment = html;
-		restoredFromDraft = false;
-		pendingDraft = html;
-		if (draftSaveTimer) clearTimeout(draftSaveTimer);
-		draftSaveTimer = setTimeout(flushPendingDraft, 1000);
+		draft.edit(html);
 	}
 
 	function discardDraft() {
-		cancelPendingDraft();
-		clearDraft(draftKey(contentId, userId));
+		draft.clear();
 		comment = existingPerspective?.review ?? '';
-		restoredFromDraft = false;
-	}
-
-	// Build customFields payload from dynamic (non-core) field values.
-	// Keys are lowercased here as a final guard — the viewer shows the
-	// title-cased label via getFieldLabel(), GraphQL always gets the bare key.
-	function buildCustomFields(): Record<string, number> | undefined {
-		const entries = Object.entries(dynamicValues).filter(([, v]) => v !== null);
-		if (entries.length === 0) return undefined;
-		return Object.fromEntries(entries.map(([k, v]) => [k.toLowerCase(), v])) as Record<string, number>;
-	}
-
-	// Get review text — sanitize HTML and only send if non-empty
-	function getReview(): string | undefined {
-		return hasReviewContent(comment) ? sanitizeHtml(comment) : undefined;
 	}
 
 	function handleDelete() {
 		// Re-check at the moment of action, not just when the button rendered.
 		if (!canDelete || !existingPerspective) return;
-		if (isStillSaving) {
-			toast.info('Still saving your perspective — try again in a moment');
-			return;
-		}
-		deleteMutation.mutate(
-			{ id: existingPerspective.id, contentID: existingPerspective.contentID },
-			{
-				onSuccess: () => {
-					// The perspective is gone — an unsaved draft for it is meaningless.
-					cancelPendingDraft();
-					clearDraft(draftKey(contentId, userId));
-					confirmingDelete = false;
-					onClose();
-				},
+		saver.remove(existingPerspective, {
+			onDeleted: () => {
+				confirmingDelete = false;
+				onClose();
 			},
-		);
+		});
 	}
 
-	// A perspective created a moment ago carries a temporary id until the
-	// server replies (see useCreatePerspective); it can't be edited or
-	// deleted by id yet.
-	const isStillSaving = $derived(isOptimisticId(existingPerspective?.id));
+	// A perspective created a moment ago carries a temporary id until the server
+	// replies (see perspectiveCache.ts); it can't be edited or deleted by id yet.
+	const isStillSaving = $derived(saver.isStillSaving(existingPerspective));
+
+	// Cmd/Ctrl+Enter saves from anywhere in the form, including the writing area where a bare
+	// Enter starts a new paragraph, so a keyboard writer need not Tab to the Save button.
+	let formEl: HTMLFormElement | undefined = $state();
+
+	function submitOnModEnter(e: KeyboardEvent) {
+		if (e.key !== 'Enter' || !(e.metaKey || e.ctrlKey) || e.isComposing) return;
+		e.preventDefault();
+		// The editor row sits inside the form on phones and outside it on desktop, so both carry
+		// this handler; stopping here keeps a phone keypress from submitting twice.
+		e.stopPropagation();
+		formEl?.requestSubmit();
+	}
 
 	function handleSubmit(e: Event) {
 		e.preventDefault();
-
-		if (isStillSaving) {
-			toast.info('Still saving your perspective — try again in a moment');
-			return;
-		}
-
-		const hasAnyRating = quality !== null || agreement !== null || importance !== null || confidence !== null;
-		const hasLike = likeValue !== null;
-		const hasDynamic = Object.values(dynamicValues).some((v) => v !== null);
-		const hasFeelings = feelings.length > 0;
-
-		if (!hasAnyRating && !hasLike && !hasComment && !hasDynamic && !hasFeelings) {
-			toast.error('Please fill in at least one field');
-			return;
-		}
-
-		const feelingsPayload = hasFeelings
-			? feelings.map((f) => ({
-					emoji: f.emoji,
-					label: f.label ?? undefined,
-					intensity: f.intensity,
-					note: f.note ?? undefined,
-				}))
-			: undefined;
-
-		// Close immediately instead of waiting for the server: the mutation hooks
-		// patch the cached lists optimistically, so the change is already on
-		// screen, and a slow network (mobile) doesn't hold the sheet open for
-		// the full round trip. mutateAsync settles even after this component
-		// unmounts. On failure the hook rolls the optimistic patch back and
-		// offers Retry, and the review text survives as a draft (flushed below,
-		// cleared only once the save succeeds).
-		flushPendingDraft();
-		const key = draftKey(contentId, userId);
-		const afterSave = () => {
-			clearDraft(key);
-			onSuccess?.();
-			if (userId > 0) void offerMarkTodosDone(contentId);
+		const form: PerspectiveFormValues = {
+			quality,
+			agreement,
+			importance,
+			confidence,
+			like: likeValue,
+			comment,
+			dynamicValues,
+			feelings,
+			isPrivate,
 		};
-
-		if (isEditMode && existingPerspective) {
-			updateMutation
-				.mutateAsync({
-					id: parseInt(existingPerspective.id, 10),
-					// Edit mode sends the full form state, not just what changed: a field
-					// the user emptied is sent as null so the server clears it -- unlike
-					// create (below), undefined here would be dropped by graphql-request
-					// and read by the server as "leave unchanged," not "clear."
-					quality,
-					agreement,
-					importance,
-					confidence,
-					like: likeValue,
-					review: getReview() ?? null,
-					customFields: buildCustomFields() ?? null,
-					feelings: feelingsPayload ?? null,
-					privacy: isPrivate ? 'PRIVATE' : 'PUBLIC',
-				})
-				.then(afterSave, () => {
-					// Error toast + Retry come from useUpdatePerspective's onError.
-				});
-		} else {
-			createMutation
-				.mutateAsync({
-					userID: userId,
-					contentID: contentId,
-					quality: quality ?? undefined,
-					agreement: agreement ?? undefined,
-					importance: importance ?? undefined,
-					confidence: confidence ?? undefined,
-					like: likeValue ?? undefined,
-					review: getReview(),
-					customFields: buildCustomFields(),
-					feelings: feelingsPayload,
-					privacy: isPrivate ? 'PRIVATE' : 'PUBLIC',
-				})
-				.then(afterSave, () => {
-					// Error toast + Retry come from useCreatePerspective's onError.
-				});
-		}
-		onClose();
+		// Close at once rather than waiting for the server: the cache is already patched, so the
+		// change is on screen. A failed save offers Retry from the module's error handling.
+		if (saver.save(form, existingPerspective, { onSaved: onSuccess }) === 'sent') onClose();
 	}
 </script>
 
@@ -463,7 +320,13 @@
 	{/if}
 
 	<!-- Scrollable body — ratings + add field -->
-	<form onsubmit={handleSubmit} class="flex flex-col flex-1 min-h-0 overflow-hidden">
+	<!-- svelte-ignore a11y_no_noninteractive_element_interactions -- the shortcut listens for keys bubbling from the fields inside -->
+	<form
+		bind:this={formEl}
+		onsubmit={handleSubmit}
+		onkeydown={submitOnModEnter}
+		class="flex flex-col flex-1 min-h-0 overflow-hidden"
+	>
 		<div class="flex-1 min-h-0 overflow-y-auto overscroll-contain">
 			{#if mobile}
 				{@render commentRows(true)}
@@ -591,7 +454,7 @@
 							disabled={isPending}
 							class="flex-1"
 						>
-							{deleteMutation.isPending ? 'Deleting...' : 'Delete'}
+							{saver.status.deleting ? 'Deleting...' : 'Delete'}
 						</Button>
 					</div>
 				</div>
@@ -633,9 +496,18 @@
 {/snippet}
 
 {#snippet commentRows(mobile: boolean)}
+	{@const stackedEditor = mobile && commentExpanded}
 	<!-- Overall + Comment row -->
-	<div class="shrink-0 flex items-center gap-3.5 px-5 py-3.5 border-b border-border">
-		<div class="flex flex-col items-center gap-1.5 flex-shrink-0">
+	<!-- On desktop this row sits outside the form, so it carries its own Cmd/Ctrl+Enter handler. -->
+	<div
+		class="shrink-0 flex gap-3.5 px-5 py-3.5 border-b border-border {stackedEditor
+			? 'flex-col items-stretch'
+			: 'items-center'}"
+		onkeydown={submitOnModEnter}
+		role="presentation"
+	>
+		<!-- A phone's open editor gets the full sheet width: the thumbs sit in a row above it instead of beside it. -->
+		<div class="flex items-center gap-1.5 flex-shrink-0 {stackedEditor ? 'flex-row gap-3' : 'flex-col'}">
 			<span class="font-sans text-[11px] font-medium text-muted-foreground uppercase tracking-[0.06em]"> Overall </span>
 			<Thumbs
 				value={likeValue}
@@ -652,7 +524,7 @@
 				onclick={() => {
 					commentExpanded = true;
 				}}
-				aria-label="Add comment"
+				aria-label={hasComment ? 'Edit comment' : 'Add a comment'}
 				class="flex flex-1 items-center justify-between gap-2 h-14 px-3 rounded-lg border border-border bg-card cursor-pointer text-left"
 			>
 				<span
@@ -675,13 +547,15 @@
 				<CommentsEditor
 					value={comment}
 					onChange={handleCommentChange}
-					minHeight={68}
+					minHeight={mobile ? 68 : 140}
+					autofocus={!mobile}
 					showPopout={true}
 					expanded={commentExpanded}
 					onPopout={() => {
 						commentExpanded = !commentExpanded;
 					}}
 					isMobile={mobile}
+					status={draftStatus}
 				/>
 			</div>
 		{/if}
@@ -689,7 +563,7 @@
 
 	{#if restoredFromDraft}
 		<div
-			class="shrink-0 flex items-center justify-between gap-2 px-5 py-2 border-b border-border bg-accent text-[12px] text-muted-foreground"
+			class="shrink-0 flex items-center justify-between gap-2 px-5 py-2 border-b border-border bg-muted text-[12px] text-muted-foreground"
 		>
 			<span>Restored unsaved draft</span>
 			<button type="button" class="text-muted-foreground underline hover:opacity-70" onclick={discardDraft}>
@@ -700,6 +574,14 @@
 {/snippet}
 
 <!-- Desktop: centered dialog -->
+<!-- A reload, tab close or app switch skips onDestroy, so write the pending draft as the page hides. -->
+<svelte:window onpagehide={flushPendingDraft} />
+<svelte:document
+	onvisibilitychange={() => {
+		if (document.visibilityState === 'hidden') flushPendingDraft();
+	}}
+/>
+
 {#if !isMobile.current}
 	<Dialog
 		bind:open
@@ -710,6 +592,7 @@
 		<DialogContent
 			class="w-[calc(100vw-2rem)] max-h-[90vh] overflow-hidden p-0 flex flex-col sm:max-w-[760px]"
 			overlayClass="bg-black/45"
+			aria-label={dialogName}
 		>
 			{@render modalBody(false)}
 		</DialogContent>
@@ -722,7 +605,7 @@
 			if (!isOpen) onClose();
 		}}
 	>
-		<DrawerContent class="max-h-[88dvh] flex flex-col p-0">
+		<DrawerContent class="max-h-[88dvh] flex flex-col p-0" aria-label={dialogName}>
 			{@render modalBody(true)}
 		</DrawerContent>
 	</Drawer>

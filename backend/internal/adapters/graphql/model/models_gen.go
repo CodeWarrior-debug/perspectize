@@ -139,47 +139,49 @@ type Content struct {
 }
 
 type ContentFilter struct {
-	ContentType         *domain.ContentType         `json:"contentType,omitempty"`
-	ContentTypes        []domain.ContentType        `json:"contentTypes,omitempty"`
-	MinLengthSeconds    *int                        `json:"minLengthSeconds,omitempty"`
-	MaxLengthSeconds    *int                        `json:"maxLengthSeconds,omitempty"`
-	Search              *string                     `json:"search,omitempty"`
-	SearchFields        []domain.ContentSearchField `json:"searchFields,omitempty"`
-	PersonID            *int                        `json:"personId,omitempty"`
-	PersonRole          *domain.PersonRole          `json:"personRole,omitempty"`
-	GenreContains       *string                     `json:"genreContains,omitempty"`
-	CastContains        *string                     `json:"castContains,omitempty"`
-	AgeRating           []string                    `json:"ageRating,omitempty"`
-	ReleasedAfter       *string                     `json:"releasedAfter,omitempty"`
-	ReleasedBefore      *string                     `json:"releasedBefore,omitempty"`
-	MinBoxOffice        *float64                    `json:"minBoxOffice,omitempty"`
-	MaxBoxOffice        *float64                    `json:"maxBoxOffice,omitempty"`
-	MinTmdbScore        *float64                    `json:"minTmdbScore,omitempty"`
-	MaxTmdbScore        *float64                    `json:"maxTmdbScore,omitempty"`
-	AuthorContains      *string                     `json:"authorContains,omitempty"`
-	MinPublishYear      *int                        `json:"minPublishYear,omitempty"`
-	MaxPublishYear      *int                        `json:"maxPublishYear,omitempty"`
-	MinPages            *int                        `json:"minPages,omitempty"`
-	MaxPages            *int                        `json:"maxPages,omitempty"`
-	MinBookRating       *float64                    `json:"minBookRating,omitempty"`
-	MaxBookRating       *float64                    `json:"maxBookRating,omitempty"`
-	WebPageRoles        []domain.WebPageRole        `json:"webPageRoles,omitempty"`
-	ParentContentID     *int                        `json:"parentContentID,omitempty"`
-	MinViewCount        *int                        `json:"minViewCount,omitempty"`
-	MaxViewCount        *int                        `json:"maxViewCount,omitempty"`
-	MinLikeCount        *int                        `json:"minLikeCount,omitempty"`
-	MaxLikeCount        *int                        `json:"maxLikeCount,omitempty"`
-	PublishedAfter      *string                     `json:"publishedAfter,omitempty"`
-	PublishedBefore     *string                     `json:"publishedBefore,omitempty"`
-	ChannelTitle        *string                     `json:"channelTitle,omitempty"`
-	TagContains         *string                     `json:"tagContains,omitempty"`
-	DescriptionSearch   *string                     `json:"descriptionSearch,omitempty"`
-	AddedByUsername     *string                     `json:"addedByUsername,omitempty"`
-	MinPerspectiveCount *int                        `json:"minPerspectiveCount,omitempty"`
-	CreatedAfter        *string                     `json:"createdAfter,omitempty"`
-	CreatedBefore       *string                     `json:"createdBefore,omitempty"`
-	UpdatedAfter        *string                     `json:"updatedAfter,omitempty"`
-	UpdatedBefore       *string                     `json:"updatedBefore,omitempty"`
+	ContentType           *domain.ContentType         `json:"contentType,omitempty"`
+	ContentTypes          []domain.ContentType        `json:"contentTypes,omitempty"`
+	MinLengthSeconds      *int                        `json:"minLengthSeconds,omitempty"`
+	MaxLengthSeconds      *int                        `json:"maxLengthSeconds,omitempty"`
+	Search                *string                     `json:"search,omitempty"`
+	SearchFields          []domain.ContentSearchField `json:"searchFields,omitempty"`
+	PersonID              *int                        `json:"personId,omitempty"`
+	PersonRole            *domain.PersonRole          `json:"personRole,omitempty"`
+	GenreContains         *string                     `json:"genreContains,omitempty"`
+	CastContains          *string                     `json:"castContains,omitempty"`
+	AgeRating             []string                    `json:"ageRating,omitempty"`
+	ReleasedAfter         *string                     `json:"releasedAfter,omitempty"`
+	ReleasedBefore        *string                     `json:"releasedBefore,omitempty"`
+	MinBoxOffice          *float64                    `json:"minBoxOffice,omitempty"`
+	MaxBoxOffice          *float64                    `json:"maxBoxOffice,omitempty"`
+	MinTmdbScore          *float64                    `json:"minTmdbScore,omitempty"`
+	MaxTmdbScore          *float64                    `json:"maxTmdbScore,omitempty"`
+	AuthorContains        *string                     `json:"authorContains,omitempty"`
+	MinPublishYear        *int                        `json:"minPublishYear,omitempty"`
+	MaxPublishYear        *int                        `json:"maxPublishYear,omitempty"`
+	MinPages              *int                        `json:"minPages,omitempty"`
+	MaxPages              *int                        `json:"maxPages,omitempty"`
+	MinBookRating         *float64                    `json:"minBookRating,omitempty"`
+	MaxBookRating         *float64                    `json:"maxBookRating,omitempty"`
+	WebPageRoles          []domain.WebPageRole        `json:"webPageRoles,omitempty"`
+	ParentContentID       *int                        `json:"parentContentID,omitempty"`
+	MinViewCount          *int                        `json:"minViewCount,omitempty"`
+	MaxViewCount          *int                        `json:"maxViewCount,omitempty"`
+	MinLikeCount          *int                        `json:"minLikeCount,omitempty"`
+	MaxLikeCount          *int                        `json:"maxLikeCount,omitempty"`
+	PublishedAfter        *string                     `json:"publishedAfter,omitempty"`
+	PublishedBefore       *string                     `json:"publishedBefore,omitempty"`
+	WebPageSiteContains   *string                     `json:"webPageSiteContains,omitempty"`
+	WebPageAuthorContains *string                     `json:"webPageAuthorContains,omitempty"`
+	ChannelTitle          *string                     `json:"channelTitle,omitempty"`
+	TagContains           *string                     `json:"tagContains,omitempty"`
+	DescriptionSearch     *string                     `json:"descriptionSearch,omitempty"`
+	AddedByUsername       *string                     `json:"addedByUsername,omitempty"`
+	MinPerspectiveCount   *int                        `json:"minPerspectiveCount,omitempty"`
+	CreatedAfter          *string                     `json:"createdAfter,omitempty"`
+	CreatedBefore         *string                     `json:"createdBefore,omitempty"`
+	UpdatedAfter          *string                     `json:"updatedAfter,omitempty"`
+	UpdatedBefore         *string                     `json:"updatedBefore,omitempty"`
 }
 
 type ContentSortInput struct {
@@ -226,6 +228,15 @@ type CreateContentFromWebsiteInput struct {
 type CreateContentFromYouTubeInput struct {
 	URL    string `json:"url"`
 	UserID int    `json:"userId"`
+}
+
+type CreateContentInput struct {
+	Youtube *CreateContentFromYouTubeInput `json:"youtube,omitempty"`
+	WebPage *CreateContentFromWebPageInput `json:"webPage,omitempty"`
+	Website *CreateContentFromWebsiteInput `json:"website,omitempty"`
+	Movie   *CreateContentFromMovieInput   `json:"movie,omitempty"`
+	Book    *CreateContentFromBookInput    `json:"book,omitempty"`
+	Passage *CreateContentFromPassageInput `json:"passage,omitempty"`
 }
 
 type CreateContentResult struct {
@@ -604,7 +615,6 @@ type Perspective struct {
 	Privacy               domain.Privacy       `json:"privacy"`
 	Description           *string              `json:"description,omitempty"`
 	Category              *string              `json:"category,omitempty"`
-	ReviewStatus          *domain.ReviewStatus `json:"reviewStatus,omitempty"`
 	Parts                 []int                `json:"parts,omitempty"`
 	Labels                []string             `json:"labels,omitempty"`
 	CategorizedRatings    []*CategorizedRating `json:"categorizedRatings,omitempty"`
@@ -791,7 +801,6 @@ type UpdatePerspectiveInput struct {
 	Privacy            *domain.Privacy            `json:"privacy,omitempty"`
 	Description        *string                    `json:"description,omitempty"`
 	Category           *string                    `json:"category,omitempty"`
-	ReviewStatus       *domain.ReviewStatus       `json:"reviewStatus,omitempty"`
 	Parts              []int                      `json:"parts,omitempty"`
 	Labels             []string                   `json:"labels,omitempty"`
 	CategorizedRatings []*CategorizedRatingInput  `json:"categorizedRatings,omitempty"`

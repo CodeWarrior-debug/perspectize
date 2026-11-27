@@ -1,5 +1,5 @@
 import { GEIST_SEMIBOLD_ADVANCE_EM, GEIST_SEMIBOLD_WIDEST_EM } from './grid-header-metrics';
-import { ACTIVITY_HEADER_CHROME, type HeaderChrome } from './grid-theme';
+import { LIBRARY_HEADER_CHROME, type HeaderChrome } from './grid-theme';
 
 /**
  * Margin on top of the measured label, in px, for subpixel rounding. The label width itself is
@@ -20,7 +20,7 @@ export interface HeaderTextStyle {
  * character, the last one included. Characters outside printable ASCII count as the widest
  * glyph, so a label can be over-estimated but never under-estimated.
  */
-export function headerTextWidth(text: string, style: HeaderTextStyle = ACTIVITY_HEADER_CHROME): number {
+export function headerTextWidth(text: string, style: HeaderTextStyle = LIBRARY_HEADER_CHROME): number {
 	const { fontSize, uppercase = false, letterSpacingEm = 0 } = style;
 	const shown = uppercase ? text.toUpperCase() : text;
 	let em = 0;
@@ -43,13 +43,13 @@ export interface HeaderWidthOptions {
  * The sort arrow and the multi-sort order number are reserved even while unsorted, so sorting a
  * column (alone or alongside others) never truncates it.
  *
- * Every Activity column's `minWidth` is at least this (see ActivityTable's column defs), and
+ * Every Library column's `minWidth` is at least this (see library/columns.ts), and
  * `tests/unit/gridHeaderWidth.test.ts` checks that for every column.
  */
 export function headerMinWidth(
 	name: string,
 	{ filter = true, sortable = true }: HeaderWidthOptions = {},
-	chrome: HeaderChrome = ACTIVITY_HEADER_CHROME,
+	chrome: HeaderChrome = LIBRARY_HEADER_CHROME,
 ): number {
 	let width = chrome.padding * 2 + headerTextWidth(name, chrome) + HEADER_WIDTH_GUARD_PX;
 	if (sortable) width += chrome.sort + chrome.sortOrder;

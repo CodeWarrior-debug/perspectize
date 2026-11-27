@@ -1,7 +1,7 @@
 # Dataloader results — `Content.primaryCategory` N+1 elimination
 
 **Query:** `ListContent` (`content(first: 50, …)` with `primaryCategory { … }`) —
-the query backing the SvelteKit `ActivityTable`.
+the query backing the SvelteKit `ContentLibrary`.
 **Method:** `backend/internal/perf/dataloader_perf_test.go`, real resolver chain
 against the Sevalla dev DB, 12 iterations each, SQL statements counted via a GORM
 callback (not estimated). Baseline and after runs used the identical harness.

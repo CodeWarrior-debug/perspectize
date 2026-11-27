@@ -21,5 +21,6 @@ graph_ts=$(stat -f %m "$graph" 2>/dev/null || stat -c %Y "$graph" 2>/dev/null) |
 
 # Detached so session start isn't held up (~10 s, AST-only, no API cost).
 log="${TMPDIR:-/tmp}/graphify-refresh-on-main.log"
-(cd "$root" && nohup graphify update . >"$log" 2>&1 &) >/dev/null 2>&1
+# GRAPHIFY_NO_BACKUP: keep a single graph, without dated copies beside it.
+(cd "$root" && GRAPHIFY_NO_BACKUP=1 nohup graphify update . >"$log" 2>&1 &) >/dev/null 2>&1
 exit 0

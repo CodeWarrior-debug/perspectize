@@ -99,7 +99,7 @@ func (s *MessagingServiceImpl) EditMessage(ctx context.Context, actorUserID int,
 		return nil, err
 	}
 	_ = s.publisher.PublishEphemeral(ctx, domain.EventEnvelope{
-		Type:      "MESSAGE_EDITED",
+		Type:      domain.KindMessageEdited,
 		ThreadID:  updated.ThreadID,
 		Seq:       updated.Seq,
 		MessageID: messageID,
@@ -122,7 +122,7 @@ func (s *MessagingServiceImpl) DeleteMessage(ctx context.Context, actorUserID in
 		return nil, err
 	}
 	_ = s.publisher.PublishEphemeral(ctx, domain.EventEnvelope{
-		Type:      "MESSAGE_DELETED",
+		Type:      domain.KindMessageDeleted,
 		ThreadID:  tombstoned.ThreadID,
 		Seq:       tombstoned.Seq,
 		MessageID: messageID,
@@ -178,7 +178,7 @@ func (s *MessagingServiceImpl) MarkRead(ctx context.Context, actorUserID, thread
 		return nil, err
 	}
 	_ = s.publisher.PublishEphemeral(ctx, domain.EventEnvelope{
-		Type:        "READ_RECEIPT_CHANGED",
+		Type:        domain.KindReadReceiptChanged,
 		ThreadID:    threadID,
 		UserID:      actorUserID,
 		LastReadSeq: seq,
@@ -198,7 +198,7 @@ func (s *MessagingServiceImpl) SetTyping(ctx context.Context, actorUserID, threa
 		return err
 	}
 	return s.publisher.PublishEphemeral(ctx, domain.EventEnvelope{
-		Type:     "TYPING_CHANGED",
+		Type:     domain.KindTypingChanged,
 		ThreadID: threadID,
 		UserID:   actorUserID,
 		Typing:   typing,
@@ -250,10 +250,10 @@ func (s *MessagingServiceImpl) AddParticipants(ctx context.Context, actorUserID,
 	envs := make([]domain.EventEnvelope, len(userIDs))
 	for i, uid := range userIDs {
 		envs[i] = domain.EventEnvelope{
-			Type:     "PARTICIPANT_CHANGED",
+			Type:     domain.KindParticipantChanged,
 			ThreadID: threadID,
 			UserID:   uid,
-			Change:   "ADDED",
+			Change:   domain.ParticipantAdded,
 		}
 	}
 	_ = s.publisher.PublishEphemeral(ctx, envs...)
@@ -281,10 +281,10 @@ func (s *MessagingServiceImpl) LeaveThread(ctx context.Context, actorUserID, thr
 		return err
 	}
 	return s.publisher.PublishEphemeral(ctx, domain.EventEnvelope{
-		Type:     "PARTICIPANT_CHANGED",
+		Type:     domain.KindParticipantChanged,
 		ThreadID: threadID,
 		UserID:   actorUserID,
-		Change:   "REMOVED",
+		Change:   domain.ParticipantRemoved,
 	})
 }
 

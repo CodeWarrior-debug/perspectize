@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { perspectiveRating } from '#lib/utils/grid-config.js';
 import { formatRatingScore } from '#lib/utils/formatting.js';
-import { activityItemCellRenderer } from '#lib/utils/activityItemCellRenderer.js';
+import { libraryItemCellRenderer } from '#lib/utils/libraryItemCellRenderer.js';
 
 describe('perspectiveRating', () => {
 	const byContentId = new Map([['13', { quality: 7000, importance: 4000, agreement: null }]]);
@@ -38,20 +38,20 @@ describe('formatRatingScore', () => {
 	});
 });
 
-describe('activityItemCellRenderer for claims', () => {
+describe('libraryItemCellRenderer for claims', () => {
 	const params = (contentType: string) => ({
 		data: { id: 189, name: 'The glove did not fit O.J. Simpson', url: null, contentType },
 		context: { onOpenDetails: () => {} },
 	});
 
 	it('draws no thumbnail for a claim, only the title', () => {
-		const cell = activityItemCellRenderer(params('CLAIM') as never) as HTMLElement;
+		const cell = libraryItemCellRenderer(params('CLAIM') as never) as HTMLElement;
 		expect(cell.querySelector('[data-testid="item-thumb"]')).toBeNull();
 		expect(cell.querySelector('[data-testid="item-title"]')?.textContent).toBe('The glove did not fit O.J. Simpson');
 	});
 
 	it('keeps the thumbnail slot for a YouTube video', () => {
-		const cell = activityItemCellRenderer(params('YOUTUBE_VIDEO') as never) as HTMLElement;
+		const cell = libraryItemCellRenderer(params('YOUTUBE_VIDEO') as never) as HTMLElement;
 		expect(cell.querySelector('[data-testid="item-thumb"]')).not.toBeNull();
 	});
 });

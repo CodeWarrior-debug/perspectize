@@ -251,12 +251,6 @@ func perspectiveModelToDomain(m *PerspectiveModel) *domain.Perspective {
 		p.Privacy = domain.PrivacyPublic
 	}
 
-	// ReviewStatus: convert pointer with ToUpper
-	if m.ReviewStatus != nil {
-		rs := domain.ReviewStatus(strings.ToUpper(*m.ReviewStatus))
-		p.ReviewStatus = &rs
-	}
-
 	// Parts: convert int64 to int
 	if len(m.Parts) > 0 {
 		p.Parts = make([]int, len(m.Parts))
@@ -337,12 +331,6 @@ func perspectiveDomainToModel(p *domain.Perspective) *PerspectiveModel {
 	// Privacy: ToLower
 	privacy := strings.ToLower(string(p.Privacy))
 	m.Privacy = &privacy
-
-	// ReviewStatus: ToLower pointer
-	if p.ReviewStatus != nil {
-		rs := strings.ToLower(string(*p.ReviewStatus))
-		m.ReviewStatus = &rs
-	}
 
 	// Parts: convert int to int64
 	if len(p.Parts) > 0 {

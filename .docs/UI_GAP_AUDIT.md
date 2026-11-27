@@ -66,8 +66,8 @@ Ordered by how much a user would notice.
 
 **Context**
 - `ColumnPickerDialog.svelte:43,59` shows only the hand-written lists `DATA_COLUMNS` / `INTERNAL_COLUMNS` in `frontend/src/lib/utils/grid-config.ts:263-282`.
-- `ActivityTable.svelte` defines 17 column ids. Take away those two lists and the always-shown `item`/`perspectize`, and `category` is exactly what's left.
-  - It is defined at `ActivityTable.svelte:520-529` with `hide: true`.
+- `ContentLibrary.svelte` defines 17 column ids. Take away those two lists and the always-shown `item`/`perspectize`, and `category` is exactly what's left.
+  - It is defined at `ContentLibrary.svelte:520-529` with `hide: true`.
   - The responsive tiers show it at sm and wider (`smCols = ['category','channel']`, `:977`).
 - **Second symptom.** `currentVisibility()` (`:151-159`) filters through `togglableColIds()`, so `category` never gets into `userColumnOverride`.
   - Once the user changes anything in the picker, the effect at `:963-970` only re-applies ids that are in the override.
@@ -87,10 +87,10 @@ Ordered by how much a user would notice.
 Also add a parity guard that reads the component source, so the test fails the next time a column is added:
 ```ts
 // tests/unit/column-registry-parity.test.ts
-import src from '$lib/components/ActivityTable.svelte?raw';
+import src from '$lib/components/library/ContentLibrary.svelte?raw';
 import { togglableColIds } from '$lib/utils/grid-config';
 
-it('every togglable ActivityTable colId is in the column picker registry', () => {
+it('every togglable ContentLibrary colId is in the column picker registry', () => {
 	const ids = [...src.matchAll(/colId:\s*'([^']+)'/g)].map((m) => m[1]);
 	const expected = [...new Set(ids)].filter((id) => !['item', 'perspectize'].includes(id));
 	expect([...togglableColIds(true)].sort()).toEqual(expected.sort());
@@ -173,7 +173,7 @@ Repeat for agreement, importance, confidence, like, feelings, review and customF
 - The schema default is `perspectives(first: Int = 10)` (`schema.graphql:382-390`). The service allows up to 100 (`perspective_service.go:278`).
 
 **Who uses these queries, all of them unpaginated**
-- `ActivityTable.svelte:238-256` decides the glasses/+ icon. For a user with more than 10 perspectives, older rows show "+" and open a blank editor even though a perspective exists.
+- `ContentLibrary.svelte:238-256` decides the glasses/+ icon. For a user with more than 10 perspectives, older rows show "+" and open a blank editor even though a perspective exists.
 - `Compare.svelte:56-62` builds the user picker, so the picker only lists the latest 10 perspectives' users.
 - `OnboardingShell.svelte:58-66` and `OnboardingCoach.svelte:71-79` get counts and "already rated" checks that stop at 10.
 
@@ -192,7 +192,7 @@ Make the same change to `ListPerspectivesByContent`. Longer term, use a lightwei
 ## 5. Filters don't work in mobile card view (<860px) ✅
 
 **Context**
-- When `cardMode` switches on, `gridApi = null` (`ActivityTable.svelte:934-937`).
+- When `cardMode` switches on, `gridApi = null` (`ContentLibrary.svelte:934-937`).
 - `<FilterChips {gridApi}>` (`:1015`) still renders, but `removeFilter` / `removeAllFilters` (`FilterChips.svelte:126-136`) return early when `gridApi` is null. **The chips show, but their X and "Clear all" do nothing.**
 - Filters can only be added through AG Grid's own column menus (`onFilterChanged`, `:822-838`). **Card view has no way to add or edit a filter.**
 - **All mode:** URL `f.*` filters still go to the server, so the cards are filtered but the filter can't be removed.
@@ -209,7 +209,7 @@ Make the same change to `ListPerspectivesByContent`. Longer term, use a lightwei
  	function removeAllFilters() {
 -		if (!gridApi) return;
 +		if (!gridApi) return onClearAll?.();
---- a/frontend/src/lib/components/ActivityTable.svelte
+--- a/frontend/src/lib/components/library/ContentLibrary.svelte
 -	<FilterChips {gridApi} filterModel={activeFilterModel} />
 +	<FilterChips
 +		{gridApi}
@@ -225,13 +225,13 @@ Also add an `applyUrlFilters(rows, filters)` helper next to `compareContentBySor
 ## 6. The grid ignores the theme picker ✅
 
 **Context**
-- `ActivityTable.svelte:443-459` gives AG Grid's `themeQuartz.withParams` fixed hex colours (`#1a365d`, `#ffffff`, `#f7fafc`, `#d4d4d4`…). `formatting.ts:400` (glasses icon) and `:434` (Category "+") are fixed too.
+- `ContentLibrary.svelte:443-459` gives AG Grid's `themeQuartz.withParams` fixed hex colours (`#1a365d`, `#ffffff`, `#f7fafc`, `#d4d4d4`…). `formatting.ts:400` (glasses icon) and `:434` (Category "+") are fixed too.
 - The Midnight and Terminal presets (`theme/presets.ts:62-88`) change `--color-*` variables. So the rest of the app goes dark while the grid stays white with a navy header.
 - `formatting.ts:407` in the same file already uses `var(--color-muted-foreground)`, so the pattern is already in the codebase.
 
 **Suggested fix.** Nothing needs to react to theme changes: the browser re-reads `var()` values when the theme updates the root.
 ```diff
---- a/frontend/src/lib/components/ActivityTable.svelte
+--- a/frontend/src/lib/components/library/ContentLibrary.svelte
 -		headerBackgroundColor: '#1a365d',
 -		headerTextColor: '#ffffff',
 -		oddRowBackgroundColor: '#f7fafc',
@@ -260,8 +260,10 @@ Do the same for `selectedRowBackgroundColor`, `columnHoverColor` and `headerColu
 
 ## 7. % Liked sorts in the grid only ✅
 
+**Retired:** the % Liked column and its sort were removed, because YouTube's API policy forbids deriving metrics from like counts. The rest of this section is history; don't build from it.
+
 **Context**
-- The `percentLiked` column (`ActivityTable.svelte:576-591`) can be sorted and has its own comparator.
+- The `percentLiked` column (`ContentLibrary.svelte:576-591`) can be sorted and has its own comparator.
 - It is missing from:
   - `SORTABLE_COLUMNS` (`grid-config.ts:69-78`): the sort picker can't add it and shows the raw id `percentLiked`.
   - `SORT_VALUE_GETTERS` (`:81-90`): the mobile card sort skips it silently.
@@ -286,7 +288,7 @@ The backend option adds `PERCENT_LIKED` to `ContentSortBy`, a rule in `helpers.g
 
 **Context**
 - `LIST_ACTIVITY_PERSPECTIVES` (`queries/perspectives/index.ts:157-179`) doesn't ask for `review` or `feelings` at all.
-- `ActivityDetailsModal`, `ActivityCardList` and `UserActivityView` never mention review, feelings or `SafeHtml`.
+- `ContentDetailsModal`, `LibraryCardList` and `UserActivityView` never mention review, feelings or `SafeHtml`.
 - Only `CompareTakeColumn.svelte:38-41` renders them.
 - So the rich formatting from #405 and the feel-wheel from #364 are invisible in the By-User feed. Perspective events there also can't open the perspective or Compare.
 
@@ -331,13 +333,13 @@ Give event-kind icons in the feed their own look (for example a quote icon for p
 ## 10. Mobile cards show 2 of 9 data columns ✅
 
 **Context**
-- `ActivityCardList.svelte:7-14`: `CardRow` has only name, url, channel and length.
+- `LibraryCardList.svelte:7-14`: `CardRow` has only name, url, channel and length.
 - `DATA_COLUMNS` has 9 entries. Cards show none of category, views, likes, % liked, publish date or tags. There's no way to set Category on mobile, and no tap version of the #390 copy popover.
 - `:82` shows "—" when length is missing, but `UserActivityView.svelte:288-291` hides it.
 
 **Suggested fix** (small consistency fix now; full parity is a feature)
 ```diff
---- a/frontend/src/lib/components/ActivityCardList.svelte
+--- a/frontend/src/lib/components/library/LibraryCardList.svelte
 -					<span>{formatDuration(row.length, row.lengthUnits)}</span>
 +					{#if row.length}
 +						<span>{formatDuration(row.length, row.lengthUnits)}</span>
@@ -350,14 +352,14 @@ For the follow-up, decide which columns belong on a card. The column-metadata li
 ## 11. Details modal is missing fields 🟡
 
 **Context**
-- The `ModalContent` props (`ActivityDetailsModal.svelte:20-30`) have no category, `createdAt` or `contentType`.
+- The `ModalContent` props (`ContentDetailsModal.svelte:20-30`) have no category, `createdAt` or `contentType`.
 - The header hard-codes `YouTube Video` (`:96`).
 - Labels differ from the grid: "Duration" / "Published" here, "Length" / "Date" in the grid header (`:162,168`).
 - The perspective summary *is* there (Perspectives and Avg. Rating tiles, `:132-146`); that part of the suspicion was refuted.
 
 **Suggested fix**
 ```diff
---- a/frontend/src/lib/components/ActivityDetailsModal.svelte
+--- a/frontend/src/lib/components/ContentDetailsModal.svelte
  	interface ModalContent {
 +		contentType?: 'YOUTUBE' | 'CLAIM';
 +		primaryCategory?: { label: string } | null;
@@ -400,7 +402,7 @@ The parent that builds `ModalContent` also has to pass the new fields through.
 
 | Column | Grid header | Column picker | Sort picker | Filter chip | Details modal |
 |---|---|---|---|---|---|
-| publishDate | Date (`ActivityTable:595`) | Published (`grid-config:269`) | Published (`:74`) | Date (`FilterChips:21`) | Published (`:168`) |
+| publishDate | Date (`ContentLibrary:595`) | Published (`grid-config:269`) | Published (`:74`) | Date (`FilterChips:21`) | Published (`:168`) |
 | duration | Length (`:532`) | Length | Length | Length | **Duration** (`:162`) |
 | createdAt | Date Added (`:663`) | **Created at** (`:280`) | Date added (`:76`) | Date Added | — |
 | updatedAt | Updated (`:646`) | **Updated at** (`:281`) | Updated | Updated | — |
@@ -453,14 +455,14 @@ The parent that builds `ModalContent` also has to pass the new fields through.
 ## 16. Category hover popover and click typeahead don't close each other 🟡
 
 **Context**
-- **Hover:** Category has a hover spec (`activityTooltipSpecs.ts:11-14`), so it opens `CellPopover` after 600ms.
-- **Click:** `onCellClicked` (`ActivityTable.svelte:762-781`) opens `CategoryTypeahead`.
+- **Hover:** Category has a hover spec (`libraryTooltipSpecs.ts:11-14`), so it opens `CellPopover` after 600ms.
+- **Click:** `onCellClicked` (`ContentLibrary.svelte:762-781`) opens `CategoryTypeahead`.
 - The category branch never calls `hover.close()`; the scroll handler at `:334` does.
 - bits-ui's outside-click dismissal probably hides the problem, but no one has watched this in a browser. The 2025 visual-sweep item P4 (typeahead with no anchor) also hasn't been re-checked.
 
 **Suggested fix**
 ```diff
---- a/frontend/src/lib/components/ActivityTable.svelte  (onCellClicked)
+--- a/frontend/src/lib/components/library/ContentLibrary.svelte  (onCellClicked)
  			} else if (event.colDef.colId === 'category') {
 +				hover.close(); // don't leave the copy-popover open under the typeahead
 ```
@@ -490,7 +492,7 @@ The parent that builds `ModalContent` also has to pass the new fields through.
 ## 18. Old, contradicting column/sort lists in `grid-config.ts` ✅
 
 **Context**
-- In `ActivityTable.svelte:53-63`, 7 of the 9 imports from `grid-config` are never called: `SORT_FIELD_MAP`, `resolveSortField`, `resolveSortOrder`, `capitalizeContentType`, `durationComparator`, `computeNextPage`, `computePrevPage`.
+- In `ContentLibrary.svelte:53-63`, 7 of the 9 imports from `grid-config` are never called: `SORT_FIELD_MAP`, `resolveSortField`, `resolveSortOrder`, `capitalizeContentType`, `durationComparator`, `computeNextPage`, `computePrevPage`.
 - `getColumnVisibility`, `COLUMN_IDS`, `COLUMN_FILTERS` and `NON_SORTABLE_COLUMNS` are only used by tests. They already disagree with the live code:
   - `getColumnVisibility` has no category.
   - `SORT_FIELD_MAP` sends duration and channel to NAME, but `COL_TO_SORT` uses LENGTH and CHANNEL_TITLE.
@@ -499,7 +501,7 @@ The parent that builds `ModalContent` also has to pass the new fields through.
 
 **Suggested fix**
 ```diff
---- a/frontend/src/lib/components/ActivityTable.svelte
+--- a/frontend/src/lib/components/library/ContentLibrary.svelte
  	import {
 -		SORT_FIELD_MAP, resolveSortField, resolveSortOrder,
 -		capitalizeContentType, durationComparator,
@@ -548,7 +550,7 @@ Then delete the dead exports and their tests from `grid-config.ts`. `capitalizeC
 ## 21. `ADDING_AG_GRID_COLUMN.md` names none of the current lists ✅
 
 **Context**
-- Grepping the guide finds 0 mentions of: `DATA_COLUMNS`, `INTERNAL_COLUMNS`, `SORTABLE_COLUMNS`, `SORT_VALUE_GETTERS`, `COL_TO_SORT`, `COL_TO_FILTER_KEY`, `urlParamsToGraphQLFilter`, `COLUMN_LABELS`, `ActivityCardList`, `ActivityDetailsModal`.
+- Grepping the guide finds 0 mentions of: `DATA_COLUMNS`, `INTERNAL_COLUMNS`, `SORTABLE_COLUMNS`, `SORT_VALUE_GETTERS`, `COL_TO_SORT`, `COL_TO_FILTER_KEY`, `urlParamsToGraphQLFilter`, `COLUMN_LABELS`, `LibraryCardList`, `ContentDetailsModal`.
 - The one list it does name, `SORT_FIELD_MAP`, is dead code (#18).
 - It cites `queries/content.ts`, which is now `queries/content/index.ts`.
 - It describes a two-branch responsive effect. The real one has 4 tiers plus the user override.

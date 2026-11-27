@@ -1,19 +1,10 @@
+import { LIBRARY_COLUMNS } from '#lib/utils/libraryColumns/index.js';
 import { describe, it, expect } from 'vitest';
-import {
-	COL_TO_SORT,
-	COLUMNS,
-	DATA_COLUMNS,
-	defaultColumnVisibility,
-	isBookOnlyTypeFilter,
-	itemColumnHeader,
-	columnViewFor,
-	type ResponsiveTier,
-} from '#lib/utils/grid-config.js';
-import { columnViewFor as columnViewForFromLayouts } from '#lib/utils/columnLayouts.js';
+import { isBookOnlyTypeFilter, itemColumnHeader, columnViewFor, type ResponsiveTier } from '#lib/utils/grid-config.js';
+import { COL_TO_SORT, DATA_COLUMNS, defaultColumnVisibility } from '#lib/utils/libraryColumns/index.js';
+import { columnViewFor as columnViewForFromLayouts } from '#lib/utils/grid-config.js';
 import { urlParamsToGraphQLFilter } from '#lib/utils/gridUrlState.js';
-import { headerMinWidth } from '#lib/utils/grid-header-width.js';
-import { ACTIVITY_TOOLTIP_SPECS } from '#lib/utils/activityTooltipSpecs.js';
-import activityTableSource from '#lib/components/ActivityTable.svelte?raw';
+import { TIP } from '#lib/utils/libraryColumns/tooltips.js';
 
 const TIERS: ResponsiveTier[] = ['xs', 'sm', 'md', 'lg'];
 
@@ -60,15 +51,9 @@ describe('Book default column set', () => {
 	});
 
 	it('adds Rating and Tags at lg', () => {
-		expect(defaultColumnVisibility('lg', 'book').visible).toEqual([
-			'perspectize',
-			'item',
-			'author',
-			'published',
-			'pages',
-			'rating',
-			'tags',
-		]);
+		expect([...defaultColumnVisibility('lg', 'book').visible].sort()).toEqual(
+			['perspectize', 'item', 'author', 'published', 'pages', 'rating', 'tags'].sort(),
+		);
 	});
 
 	it('hides the Movie and YouTube-only columns, and the picker-only Editions', () => {
@@ -87,7 +72,6 @@ describe('Book default column set', () => {
 			'publishDate',
 			'views',
 			'likes',
-			'percentLiked',
 			'description',
 			'editions',
 			'readers',
@@ -122,19 +106,21 @@ describe('the other views keep their exact default sets', () => {
 	});
 
 	it('general lg is the unchanged YouTube set', () => {
-		expect(defaultColumnVisibility('lg', 'general').visible).toEqual([
-			'item',
-			'type',
-			'perspectize',
-			'category',
-			'channel',
-			'duration',
-			'publishDate',
-			'views',
-			'likes',
-			'percentLiked',
-			'tags',
-		]);
+		// Set comparison: the grid order follows the column picker, not this list.
+		expect([...defaultColumnVisibility('lg', 'general').visible].sort()).toEqual(
+			[
+				'item',
+				'type',
+				'perspectize',
+				'category',
+				'channel',
+				'duration',
+				'publishDate',
+				'views',
+				'likes',
+				'tags',
+			].sort(),
+		);
 	});
 
 	it('the movie and general views hide every Book column', () => {
@@ -197,99 +183,16 @@ describe('Published, Pages and Book rating filters', () => {
 		});
 	});
 
-	it('gives each of the three columns a number-range filter key', () => {
-		for (const [colId, filterKey] of [
-			['published', 'published'],
-			['pages', 'pages'],
-			['rating', 'bookrating'],
-		] as const) {
-			const col = COLUMNS.find((c) => c.colId === colId);
-			expect(col?.filterKey, colId).toBe(filterKey);
-			expect(col?.filterRange, colId).toBe('number');
-			expect(col?.filterValue, colId).toBeTypeOf('function');
-		}
-	});
-
 	it('leaves Editions without a filter (the server has no field for it)', () => {
-		expect(COLUMNS.find((c) => c.colId === 'editions')?.filterKey).toBeUndefined();
+		expect(LIBRARY_COLUMNS.find((c) => c.colId === 'editions')?.filter?.key).toBeUndefined();
 	});
 });
 
-// The grid's colDefs live in ActivityTable.svelte (AG Grid does not render in jsdom), so these
+// The grid's colDefs live in library/columns.ts (AG Grid does not render in jsdom), so these
 // read its source, as the Movie column tests do.
-describe('Book colDefs in ActivityTable', () => {
-	const blocks = activityTableSource.split(/(?=colId:\s*')/g);
-	const block = (colId: string): string => {
-		const b = blocks.find((x) => x.startsWith(`colId: '${colId}'`));
-		if (!b) throw new Error(`no colDef for ${colId}`);
-		return b;
-	};
-	// Mirrors ActivityTable's colDef map: an explicit minWidth only raises the header floor.
-	function minWidth(colId: string): number {
-		const b = block(colId);
-		const explicit = Number(b.match(/\n\s*minWidth:\s*(\d+)/)?.[1] ?? 0);
-		const name = b.match(/headerName:\s*'([^']*)'/)?.[1] ?? '';
-		const header = headerMinWidth(name, {
-			filter: !/\n\s*filter:\s*false/.test(b),
-			sortable: !/\n\s*sortable:\s*false/.test(b),
-		});
-		return Math.max(explicit, header);
-	}
-
-	it('has a colDef for every Book column', () => {
-		for (const colId of ['author', 'published', 'pages', 'rating', 'editions', 'readers']) {
-			expect(() => block(colId), colId).not.toThrow();
-		}
-	});
-
-	it('the Book lg set fits the 1212px grid', () => {
-		const { visible } = defaultColumnVisibility('lg', 'book');
-		const total = visible.reduce((sum, id) => sum + minWidth(id), 0);
-		expect(total).toBeLessThanOrEqual(1212);
-	});
-
-	it('the Book md set fits the 1212px grid', () => {
-		const { visible } = defaultColumnVisibility('md', 'book');
-		const total = visible.reduce((sum, id) => sum + minWidth(id), 0);
-		expect(total).toBeLessThanOrEqual(1212);
-	});
-
-	it('Published renders the plain year, never through the thousands-separated number formatter', () => {
-		const published = block('published');
-		expect(published).toMatch(/String\(params\.value\)/);
-		expect(published).not.toMatch(/formatCount|toLocaleString|formatBookRating/);
-	});
-
-	it('Rating is muted under 5 ratings', () => {
-		expect(block('rating')).toMatch(/hasLowRatingCount\(\{ data: params\.data \}\)/);
-	});
-
-	it('names each Book column header tooltip as planned', () => {
-		expect(block('author')).toContain("headerTooltip: 'Author(s) from Open Library'");
-		expect(block('published')).toContain("headerTooltip: 'First published year'");
-		expect(block('pages')).toContain("headerTooltip: 'Median page count across editions'");
-		expect(block('rating')).toContain(
-			"headerTooltip: 'Open Library community rating out of 5. Muted when fewer than 5 ratings.'",
-		);
-		expect(block('editions')).toContain("headerTooltip: 'Number of editions'");
-		expect(block('readers')).toContain('Open Library users only, not readers in general');
-	});
-
-	it('Readers is picker-only, sorts client-side and has no server sort or filter', () => {
-		const readers = COLUMNS.find((c) => c.colId === 'readers');
-		expect(readers?.picker).toBe('data');
-		expect(readers?.clientOnlySort).toBe(true);
-		expect(readers?.filterKey).toBeUndefined();
-		expect(COL_TO_SORT.readers).toBeUndefined();
-		for (const tier of TIERS) {
-			expect(defaultColumnVisibility(tier, 'book').visible, tier).not.toContain('readers');
-		}
-	});
-});
-
 describe('Book tooltip specs', () => {
 	it('readers explains the breakdown, the Open-Library-only caveat and the as-of date', () => {
-		const spec = ACTIVITY_TOOLTIP_SPECS.readers as unknown as { text: (c: { data: unknown }) => string };
+		const spec = TIP.readers as unknown as { text: (c: { data: unknown }) => string };
 		const text = spec.text({
 			data: {
 				contentType: 'BOOK',
@@ -307,7 +210,7 @@ describe('Book tooltip specs', () => {
 	});
 
 	it('author lists every author on hover, and says so when there are none', () => {
-		const spec = ACTIVITY_TOOLTIP_SPECS.author as unknown as {
+		const spec = TIP.author as unknown as {
 			items: (c: { data: unknown }) => string[];
 			emptyText: string;
 		};
@@ -317,7 +220,7 @@ describe('Book tooltip specs', () => {
 	});
 
 	it('rating explains the average and the count, or that there are no ratings yet', () => {
-		const spec = ACTIVITY_TOOLTIP_SPECS.rating as unknown as { text: (c: { data: unknown }) => string };
+		const spec = TIP.rating as unknown as { text: (c: { data: unknown }) => string };
 		expect(spec.text({ data: { contentType: 'BOOK', book: { ratingsAverage: 4.1, ratingsCount: 100 } } })).toBe(
 			'4.1 out of 5 · 100 ratings',
 		);

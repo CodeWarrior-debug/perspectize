@@ -1,8 +1,8 @@
 /**
  * Tests for the Library page's header and search-scope picker
  * (src/routes/content-library/+page.svelte).
- * ActivityTable itself is stubbed out — it has its own extensive test suite
- * (tests/components/ActivityTable.test.ts) — so these focus purely on the
+ * ContentLibrary itself is stubbed out — it has its own extensive test suite
+ * (tests/components/ContentLibrary.test.ts) — so these focus purely on the
  * search box + scope popover writing the right `q`/`qf` URL params.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
@@ -11,7 +11,7 @@ import { tick } from 'svelte';
 import { goto } from '$app/navigation';
 import { mockPageState } from '../setup';
 
-vi.mock('#lib/components/ActivityTable.svelte', () => ({
+vi.mock('#lib/components/library/ContentLibrary.svelte', () => ({
 	default: vi.fn(() => ({ $$: {}, $set: vi.fn(), $on: vi.fn(), $destroy: vi.fn() })),
 }));
 

@@ -11,7 +11,7 @@
 //	go test -tags perf ./internal/perf/ -run TestContentListDataloaderPerf -v -count=1
 //
 // The harness issues the exact `ListContent` GraphQL query the SvelteKit
-// ActivityTable uses (including the `primaryCategory` sub-selection that
+// ContentLibrary uses (including the `primaryCategory` sub-selection that
 // triggers the N+1), 12 times, and reports latency percentiles plus the
 // number of SQL statements issued per request (counted via a GORM callback,
 // not estimated).

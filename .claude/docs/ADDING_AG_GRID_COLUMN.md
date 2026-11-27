@@ -1,6 +1,6 @@
 # Adding a Column to the AG Grid Table
 
-Decision guide for adding a new column to the ActivityTable AG Grid.
+Decision guide for adding a new column to the ContentLibrary AG Grid.
 
 This guide used to point at symbols that no longer exist and describe a
 two-tier responsive effect that had grown to four tiers with no test
@@ -20,20 +20,23 @@ missing that colId (still visible immediately in the picker/sort-picker
 UI), not a silent, separately-drifting list — see `.docs/UI_THOROUGHNESS_CHECKLIST.md`
 §3.1 for why this replaced the older multi-registry design.
 
+**Never derive a column from YouTube API data** (views, likes, comments and the like): no computed column, sort, filter or tooltip. YouTube's API policy forbids it. Showing a returned value as it is, or formatting it (duration, date), is fine.
+
 ## Key files
 
 | File | Purpose |
 |------|---------|
-| `frontend/src/lib/components/ActivityTable.svelte` | Column definitions (`columnDefs`), the responsive `$effect`, click/hover handlers |
+| `frontend/src/lib/components/library/columns.ts` | Column definitions (`buildLibraryColumnDefs`) |
+| `frontend/src/lib/components/library/ContentLibrary.svelte` | The responsive `$effect`, click/hover handlers |
 | `frontend/src/lib/utils/formatting.ts` | Cell renderers, value formatters, value getters |
-| `frontend/src/lib/utils/activityTooltipSpecs.ts` | Hover-popover specs (`ACTIVITY_TOOLTIP_SPECS`) |
+| `frontend/src/lib/utils/libraryTooltipSpecs.ts` | Hover-popover specs (`LIBRARY_TOOLTIP_SPECS`) |
 | `frontend/src/lib/utils/grid-config.ts` | `COLUMNS`/`ColumnMeta` — the single source of truth. `DATA_COLUMNS`/`INTERNAL_COLUMNS` (column picker), `SORTABLE_COLUMNS`/`SORT_VALUE_GETTERS` (sort picker + client-side sort), `COL_TO_SORT`/`SORT_TO_COL` (server sort), `COL_TO_FILTER_KEY`/`COLUMN_LABELS` (URL filter keys + filter-chip labels), `compareContentBySorts`/`filterContentRows` — all derived from `COLUMNS` |
 | `frontend/src/lib/utils/gridUrlState.ts` | Re-exports `COL_TO_SORT`/`SORT_TO_COL`/`COL_TO_FILTER_KEY` from `grid-config.ts`; owns `urlParamsToGraphQLFilter` and URL (de)serialization |
 | `frontend/src/lib/components/FilterChips.svelte` | Imports `COLUMN_LABELS` from `grid-config.ts` for filter-chip text |
 | `frontend/src/lib/components/ColumnPickerDialog.svelte` | Renders `DATA_COLUMNS`/`INTERNAL_COLUMNS` |
 | `frontend/src/lib/components/SortPickerDialog.svelte` | Renders `SORTABLE_COLUMNS` |
-| `frontend/src/lib/components/ActivityCardList.svelte` | Mobile card view — has its own, much smaller field list |
-| `frontend/src/lib/components/ActivityDetailsModal.svelte` | Details modal — also has its own field list |
+| `frontend/src/lib/components/library/LibraryCardList.svelte` | Mobile card view — has its own, much smaller field list |
+| `frontend/src/lib/components/ContentDetailsModal.svelte` | Details modal — also has its own field list |
 | `frontend/src/lib/queries/content/index.ts` | GraphQL query fields and the `ContentItem` TypeScript interface |
 | `frontend/tests/unit/grid-config.test.ts`, `gridUrlState.test.ts`, `formatting.test.ts` | Unit tests for the above |
 | `frontend/tests/unit/column-registry-parity.test.ts`, `column-label-parity.test.ts` | Parity guards — read the real `columnDefs`/`headerName`s from source and fail if `COLUMNS` drifts from them (kept as a belt-and-suspenders check even though the single source makes cross-registry drift structurally impossible — see "Registries a column must be added to" below) |
@@ -57,7 +60,7 @@ Is the field already in the ContentItem TypeScript interface?
 │
 └── NO → Where does the data live?
     │
-    ├── COMPUTED from existing fields (e.g. percentLiked from viewCount/likeCount)
+    ├── COMPUTED from existing fields (e.g. vsBudget from revenue/budget)
     │   → FRONTEND-ONLY: use valueGetter, no backend needed for the column
     │   itself — but see Decision 5 if it should also sort server-side.
     │
@@ -66,7 +69,7 @@ Is the field already in the ContentItem TypeScript interface?
     │   Steps:
     │   1. Add field to Content type in schema.graphql
     │   2. Add virtual field to GORM model (gorm:"-" tag) — see the
-    │      ViewCount/LikeCount/PercentLiked pattern in gorm_models.go
+    │      ViewCount/LikeCount pattern in gorm_models.go
     │   3. Add SQL extraction path in helpers.go
     │   4. Add field to GraphQL resolver if not auto-resolved
     │   5. Run make graphql-gen
@@ -96,8 +99,8 @@ Is the field already in the ContentItem TypeScript interface?
           tags:         response->'items'->0->'snippet'->'tags'
           description:  response->'items'->0->'snippet'->>'description'
 
-          Percent-liked-style computed rules (division, CASE) also live in
-          helpers.go's contentSortRule() — see the PERCENT_LIKED case for the
+          Computed rules (division, CASE) also live in
+          helpers.go's contentSortRule() — see the VS_BUDGET case for the
           NULLIF/CASE pattern for a rate that can divide by zero or be
           missing.
 ```
@@ -120,7 +123,7 @@ Is the field already in the ContentItem TypeScript interface?
 | **`field`** | Maps to `ContentItem` property | Must match TS interface field, or omit if using `valueGetter` |
 | **`headerName`** | Display text | Short label — this is the label every other registry below should match (see "One label everywhere") |
 | **`headerTooltip`** | Hover text | Longer description |
-| **`context: { tooltipSpec }`** | Cell hover popover (#390) | Omit for the default (displayed text + copy of raw value); `false` to opt out; `{ text, copyValue }` to override display/copy; `{ mode: 'multi', items, emptyText }` for chip lists; add the spec to `ACTIVITY_TOOLTIP_SPECS` |
+| **`context: { tooltipSpec }`** | Cell hover popover (#390) | Omit for the default (displayed text + copy of raw value); `false` to opt out; `{ text, copyValue }` to override display/copy; `{ mode: 'multi', items, emptyText }` for chip lists; add the spec to `LIBRARY_TOOLTIP_SPECS` |
 
 ---
 
@@ -150,7 +153,7 @@ the last column (see `frontend/CLAUDE.md`'s "Column minimum widths" gotcha).
 | Date formatting | `valueFormatter` | `formatting.ts` | `dateValueFormatter`, `formatPublishDate` |
 | Array to string | `valueFormatter` | `formatting.ts` | `formatTags` |
 | Truncated text | `valueFormatter` | `formatting.ts` | `truncateDescription` |
-| Computed from multiple fields | `valueGetter` | inline or `formatting.ts` | `durationValueGetter`, `percentLikedValueGetter` |
+| Computed from multiple fields | `valueGetter` | inline or `formatting.ts` | `durationValueGetter`, `vsBudgetValueGetter` |
 | Rich HTML (images, links, icons) | `cellRenderer` returning `HTMLElement` | `formatting.ts` | `itemCellRenderer`, `typeCellRenderer`, `categoryCellRenderer` |
 
 **Use theme tokens, not hex colours.** A renderer that sets `style.color`/
@@ -183,7 +186,7 @@ client sorting is required, server sorting is optional):
    but no `serverSort` is intentionally left out of `COL_TO_SORT`, and
    `sortsToGraphQL` silently drops any colId missing from it, so in "All
    Items" mode the sort has no effect. Leave a comment saying so on the
-   entry (see `percentLiked`'s entry for the pattern), or the next reader
+   entry, or the next reader
    will assume it's a bug.
 
 **Server-side too** (needs a real backend sort, e.g. it's a persisted
@@ -193,7 +196,7 @@ column, or the client-only limitation above isn't acceptable):
 3. Add the matching constant to `ContentSortBy` in `domain/pagination.go`.
 4. Add a case to `contentSortRule()` in `helpers.go` — for a JSONB or
    computed field, this is where the SQL expression goes (see the
-   `PERCENT_LIKED` case for a division that can be zero/NULL).
+   `VS_BUDGET` case for a division that can be zero/NULL).
 5. Set `serverSort: 'BACKEND_ENUM_VALUE'` on the same `ColumnMeta` entry in
    `grid-config.ts` — this feeds both `COL_TO_SORT` and (reversed)
    `SORT_TO_COL`. If two colIds ever share a `serverSort` value, `SORT_TO_COL`
@@ -272,7 +275,7 @@ some responsive tiers, but wasn't in `DATA_COLUMNS`, so it could never be
 hidden or re-shown once hidden.
 
 `tests/unit/column-registry-parity.test.ts` reads every `colId` out of
-`ActivityTable.svelte`'s source and fails if one is missing from
+`ContentLibrary.svelte`'s source and fails if one is missing from
 `DATA_COLUMNS`/`INTERNAL_COLUMNS` (except the always-visible `item` and
 `perspectize`) — **this is the test that should fail if you skip this
 step**. If it doesn't fail, the test itself needs updating first.
@@ -283,7 +286,7 @@ step**. If it doesn't fail, the test itself needs updating first.
 stay in sync:
 
 1. **`hide: true`** in the colDef — the initial default.
-2. **The responsive `$effect`** in `ActivityTable.svelte` — overrides
+2. **The responsive `$effect`** in `ContentLibrary.svelte` — overrides
    visibility on every breakpoint change, and always wins once it runs
    (it runs on every `gridReady`, including after a grid remount — see
    `frontend/CLAUDE.md`'s "Grid remount gotcha").
@@ -295,7 +298,7 @@ The effect uses **four** tiers, not two — `xs` (<445px), `sm` (445–639px),
 const alwaysVisible = ['item', 'type', 'perspectize']; // every tier
 const smCols = ['category', 'channel'];                // sm and wider
 const mdCols = ['duration', 'publishDate'];             // md and wider
-const lgCols = ['views', 'likes', 'percentLiked', 'user', 'tags']; // lg only
+const lgCols = ['views', 'likes', 'user', 'tags']; // lg only
 const alwaysHidden = ['description'];                   // never shown by the tier system
 // createdAt/updatedAt/id/addedByUserID/url stay hidden via their colDef
 // `hide: true` until the user (or, for the admin-only ones, an admin)
@@ -315,7 +318,7 @@ as `createdAt`/`updatedAt`/the admin-only columns.
 
 Insert the `ColDef` in the `columnDefs` array at the desired position.
 Current order: perspectize (action), item (name + thumbnail), type, category
-(hidden), duration, views, likes, percentLiked, publishDate, channel, tags,
+(hidden), duration, views, likes, publishDate, channel, tags,
 description (hidden), updatedAt (hidden), createdAt (hidden), then the
 admin-only id/addedByUserID/url (all hidden).
 
@@ -333,12 +336,12 @@ other place derives from that single field:
 - `DATA_COLUMNS`/`INTERNAL_COLUMNS` (column picker)
 - `SORTABLE_COLUMNS` (sort picker)
 - `COLUMN_LABELS`, imported by `FilterChips.svelte` (filter chips)
-- `ActivityDetailsModal.svelte`'s own field labels, if the field is shown
+- `ContentDetailsModal.svelte`'s own field labels, if the field is shown
   there — this one is still a separate, hand-written list, not derived from
   `COLUMNS`
 
 `tests/unit/column-label-parity.test.ts` reads `headerName` out of
-`ActivityTable.svelte`'s source and fails if `COLUMNS`' `label` disagrees
+`ContentLibrary.svelte`'s source and fails if `COLUMNS`' `label` disagrees
 with it for any shared colId — kept as a belt-and-suspenders check even
 though a single `label` field makes the derived exports disagreeing with
 *each other* structurally impossible; it still catches `COLUMNS` disagreeing
@@ -351,9 +354,9 @@ with the actual `headerName` in the colDef.
 Copy this into the PR when adding a column (frontend-only columns can skip
 the backend rows):
 
-- [ ] `columnDefs` in `ActivityTable.svelte` (colId, headerName, sizing, filter/sort/hide)
+- [ ] `columnDefs` in `ContentLibrary.svelte` (colId, headerName, sizing, filter/sort/hide)
 - [ ] Renderer/formatter in `formatting.ts`, using theme tokens if it sets colour
-- [ ] Tooltip spec in `activityTooltipSpecs.ts` (or an explicit opt-out)
+- [ ] Tooltip spec in `libraryTooltipSpecs.ts` (or an explicit opt-out)
 - [ ] The responsive `$effect`'s tier lists
 - [ ] One `ColumnMeta` entry added to `COLUMNS` in `grid-config.ts`, with:
   - [ ] `picker: 'data'` or `'admin'` (column picker) — **the #1 thing this guide used to miss**, back when this was a separately hand-maintained list
@@ -362,7 +365,7 @@ the backend rows):
   - [ ] `serverSort`, if sortable server-side (`gridUrlState.ts`'s `COL_TO_SORT`/`SORT_TO_COL`)
   - [ ] `filterKey` (+ `filterRange` if a number/date range), if filterable — feeds the URL `f.*` param and `urlParamsToGraphQLFilter`
 - [ ] Search scope (`SearchScopeKey`, `SCOPE_TO_GQL_FIELD`, `SCOPE_LABELS`), if searchable
-- [ ] `ActivityCardList.svelte` and `ActivityDetailsModal.svelte`, if the column should also appear on mobile cards / the details modal — both have their own, separate field lists, not derived from `COLUMNS`
+- [ ] `LibraryCardList.svelte` and `ContentDetailsModal.svelte`, if the column should also appear on mobile cards / the details modal — both have their own, separate field lists, not derived from `COLUMNS`
 - [ ] `cellRenderer` with no `valueGetter`/`field`: add its text to `exportCellText` and `RENDERED_TEXT_COLIDS` in `exportTable.ts` (`export-text-parity.test.ts` fails otherwise)
 - [ ] Tests updated (see Testing, below) and both parity tests still pass
 
@@ -382,7 +385,7 @@ the backend rows):
 
 **`frontend/tests/unit/column-registry-parity.test.ts`, `column-label-parity.test.ts`** — these should already fail (and then pass again once you've made the change) if you added a togglable column or changed a label; you shouldn't need to edit them directly.
 
-**`frontend/tests/components/ActivityTable.test.ts`** — limited by JSDOM (AG Grid doesn't fully render); add tests for any new props or state logic.
+**`frontend/tests/components/ContentLibrary.test.ts`** — limited by JSDOM (AG Grid doesn't fully render); add tests for any new props or state logic.
 
 ### Backend tests to update (if backend changes were needed)
 
@@ -399,7 +402,7 @@ the backend rows):
 For a field that already exists in `ContentItem`, sortable client-side only, no backend changes:
 
 ```typescript
-// In columnDefs array (ActivityTable.svelte)
+// In columnDefs array (ContentLibrary.svelte)
 {
   colId: 'commentCount',
   field: 'commentCount',
@@ -410,8 +413,8 @@ For a field that already exists in `ContentItem`, sortable client-side only, no 
   filter: 'agNumberColumnFilter',
   hide: true,
   valueFormatter: (params: ValueFormatterParams) => formatCount(params.value),
-  // Omit for the default popover, or reference a spec from ACTIVITY_TOOLTIP_SPECS
-  context: { tooltipSpec: ACTIVITY_TOOLTIP_SPECS.commentCount },
+  // Omit for the default popover, or reference a spec from LIBRARY_TOOLTIP_SPECS
+  context: { tooltipSpec: LIBRARY_TOOLTIP_SPECS.commentCount },
 },
 ```
 

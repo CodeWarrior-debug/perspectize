@@ -77,9 +77,6 @@ models:
   PersonRole:
     model:
       - github.com/CodeWarrior-debug/perspectize/backend/internal/core/domain.PersonRole
-  ReviewStatus:
-    model:
-      - github.com/CodeWarrior-debug/perspectize/backend/internal/core/domain.ReviewStatus
   UserRole:
     model:
       - github.com/CodeWarrior-debug/perspectize/backend/internal/core/domain.UserRole

@@ -1,9 +1,7 @@
 /**
  * Layout-level coach gate store for step 3+.
- * Eligibility is computed from `me.onboarding`; open/forced replay can be set by Help later.
+ * Holds the forced replay and the quiet-graduate attempt flag; eligibility lives in `./eligibility`.
  */
-import { isCoachEligible, shouldQuietGraduate, type OnboardingState } from './eligibility';
-
 let forceOpen = $state(false);
 let quietGraduateAttempted = $state(false);
 
@@ -39,24 +37,4 @@ export function getQuietGraduateAttempted(): boolean {
 
 export function markQuietGraduateAttempted(): void {
 	quietGraduateAttempted = true;
-}
-
-export function resolveShowCoach(opts: {
-	signedIn: boolean;
-	meLoaded: boolean;
-	onboarding: OnboardingState | null | undefined;
-}): boolean {
-	if (!opts.signedIn) return false;
-	if (forceOpen) return true;
-	return isCoachEligible({ meLoaded: opts.meLoaded, onboarding: opts.onboarding });
-}
-
-export function resolveQuietGraduate(opts: {
-	eligible: boolean;
-	ownedContentCount: number;
-	perspectiveCount: number;
-	completedAt?: string | null;
-}): boolean {
-	if (quietGraduateAttempted) return false;
-	return shouldQuietGraduate(opts);
 }

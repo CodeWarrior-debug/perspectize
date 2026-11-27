@@ -1,5 +1,5 @@
 import type { UserTodoItem } from '#lib/queries/userTodos/index.js';
-import { activityItemCellRenderer } from './activityItemCellRenderer';
+import { libraryItemCellRenderer } from './libraryItemCellRenderer';
 import { planContentLabel } from './plan-grid-config';
 
 /**
@@ -33,7 +33,7 @@ function textOnlyCell(label: string): HTMLElement {
 export function planItemCellRenderer(todo: UserTodoItem): HTMLElement | string {
 	const content = todo.content;
 	if (!content) return textOnlyCell(planContentLabel(todo));
-	return activityItemCellRenderer({
+	return libraryItemCellRenderer({
 		data: {
 			id: content.id,
 			name: content.name,

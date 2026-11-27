@@ -50,13 +50,8 @@ func (r *queryResolver) UserTodos(ctx context.Context, first *int, after *string
 	}
 
 	return &model.PaginatedUserTodos{
-		Items: userTodosToModel(result.Items),
-		PageInfo: &model.PageInfo{
-			HasNextPage:     result.HasNext,
-			HasPreviousPage: result.HasPrev,
-			StartCursor:     result.StartCursor,
-			EndCursor:       result.EndCursor,
-		},
+		Items:      userTodosToModel(result.Items),
+		PageInfo:   pageInfoToModel(result.HasNext, result.HasPrev, result.StartCursor, result.EndCursor),
 		TotalCount: result.TotalCount,
 	}, nil
 }

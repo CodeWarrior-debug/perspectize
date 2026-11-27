@@ -3,7 +3,8 @@ import { toast } from 'svelte-sonner';
 import { graphqlRequest } from '../client';
 import { SEND_MESSAGE, type SendMessageResponse, type MessagingUser } from './index';
 import { queryKeys } from '../keys';
-import { makeClientNonce, optimisticMessage, addOptimistic, reconcileSentMessage } from '#lib/messaging/optimistic.js';
+import { makeClientNonce, optimisticMessage, addOptimistic } from '#lib/messaging/optimistic.js';
+import { applyMessageResult } from '#lib/messaging/messagingCache.js';
 import type { ThreadMessagesCache } from '#lib/messaging/threadCache.js';
 
 export interface SendArgs {
@@ -40,16 +41,19 @@ export function useSendMessage() {
 			return { response, clientNonce, args };
 		},
 		onError: (_err: unknown, args: SendArgs) => {
-			const optId = 'optimistic:' + args.__nonce;
-			queryClient.setQueryData<ThreadMessagesCache>(queryKeys.messaging.messages.list(args.threadId), (cache) =>
-				cache ? { ...cache, items: cache.items.filter((m) => m.id !== optId) } : cache,
-			);
+			applyMessageResult(queryClient, {
+				kind: 'sendFailed',
+				threadId: args.threadId,
+				clientNonce: args.__nonce ?? '',
+			});
 			toast.error('Message failed to send');
 		},
 		onSuccess: (result: { response: SendMessageResponse; clientNonce: string; args: SendArgs }) => {
-			queryClient.setQueryData<ThreadMessagesCache>(queryKeys.messaging.messages.list(result.args.threadId), (cache) =>
-				cache ? reconcileSentMessage(cache, result.clientNonce, result.response.sendMessage) : cache,
-			);
+			applyMessageResult(queryClient, {
+				kind: 'sent',
+				message: result.response.sendMessage,
+				clientNonce: result.clientNonce,
+			});
 		},
 	}));
 }
