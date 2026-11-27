@@ -1,6 +1,6 @@
 # Backend Dependency Upgrade Analysis
 
-**Generated:** 2026-11-01 · **Last applied:** 2026-11-01
+**Generated:** 2026-11-26 · **Last applied:** 2026-11-26
 **Scope:** `backend/go.mod` (Go GraphQL API), **direct (non-indirect) dependencies only**
 **Tool used:** `go list -m -u -versions ./...` (Go's built-in module tooling — there's no widely-adopted third-party "ncu for Go"; `go list -u` against the module graph is the standard equivalent) plus `go.mod`'s own `go`/`toolchain` directives and `proxy.golang.org` publish timestamps for age.
 
@@ -8,9 +8,9 @@ This report lives alongside the monthly maintenance routine (see [SKILL.md](SKIL
 
 ## Result summary
 
-Two direct deps were behind on 2026-11-01 and were bumped: `github.com/99designs/gqlgen` v0.17.95 -> **v0.17.98** (required `make graphql-gen`; `generated.go` changed, the version header in `messaging.resolvers.go` changed, nothing else) and `github.com/jackc/pgx/v5` v5.11.0 -> **v5.12.0**. `go build ./...`, `gofmt -l .`, `go vet -tags perf ./internal/perf/...` and `go test ./...` are clean. `github.com/go-chi/chi/v5` v5.5.0 landed via Dependabot PR #615.
+One direct dep was behind on 2026-11-26 and was bumped: `github.com/clerk/clerk-sdk-go/v2` v2.9.0 -> **v2.10.0**. `go build ./...`, `gofmt -l .` and `go test ./...` are clean (DB-backed tests skip without `DATABASE_URL`).
 
-Open Dependabot alert: `github.com/go-jose/go-jose/v3` <= 3.0.5 (high, DoS parsing RSA JWKs) has **no patched v3 release**. It is an indirect dependency via `github.com/clerk/clerk-sdk-go/v2` (already latest), so it cannot be fixed here; watch for a Clerk SDK release.
+No open Dependabot alerts on 2026-11-26.
 
 Toolchain: `go.mod` pins `go 1.27.2`; no toolchain upgrade needed.
 
@@ -20,7 +20,8 @@ Toolchain: `go.mod` pins `go 1.27.2`; no toolchain upgrade needed.
 |---|---|---|
 | `github.com/99designs/gqlgen` | v0.17.98 | GraphQL server code generator (schema-first) |
 | `github.com/DATA-DOG/go-sqlmock` | v1.5.2 | SQL mock driver for repository-layer unit tests |
-| `github.com/clerk/clerk-sdk-go/v2` | v2.7.0 | Clerk auth SDK (session/user verification) |
+| `github.com/clerk/clerk-sdk-go/v2` | v2.10.0 | Clerk auth SDK (session/user verification) |
+| `github.com/coder/websocket` | v1.8.15 | WebSocket support for subscriptions |
 | `github.com/go-chi/chi/v5` | v5.5.0 | HTTP router |
 | `github.com/go-chi/cors` | v1.2.2 | CORS middleware for chi |
 | `github.com/go-chi/httprate` | v0.16.0 | Rate-limiting middleware for chi |
