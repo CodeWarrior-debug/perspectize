@@ -23,7 +23,7 @@ The rebuilt preview is `tools/content-type-designer/previews/movie-activity.html
 
 - No live TMDB token: the adapter is tested only on hand-built fixtures.
 - Migration `000030` (partial GIN index) is written and NOT applied anywhere; its number is provisional.
-- No browser verification of any UI. This is a user-visible PR, so it needs the `needs-demo-video` label per `.docs/PR_WORKFLOW.md`.
+- No browser verification of any UI. This is a user-visible PR, so it needs the `needs-demo-evidence` label per `.docs/PR_WORKFLOW.md`.
 - The Duration header ellipsis at 111px is unverified.
 
 ## (c) Morning checklist

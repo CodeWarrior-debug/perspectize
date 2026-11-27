@@ -74,7 +74,6 @@ type ContentModel struct {
 	// are not real columns.
 	ViewCount    *int64   `gorm:"column:view_count;->;-:migration"`
 	LikeCount    *int64   `gorm:"column:like_count;->;-:migration"`
-	PercentLiked *float64 `gorm:"column:percent_liked;->;-:migration"`
 	PublishedAt  *string  `gorm:"column:published_at_sort;->;-:migration"`
 	BoxOffice    *int64   `gorm:"column:box_office;->;-:migration"`
 	VsBudget     *float64 `gorm:"column:vs_budget;->;-:migration"`
@@ -114,7 +113,6 @@ type PerspectiveModel struct {
 	Category              *string         `gorm:""`
 	Labels                StringArray     `gorm:"type:text[]"`
 	Description           *string         `gorm:""`
-	ReviewStatus          *string         `gorm:""`
 	CategorizedRatings    JSONBArray      `gorm:"type:jsonb[];column:categorized_ratings"`
 	Feelings              JSONBArray      `gorm:"type:jsonb[];column:feelings"`
 	PrimaryPerspectiveID  *int            `gorm:"column:primary_perspective_id"`

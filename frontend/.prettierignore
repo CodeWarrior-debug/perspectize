@@ -12,3 +12,6 @@ src/lib/data/*.json
 src/lib/fonts/google-fonts-catalog.json
 reports/
 .stryker-tmp/
+# Machine-written architecture baselines (scripts/arch-check.sh --update)
+eslint-suppressions.json
+.dependency-cruiser-known-violations.json

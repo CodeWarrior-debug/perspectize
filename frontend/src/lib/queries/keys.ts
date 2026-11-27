@@ -51,6 +51,10 @@ export const queryKeys = {
 		// The viewer's own claims (Declare page). Under lists() so any content-list
 		// invalidation (create/update of a claim) also marks it stale.
 		claimList: () => [...queryKeys.content.lists(), 'claims'] as const,
+		// How many rows one user added (useOwnedContentCount). Under lists() so adding
+		// content marks it stale.
+		ownedCount: (userId: number, username: string) =>
+			[...queryKeys.content.lists(), 'owned-count', userId, username] as const,
 	},
 
 	bible: {

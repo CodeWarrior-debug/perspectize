@@ -2,26 +2,18 @@
 	/**
 	 * Signed-in shell: coach eligibility, quiet graduate, and OnboardingCoach mount.
 	 */
-	import { createQuery } from '@tanstack/svelte-query';
 	import { useMe } from '#lib/queries/users/useMe.svelte.js';
-	import { isCoachEligible } from '#lib/onboarding/eligibility.js';
+	import { isCoachEligible, shouldQuietGraduate } from '#lib/onboarding/eligibility.js';
 	import {
-		resolveShowCoach,
-		resolveQuietGraduate,
+		getQuietGraduateAttempted,
 		markQuietGraduateAttempted,
 		getCoachForceOpen,
 		getCoachReplayNonce,
 	} from '#lib/onboarding/coachGate.svelte.js';
 	import { CURRENT_INTRO_VERSION } from '#lib/onboarding/config.js';
 	import { useMarkOnboardingSeen } from '#lib/queries/users/useMarkOnboardingSeen.js';
-	import { graphqlRequest } from '#lib/queries/client.js';
-	import { LIST_CONTENT, type ContentResponse } from '#lib/queries/content/index.js';
-	import {
-		LIST_PERSPECTIVES_BY_USER,
-		MAX_PERSPECTIVES_PER_LIST,
-		type ListPerspectivesByUserResponse,
-	} from '#lib/queries/perspectives/index.js';
-	import { queryKeys } from '#lib/queries/keys.js';
+	import { useOwnedContentCount } from '#lib/queries/content/useOwnedContentCount.js';
+	import { useMyPerspectives } from '#lib/queries/perspectives/useMyPerspectives.js';
 	import OnboardingCoach from '#lib/components/onboarding/OnboardingCoach.svelte';
 
 	const meState = useMe();
@@ -31,54 +23,28 @@
 	const onboarding = $derived(meState.me?.onboarding ?? null);
 	const eligible = $derived(isCoachEligible({ meLoaded, onboarding }));
 	const userId = $derived(meState.me ? parseInt(meState.me.id, 10) : 0);
-	const userIdStr = $derived(meState.me?.id ?? '');
 	const forceOpen = $derived(getCoachForceOpen());
 
-	const showCoach = $derived(
-		resolveShowCoach({
-			signedIn: true,
-			meLoaded,
-			onboarding,
-		}),
-	);
+	const showCoach = $derived(forceOpen || eligible);
 
 	// Counts for quiet graduate — only when auto-eligible and not Help force-open.
 	const needQuietCheck = $derived(eligible && !forceOpen && userId > 0);
 
-	const contentQuery = createQuery(() => ({
-		queryKey: [...queryKeys.content.lists(), 'quiet-graduate', userId],
-		queryFn: () =>
-			graphqlRequest<ContentResponse>(LIST_CONTENT, {
-				first: 20,
-				sortBy: 'UPDATED_AT',
-				sortOrder: 'DESC',
-				includeTotalCount: false,
-			}),
-		enabled: needQuietCheck,
-		staleTime: 60_000,
-	}));
-
-	const perspectivesQuery = createQuery(() => ({
-		queryKey: queryKeys.perspectives.listByUser(userId),
-		queryFn: () =>
-			graphqlRequest<ListPerspectivesByUserResponse>(LIST_PERSPECTIVES_BY_USER, {
-				userID: userId,
-				first: MAX_PERSPECTIVES_PER_LIST,
-			}),
-		enabled: needQuietCheck,
-		staleTime: 60_000,
-	}));
-
-	const ownedContentCount = $derived(
-		(contentQuery.data?.content?.items ?? []).filter((c) => c.addedByUserID === userIdStr).length,
+	const ownedContent = useOwnedContentCount(() =>
+		needQuietCheck && meState.me ? { id: userId, username: meState.me.username } : null,
 	);
+
+	// Shares the by-user perspectives query with the library and Plan (one request, one key).
+	const perspectivesQuery = useMyPerspectives(() => (needQuietCheck ? userId : null));
+
+	const ownedContentCount = $derived(ownedContent.data ?? 0);
 	const perspectiveCount = $derived(perspectivesQuery.data?.perspectives?.items?.length ?? 0);
-	const countsReady = $derived(!needQuietCheck || (contentQuery.isSuccess && perspectivesQuery.isSuccess));
+	const countsReady = $derived(!needQuietCheck || (ownedContent.isSuccess && perspectivesQuery.isSuccess));
 
 	const quietMatch = $derived(
 		needQuietCheck &&
 			countsReady &&
-			resolveQuietGraduate({
+			shouldQuietGraduate({
 				eligible,
 				ownedContentCount,
 				perspectiveCount,
@@ -88,8 +54,10 @@
 
 	// Quiet graduate: activated library → mark seen once without coach UI.
 	// Skipped when Help force-opens the coach (step 4).
+	// The attempt flag gates only the write: `quietMatch` stays true, so the coach stays hidden
+	// while the write is in flight or if it fails.
 	$effect(() => {
-		if (!quietMatch) return;
+		if (!quietMatch || getQuietGraduateAttempted()) return;
 		markQuietGraduateAttempted();
 		markSeen.mutate(CURRENT_INTRO_VERSION);
 	});

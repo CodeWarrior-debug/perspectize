@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { buildPopoverState, createHoverController } from '#lib/utils/tooltipHover.js';
-import { formatCountExact, percentLikedTooltip, percentLikedValueGetter } from '#lib/utils/formatting.js';
-import { LIBRARY_TOOLTIP_SPECS } from '#lib/utils/libraryTooltipSpecs.js';
+import { formatCountExact } from '#lib/utils/formatting.js';
+import { TIP } from '#lib/utils/libraryColumns/tooltips.js';
 import type { PopoverState } from '#lib/components/CellPopover.svelte';
 
 const cellEl = document.createElement('div');
@@ -33,8 +33,8 @@ describe('buildPopoverState', () => {
 	});
 });
 
-describe('LIBRARY_TOOLTIP_SPECS (real column specs)', () => {
-	const S = LIBRARY_TOOLTIP_SPECS;
+describe('TIP (real column specs)', () => {
+	const S = TIP;
 	const mk = (key: keyof typeof S, data: any, value: unknown = undefined, valueFormatted: string | null = null) =>
 		buildPopoverState({ colDef: { context: { tooltipSpec: S[key] } }, value, valueFormatted, data, cellEl });
 
@@ -53,7 +53,6 @@ describe('LIBRARY_TOOLTIP_SPECS (real column specs)', () => {
 				'evaluateBy',
 				'item',
 				'likes',
-				'percentLiked',
 				'perspectize',
 				'rating',
 				'readers',
@@ -101,13 +100,6 @@ describe('LIBRARY_TOOLTIP_SPECS (real column specs)', () => {
 		const s = mk('likes', { likeCount: 9876543 }, 9876543, '9.9M');
 		expect(s?.text).toBe(formatCountExact(9876543));
 		expect(s?.copy).toBe('9876543');
-	});
-
-	it('percentLiked uses tooltip text and raw value for copy', () => {
-		const data = { likeCount: 1, viewCount: 4 };
-		const s = mk('percentLiked', data);
-		expect(s?.text).toBe(percentLikedTooltip({ data } as any));
-		expect(s?.copy).toBe(String(percentLikedValueGetter({ data } as any)));
 	});
 
 	it('tags with items is multi with no copy', () => {

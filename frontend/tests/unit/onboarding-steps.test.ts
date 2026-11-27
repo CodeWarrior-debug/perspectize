@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { advanceCoachStep, skipCoachStep, coachStepTitle, coachStepBody } from '#lib/onboarding/steps.js';
+import { advanceCoachStep, coachStepTitle, coachStepBody } from '#lib/onboarding/steps.js';
 
 describe('coach step machine', () => {
 	it('advances from step 1 to step 2', () => {
@@ -8,11 +8,6 @@ describe('coach step machine', () => {
 
 	it('completes from step 2', () => {
 		expect(advanceCoachStep(2)).toBe('complete');
-	});
-
-	it('skip step mirrors advance (UI-local only)', () => {
-		expect(skipCoachStep(1)).toBe(2);
-		expect(skipCoachStep(2)).toBe('complete');
 	});
 
 	it('exposes titles and body copy for both steps', () => {

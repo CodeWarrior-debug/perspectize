@@ -15,7 +15,7 @@ import (
 // presenceEvent is one recorded PRESENCE_CHANGED fan-out.
 type presenceEvent struct {
 	userID   int
-	state    string
+	state    domain.PresenceState
 	threadID int
 }
 
@@ -35,7 +35,7 @@ func (s *stubNotifier) PublishEphemeral(_ context.Context, envs ...domain.EventE
 	return nil
 }
 
-func (s *stubNotifier) count(state string) int {
+func (s *stubNotifier) count(state domain.PresenceState) int {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	n := 0
@@ -47,7 +47,7 @@ func (s *stubNotifier) count(state string) int {
 	return n
 }
 
-func (s *stubNotifier) withState(state string) []presenceEvent {
+func (s *stubNotifier) withState(state domain.PresenceState) []presenceEvent {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	var out []presenceEvent
@@ -119,7 +119,7 @@ func TestPresenceSession_OnlineThenOfflineAfterGrace(t *testing.T) {
 	go realtime.RunPresenceSession(ctx, tracker, notifier, repo, 42, testCfg)
 
 	time.Sleep(30 * time.Millisecond)
-	online := notifier.withState("ONLINE")
+	online := notifier.withState(domain.PresenceOnline)
 	assert.Len(t, online, 1, "exactly one ONLINE published")
 	if len(online) == 1 {
 		assert.Equal(t, presenceEvent{userID: 42, state: "ONLINE", threadID: 7}, online[0])
@@ -128,7 +128,7 @@ func TestPresenceSession_OnlineThenOfflineAfterGrace(t *testing.T) {
 	cancel()
 	time.Sleep(120 * time.Millisecond) // ~3x the grace window
 
-	offline := notifier.withState("OFFLINE")
+	offline := notifier.withState(domain.PresenceOffline)
 	assert.Len(t, offline, 1, "exactly one OFFLINE after the grace window")
 	if len(offline) == 1 {
 		assert.Equal(t, presenceEvent{userID: 42, state: "OFFLINE", threadID: 7}, offline[0])
@@ -144,7 +144,7 @@ func TestPresenceSession_ReconnectWithinGraceSuppressesOffline(t *testing.T) {
 	go realtime.RunPresenceSession(ctx, tracker, notifier, repo, 42, testCfg)
 
 	time.Sleep(30 * time.Millisecond)
-	assert.Equal(t, 1, notifier.count("ONLINE"))
+	assert.Equal(t, 1, notifier.count(domain.PresenceOnline))
 
 	cancel()
 	time.Sleep(15 * time.Millisecond)
@@ -152,7 +152,7 @@ func TestPresenceSession_ReconnectWithinGraceSuppressesOffline(t *testing.T) {
 	tracker.Connect(42)
 	time.Sleep(120 * time.Millisecond)
 
-	assert.Equal(t, 0, notifier.count("OFFLINE"), "reconnect within grace suppresses OFFLINE")
+	assert.Equal(t, 0, notifier.count(domain.PresenceOffline), "reconnect within grace suppresses OFFLINE")
 }
 
 func TestPresenceSession_SecondConnectionKeepsUserOnline(t *testing.T) {
@@ -167,17 +167,17 @@ func TestPresenceSession_SecondConnectionKeepsUserOnline(t *testing.T) {
 	go realtime.RunPresenceSession(ctxB, tracker, notifier, repo, 42, testCfg)
 
 	time.Sleep(40 * time.Millisecond)
-	assert.Equal(t, 1, notifier.count("ONLINE"), "only the first Connect publishes ONLINE")
+	assert.Equal(t, 1, notifier.count(domain.PresenceOnline), "only the first Connect publishes ONLINE")
 
 	// Close connection A: not the last connection, so no OFFLINE is scheduled.
 	cancelA()
 	time.Sleep(120 * time.Millisecond)
-	assert.Equal(t, 0, notifier.count("OFFLINE"), "B still holds a connection")
+	assert.Equal(t, 0, notifier.count(domain.PresenceOffline), "B still holds a connection")
 
 	// Close connection B: the last one. OFFLINE fires after the grace window.
 	cancelB()
 	time.Sleep(120 * time.Millisecond)
-	assert.Equal(t, 1, notifier.count("OFFLINE"), "exactly one OFFLINE after the last connection closes")
+	assert.Equal(t, 1, notifier.count(domain.PresenceOffline), "exactly one OFFLINE after the last connection closes")
 }
 
 func TestPresenceSession_HeartbeatKeepsLastSeenFresh(t *testing.T) {
@@ -192,6 +192,6 @@ func TestPresenceSession_HeartbeatKeepsLastSeenFresh(t *testing.T) {
 	// ~4 heartbeat intervals while the session is still open.
 	time.Sleep(45 * time.Millisecond)
 	assert.True(t, tracker.IsOnline(42), "session still open => online")
-	assert.Equal(t, 0, notifier.count("OFFLINE"), "no spurious OFFLINE while the session is alive")
-	assert.Equal(t, 1, notifier.count("ONLINE"))
+	assert.Equal(t, 0, notifier.count(domain.PresenceOffline), "no spurious OFFLINE while the session is alive")
+	assert.Equal(t, 1, notifier.count(domain.PresenceOnline))
 }

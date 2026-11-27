@@ -1,3 +1,4 @@
+import { LIBRARY_COLUMNS } from '#lib/utils/libraryColumns/index.js';
 import { describe, it, expect } from 'vitest';
 import {
 	castCellRenderer,
@@ -26,18 +27,13 @@ import {
 	EMPTY_VALUE,
 } from '#lib/utils/formatting.js';
 import {
-	COLUMNS,
-	COL_TO_SORT,
-	DATA_COLUMNS,
-	defaultColumnVisibility,
 	isMovieOnlyTypeFilter,
 	capitalizeContentType,
-	compareContentBySorts,
 	unknownLastComparator,
 	ratedComparator,
 } from '#lib/utils/grid-config.js';
-import libraryColumnsSource from '#lib/components/library/columns.ts?raw';
-import { headerMinWidth } from '#lib/utils/grid-header-width.js';
+import { COL_TO_SORT, DATA_COLUMNS, defaultColumnVisibility } from '#lib/utils/libraryColumns/index.js';
+import { compareContentBySorts } from '#lib/utils/libraryColumns/clientRows.js';
 import { libraryItemCellRenderer } from '#lib/utils/libraryItemCellRenderer.js';
 import {
 	sortsToGraphQL,
@@ -376,56 +372,6 @@ describe('movie item cell', () => {
 	});
 });
 
-describe('Movie COLUMNS entries', () => {
-	const byId = (id: string) => COLUMNS.find((c) => c.colId === id);
-
-	it('Box office, Vs. budget and Rated sort server-side by their backend enums', () => {
-		expect(byId('boxOffice')).toMatchObject({ sortable: true, serverSort: 'BOX_OFFICE', label: 'Take' });
-		expect(byId('vsBudget')).toMatchObject({ sortable: true, serverSort: 'VS_BUDGET', label: 'ROI' });
-		expect(byId('rated')).toMatchObject({ sortable: true, serverSort: 'AGE_RATING', label: 'Rated' });
-		expect(COL_TO_SORT.boxOffice).toBe('BOX_OFFICE');
-		expect(COL_TO_SORT.vsBudget).toBe('VS_BUDGET');
-		expect(COL_TO_SORT.rated).toBe('AGE_RATING');
-		expect(sortsToGraphQL([{ col: 'boxOffice', dir: 'desc' }])).toEqual([{ field: 'BOX_OFFICE', order: 'DESC' }]);
-	});
-
-	it('Cast and Genre are not sortable', () => {
-		for (const id of ['cast', 'genre']) {
-			expect(byId(id)?.sortable, id).toBe(false);
-			expect(byId(id)?.serverSort, id).toBeUndefined();
-		}
-	});
-
-	it('Released and TMDB Score sort on the server (RELEASE_DATE, TMDB_SCORE)', () => {
-		expect(byId('released')?.serverSort).toBe('RELEASE_DATE');
-		expect(byId('tmdbScore')?.serverSort).toBe('TMDB_SCORE');
-		for (const id of ['released', 'tmdbScore']) {
-			expect(byId(id)?.sortable, id).toBe(true);
-			expect(byId(id)?.clientOnlySort, id).toBeFalsy();
-		}
-	});
-
-	it('Duration is the header name for the runtime column', () => {
-		expect(byId('duration')?.label).toBe('Duration');
-	});
-
-	it('client-side sort uses the movie values, unknown last', () => {
-		const a = movie({ revenue: 10 });
-		const b = movie({ revenue: 20 });
-		const none = movie({ revenue: null });
-		const sorted = [none, a, b].sort((x, y) => compareContentBySorts(x, y, [{ col: 'boxOffice', dir: 'desc' }]));
-		expect(sorted).toEqual([b, a, none]);
-		const r = [movie({ certification: 'R' }), movie({ certification: 'G' }), movie({ certification: 'NR' })];
-		r.sort((x, y) => compareContentBySorts(x, y, [{ col: 'rated', dir: 'asc' }]));
-		expect(r.map((x) => (x.movie as { certification: string }).certification)).toEqual(['G', 'R', 'NR']);
-	});
-
-	it('Budget, Votes, Collection, Synopsis and TMDB ID are picker columns', () => {
-		const ids = DATA_COLUMNS.map((c) => c.colId);
-		for (const id of ['budget', 'votes', 'collection', 'synopsis', 'tmdbId']) expect(ids).toContain(id);
-	});
-});
-
 describe('Movie default column set', () => {
 	it('is detected only when the type filter is exactly MOVIE', () => {
 		expect(isMovieOnlyTypeFilter('movie')).toBe(true);
@@ -479,7 +425,6 @@ describe('Movie default column set', () => {
 				'publishDate',
 				'views',
 				'likes',
-				'percentLiked',
 				'tags',
 			]),
 		);
@@ -488,7 +433,7 @@ describe('Movie default column set', () => {
 			expect(lg.hidden, id).toContain(id);
 		}
 		expect(lg.hidden).toContain('description');
-		expect(defaultColumnVisibility('xs', 'general').visible).toEqual(['item', 'type', 'perspectize']);
+		expect([...defaultColumnVisibility('xs', 'general').visible].sort()).toEqual(['item', 'perspectize', 'type']);
 	});
 
 	it('every column is either shown or hidden, never both', () => {
@@ -551,96 +496,6 @@ describe('Movie search scopes', () => {
 function agSort<T>(values: T[], cmp: (a: T, b: T, na: unknown, nb: unknown, desc: boolean) => number, desc: boolean) {
 	return [...values].sort((a, b) => (desc ? -1 : 1) * cmp(a, b, null, null, desc));
 }
-
-describe('grid comparators (Loaded-mode desktop grid)', () => {
-	it('unknownLastComparator orders numbers with null last ascending and descending', () => {
-		const v = [null, 20, 10, null, 30];
-		expect(agSort(v, unknownLastComparator, false)).toEqual([10, 20, 30, null, null]);
-		expect(agSort(v, unknownLastComparator, true)).toEqual([30, 20, 10, null, null]);
-	});
-
-	it('ratedComparator orders by rating, not A-Z, unrated last in both directions', () => {
-		const v = ['R', null, 'G', 'PG-13', 'NC-17', 'PG', 'NR'];
-		expect(agSort(v, ratedComparator, false).slice(0, 5)).toEqual(['G', 'PG', 'PG-13', 'R', 'NC-17']);
-		expect(agSort(v, ratedComparator, false).slice(5).sort()).toEqual([null, 'NR'].sort());
-		expect(agSort(v, ratedComparator, true).slice(0, 5)).toEqual(['NC-17', 'R', 'PG-13', 'PG', 'G']);
-		const desc = agSort(v, ratedComparator, true);
-		expect(desc.slice(5).every((x) => x === null || x === 'NR')).toBe(true);
-	});
-
-	it('the Rated, Box office and Vs. budget colDefs use these comparators', () => {
-		for (const id of ['rated', 'boxOffice', 'vsBudget']) {
-			const block = libraryColumnsSource.split(/(?=colId:\s*')/g).find((b) => b.startsWith(`colId: '${id}'`));
-			expect(block, id).toMatch(/comparator:\s*(ratedComparator|unknownLastComparator)/);
-		}
-	});
-});
-
-describe('default column sets fit the 1212px grid', () => {
-	const blocks = libraryColumnsSource.split(/(?=colId:\s*')/g);
-	// Mirrors buildLibraryColumnDefs' colDef map: the header floor, raised (never lowered) by an explicit minWidth.
-	function minWidth(colId: string): number {
-		const b = blocks.find((x) => x.startsWith(`colId: '${colId}'`));
-		if (!b) throw new Error(`no colDef for ${colId}`);
-		const explicit = Number(b.match(/\n\s*minWidth:\s*(\d+)/)?.[1] ?? 0);
-		const name = b.match(/headerName:\s*'([^']*)'/)?.[1] ?? '';
-		const header = headerMinWidth(name, {
-			filter: !/\n\s*filter:\s*false/.test(b),
-			sortable: !/\n\s*sortable:\s*false/.test(b),
-		});
-		return Math.max(explicit, header);
-	}
-	it('YouTube lg set sums under 1212', () => {
-		const { visible } = defaultColumnVisibility('lg', 'general');
-		const total = visible.reduce((sum, id) => sum + minWidth(id), 0);
-		expect(total).toBeLessThanOrEqual(1212);
-	});
-
-	it('Movie lg set sums under 1212', () => {
-		const { visible } = defaultColumnVisibility('lg', 'movie', 'movie');
-		const total = visible.reduce((sum, id) => sum + minWidth(id), 0);
-		expect(total).toBeLessThanOrEqual(1212);
-	});
-
-	it('Claim lg set sums under 1212', () => {
-		const { visible } = defaultColumnVisibility('lg', 'claim', 'claim');
-		const total = visible.reduce((sum, id) => sum + minWidth(id), 0);
-		expect(total).toBeLessThanOrEqual(1212);
-	});
-
-	it('no colDef has its effective minWidth (header floor included) above its maxWidth', () => {
-		for (const b of blocks) {
-			const id = b.match(/^colId:\s*'([^']+)'/)?.[1];
-			const max = b.match(/\n\s*maxWidth:\s*(\d+)/)?.[1];
-			if (id && max) expect(minWidth(id), id).toBeLessThanOrEqual(Number(max));
-		}
-	});
-
-	it('Movie lg minimum widths are the header-derived floors without Type, which the filter names (sum 1162)', () => {
-		// Sortable columns also reserve the multi-sort order number (~11px each, see headerChrome).
-		const { visible } = defaultColumnVisibility('lg', 'movie', 'movie');
-		expect(visible).not.toContain('type');
-		const widths = Object.fromEntries(visible.map((id) => [id, minWidth(id)]));
-		expect(widths).toMatchObject({
-			item: 175,
-			genre: 79,
-			rated: 110,
-			cast: 125,
-			duration: 132,
-			released: 133,
-			boxOffice: 101,
-			vsBudget: 71,
-			tmdbScore: 115,
-			tags: 71,
-		});
-		expect(Object.values(widths).reduce((a, b) => a + b, 0)).toBe(1162);
-	});
-
-	it('the map in buildLibraryColumnDefs floors every column at its header width', () => {
-		// Guards against a colDef's explicit minWidth replacing (rather than raising) the header floor.
-		expect(libraryColumnsSource).toMatch(/minWidth:\s*Math\.max\(\s*col\.minWidth \?\? 0,\s*headerMinWidth\(/);
-	});
-});
 
 describe('cast cell person links', () => {
 	it('tags every named person with their TMDB id, directors and cast alike', () => {

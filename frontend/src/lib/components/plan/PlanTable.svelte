@@ -1,16 +1,11 @@
 <script lang="ts">
 	import AgGridSvelte5Component from 'ag-grid-svelte5';
 	import { ClientSideRowModelModule } from '@ag-grid-community/client-side-row-model';
-	import type {
-		CellClickedEvent,
-		GridApi,
-		GridOptions,
-		RowDragEndEvent,
-		SortChangedEvent,
-	} from '@ag-grid-community/core';
+	import type { CellClickedEvent, GridOptions, RowDragEndEvent, SortChangedEvent } from '@ag-grid-community/core';
 	import type { UserTodoItem, UserTodoSortBy } from '#lib/queries/userTodos/index.js';
 	import { PLAN_GRID_THEME } from '#lib/utils/grid-theme.js';
 	import { emptyCellClassRules } from '#lib/utils/grid-empty.js';
+	import { createGridHandle } from '#lib/utils/gridHandle.svelte.js';
 	import EmptyAware from '#lib/components/EmptyAware.svelte';
 	import { useCardMode, useResponsiveTier } from '#lib/utils/responsive.svelte.js';
 	import {
@@ -52,8 +47,7 @@
 		onReorder: (todoIds: number[]) => void;
 	} = $props();
 
-	let gridApi = $state<GridApi<UserTodoItem> | null>(null);
-	let gridReady = $state(false);
+	const grid = createGridHandle<UserTodoItem>();
 	const responsive = useResponsiveTier();
 	const card = useCardMode();
 	const tier = $derived(responsive.current);
@@ -72,10 +66,7 @@
 			animateRows: false,
 			overlayNoRowsTemplate:
 				'<div class="py-12 text-center text-muted-foreground">No Todos here yet. Use Add Todo to start a plan.</div>',
-			onGridReady: (params) => {
-				gridApi = params.api;
-				gridReady = true;
-			},
+			...grid.options(),
 			onSortChanged: (event: SortChangedEvent<UserTodoItem>) => {
 				onSortChange(serverSortFromColumnState(event.api.getColumnState()));
 			},
@@ -102,25 +93,19 @@
 	// because rowDrag is read once per column definition.
 	const gridOptions = $derived(buildGridOptions(listMode));
 
-	// Unmounting the grid (card mode, or a list-mode remount) leaves a stale API behind;
-	// clear it so the effects below don't call into a destroyed grid.
+	// Unmounting the grid (card mode) leaves a stale API behind; clear it so the effects
+	// below don't call into a destroyed grid.
 	$effect(() => {
-		if (cardMode) {
-			gridApi = null;
-			gridReady = false;
-		}
+		if (cardMode) grid.detach();
 	});
 
 	// Column visibility follows the responsive tier. Re-applied on every grid ready,
 	// since a remounted grid starts from the column defs' own hide flags.
 	$effect(() => {
 		const shown = new Set(planColumnsForTier(tier));
-		const api = gridApi;
-		if (!api || !gridReady) return;
-		// A frame later, as ContentLibrary does: called straight from gridReady the column API
-		// throws ("setColumnMovingCss" of undefined) because the body controller isn't up yet.
-		const frame = requestAnimationFrame(() => {
-			if (api.isDestroyed()) return;
+		if (!grid.ready) return;
+		// A frame later: column APIs throw when called straight from grid ready (see gridHandle).
+		return grid.afterFrame((api) => {
 			api.setColumnsVisible(
 				PLAN_COL_IDS.filter((id) => shown.has(id)),
 				true,
@@ -130,7 +115,6 @@
 				false,
 			);
 		});
-		return () => cancelAnimationFrame(frame);
 	});
 </script>
 

@@ -1401,7 +1401,6 @@ export const COLUMNS = [
         gapFallback: 'em-dash',
         align: 'right',
         bindings: {
-            youtube: b('% Liked', 'typical', 'derived', 'likeCount ÷ viewCount', true, { tooltip: 'Likes as a percentage of views' }),
             movie: b('Score', 'typical', 'api', "response->>'vote_average' × 10", true, {
                 tooltip: 'TMDB user score (vote_average × 10). Community votes, not critics.',
                 cellTip: 'Score with its vote count ("81% from 6,912 votes"). Copy copies the raw 0–10 average.',

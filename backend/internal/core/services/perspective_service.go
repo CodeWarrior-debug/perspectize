@@ -10,11 +10,15 @@ import (
 	portservices "github.com/CodeWarrior-debug/perspectize/backend/internal/core/ports/services"
 )
 
-// PerspectiveService implements business logic for perspective operations
+// PerspectiveService implements business logic for perspective operations.
+// What a valid perspective is lives in domain.ValidatePerspective; this
+// service adds the actor's rights (ownership, moderation fields, readable
+// content and linked perspectives).
 type PerspectiveService struct {
 	repo        repositories.PerspectiveRepository
 	userRepo    repositories.UserRepository
 	contentRepo repositories.ContentRepository
+	linked      repositories.LinkedPerspectiveReader
 }
 
 // PerspectiveServiceOption configures optional PerspectiveService dependencies.
@@ -26,6 +30,13 @@ type PerspectiveServiceOption func(*PerspectiveService)
 // always wires it.
 func WithContentRepository(repo repositories.ContentRepository) PerspectiveServiceOption {
 	return func(s *PerspectiveService) { s.contentRepo = repo }
+}
+
+// WithLinkedPerspectiveReader lets Create and Update check that the
+// perspectives a write links to are readable by the acting user. Without it
+// that check is skipped; production always wires it.
+func WithLinkedPerspectiveReader(reader repositories.LinkedPerspectiveReader) PerspectiveServiceOption {
+	return func(s *PerspectiveService) { s.linked = reader }
 }
 
 // NewPerspectiveService creates a new perspective service
@@ -60,6 +71,29 @@ func (s *PerspectiveService) requireVisibleContent(ctx context.Context, contentI
 	return nil
 }
 
+// requireReadableLinks answers domain.ErrLinkedPerspectiveNotFound unless every
+// id in ids is readable by viewerID. It issues one batched lookup, and none when
+// ids is empty. An unreadable id and a missing one get the same answer.
+func (s *PerspectiveService) requireReadableLinks(ctx context.Context, ids []int, viewerID int) error {
+	if s.linked == nil || len(ids) == 0 {
+		return nil
+	}
+	visible, err := s.linked.VisibleIDs(ctx, ids, viewerID)
+	if err != nil {
+		return fmt.Errorf("failed to check linked perspectives: %w", err)
+	}
+	readable := make(map[int]bool, len(visible))
+	for _, id := range visible {
+		readable[id] = true
+	}
+	for _, id := range ids {
+		if !readable[id] {
+			return domain.ErrLinkedPerspectiveNotFound
+		}
+	}
+	return nil
+}
+
 // Create creates a new perspective with validation
 func (s *PerspectiveService) Create(ctx context.Context, input portservices.CreatePerspectiveInput) (*domain.Perspective, error) {
 	// User existence is enforced by the perspectives -> users FK: the
@@ -69,57 +103,6 @@ func (s *PerspectiveService) Create(ctx context.Context, input portservices.Crea
 		return nil, fmt.Errorf("%w: user_id must be a positive integer", domain.ErrInvalidInput)
 	}
 
-	// Validate ratings are in range
-	if !domain.ValidateRating(input.Quality) {
-		return nil, fmt.Errorf("%w: quality %d", domain.ErrInvalidRating, *input.Quality)
-	}
-	if !domain.ValidateRating(input.Agreement) {
-		return nil, fmt.Errorf("%w: agreement %d", domain.ErrInvalidRating, *input.Agreement)
-	}
-	if !domain.ValidateRating(input.Importance) {
-		return nil, fmt.Errorf("%w: importance %d", domain.ErrInvalidRating, *input.Importance)
-	}
-	if !domain.ValidateRating(input.Confidence) {
-		return nil, fmt.Errorf("%w: confidence %d", domain.ErrInvalidRating, *input.Confidence)
-	}
-
-	// Validate categorized ratings
-	for _, cr := range input.CategorizedRatings {
-		rating := cr.Rating
-		if !domain.ValidateRating(&rating) {
-			return nil, fmt.Errorf("%w: categorized rating for '%s' is %d", domain.ErrInvalidRating, cr.Category, rating)
-		}
-	}
-
-	// Validate at least one field is non-empty
-	hasContent := input.Quality != nil ||
-		input.Agreement != nil ||
-		input.Importance != nil ||
-		input.Confidence != nil ||
-		input.Like != nil ||
-		input.Review != nil ||
-		input.Description != nil ||
-		len(input.Feelings) > 0
-	if !hasContent {
-		return nil, fmt.Errorf("%w: at least one field must be provided", domain.ErrInvalidInput)
-	}
-
-	// Validate related perspective IDs array cap
-	if len(input.RelatedPerspectiveIDs) > 50 {
-		return nil, fmt.Errorf("%w: related_perspective_ids cannot exceed 50 entries", domain.ErrInvalidInput)
-	}
-
-	// Validate feelings
-	if len(input.Feelings) > domain.MaxFeelings {
-		return nil, fmt.Errorf("%w: feelings cannot exceed %d entries", domain.ErrInvalidInput, domain.MaxFeelings)
-	}
-	for _, f := range input.Feelings {
-		if !domain.ValidateFeelingEntry(f) {
-			return nil, fmt.Errorf("%w: feeling %q has an invalid emoji or intensity %d", domain.ErrInvalidInput, f.Emoji, f.Intensity)
-		}
-	}
-
-	// Set default privacy
 	privacy := domain.PrivacyPublic
 	if input.Privacy != nil {
 		privacy = *input.Privacy
@@ -152,10 +135,17 @@ func (s *PerspectiveService) Create(ctx context.Context, input portservices.Crea
 		Review:                sanitizedReview,
 	}
 
+	if err := domain.ValidatePerspective(perspective); err != nil {
+		return nil, err
+	}
+
 	if input.ContentID != nil {
 		if err := s.requireVisibleContent(ctx, *input.ContentID, input.UserID); err != nil {
 			return nil, err
 		}
+	}
+	if err := s.requireReadableLinks(ctx, createdLinks(input), input.UserID); err != nil {
+		return nil, err
 	}
 
 	created, err := s.repo.Create(ctx, perspective)
@@ -167,6 +157,15 @@ func (s *PerspectiveService) Create(ctx context.Context, input portservices.Crea
 	}
 
 	return created, nil
+}
+
+// createdLinks lists every perspective id a new perspective links to.
+func createdLinks(input portservices.CreatePerspectiveInput) []int {
+	var ids []int
+	if input.PrimaryPerspectiveID != nil {
+		ids = append(ids, *input.PrimaryPerspectiveID)
+	}
+	return append(ids, input.RelatedPerspectiveIDs...)
 }
 
 // GetByID retrieves a perspective by ID
@@ -182,21 +181,39 @@ func (s *PerspectiveService) GetByID(ctx context.Context, id int) (*domain.Persp
 	return perspective, nil
 }
 
-// Update updates an existing perspective
-// applyRating implements the tri-state update rule for one rating field:
-// clear wins, then a provided value is validated and applied, otherwise the
-// field is left alone.
-func applyRating(name string, clear bool, v *int, dst **int) error {
+// applyRating implements the tri-state update rule for one rating field: clear
+// wins, then a provided value is applied, otherwise the field is left alone.
+// The value is validated later, against the whole perspective.
+func applyRating(clear bool, v *int, dst **int) {
 	switch {
 	case clear:
 		*dst = nil
 	case v != nil:
-		if !domain.ValidateRating(v) {
-			return fmt.Errorf("%w: %s %d", domain.ErrInvalidRating, name, *v)
-		}
 		*dst = v
 	}
-	return nil
+}
+
+// newlyLinked lists the perspective ids an update attaches that the row did
+// not already link to. Links already attached are not re-checked, so a link
+// that later stops being readable does not block unrelated edits.
+func newlyLinked(existing *domain.Perspective, input portservices.UpdatePerspectiveInput) []int {
+	var ids []int
+	if input.PrimaryPerspectiveID != nil &&
+		(existing.PrimaryPerspectiveID == nil || *existing.PrimaryPerspectiveID != *input.PrimaryPerspectiveID) {
+		ids = append(ids, *input.PrimaryPerspectiveID)
+	}
+	if input.RelatedPerspectiveIDs != nil {
+		have := make(map[int]bool, len(existing.RelatedPerspectiveIDs))
+		for _, id := range existing.RelatedPerspectiveIDs {
+			have[id] = true
+		}
+		for _, id := range input.RelatedPerspectiveIDs {
+			if !have[id] {
+				ids = append(ids, id)
+			}
+		}
+	}
+	return ids
 }
 
 // Update applies input on behalf of actorUserID, who must own the
@@ -218,11 +235,8 @@ func (s *PerspectiveService) Update(ctx context.Context, input portservices.Upda
 	if err != nil {
 		return nil, fmt.Errorf("failed to get perspective: %w", err)
 	}
-	if existing.UserID != actorUserID {
-		// Only a PUBLIC perspective is known to be visible to this user.
-		// Anything else answers as if it didn't exist rather than confirming
-		// the id -- matching perspectiveByID's null for non-owners.
-		if existing.Privacy == domain.PrivacyPublic {
+	if !(domain.Audience{Privacy: existing.Privacy, OwnerID: existing.UserID}).WritableBy(actorUserID) {
+		if err := domain.NonOwnerWriteError(existing.Privacy); errors.Is(err, domain.ErrForbidden) {
 			return nil, fmt.Errorf("%w: you can only modify your own perspectives", domain.ErrForbidden)
 		}
 		return nil, fmt.Errorf("failed to get perspective: %w", domain.ErrNotFound)
@@ -236,51 +250,28 @@ func (s *PerspectiveService) Update(ctx context.Context, input portservices.Upda
 		}
 	}
 
-	// Validate and update ratings. Explicit clear wins over a provided value (the
-	// mapper never sets both for the same field, but resolving the precedence
-	// here keeps this function correct even if a future caller did); a value is
-	// validated then applied; omitted leaves the existing rating untouched.
-	if err := applyRating("quality", input.ClearQuality, input.Quality, &existing.Quality); err != nil {
-		return nil, err
-	}
-	if err := applyRating("agreement", input.ClearAgreement, input.Agreement, &existing.Agreement); err != nil {
-		return nil, err
-	}
-	if err := applyRating("importance", input.ClearImportance, input.Importance, &existing.Importance); err != nil {
-		return nil, err
-	}
-	if err := applyRating("confidence", input.ClearConfidence, input.Confidence, &existing.Confidence); err != nil {
-		return nil, err
-	}
+	// Computed before the merge, which would make every link look already attached.
+	linked := newlyLinked(existing, input)
 
-	// Validate categorized ratings if provided
+	// Merge the patch into the row. Explicit clear wins over a provided value
+	// (the mapper never sets both for the same field); omitted leaves the
+	// existing value untouched.
+	applyRating(input.ClearQuality, input.Quality, &existing.Quality)
+	applyRating(input.ClearAgreement, input.Agreement, &existing.Agreement)
+	applyRating(input.ClearImportance, input.Importance, &existing.Importance)
+	applyRating(input.ClearConfidence, input.Confidence, &existing.Confidence)
+
 	if input.CategorizedRatings != nil {
-		for _, cr := range input.CategorizedRatings {
-			rating := cr.Rating
-			if !domain.ValidateRating(&rating) {
-				return nil, fmt.Errorf("%w: categorized rating for '%s' is %d", domain.ErrInvalidRating, cr.Category, rating)
-			}
-		}
 		existing.CategorizedRatings = input.CategorizedRatings
 	}
 
-	// Validate and update feelings. Explicit clear (an empty list from the
-	// client) wins over a provided value, same tri-state rule as the ratings.
+	// Explicit clear (an empty list from the client) wins over a provided value.
 	if input.ClearFeelings {
 		existing.Feelings = nil
 	} else if input.Feelings != nil {
-		if len(input.Feelings) > domain.MaxFeelings {
-			return nil, fmt.Errorf("%w: feelings cannot exceed %d entries", domain.ErrInvalidInput, domain.MaxFeelings)
-		}
-		for _, f := range input.Feelings {
-			if !domain.ValidateFeelingEntry(f) {
-				return nil, fmt.Errorf("%w: feeling %q has an invalid emoji or intensity %d", domain.ErrInvalidInput, f.Emoji, f.Intensity)
-			}
-		}
 		existing.Feelings = input.Feelings
 	}
 
-	// Update optional fields
 	if input.ContentID != nil {
 		existing.ContentID = input.ContentID
 	}
@@ -298,9 +289,6 @@ func (s *PerspectiveService) Update(ctx context.Context, input portservices.Upda
 	if input.Category != nil {
 		existing.Category = input.Category
 	}
-	if input.ReviewStatus != nil {
-		existing.ReviewStatus = input.ReviewStatus
-	}
 	if input.Parts != nil {
 		existing.Parts = input.Parts
 	}
@@ -311,9 +299,6 @@ func (s *PerspectiveService) Update(ctx context.Context, input portservices.Upda
 		existing.PrimaryPerspectiveID = input.PrimaryPerspectiveID
 	}
 	if input.RelatedPerspectiveIDs != nil {
-		if len(input.RelatedPerspectiveIDs) > 50 {
-			return nil, fmt.Errorf("%w: related_perspective_ids cannot exceed 50 entries", domain.ErrInvalidInput)
-		}
 		existing.RelatedPerspectiveIDs = input.RelatedPerspectiveIDs
 	}
 	if input.ClearCustomFields {
@@ -326,6 +311,17 @@ func (s *PerspectiveService) Update(ctx context.Context, input portservices.Upda
 	} else if input.Review != nil {
 		s := sanitizeReview(*input.Review)
 		existing.Review = &s
+	}
+
+	// The same rules Create applies, to the state this update would store. The
+	// related-ID and feelings caps are checked only when the patch sets that list,
+	// so a stored row already over a cap can still be edited in other fields.
+	scope := domain.ListScope{Related: input.RelatedPerspectiveIDs != nil, Feelings: input.Feelings != nil}
+	if err := domain.ValidatePerspectiveScoped(existing, scope); err != nil {
+		return nil, err
+	}
+	if err := s.requireReadableLinks(ctx, linked, actorUserID); err != nil {
+		return nil, err
 	}
 
 	updated, err := s.repo.Update(ctx, existing, actorUserID)
@@ -365,23 +361,18 @@ func (s *PerspectiveService) Delete(ctx context.Context, id int, actorUserID int
 	// Someone else's perspective. Only a PUBLIC one is known to be visible to
 	// this user; anything else answers as if it didn't exist rather than
 	// confirming the id -- matching perspectiveByID's null for non-owners.
-	if existing.UserID != actorUserID && existing.Privacy == domain.PrivacyPublic {
-		return fmt.Errorf("%w: you can only delete your own perspectives", domain.ErrForbidden)
+	if !(domain.Audience{Privacy: existing.Privacy, OwnerID: existing.UserID}).WritableBy(actorUserID) {
+		if err := domain.NonOwnerWriteError(existing.Privacy); errors.Is(err, domain.ErrForbidden) {
+			return fmt.Errorf("%w: you can only delete your own perspectives", domain.ErrForbidden)
+		}
 	}
 	return fmt.Errorf("failed to delete perspective: %w", domain.ErrNotFound)
 }
 
 // ListPerspectives retrieves a paginated list of perspectives
 func (s *PerspectiveService) ListPerspectives(ctx context.Context, params domain.PerspectiveListParams) (*domain.PaginatedPerspectives, error) {
-	if params.First != nil {
-		if *params.First < 1 || *params.First > 100 {
-			return nil, fmt.Errorf("%w: first must be between 1 and 100", domain.ErrInvalidInput)
-		}
-	}
-	if params.Last != nil {
-		if *params.Last < 1 || *params.Last > 100 {
-			return nil, fmt.Errorf("%w: last must be between 1 and 100", domain.ErrInvalidInput)
-		}
+	if _, err := domain.ResolvePage(params.First, params.Last, params.After, params.Before); err != nil {
+		return nil, err
 	}
 
 	// Read authorization: unless the caller is unambiguously asking only for
@@ -402,10 +393,9 @@ func (s *PerspectiveService) ListPerspectives(ctx context.Context, params domain
 }
 
 // AggregateByContentIDs computes the perspective count and average Quality
-// rating for each given content ID, across ALL perspectives (public and
-// private) — see the repository's AggregateByContentIDs doc comment. A thin
-// passthrough; no auth restriction needed since this never exposes any
-// individual perspective's content, only an aggregate count/average.
+// rating for each given content ID over PUBLIC perspectives only, so the result
+// is the same for every viewer and needs no auth restriction. See the
+// repository's AggregateByContentIDs doc comment.
 func (s *PerspectiveService) AggregateByContentIDs(ctx context.Context, contentIDs []int) (map[int]*domain.PerspectiveAggregate, error) {
 	aggregates, err := s.repo.AggregateByContentIDs(ctx, contentIDs)
 	if err != nil {
@@ -427,13 +417,13 @@ func (s *PerspectiveService) CountVisibleByContentIDs(ctx context.Context, conte
 
 // FeelingStats computes feeling count/average/stddev intensity — see
 // domain.FeelingStats and the repository's FeelingStats doc comment. A thin
-// passthrough with input validation; no auth restriction needed since this
-// never exposes any individual perspective's content, only an aggregate.
-func (s *PerspectiveService) FeelingStats(ctx context.Context, contentID *int, emoji string, label *string) (*domain.FeelingStats, error) {
+// passthrough with input validation. The repository scopes the count to what
+// viewerID may read, so content the viewer cannot read counts as no content.
+func (s *PerspectiveService) FeelingStats(ctx context.Context, contentID *int, emoji string, label *string, viewerID *int) (*domain.FeelingStats, error) {
 	if emoji == "" {
 		return nil, fmt.Errorf("%w: emoji is required", domain.ErrInvalidInput)
 	}
-	stats, err := s.repo.FeelingStats(ctx, contentID, emoji, label)
+	stats, err := s.repo.FeelingStats(ctx, contentID, emoji, label, viewerID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to compute feeling stats: %w", err)
 	}
@@ -443,11 +433,11 @@ func (s *PerspectiveService) FeelingStats(ctx context.Context, contentID *int, e
 // CustomFieldStats computes how many perspectives set the given
 // CustomFields key — see domain.CustomFieldStats and the repository's
 // CustomFieldStats doc comment.
-func (s *PerspectiveService) CustomFieldStats(ctx context.Context, contentID *int, key string) (*domain.CustomFieldStats, error) {
+func (s *PerspectiveService) CustomFieldStats(ctx context.Context, contentID *int, key string, viewerID *int) (*domain.CustomFieldStats, error) {
 	if key == "" {
 		return nil, fmt.Errorf("%w: key is required", domain.ErrInvalidInput)
 	}
-	stats, err := s.repo.CustomFieldStats(ctx, contentID, key)
+	stats, err := s.repo.CustomFieldStats(ctx, contentID, key, viewerID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to compute custom field stats: %w", err)
 	}

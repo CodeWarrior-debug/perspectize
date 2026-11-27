@@ -113,15 +113,20 @@ export default defineConfig({
 		...(faro.sourcemap ? { sourcemap: faro.sourcemap } : {}),
 		rolldownOptions: {
 			output: {
-				// Tiptap/ProseMirror (the perspective editor's rich-text engine, ~170KB
-				// gzipped) is only reachable through a dynamic import (PerspectivePopover),
-				// but Rollup's default chunking co-located a few of its small shared
-				// helper exports with code the always-loaded root layout imports
-				// statically — which pulled the whole editor bundle into every page's
-				// critical path. Force it into its own chunk so it stays isolated behind
-				// the dynamic import.
+				// Tiptap/ProseMirror (the perspective editor's rich-text engine, ~150KB
+				// gzipped) must stay out of the JavaScript every page loads up front, so it
+				// gets its own chunk. A group also captures the dependencies of what it
+				// matches: a library that up-front code shares with the editor needs its own
+				// higher-priority group, or every page imports the editor chunk to reach it.
+				// `scripts/check-first-load.mjs` fails the build in CI when that happens.
 				codeSplitting: {
 					groups: [
+						{
+							// Positioning for the editor's bubble menu and for bits-ui popovers.
+							name: 'floating-ui',
+							test: /node_modules[\\/]@floating-ui/,
+							priority: 1,
+						},
 						{
 							name: 'tiptap-vendor',
 							test: /node_modules[\\/](@tiptap|prosemirror)/,
@@ -132,6 +137,10 @@ export default defineConfig({
 		},
 	},
 	test: {
+		// Vitest 5 takes a project's attachmentsDir from this root config, not from
+		// vitest.config.browser.ts, so the browser failure screenshots need it here.
+		// Same default as SCREENSHOT_DIR in that file.
+		attachmentsDir: process.env.SV_SCREENSHOTS_DIR ?? '/Users/jamesjordan/Downloads/screenshots',
 		// In CI, also write every result to a file (uploaded by frontend-test.yml), so
 		// when several files fail under load none of them scrolls off the log (#728).
 		// `github-actions` keeps the inline PR annotations that overriding `reporters`

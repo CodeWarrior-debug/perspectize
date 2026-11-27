@@ -34,6 +34,8 @@
 	import BiblePassageIcon from '#lib/components/BiblePassageIcon.svelte';
 	import CardFacts, { type CardFact } from '#lib/components/CardFacts.svelte';
 	import AddToPlanButton from '#lib/components/plan/AddToPlanButton.svelte';
+	import TypeGlyph from '#lib/components/contentTypes/TypeGlyph.svelte';
+	import { descriptorFor } from '#lib/contentTypes/registry.js';
 
 	interface CardRow {
 		id: string | number;
@@ -45,7 +47,7 @@
 		lengthDisplay?: LengthDisplay | null;
 		// Beyond name/channel/duration, the mobile card shows category, views and
 		// likes — the three most-used of the grid's other columns; the remaining
-		// columns (% liked, publish date, tags, description) are grid/details-modal
+		// columns (publish date, tags, description) are grid/details-modal
 		// only on mobile.
 		primaryCategory?: { label: string } | null;
 		viewCount?: number | null;
@@ -87,6 +89,7 @@
 
 	const isPassage = (row: CardRow) => row.contentType === 'BIBLE_PASSAGE';
 	const isClaim = (row: CardRow) => row.contentType === 'CLAIM';
+	const isWebsite = (row: CardRow) => row.contentType === 'WEBSITE';
 	const isMovie = (row: CardRow) => row.contentType === 'MOVIE';
 	const isBook = (row: CardRow) => row.contentType === 'BOOK';
 	const isWebPage = (row: CardRow) => row.contentType === 'WEB_PAGE';
@@ -163,7 +166,7 @@
 
 	/** Grey tile only behind a video thumbnail or an empty slot; posters, covers, the passage and the claim icon sit on the card colour. */
 	function thumbBg(row: CardRow): string {
-		if (isPassage(row) || isClaim(row) || thumbSrc(row)?.fitted) return '';
+		if (isPassage(row) || isClaim(row) || isWebsite(row) || thumbSrc(row)?.fitted) return '';
 		return 'bg-muted';
 	}
 
@@ -190,6 +193,11 @@
 					<!-- A claim has no image to show (and no url), so its type icon fills the slot. -->
 					<div class="flex h-full w-full items-center justify-center text-primary">
 						<MessageSquareTextIcon data-icon="claim" class="size-8" />
+					</div>
+				{:else if isWebsite(row)}
+					<!-- A website has no image of its own, so its type icon fills the slot. -->
+					<div class="flex h-full w-full items-center justify-center text-primary">
+						<TypeGlyph icon={descriptorFor(row.contentType).icon} class="size-8" />
 					</div>
 				{:else}
 					{@const thumb = thumbSrc(row)}

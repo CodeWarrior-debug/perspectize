@@ -1,21 +1,22 @@
 /**
  * URL ↔ grid state synchronization utilities.
- * Serializes/deserializes AG Grid filter models to/from URL search params.
+ * Serializes/deserializes AG Grid filter models and sorts to/from URL search params, and turns the
+ * URL filters into the GraphQL ContentFilter input for "All Items" mode. Per-column facts (sort keys,
+ * filter keys and value syntax, server fields) come from the Library column module.
  */
-import type { WebPageRole } from '#lib/queries/content/index.js';
 import {
-	COL_TO_SORT,
-	SORT_TO_COL,
 	COL_TO_FILTER_KEY,
-	NUMBER_RANGE_COLS,
+	COL_TO_SORT,
 	DATE_RANGE_COLS,
-	SET_FILTER_COLS,
 	DAY_DATE_COLS,
-	CONTENT_TYPE_OPTIONS,
-	PERSON_FILTER_KEY,
-	parsePersonFilter,
-} from './grid-config';
-import { WEB_PAGE_ROLE_OPTIONS } from './webPage';
+	NUMBER_RANGE_COLS,
+	RETIRED_COL_IDS,
+	SET_FILTER_COLS,
+	libraryColumn,
+	type ContentFilterInput,
+} from './libraryColumns/index';
+import { parseSetValue } from './libraryColumns/filterCodec';
+import { CONTENT_TYPE_OPTIONS, PERSON_FILTER_KEY, parsePersonFilter } from './grid-config';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -119,7 +120,7 @@ function parseSorts(raw: string | null): SortSpec[] {
 		if (dotIdx === -1) continue;
 		const col = part.slice(0, dotIdx);
 		const dir = part.slice(dotIdx + 1);
-		if (!col || (dir !== 'asc' && dir !== 'desc') || seen.has(col)) continue;
+		if (!col || (dir !== 'asc' && dir !== 'desc') || seen.has(col) || RETIRED_COL_IDS.has(col)) continue;
 		seen.add(col);
 		sorts.push({ col, dir });
 		if (sorts.length >= MAX_SORT_COLUMNS) break;
@@ -134,20 +135,9 @@ function serializeSortsForUrl(sorts: SortSpec[]): string {
 	return sorts.length === 0 ? NO_SORT : serializeSorts(sorts);
 }
 
-// ---------------------------------------------------------------------------
-// AG Grid colId ↔ GraphQL ContentSortBy bidirectional maps
-// ---------------------------------------------------------------------------
-//
-// COL_TO_SORT/SORT_TO_COL are re-exported from grid-config.ts, which is the
-// single source of truth for per-column metadata (see COLUMNS/ColumnMeta
-// there) — kept as named exports here since this is the URL/GraphQL codec
-// module callers of sortsToGraphQL etc. already import from.
-
-export { COL_TO_SORT, SORT_TO_COL };
-
 /**
  * Convert a SortSpec[] (URL/AG Grid shape) to the GraphQL `sorts` input list.
- * Unknown colIds (not in COL_TO_SORT) are dropped. Returns undefined for an
+ * Unknown colIds (no server sort) are dropped. Returns undefined for an
  * empty result so callers can omit the variable entirely.
  */
 export function sortsToGraphQL(sorts: SortSpec[]): { field: string; order: 'ASC' | 'DESC' }[] | undefined {
@@ -239,38 +229,6 @@ function sameScopes(a: SearchScopeKey[], b: SearchScopeKey[]): boolean {
 	return a.length === b.length && a.every((s) => b.includes(s));
 }
 
-// ---------------------------------------------------------------------------
-// AG Grid filter model types
-// ---------------------------------------------------------------------------
-
-type AGTextFilter = { filterType: 'text'; type: string; filter: string };
-type AGNumberFilter = { filterType: 'number'; type: string; filter?: number; filterTo?: number };
-type AGDateFilter = { filterType: 'date'; type: string; dateFrom?: string; dateTo?: string };
-type AGSetFilter = { filterType: 'set'; values: string[] };
-
-/** Split a comma-separated set-filter URL value, dropping blanks and duplicates.
- * Bookmarked URLs from before the youtube → youtube_video rename still say "youtube". */
-export function parseSetValue(value: string): string[] {
-	return [
-		...new Set(
-			value
-				.split(',')
-				.map((v) => v.trim().toLowerCase())
-				.map((v) => (v === 'youtube' ? 'youtube_video' : v))
-				.filter(Boolean),
-		),
-	];
-}
-
-// ---------------------------------------------------------------------------
-// Column mappings: AG Grid colId ↔ URL f.* param key
-// ---------------------------------------------------------------------------
-//
-// COL_TO_FILTER_KEY/NUMBER_RANGE_COLS/DATE_RANGE_COLS are re-exported from
-// grid-config.ts (see COLUMNS there) — see the note above COL_TO_SORT.
-
-export { COL_TO_FILTER_KEY, NUMBER_RANGE_COLS, DATE_RANGE_COLS };
-
 /**
  * The `f.*` params that have no grid column (just the person filter), so the grid's own filter
  * model can't carry them. Re-merge these whenever the URL filters are rebuilt from the grid.
@@ -279,14 +237,19 @@ export function nonGridFilters(filters: Record<string, string>): Record<string, 
 	return PERSON_FILTER_KEY in filters ? { [PERSON_FILTER_KEY]: filters[PERSON_FILTER_KEY] } : {};
 }
 
-/** URL f.* param key → AG Grid colId */
-const FILTER_KEY_TO_COL: Record<string, string> = Object.fromEntries(
-	Object.entries(COL_TO_FILTER_KEY).map(([col, key]) => [key, col]),
-);
-
 // ---------------------------------------------------------------------------
 // filterToUrlParams — AG Grid FilterModel → URL f.* params
 // ---------------------------------------------------------------------------
+
+type AGTextFilter = { filterType: 'text'; type: string; filter: string };
+type AGNumberFilter = { filterType: 'number'; type: string; filter?: number; filterTo?: number };
+type AGDateFilter = { filterType: 'date'; type: string; dateFrom?: string; dateTo?: string };
+type AGSetFilter = { filterType: 'set'; values: string[] };
+
+/** URL f.* param key → AG Grid colId. */
+const FILTER_KEY_TO_COL: Record<string, string> = Object.fromEntries(
+	Object.entries(COL_TO_FILTER_KEY).map(([col, key]) => [key, col]),
+);
 
 /**
  * Convert AG Grid FilterModel to URL f.* params.
@@ -454,11 +417,8 @@ export function urlParamsToFilter(filters: Record<string, string>): Record<strin
 // GraphQL ContentFilter input
 // ---------------------------------------------------------------------------
 
-/** GraphQL ContentSearchField enum values (backend `schema.graphql`) */
-export type ContentSearchFieldGQL = 'TITLE' | 'DESCRIPTION' | 'CHANNEL_TITLE' | 'TAGS' | 'CAST' | 'DIRECTOR';
-
 /** UI scope key → GraphQL ContentSearchField enum value */
-const SCOPE_TO_GQL_FIELD: Record<SearchScopeKey, ContentSearchFieldGQL> = {
+const SCOPE_TO_GQL_FIELD: Record<SearchScopeKey, NonNullable<ContentFilterInput['searchFields']>[number]> = {
 	title: 'TITLE',
 	desc: 'DESCRIPTION',
 	channel: 'CHANNEL_TITLE',
@@ -467,87 +427,10 @@ const SCOPE_TO_GQL_FIELD: Record<SearchScopeKey, ContentSearchFieldGQL> = {
 	director: 'DIRECTOR',
 };
 
-/** GraphQL ContentFilter input — defined here so Plan 02 (Wave 1) doesn't depend on Plan 03 */
-export interface ContentFilterInput {
-	contentType?: string;
-	contentTypes?: string[];
-	/** Webpage rows only; any of the listed roles matches (OR). Other content types never match. */
-	webPageRoles?: WebPageRole[];
-	minLengthSeconds?: number;
-	maxLengthSeconds?: number;
-	search?: string;
-	searchFields?: ContentSearchFieldGQL[];
-	minViewCount?: number;
-	maxViewCount?: number;
-	minLikeCount?: number;
-	maxLikeCount?: number;
-	publishedAfter?: string;
-	publishedBefore?: string;
-	channelTitle?: string;
-	tagContains?: string;
-	descriptionSearch?: string;
-	addedByUsername?: string;
-	createdAfter?: string;
-	createdBefore?: string;
-	updatedAfter?: string;
-	updatedBefore?: string;
-	// Movie filters (movie rows only; other rows never match)
-	personId?: string;
-	personRole?: 'CAST' | 'DIRECTOR';
-	genreContains?: string;
-	castContains?: string;
-	// Book filter (book rows only): case-insensitive contains on the first author.
-	authorContains?: string;
-	minPublishYear?: number;
-	maxPublishYear?: number;
-	minPages?: number;
-	maxPages?: number;
-	minBookRating?: number;
-	maxBookRating?: number;
-	ageRating?: string[];
-	releasedAfter?: string;
-	releasedBefore?: string;
-	minBoxOffice?: number;
-	maxBoxOffice?: number;
-	minTmdbScore?: number;
-	maxTmdbScore?: number;
-}
-
-/**
- * Parse a range string into {min, max} numbers.
- * Returns undefined for unparseable values.
- */
-function parseNumberRange(value: string): { min?: number; max?: number } {
-	const sep = value.indexOf('..');
-	if (sep === -1) {
-		const n = Number(value);
-		return isNaN(n) ? {} : { min: n, max: n };
-	}
-	const minStr = value.substring(0, sep);
-	const maxStr = value.substring(sep + 2);
-	const min = minStr ? Number(minStr) : undefined;
-	const max = maxStr ? Number(maxStr) : undefined;
-	return {
-		min: min !== undefined && !isNaN(min) ? min : undefined,
-		max: max !== undefined && !isNaN(max) ? max : undefined,
-	};
-}
-
-/**
- * Parse a range string into {from, to} date strings.
- */
-function parseDateRange(value: string): { from?: string; to?: string } {
-	const sep = value.indexOf('..');
-	if (sep === -1) return { from: value };
-	return {
-		from: value.substring(0, sep) || undefined,
-		to: value.substring(sep + 2) || undefined,
-	};
-}
-
 /**
  * Convert URL f.* params and search string to GraphQL ContentFilter input for server-side mode.
- * Returns undefined if no filters are active.
+ * Each column's own filter rule supplies its fields; a column without a server rule (client-only)
+ * sends nothing. Returns undefined if no filters are active.
  */
 export function urlParamsToGraphQLFilter(
 	filters: Record<string, string>,
@@ -555,7 +438,6 @@ export function urlParamsToGraphQLFilter(
 	searchFields: SearchScopeKey[] = ALL_SEARCH_SCOPES,
 ): ContentFilterInput | undefined {
 	const result: ContentFilterInput = {};
-	let hasAny = false;
 
 	if (search) {
 		result.search = search;
@@ -565,252 +447,24 @@ export function urlParamsToGraphQLFilter(
 		if (!(searchFields.length === 1 && searchFields[0] === 'title')) {
 			result.searchFields = searchFields.map((s) => SCOPE_TO_GQL_FIELD[s]);
 		}
-		hasAny = true;
 	}
 
 	for (const [filterKey, value] of Object.entries(filters)) {
 		if (!value) continue;
 
-		switch (filterKey) {
-			case 'type': {
-				// Unknown values (a stale or hand-edited URL) are dropped rather than sent,
-				// since the server rejects anything outside its ContentType enum.
-				const known = new Set(CONTENT_TYPE_OPTIONS.map((o) => o.value));
-				const types = parseSetValue(value)
-					.filter((v) => known.has(v))
-					.map((v) => v.toUpperCase());
-				if (types.length > 0) {
-					result.contentTypes = types;
-					hasAny = true;
-				}
-				break;
+		if (filterKey === PERSON_FILTER_KEY) {
+			const person = parsePersonFilter(value);
+			if (person) {
+				result.personId = String(person.id);
+				if (person.role) result.personRole = person.role.toUpperCase() as 'CAST' | 'DIRECTOR';
 			}
-
-			case 'views': {
-				const { min, max } = parseNumberRange(value);
-				if (min !== undefined) {
-					result.minViewCount = min;
-					hasAny = true;
-				}
-				if (max !== undefined) {
-					result.maxViewCount = max;
-					hasAny = true;
-				}
-				break;
-			}
-
-			case 'likes': {
-				const { min, max } = parseNumberRange(value);
-				if (min !== undefined) {
-					result.minLikeCount = min;
-					hasAny = true;
-				}
-				if (max !== undefined) {
-					result.maxLikeCount = max;
-					hasAny = true;
-				}
-				break;
-			}
-
-			case 'duration': {
-				const { min, max } = parseNumberRange(value);
-				if (min !== undefined) {
-					result.minLengthSeconds = min;
-					hasAny = true;
-				}
-				if (max !== undefined) {
-					result.maxLengthSeconds = max;
-					hasAny = true;
-				}
-				break;
-			}
-
-			case 'date': {
-				const { from, to } = parseDateRange(value);
-				if (from) {
-					result.publishedAfter = from;
-					hasAny = true;
-				}
-				if (to) {
-					result.publishedBefore = to;
-					hasAny = true;
-				}
-				break;
-			}
-
-			case 'channel':
-				result.channelTitle = value;
-				hasAny = true;
-				break;
-
-			case 'user':
-				result.addedByUsername = value;
-				hasAny = true;
-				break;
-
-			case 'tags':
-				result.tagContains = value;
-				hasAny = true;
-				break;
-
-			case 'desc':
-				result.descriptionSearch = value;
-				hasAny = true;
-				break;
-
-			case 'added': {
-				const { from, to } = parseDateRange(value);
-				if (from) {
-					result.createdAfter = from;
-					hasAny = true;
-				}
-				if (to) {
-					result.createdBefore = to;
-					hasAny = true;
-				}
-				break;
-			}
-
-			case 'cast':
-				result.castContains = value;
-				hasAny = true;
-				break;
-
-			case 'author':
-				result.authorContains = value;
-				hasAny = true;
-				break;
-
-			case 'genre':
-				result.genreContains = value;
-				hasAny = true;
-				break;
-
-			case 'rated': {
-				// Certifications are stored uppercase (PG-13); URL set values are lowercased.
-				const ratings = parseSetValue(value).map((v) => v.toUpperCase());
-				if (ratings.length > 0) {
-					result.ageRating = ratings;
-					hasAny = true;
-				}
-				break;
-			}
-
-			case 'released': {
-				const { from, to } = parseDateRange(value);
-				if (from) {
-					result.releasedAfter = from;
-					hasAny = true;
-				}
-				if (to) {
-					result.releasedBefore = to;
-					hasAny = true;
-				}
-				break;
-			}
-
-			case 'boxoffice': {
-				const { min, max } = parseNumberRange(value);
-				if (min !== undefined) {
-					result.minBoxOffice = min;
-					hasAny = true;
-				}
-				if (max !== undefined) {
-					result.maxBoxOffice = max;
-					hasAny = true;
-				}
-				break;
-			}
-
-			case 'tmdb': {
-				const { min, max } = parseNumberRange(value);
-				if (min !== undefined) {
-					result.minTmdbScore = min;
-					hasAny = true;
-				}
-				if (max !== undefined) {
-					result.maxTmdbScore = max;
-					hasAny = true;
-				}
-				break;
-			}
-
-			case 'published': {
-				const { min, max } = parseNumberRange(value);
-				if (min !== undefined) {
-					result.minPublishYear = min;
-					hasAny = true;
-				}
-				if (max !== undefined) {
-					result.maxPublishYear = max;
-					hasAny = true;
-				}
-				break;
-			}
-
-			case 'pages': {
-				const { min, max } = parseNumberRange(value);
-				if (min !== undefined) {
-					result.minPages = min;
-					hasAny = true;
-				}
-				if (max !== undefined) {
-					result.maxPages = max;
-					hasAny = true;
-				}
-				break;
-			}
-
-			case 'bookrating': {
-				const { min, max } = parseNumberRange(value);
-				if (min !== undefined) {
-					result.minBookRating = min;
-					hasAny = true;
-				}
-				if (max !== undefined) {
-					result.maxBookRating = max;
-					hasAny = true;
-				}
-				break;
-			}
-
-			case 'webrole': {
-				// Unknown roles are dropped, like unknown types: the server rejects anything outside WebPageRole.
-				const known = new Set(WEB_PAGE_ROLE_OPTIONS.map((o) => o.value.toLowerCase()));
-				const roles = parseSetValue(value)
-					.filter((v) => known.has(v))
-					.map((v) => v.toUpperCase() as WebPageRole);
-				if (roles.length > 0) {
-					result.webPageRoles = roles;
-					hasAny = true;
-				}
-				break;
-			}
-
-			case PERSON_FILTER_KEY: {
-				const person = parsePersonFilter(value);
-				if (person) {
-					result.personId = String(person.id);
-					if (person.role) result.personRole = person.role.toUpperCase() as 'CAST' | 'DIRECTOR';
-					hasAny = true;
-				}
-				break;
-			}
-
-			case 'updated': {
-				const { from, to } = parseDateRange(value);
-				if (from) {
-					result.updatedAfter = from;
-					hasAny = true;
-				}
-				if (to) {
-					result.updatedBefore = to;
-					hasAny = true;
-				}
-				break;
-			}
+			continue;
 		}
+
+		const colId = FILTER_KEY_TO_COL[filterKey];
+		const server = colId ? libraryColumn(colId)?.filter?.server : undefined;
+		if (server) Object.assign(result, server(value));
 	}
 
-	return hasAny ? result : undefined;
+	return Object.keys(result).length > 0 ? result : undefined;
 }

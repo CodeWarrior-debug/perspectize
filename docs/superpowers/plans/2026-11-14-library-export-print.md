@@ -238,4 +238,4 @@
 - [ ] **Step 1:** `pnpm --dir frontend run check`. Expected: no new errors.
 - [ ] **Step 2:** `pnpm --dir frontend run test:run`. Expected: all pass (the known-flaky AddVideoDialog test may time out under the full suite; rerun it alone before reporting).
 - [ ] **Step 3:** Stale references: grep the repo for `csv-export` and `exportActions` mentions left from the losing spike. Query budget: no change, since export reads loaded rows (state this in the PR).
-- [ ] **Step 4:** Record a short demo clip of the Export menu, CSV opening in a spreadsheet, and the print preview (`sv-` prefix, `needs-demo-video`). This is a local session: push, but open the PR only when asked.
+- [ ] **Step 4:** Record a short demo clip of the Export menu, CSV opening in a spreadsheet, and the print preview (`sv-` prefix, `needs-demo-evidence`). This is a local session: push, but open the PR only when asked.

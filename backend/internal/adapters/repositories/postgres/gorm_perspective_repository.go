@@ -9,7 +9,6 @@ import (
 	"github.com/CodeWarrior-debug/perspectize/backend/internal/core/domain"
 	"github.com/CodeWarrior-debug/perspectize/backend/internal/core/ports/repositories"
 	"github.com/jackc/pgx/v5/pgconn"
-	paginator "github.com/pilagod/gorm-cursor-paginator/v2/paginator"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 )
@@ -30,7 +29,7 @@ const perspectivesUserContentPrivacyUnique = "uq_perspectives_user_content_priva
 // perspectivesUserContentPrivacyUnique. The SQL detail stays out of the message.
 func perspectiveDuplicateError(privacy domain.Privacy) error {
 	return fmt.Errorf("%w: you already have a %s perspective on this content",
-		domain.ErrAlreadyExists, strings.ToLower(string(privacy)))
+		domain.ErrDuplicatePerspective, strings.ToLower(string(privacy)))
 }
 
 // GormPerspectiveRepository implements the PerspectiveRepository interface using GORM
@@ -141,24 +140,13 @@ func (r *GormPerspectiveRepository) Delete(ctx context.Context, id int, ownerUse
 
 // List retrieves a paginated list of perspectives
 func (r *GormPerspectiveRepository) List(ctx context.Context, params domain.PerspectiveListParams) (*domain.PaginatedPerspectives, error) {
-	limit := 10
-	if params.First != nil {
-		limit = *params.First
+	window, err := domain.ResolvePage(params.First, params.Last, params.After, params.Before)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list perspectives: %w", err)
 	}
 
 	// Build sort rules using helper from helpers.go
 	rules := buildPerspectiveSortRules(params.SortBy, params.SortOrder)
-
-	// Configure paginator options
-	opts := []paginator.Option{
-		paginator.WithRules(rules...),
-		paginator.WithLimit(limit),
-		paginator.WithAllowTupleCmp(paginator.TRUE),
-	}
-	if params.After != nil {
-		opts = append(opts, paginator.WithAfter(*params.After))
-	}
-	p := paginator.New(opts...)
 
 	// Start query with context and apply filters BEFORE pagination
 	query := r.db.WithContext(ctx).Model(&PerspectiveModel{})
@@ -180,20 +168,15 @@ func (r *GormPerspectiveRepository) List(ctx context.Context, params domain.Pers
 	// WHERE shape chosen over UNION: benchmark 2026-09-10 (plan Task 6) — WHERE
 	// ~8.9ms vs UNION ~9.3ms unindexed, 0.02ms vs 0.29ms with a (user_id,created_at) index.
 	if params.RestrictToPublicOrOwner {
-		visible, args := visiblePerspectivePredicate(params.ViewerID)
+		visible, args := perspectiveAudience.readableSQL("", params.ViewerID)
 		query = query.Where(visible, args...)
 	}
 
 	// Content privacy dominates perspective privacy: a perspective on a private
 	// content row is listed only to that content's owner. One EXISTS in the same
 	// statement, so no extra query.
-	if params.ViewerID != nil {
-		query = query.Where("EXISTS (SELECT 1 FROM content c WHERE c.id = perspectives.content_id AND (c.privacy = ? OR c.added_by_user_id = ?))",
-			privacyToDBValue(domain.PrivacyPublic), *params.ViewerID)
-	} else {
-		query = query.Where("EXISTS (SELECT 1 FROM content c WHERE c.id = perspectives.content_id AND c.privacy = ?)",
-			privacyToDBValue(domain.PrivacyPublic))
-	}
+	contentCond, contentArgs := perspectiveContentSQL("perspectives", params.ViewerID)
+	query = query.Where(contentCond, contentArgs...)
 
 	// Total count (before cursor/limit — respects filters only)
 	var totalCountInt *int
@@ -210,12 +193,9 @@ func (r *GormPerspectiveRepository) List(ctx context.Context, params domain.Pers
 
 	// Execute pagination
 	var models []PerspectiveModel
-	pageResult, cursor, err := p.Paginate(query, &models)
+	cursor, err := listPage(query, rules, window, &models)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list perspectives: %w", err)
-	}
-	if pageResult.Error != nil {
-		return nil, fmt.Errorf("failed to list perspectives: %w", pageResult.Error)
 	}
 
 	// Map results to domain
@@ -224,18 +204,14 @@ func (r *GormPerspectiveRepository) List(ctx context.Context, params domain.Pers
 		items[i] = perspectiveModelToDomain(&models[i])
 	}
 
-	result := &domain.PaginatedPerspectives{
-		Items:      items,
-		HasNext:    cursor.After != nil,
-		HasPrev:    cursor.Before != nil,
-		TotalCount: totalCountInt,
-	}
-
-	// StartCursor = cursor.Before, EndCursor = cursor.After
-	result.StartCursor = cursor.Before
-	result.EndCursor = cursor.After
-
-	return result, nil
+	return &domain.PaginatedPerspectives{
+		Items:       items,
+		HasNext:     cursor.HasNext,
+		HasPrev:     cursor.HasPrev,
+		StartCursor: cursor.StartCursor,
+		EndCursor:   cursor.EndCursor,
+		TotalCount:  totalCountInt,
+	}, nil
 }
 
 // aggregateRow is the scan target for the grouped count/avg query below.
@@ -249,31 +225,30 @@ type aggregateRow struct {
 	ImportJobID  *int
 }
 
-// AggregateByContentIDs computes, per content ID, the count of ALL
-// perspectives (public and private alike — a perspective's Privacy controls
-// who can read its content, not whether it counts toward the aggregate;
-// see FEATURE_BACKLOG.md for a possible future opt-out), how many of those
-// set a Quality rating, and their average Quality.
+// AggregateByContentIDs computes, per content ID, the count of the PUBLIC
+// perspectives (domain.Audience.CountsInAggregates: private rows never count),
+// how many of those set a Quality rating, and their average Quality.
 //
 // QualityCount (COUNT(quality), which skips NULLs) can be smaller than Count
-// (COUNT(*), every perspective) since Quality is optional — that's the
-// number shown in the average-rating tooltip so "N ratings" always matches
-// what AverageQuality was actually computed over.
+// (COUNT(*)) since Quality is optional. That is the number shown in the
+// average-rating tooltip, so "N ratings" matches what AverageQuality covers.
 //
-// Driven from the content table (LEFT JOIN), so every EXISTING content id gets
-// an entry — Count 0 when it has no perspectives — and only ids with no
-// content row are absent. Callers can therefore tell "no such content" (absent)
-// from "no perspectives yet" (Count == 0) in the same single query.
+// The aggregate predicate sits in the LEFT JOIN's ON clause, not WHERE, so a
+// content row whose perspectives are all private still gets an entry with
+// Count 0. Driven from the content table, every EXISTING content id gets an
+// entry, and only ids with no content row are absent. Callers can tell "no
+// such content" (absent) from "no public perspectives" (Count == 0).
 func (r *GormPerspectiveRepository) AggregateByContentIDs(ctx context.Context, contentIDs []int) (map[int]*domain.PerspectiveAggregate, error) {
 	if len(contentIDs) == 0 {
 		return map[int]*domain.PerspectiveAggregate{}, nil
 	}
 
+	aggCond, aggArgs := perspectiveAudience.aggregateSQL("p.")
 	var rows []aggregateRow
 	err := r.db.WithContext(ctx).
 		Table("content AS c").
 		Select("c.id AS content_id, COUNT(p.id) AS count, COUNT(p.quality) AS quality_count, AVG(p.quality) AS avg_quality, c.privacy AS privacy, c.added_by_user_id AS owner_id, c.import_job_id").
-		Joins("LEFT JOIN perspectives p ON p.content_id = c.id").
+		Joins("LEFT JOIN perspectives p ON p.content_id = c.id AND "+aggCond, aggArgs...).
 		Where("c.id = ANY(CAST(? AS bigint[]))", intsToArray(contentIDs)).
 		Group("c.id").
 		Find(&rows).Error
@@ -310,7 +285,7 @@ func (r *GormPerspectiveRepository) CountVisibleByContentIDs(ctx context.Context
 		return map[int]int{}, nil
 	}
 
-	visible, args := visiblePerspectivePredicate(viewerID)
+	visible, args := perspectiveAudience.readableSQL("", viewerID)
 	query := r.db.WithContext(ctx).
 		Table("perspectives").
 		Select("content_id, COUNT(*) AS count").
@@ -346,7 +321,7 @@ type feelingStatsRow struct {
 // object's ->>'emoji'/->>'intensity' text extraction can filter/aggregate
 // directly; COUNT(DISTINCT p.id) guards against double-counting a
 // perspective that (unusually) lists the same feeling twice.
-func (r *GormPerspectiveRepository) FeelingStats(ctx context.Context, contentID *int, emoji string, label *string) (*domain.FeelingStats, error) {
+func (r *GormPerspectiveRepository) FeelingStats(ctx context.Context, contentID *int, emoji string, label *string, viewerID *int) (*domain.FeelingStats, error) {
 	query := `
 		SELECT
 			COUNT(DISTINCT p.id) AS count,
@@ -355,7 +330,9 @@ func (r *GormPerspectiveRepository) FeelingStats(ctx context.Context, contentID 
 		FROM perspectives p
 		CROSS JOIN LATERAL unnest(p.feelings) AS f
 		WHERE f->>'emoji' = ?`
-	args := []interface{}{emoji}
+	scopeCond, scopeArgs := statsScopeSQL("p", viewerID)
+	query += ` AND ` + scopeCond
+	args := append([]interface{}{emoji}, scopeArgs...)
 
 	if label != nil {
 		query += ` AND lower(f->>'label') = lower(?)`
@@ -378,7 +355,7 @@ func (r *GormPerspectiveRepository) FeelingStats(ctx context.Context, contentID 
 		row.StddevIntensity = nil
 	}
 
-	total, err := r.countPerspectives(ctx, contentID)
+	total, err := r.countPerspectives(ctx, contentID, viewerID)
 	if err != nil {
 		return nil, err
 	}
@@ -397,12 +374,14 @@ func (r *GormPerspectiveRepository) FeelingStats(ctx context.Context, contentID 
 // CustomFields key, for any value. jsonb_exists (rather than the `?`
 // containment operator) sidesteps GORM Raw()'s own `?` placeholder parsing,
 // which would otherwise misread a literal `?` operator as an extra bind arg.
-func (r *GormPerspectiveRepository) CustomFieldStats(ctx context.Context, contentID *int, key string) (*domain.CustomFieldStats, error) {
+func (r *GormPerspectiveRepository) CustomFieldStats(ctx context.Context, contentID *int, key string, viewerID *int) (*domain.CustomFieldStats, error) {
 	query := `
 		SELECT COUNT(*) AS count
 		FROM perspectives p
 		WHERE jsonb_exists(p.custom_fields, ?)`
-	args := []interface{}{key}
+	scopeCond, scopeArgs := statsScopeSQL("p", viewerID)
+	query += ` AND ` + scopeCond
+	args := append([]interface{}{key}, scopeArgs...)
 
 	if contentID != nil {
 		query += ` AND p.content_id = ?`
@@ -414,7 +393,7 @@ func (r *GormPerspectiveRepository) CustomFieldStats(ctx context.Context, conten
 		return nil, fmt.Errorf("failed to compute custom field stats: %w", err)
 	}
 
-	total, err := r.countPerspectives(ctx, contentID)
+	total, err := r.countPerspectives(ctx, contentID, viewerID)
 	if err != nil {
 		return nil, err
 	}
@@ -428,11 +407,13 @@ func (r *GormPerspectiveRepository) CustomFieldStats(ctx context.Context, conten
 
 // countPerspectives is the shared "total perspectives in scope" denominator
 // behind FeelingStats and CustomFieldStats' PercentOfPerspectives.
-func (r *GormPerspectiveRepository) countPerspectives(ctx context.Context, contentID *int) (int, error) {
+func (r *GormPerspectiveRepository) countPerspectives(ctx context.Context, contentID *int, viewerID *int) (int, error) {
 	q := r.db.WithContext(ctx).Model(&PerspectiveModel{})
 	if contentID != nil {
 		q = q.Where("content_id = ?", *contentID)
 	}
+	scopeCond, scopeArgs := statsScopeSQL("perspectives", viewerID)
+	q = q.Where(scopeCond, scopeArgs...)
 	var count int64
 	if err := q.Count(&count).Error; err != nil {
 		return 0, fmt.Errorf("failed to count perspectives: %w", err)
@@ -446,4 +427,28 @@ func (r *GormPerspectiveRepository) ReassignByUser(ctx context.Context, fromUser
 		Model(&PerspectiveModel{}).
 		Where("user_id = ?", fromUserID).
 		Update("user_id", toUserID).Error
+}
+
+// VisibleIDs returns the subset of ids viewerID may read, in one query (see
+// repositories.LinkedPerspectiveReader). The predicate is the list's read rule:
+// a public row or the viewer's own, and, when the row is attached to content,
+// that content public or owned by the viewer. The content check is written so
+// a row with no content still passes, which List's EXISTS join would not.
+func (r *GormPerspectiveRepository) VisibleIDs(ctx context.Context, ids []int, viewerID int) ([]int, error) {
+	if len(ids) == 0 {
+		return nil, nil
+	}
+	visible, args := perspectiveAudience.readableSQL("", &viewerID)
+	contentCond, contentArgs := perspectiveContentSQL("perspectives", &viewerID)
+	var out []int
+	err := r.db.WithContext(ctx).
+		Table("perspectives").
+		Where("id = ANY(CAST(? AS bigint[]))", intsToArray(ids)).
+		Where(visible, args...).
+		Where(contentCond, contentArgs...).
+		Pluck("id", &out).Error
+	if err != nil {
+		return nil, fmt.Errorf("failed to check linked perspectives: %w", err)
+	}
+	return out, nil
 }

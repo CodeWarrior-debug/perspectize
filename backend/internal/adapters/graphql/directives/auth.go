@@ -2,6 +2,7 @@ package directives
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"reflect"
 	"strconv"
@@ -61,12 +62,12 @@ func (d *DirectiveRoot) Owner(ctx context.Context, obj interface{}, next graphql
 		if err != nil {
 			return nil, fmt.Errorf("resource not found")
 		}
-		if perspective.UserID != user.ID {
+		if !(domain.Audience{Privacy: perspective.Privacy, OwnerID: perspective.UserID}).WritableBy(user.ID) {
 			// Only a PUBLIC perspective is known to be visible to this user.
 			// Anything else (PRIVATE today, or a future shared/unlisted state)
 			// answers as if it didn't exist rather than confirming the id with
 			// "access denied" -- matching perspectiveByID's null for non-owners.
-			if perspective.Privacy == domain.PrivacyPublic {
+			if errors.Is(domain.NonOwnerWriteError(perspective.Privacy), domain.ErrForbidden) {
 				return nil, fmt.Errorf("access denied: you can only modify your own perspectives")
 			}
 			return nil, fmt.Errorf("resource not found")

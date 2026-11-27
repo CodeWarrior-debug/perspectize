@@ -384,8 +384,8 @@ func TestGormContentRepository_UpdatePrimaryCategoryID_ViewerScope(t *testing.T)
 
 	t.Run("one scoped UPDATE ... RETURNING binding the viewer id", func(t *testing.T) {
 		db, mock := newMockDB(t)
-		mock.ExpectQuery(`UPDATE "content" SET .* WHERE id = .* AND \(privacy = 'public' OR added_by_user_id = .*\) RETURNING`).
-			WithArgs(int64(9), sqlmock.AnyArg(), int64(11), int64(7)).
+		mock.ExpectQuery(`UPDATE "content" SET .* WHERE id = .* AND \(privacy = .* OR added_by_user_id = .*\) RETURNING`).
+			WithArgs(int64(9), sqlmock.AnyArg(), int64(11), "public", int64(7)).
 			WillReturnRows(contentRows().AddRow(11, "claim", nil, "claim", 7, nil, nil, nil, 9, contentRepoTime, contentRepoTime))
 
 		c := querycount.Attach(t, db)
@@ -399,8 +399,8 @@ func TestGormContentRepository_UpdatePrimaryCategoryID_ViewerScope(t *testing.T)
 
 	t.Run("zero rows (missing or another user's private row) is ErrNotFound in one statement", func(t *testing.T) {
 		db, mock := newMockDB(t)
-		mock.ExpectQuery(`UPDATE "content" SET .* WHERE id = .* AND \(privacy = 'public' OR added_by_user_id = .*\) RETURNING`).
-			WithArgs(int64(9), sqlmock.AnyArg(), int64(11), int64(8)).
+		mock.ExpectQuery(`UPDATE "content" SET .* WHERE id = .* AND \(privacy = .* OR added_by_user_id = .*\) RETURNING`).
+			WithArgs(int64(9), sqlmock.AnyArg(), int64(11), "public", int64(8)).
 			WillReturnRows(contentRows())
 
 		c := querycount.Attach(t, db)
@@ -559,8 +559,9 @@ func TestGormContentRepository_List(t *testing.T) {
 		{"max view count", &domain.ContentFilter{MaxViewCount: cInt(9000)}, `'statistics'->>'viewCount'.*<= `},
 		{"min like count", &domain.ContentFilter{MinLikeCount: cInt(10)}, `'statistics'->>'likeCount'.*>= `},
 		{"max like count", &domain.ContentFilter{MaxLikeCount: cInt(90)}, `'statistics'->>'likeCount'.*<= `},
-		{"published after", &domain.ContentFilter{PublishedAfter: cStr("2026-01-01")}, `'snippet'->>'publishedAt' >= `},
-		{"published before", &domain.ContentFilter{PublishedBefore: cStr("2026-12-31")}, `'snippet'->>'publishedAt' <= `},
+		// The filter reads the same published-date expression as the sort, so a web page filters by its own date.
+		{"published after", &domain.ContentFilter{PublishedAfter: cStr("2026-01-01")}, `THEN response->>'publishedAt' ELSE response->'items'->0->'snippet'->>'publishedAt' END >= `},
+		{"published before", &domain.ContentFilter{PublishedBefore: cStr("2026-12-31")}, `THEN response->>'publishedAt' ELSE response->'items'->0->'snippet'->>'publishedAt' END <= `},
 		{"channel title", &domain.ContentFilter{ChannelTitle: cStr("chan")}, `'snippet'->>'channelTitle' ILIKE `},
 		{"tag contains", &domain.ContentFilter{TagContains: cStr("tag")}, `'snippet'->'tags'.*ILIKE `},
 		{"description search", &domain.ContentFilter{DescriptionSearch: cStr("desc")}, `'snippet'->>'description' ILIKE `},

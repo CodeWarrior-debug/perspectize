@@ -13,16 +13,16 @@ type Identity struct {
 
 // EventEnvelope is the decoded pg_notify('thread_events', ...) payload.
 type EventEnvelope struct {
-	Type      string `json:"type"`
-	ThreadID  int    `json:"thread_id"`
-	Seq       int64  `json:"seq"`
-	MessageID int64  `json:"message_id"`
+	Type      EventKind `json:"type"`
+	ThreadID  int       `json:"thread_id"`
+	Seq       int64     `json:"seq"`
+	MessageID int64     `json:"message_id"`
 	// Ephemeral-only fields (absent for MESSAGE_POSTED):
-	UserID      int    `json:"user_id,omitempty"`
-	Typing      bool   `json:"typing,omitempty"`
-	LastReadSeq int64  `json:"last_read_seq,omitempty"`
-	Change      string `json:"change,omitempty"`
-	State       string `json:"state,omitempty"`
+	UserID      int               `json:"user_id,omitempty"`
+	Typing      bool              `json:"typing,omitempty"`
+	LastReadSeq int64             `json:"last_read_seq,omitempty"`
+	Change      ParticipantChange `json:"change,omitempty"`
+	State       PresenceState     `json:"state,omitempty"`
 }
 
 // ThreadEvent is a marker interface for events delivered on a thread's real-time event stream.
@@ -49,7 +49,7 @@ type TypingChangedEvent struct {
 type ParticipantChangedEvent struct {
 	ThreadID int
 	UserID   int
-	Change   string // "ADDED" | "REMOVED"
+	Change   ParticipantChange
 }
 
 // PresenceChangedEvent is delivered when a participant's presence state changes.

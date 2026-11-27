@@ -3,7 +3,8 @@
 	import ListXIcon from '@lucide/svelte/icons/list-x';
 	import type { GridApi } from '@ag-grid-community/core';
 	import { formatDurationSeconds, formatBoxOffice } from '#lib/utils/formatting.js';
-	import { COLUMN_LABELS, liveGridApi, setFilterValueLabel } from '#lib/utils/grid-config.js';
+	import { liveGridApi, setFilterValueLabel } from '#lib/utils/grid-config.js';
+	import { COLUMN_LABELS } from '#lib/utils/libraryColumns/index.js';
 
 	interface FilterChip {
 		colId: string;

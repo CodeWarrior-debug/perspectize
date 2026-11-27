@@ -81,14 +81,14 @@ func (m *mockPerspectiveRepository) CountVisibleByContentIDs(ctx context.Context
 	return map[int]int{}, nil
 }
 
-func (m *mockPerspectiveRepository) FeelingStats(ctx context.Context, contentID *int, emoji string, label *string) (*domain.FeelingStats, error) {
+func (m *mockPerspectiveRepository) FeelingStats(ctx context.Context, contentID *int, emoji string, label *string, viewerID *int) (*domain.FeelingStats, error) {
 	if m.feelingStatsFn != nil {
 		return m.feelingStatsFn(ctx, contentID, emoji, label)
 	}
 	return &domain.FeelingStats{Emoji: emoji, Label: label}, nil
 }
 
-func (m *mockPerspectiveRepository) CustomFieldStats(ctx context.Context, contentID *int, key string) (*domain.CustomFieldStats, error) {
+func (m *mockPerspectiveRepository) CustomFieldStats(ctx context.Context, contentID *int, key string, viewerID *int) (*domain.CustomFieldStats, error) {
 	if m.customFieldStatsFn != nil {
 		return m.customFieldStatsFn(ctx, contentID, key)
 	}
@@ -807,7 +807,7 @@ func TestPerspectiveService_FeelingStats(t *testing.T) {
 		svc := services.NewPerspectiveService(repo, &mockUserRepoForPerspective{})
 
 		label := "Love"
-		got, err := svc.FeelingStats(ctx, &contentID, "🥰", &label)
+		got, err := svc.FeelingStats(ctx, &contentID, "🥰", &label, nil)
 		require.NoError(t, err)
 		assert.Equal(t, 3, got.Count)
 		assert.Equal(t, 10, got.TotalPerspectives)
@@ -819,7 +819,7 @@ func TestPerspectiveService_FeelingStats(t *testing.T) {
 
 	t.Run("rejects an empty emoji", func(t *testing.T) {
 		svc := services.NewPerspectiveService(&mockPerspectiveRepository{}, &mockUserRepoForPerspective{})
-		_, err := svc.FeelingStats(ctx, nil, "", nil)
+		_, err := svc.FeelingStats(ctx, nil, "", nil, nil)
 		require.Error(t, err)
 		assert.ErrorIs(t, err, domain.ErrInvalidInput)
 	})
@@ -831,7 +831,7 @@ func TestPerspectiveService_FeelingStats(t *testing.T) {
 			},
 		}
 		svc := services.NewPerspectiveService(repo, &mockUserRepoForPerspective{})
-		_, err := svc.FeelingStats(ctx, nil, "🥰", nil)
+		_, err := svc.FeelingStats(ctx, nil, "🥰", nil, nil)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "db exploded")
 	})
@@ -850,7 +850,7 @@ func TestPerspectiveService_CustomFieldStats(t *testing.T) {
 		}
 		svc := services.NewPerspectiveService(repo, &mockUserRepoForPerspective{})
 
-		got, err := svc.CustomFieldStats(ctx, nil, "mood")
+		got, err := svc.CustomFieldStats(ctx, nil, "mood", nil)
 		require.NoError(t, err)
 		assert.Equal(t, 5, got.Count)
 		require.NotNil(t, got.PercentOfPerspectives())
@@ -859,7 +859,7 @@ func TestPerspectiveService_CustomFieldStats(t *testing.T) {
 
 	t.Run("rejects an empty key", func(t *testing.T) {
 		svc := services.NewPerspectiveService(&mockPerspectiveRepository{}, &mockUserRepoForPerspective{})
-		_, err := svc.CustomFieldStats(ctx, nil, "")
+		_, err := svc.CustomFieldStats(ctx, nil, "", nil)
 		require.Error(t, err)
 		assert.ErrorIs(t, err, domain.ErrInvalidInput)
 	})

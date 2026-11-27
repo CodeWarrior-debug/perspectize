@@ -243,7 +243,7 @@ describe('column charts on the activity grid', () => {
 				.toBe(true);
 			// The chart follows the filtered rows: 25M, 40M, 90M of the 5.
 			(chartButton() as HTMLElement).click();
-			await expect.element(browserPage.getByText('based on 3 loaded movies')).toBeVisible();
+			await expect.element(browserPage.getByText('based on 3 loaded movies · 0 empty')).toBeVisible();
 		});
 
 		it('names each chart button after its column header', async () => {
